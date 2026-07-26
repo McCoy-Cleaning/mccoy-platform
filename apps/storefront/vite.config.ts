@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
+import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { loadMonorepoEnvPlugin } from "../../scripts/vite-load-monorepo-env";
@@ -14,9 +15,11 @@ import { nodeBuiltinClientShimPlugin } from "../../scripts/vite-node-builtin-cli
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.resolve(__dirname, "../..");
 
-// No Nitro/Cloudflare build step — the deploy target is TanStack's Node
-// server entry (`dist/server/server.js`), used by both `vite preview` and
-// Playwright E2E.
+// Local `vite preview` / Playwright need TanStack's Node entry
+// (`dist/server/server.js`). Vercel requires Nitro for TanStack Start routing
+// (otherwise the platform returns 404: NOT_FOUND). VERCEL=1 is set on Vercel builds.
+const useNitroForVercel = Boolean(process.env.VERCEL);
+
 export default defineConfig(({ command, mode }) => {
   const isDevBuild = command === "build" && mode === "development";
 
@@ -45,6 +48,7 @@ export default defineConfig(({ command, mode }) => {
           client: { files: ["**/server/**"], specifiers: ["server-only"] },
         },
       }),
+      ...(useNitroForVercel ? [nitro()] : []),
       viteReact(),
       loadMonorepoEnvPlugin(monorepoRoot),
       reactDomServerShimPlugin(),
