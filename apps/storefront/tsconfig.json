@@ -1,0 +1,33 @@
+{
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@mccoy/domain": ["../../packages/domain/src/index.ts"],
+      "@mccoy/validation": ["../../packages/validation/src/index.ts"],
+      "@mccoy/database": ["../../packages/database/src/index.ts"],
+      "@mccoy/database/client": ["../../packages/database/src/client.ts"],
+      "@mccoy/database/server": ["../../packages/database/src/server.ts"],
+      "@mccoy/email": ["../../packages/email/src/index.ts"],
+      "@mccoy/email/contracts": ["../../packages/email/src/contracts.ts"],
+      "@mccoy/email/server": ["../../packages/email/src/server.ts"],
+      "@mccoy/security": ["../../packages/security/src/index.ts"],
+      "@mccoy/ui": ["../../packages/ui/src/index.ts"]
+    }
+  }
+}

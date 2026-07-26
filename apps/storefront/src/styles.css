@@ -1,0 +1,332 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@source "../../../packages/ui/src";
+/* CMS blocks live in cms-renderer — without this, SectionShell/title/gap utilities are purged. */
+@source "../../../packages/cms-renderer/src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.875rem;
+  /* McCoy Cleaning brand — dark navy with cyan accent */
+  --background: oklch(0.16 0.045 260);
+  --foreground: oklch(0.985 0.005 240);
+  --card: oklch(0.21 0.05 260);
+  --card-foreground: oklch(0.985 0.005 240);
+  --popover: oklch(0.21 0.05 260);
+  --popover-foreground: oklch(0.985 0.005 240);
+  --primary: oklch(0.78 0.16 235);
+  --primary-foreground: oklch(0.16 0.045 260);
+  --secondary: oklch(0.28 0.06 260);
+  --secondary-foreground: oklch(0.985 0.005 240);
+  --muted: oklch(0.24 0.045 260);
+  --muted-foreground: oklch(0.72 0.03 240);
+  --accent: oklch(0.78 0.16 235);
+  --accent-foreground: oklch(0.16 0.045 260);
+  --destructive: oklch(0.65 0.23 25);
+  --destructive-foreground: oklch(0.985 0.005 240);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.78 0.16 235);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family:
+      "Helvetica Neue",
+      Helvetica,
+      "Arial",
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .font-display {
+    font-family: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    letter-spacing: -0.03em;
+  }
+  .font-sans-helv {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+}
+
+/* utilities */
+.bg-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(63, 182, 242, 0.1) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+.glow {
+  box-shadow:
+    0 0 40px -10px rgba(63, 182, 242, 0.5),
+    0 0 80px -30px rgba(63, 182, 242, 0.35);
+}
+
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+.animate-marquee {
+  animation: marquee 90s linear infinite;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  contain: layout paint style;
+}
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+.service-modal-panel {
+  left: 50%;
+  top: 50%;
+  width: calc(100vw - 1.5rem);
+  max-height: min(46rem, calc(100vh - 5rem));
+  transform: translate3d(-50%, -50%, 0);
+  backface-visibility: hidden;
+  overscroll-behavior: contain;
+}
+@supports (height: 100svh) {
+  .service-modal-panel {
+    max-height: min(46rem, calc(100svh - 5rem));
+  }
+}
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 4rem,
+    #000 calc(100% - 4rem),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 4rem,
+    #000 calc(100% - 4rem),
+    transparent
+  );
+}
+.partner-logo-card {
+  /* Match former Tailwind h-24 w-40 / sm:h-28 sm:w-48 — not the 300px clamp. */
+  width: 10rem;
+  height: 6rem;
+  padding: 0.875rem 1rem;
+  box-sizing: border-box;
+  contain: layout paint;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Inline style sets the matte; never force white here. */
+  background-color: transparent;
+}
+@media (min-width: 640px) {
+  .partner-logo-card {
+    width: 12rem;
+    height: 7rem;
+  }
+}
+/*
+ * Flex containment (not absolute + translate) so unloaded images don’t stay
+ * 0×0 then pop, and so the marquee isn’t animating nested non-composited
+ * transforms on every logo.
+ */
+.partner-logo-picture {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.partner-logo-card img,
+.partner-logo-img {
+  max-width: 84%;
+  max-height: 78%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.notranslate [data-label]::before,
+[translate="no"] [data-label]::before {
+  content: attr(data-label);
+}
+
+@keyframes mm-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .animate-marquee {
+    /* Slightly slower + no will-change thrash on small screens */
+    animation-duration: 120s;
+  }
+
+  .marquee-mask {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 4.5rem,
+      #000 calc(100% - 4.5rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 4.5rem,
+      #000 calc(100% - 4.5rem),
+      transparent
+    );
+  }
+}
+
+@media (min-width: 640px) {
+  .service-modal-panel {
+    width: calc(100vw - 4rem);
+    max-height: calc(100vh - 4rem);
+  }
+}
+
+@supports (height: 100svh) {
+  @media (min-width: 640px) {
+    .service-modal-panel {
+      max-height: calc(100svh - 4rem);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+    transform: none;
+  }
+}
