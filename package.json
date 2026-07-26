@@ -1,0 +1,51 @@
+{
+  "name": "mccoy",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mccoy/storefront",
+    "dev:storefront": "npm run dev -w @mccoy/storefront",
+    "dev:admin": "npm run dev -w @mccoy/admin",
+    "build": "npm run build -w @mccoy/storefront",
+    "build:storefront": "npm run build -w @mccoy/storefront",
+    "build:admin": "npm run build -w @mccoy/admin",
+    "preview:storefront": "npm run preview -w @mccoy/storefront",
+    "preview:admin": "npm run preview -w @mccoy/admin",
+    "start:storefront": "npm run start -w @mccoy/storefront",
+    "start:admin": "npm run start -w @mccoy/admin",
+    "typecheck": "npm run typecheck -w @mccoy/domain && npm run typecheck -w @mccoy/validation && npm run typecheck -w @mccoy/cms-schema && npm run typecheck -w @mccoy/cms-renderer && npm run typecheck -w @mccoy/cms-editor && npm run typecheck -w @mccoy/content-ai && npm run typecheck -w @mccoy/security && npm run typecheck -w @mccoy/notifications && npm run typecheck -w @mccoy/database && npm run typecheck -w @mccoy/email && npm run typecheck -w @mccoy/ui && npm run typecheck -w @mccoy/storefront && npm run typecheck -w @mccoy/admin",
+    "typecheck:packages": "npm run typecheck -w @mccoy/domain && npm run typecheck -w @mccoy/validation && npm run typecheck -w @mccoy/cms-schema && npm run typecheck -w @mccoy/cms-renderer && npm run typecheck -w @mccoy/cms-editor && npm run typecheck -w @mccoy/content-ai && npm run typecheck -w @mccoy/security && npm run typecheck -w @mccoy/notifications && npm run typecheck -w @mccoy/database && npm run typecheck -w @mccoy/email && npm run typecheck -w @mccoy/ui",
+    "typecheck:apps": "npm run typecheck -w @mccoy/storefront && npm run typecheck -w @mccoy/admin",
+    "check:shared": "npm run typecheck -w @mccoy/domain && npm run typecheck -w @mccoy/validation && npm run typecheck -w @mccoy/cms-schema && npm run typecheck -w @mccoy/cms-renderer && npm run typecheck -w @mccoy/cms-editor && npm run typecheck -w @mccoy/security && npm run typecheck -w @mccoy/notifications && npm run typecheck -w @mccoy/database && npm run typecheck -w @mccoy/email && npm run typecheck -w @mccoy/ui && npm run test -w @mccoy/cms-schema && npm run test -w @mccoy/cms-renderer && npm run test -w @mccoy/cms-editor && npm run test -w @mccoy/notifications && npm run test -w @mccoy/database",
+    "check:admin": "npm run typecheck -w @mccoy/content-ai && npm run typecheck -w @mccoy/admin && npm run build -w @mccoy/admin",
+    "check:storefront": "npm run typecheck -w @mccoy/storefront && npm run build -w @mccoy/storefront",
+    "lint": "npm run lint -w @mccoy/storefront",
+    "format": "prettier --write .",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:ui": "playwright test --project=chromium --ui",
+    "test:e2e:update-snapshots": "playwright test --project=chromium --update-snapshots",
+    "test:e2e:brave": "playwright test --project=brave-smoke",
+    "test:e2e:smoke": "playwright test --project=chromium e2e/smoke.p0.spec.ts",
+    "test:e2e:forms": "playwright test --project=chromium e2e/forms-aanvragen.spec.ts",
+    "test:e2e:quality": "playwright test --project=chromium e2e/a11y.critical.spec.ts e2e/responsive.spec.ts e2e/resilience.spec.ts e2e/security.browser.spec.ts",
+    "test:e2e:ci": "playwright test --project=chromium --reporter=list",
+    "test:e2e:fuller": "playwright test --project=chromium --reporter=list --grep-invert \"pixel screenshots|Brave\"",
+    "test:e2e:locale": "playwright test --project=chromium e2e/cms-locale-en-publish.spec.ts e2e/public-locale.spec.ts",
+    "test:e2e:coverage": "playwright test --project=chromium e2e/cms-field-coverage.spec.ts e2e/cms-add-sections.spec.ts",
+    "test:unit:email": "npm run test -w @mccoy/email"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "@playwright/test": "1.57.0",
+    "prettier": "^3.7.3",
+    "sharp": "^0.34.2",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

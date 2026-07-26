@@ -1,0 +1,22 @@
+# McCoy Supabase local/CLI config
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "mccoy"
+
+[api]
+enabled = true
+# private is reachable only with service_role grants (anon/authenticated have no USAGE/table rights).
+schemas = ["public", "private", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+
+[auth]
+enabled = true
+enable_signup = false

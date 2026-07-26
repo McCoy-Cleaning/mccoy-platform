@@ -1,0 +1,19 @@
+# McCoy Cleaning
+
+> Professioneel schoonmaakbedrijf in Twente (Oldenzaal). Kantoorschoonmaak, glasbewassing, vloeronderhoud, horeca- en opleveringsschoonmaak door een vast eigen team.
+
+## Pages
+
+- [Home](/): Overzicht van McCoy Cleaning en de regio Twente.
+- [Diensten](/services): Kantoorschoonmaak, glasbewassing, vloeronderhoud, horeca en oplevering.
+- [Over ons](/about): Missie, visie en geschiedenis sinds 1998.
+- [Producten](/products): McCoy Cleaning Products — geurdispensers en periodieke service.
+- [Vacatures](/vacatures): Werken bij McCoy — schoonmaakmedewerker, glazenwasser, oproepkracht.
+- [Offerte](/offerte): Vraag direct een offerte aan.
+- [Contact](/contact): Contactgegevens en adres in Oldenzaal.
+- [Schoonmaakbedrijf Enschede](/schoonmaakbedrijf-enschede): Lokale landingspagina voor bedrijven in Enschede.
+- [Schoonmaakbedrijf Hengelo](/schoonmaakbedrijf-hengelo): Lokale landingspagina voor bedrijven in Hengelo.
+
+## Optional
+
+- [Voorwaarden](/terms): Algemene voorwaarden.

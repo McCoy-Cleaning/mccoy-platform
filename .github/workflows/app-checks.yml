@@ -1,0 +1,113 @@
+# Independent Admin / Storefront checks with stable job names.
+# Jobs always report; heavy work is skipped when the path set is unaffected.
+# Do not remove these job names from branch protection when adding path logic.
+
+name: App checks
+
+on:
+  push:
+    branches: [main, master, staging]
+  pull_request:
+
+concurrency:
+  group: app-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      admin: ${{ steps.filter.outputs.admin }}
+      storefront: ${{ steps.filter.outputs.storefront }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            admin:
+              - 'apps/admin/**'
+              - 'packages/content-ai/**'
+              - 'packages/cms-editor/**'
+            storefront:
+              - 'apps/storefront/**'
+            shared:
+              - 'packages/cms-schema/**'
+              - 'packages/cms-renderer/**'
+              - 'packages/database/**'
+              - 'packages/domain/**'
+              - 'packages/email/**'
+              - 'packages/security/**'
+              - 'packages/ui/**'
+              - 'packages/validation/**'
+              - 'supabase/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'scripts/**'
+              - 'playwright.config.ts'
+              - 'e2e/**'
+              - '.github/workflows/**'
+
+  admin-checks:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.shared == 'true'
+        run: npm ci
+      - name: Admin typecheck + build
+        if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.shared == 'true'
+        run: npm run check:admin
+      - name: Skip (Admin unaffected)
+        if: needs.changes.outputs.admin != 'true' && needs.changes.outputs.shared != 'true'
+        run: echo "Admin checks skipped — no Admin or shared paths changed."
+
+  storefront-checks:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        if: needs.changes.outputs.storefront == 'true' || needs.changes.outputs.shared == 'true'
+        run: npm ci
+      - name: Storefront typecheck + build
+        if: needs.changes.outputs.storefront == 'true' || needs.changes.outputs.shared == 'true'
+        run: npm run check:storefront
+      - name: Skip (Storefront unaffected)
+        if: needs.changes.outputs.storefront != 'true' && needs.changes.outputs.shared != 'true'
+        run: echo "Storefront checks skipped — no Storefront or shared paths changed."
+
+  shared-checks:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.admin == 'true' || needs.changes.outputs.storefront == 'true'
+        run: npm ci
+      - name: Shared package typecheck + unit tests
+        if: needs.changes.outputs.shared == 'true'
+        run: npm run check:shared
+      - name: Bundle boundary — cms-editor never enters Storefront
+        if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.storefront == 'true' || needs.changes.outputs.admin == 'true'
+        run: npm run test -w @mccoy/cms-schema -- --run src/no-static-cms-editor-import.test.ts
+      - name: Skip (no relevant package/app changes)
+        if: needs.changes.outputs.shared != 'true' && needs.changes.outputs.admin != 'true' && needs.changes.outputs.storefront != 'true'
+        run: echo "Shared checks skipped — docs-only or unrelated paths."

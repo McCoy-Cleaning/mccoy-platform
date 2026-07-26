@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "files": [],
+  "references": [
+    { "path": "./apps/storefront" },
+    { "path": "./apps/admin" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/validation" },
+    { "path": "./packages/database" },
+    { "path": "./packages/email" },
+    { "path": "./packages/security" },
+    { "path": "./packages/ui" }
+  ]
+}

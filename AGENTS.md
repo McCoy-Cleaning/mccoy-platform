@@ -1,0 +1,1005 @@
+```
+# McCoy Platform — Persistent Engineering Instructions
+
+## Purpose
+
+Apply these instructions to every implementation, refactor, review, migration, and deployment in this repository.
+
+The platform must consistently prioritize:
+
+- Premium design and UX
+- Security and privacy
+- Correct architecture
+- Database integrity
+- Performance and scalability
+- Accessibility
+- Maintainability
+- Reliable payments and order processing
+
+Before changing code, inspect the relevant existing implementation, tests, migrations, types, and documentation. Do not invent business rules involving money, VAT, invoices, shipping, inventory, permissions, or legal records.
+
+---
+
+## Product context
+
+McCoy is a custom B2B ecommerce platform with:
+
+- Public storefront
+- Guest checkout
+- Company-only registration
+- Customer portal
+- McCoy admin dashboard
+- Public products and public base prices
+- Product customers and McCoy service clients
+- Company-specific pricing where configured
+- Company-specific curated product lists
+- Favorites, saved lists, last bought, frequently bought, and reorder features
+- Mollie online payments
+- Invoice ordering for eligible registered companies
+- Product, company, order, inventory, payment, request, and reporting administration
+- Website forms stored as structured admin requests while still sending email notifications
+
+### Guest
+
+- Can browse all public products and prices
+- Can order without registering
+- Can pay online only
+- Cannot pay by invoice
+- Has no customer portal or company-specific benefits
+
+### Registered product customer
+
+- Registers as a company
+- Provides KVK number and VAT identification number separately
+- Must verify email
+- Starts as `product_customer`
+- Has customer portal access
+- Can pay online
+- Can pay by invoice only when server-side policy permits it
+
+### Registered service client
+
+- Has all product-customer functionality
+- Is represented as `service_client`
+- May receive company-specific prices
+- May receive curated standard, optional, recommended, or pinned product lists
+- May receive special payment terms and enhanced reorder features
+- Benefits remain configurable per company
+
+The first UI may support one user per company, but the data model must support multiple users per company later.
+
+---
+
+## Engineering priorities
+
+Use this priority order when requirements conflict:
+
+1. Prevent security incidents, data loss, or financial corruption
+2. Preserve payment, order, tax, stock, and audit integrity
+3. Follow approved business requirements
+4. Follow this file
+5. Follow documented architecture decisions
+6. Follow repository conventions
+7. Follow framework conventions
+
+Prefer:
+
+- Server-enforced rules over frontend assumptions
+- Explicit behavior over hidden magic
+- Small cohesive modules over large multipurpose files
+- Database constraints over application-only validation
+- Idempotent operations over best-effort duplicate checks
+- Immutable financial history over rewriting records
+- Versioned migrations over manual database edits
+- Secure defaults over convenience
+- Measured optimization over speculative complexity
+
+---
+
+## Architecture
+
+Keep clear boundaries between:
+
+- UI and presentation
+- Application use cases
+- Domain/business rules
+- Data access
+- External integrations
+- Infrastructure and configuration
+
+The browser is untrusted.
+
+Privileged behavior must run in trusted server code such as server routes, Vercel Functions, Supabase Edge Functions, or backend workers.
+
+Never place sensitive business rules exclusively in React components.
+
+Do not access the database directly from arbitrary UI components. Use a defined service or data-access layer.
+
+Do not change the framework, authentication provider, database strategy, payment provider, hosting model, or major state-management approach without an approved architecture decision.
+
+---
+
+## TypeScript and code quality
+
+- Use TypeScript strict mode
+- Avoid `any`; narrow unknown external data immediately
+- Validate all external input at runtime
+- Use clear domain-based names
+- Keep functions focused and testable
+- Use explicit state types or discriminated unions
+- Never ignore rejected promises
+- Never swallow errors without deliberate handling and logging
+- Remove debug output, dead code, placeholder credentials, and abandoned implementations
+- Keep domain logic independent from UI libraries
+- Add comments only for constraints, risks, or non-obvious reasoning
+- Do not add dependencies without reviewing necessity, maintenance, license, and security posture
+
+---
+
+## Security
+
+### Authentication
+
+- Require email verification for company accounts
+- Require MFA for McCoy admin accounts
+- Use provider-managed secure sessions
+- Implement secure password reset
+- Avoid account enumeration
+- Reauthenticate for high-risk actions where appropriate
+- Revoke staff access promptly when no longer needed
+
+### Authorization
+
+Authentication is not authorization.
+
+- Enforce authorization in trusted server code and the database
+- Never rely on hidden buttons, route guards, local storage, or frontend role values
+- Resolve company membership from the authenticated identity
+- Never trust a browser-supplied `company_id` for sensitive actions
+- Apply least privilege and deny by default
+- Test that Company A cannot access Company B data
+- Test that customers cannot invoke admin operations
+
+### Supabase/PostgreSQL
+
+- Enable Row Level Security on every client-accessible table
+- Create explicit policies for select, insert, update, and delete
+- Test RLS policies
+- Keep service-role keys server-side only
+- Never disable RLS as a shortcut
+- Never use privileged Supabase keys from the browser
+
+### Secrets
+
+Never expose or commit:
+
+- Supabase service-role keys
+- Mollie API keys
+- Email-provider keys
+- Database passwords
+- Webhook secrets
+- Private storage secrets
+- Admin bootstrap credentials
+- Production tokens
+
+Use environment variables and approved secret stores. Keep `.env.example` free of real values.
+
+### Input and web security
+
+- Validate every request server-side
+- Apply type, format, range, and length limits
+- Escape user-generated content
+- Never render customer messages as unsafe HTML
+- Rate-limit login, registration, password reset, forms, checkout, payment creation, and sensitive APIs
+- Add bot protection where warranted
+- Validate uploads by MIME type, extension, size, and authorization
+- Store private files in private buckets
+- Restrict CORS to required origins
+- Use appropriate CSRF/origin protections
+- Do not reveal stack traces, SQL errors, internal paths, or provider internals to users
+- Protect staging and preview deployments
+- Do not use production customer data in normal development or previews
+
+### Audit logging
+
+Audit security-sensitive admin actions, including:
+
+- Company type changes
+- Invoice permission changes
+- Payment-term changes
+- Custom-price changes
+- Company-product-list changes
+- Role and permission changes
+- Account blocking
+- Manual payment marking
+- Order cancellation
+- Refunds
+- Inventory adjustments
+- Sensitive company-data changes
+
+Include actor, action, target, timestamp, correlation ID, and before/after values where appropriate.
+
+---
+
+## Database standards
+
+- Use PostgreSQL as source of truth
+- Use UUID primary keys internally unless documented otherwise
+- Use separate human-readable order, invoice, shipment, and request numbers
+- Store timestamps in UTC
+- Store money as integer minor units, never floating point
+- Store ISO currency codes
+- Use snake_case database identifiers
+- Add foreign keys, check constraints, unique constraints, and appropriate indexes
+- Archive referenced records instead of deleting them
+- Use transactions for multi-step financial, inventory, payment, and order operations
+- Use version-controlled migrations only
+- Never make undocumented production schema changes
+- Separate risky schema changes, backfills, and destructive cleanup
+
+### Company ownership
+
+Model company membership explicitly, for example through `company_users`.
+
+Do not rely solely on mutable profile metadata for company identity.
+
+Every company-owned record must have ownership that can be enforced through foreign keys and RLS.
+
+### Historical snapshots
+
+Orders must snapshot purchase-time values:
+
+- Product name
+- SKU
+- Variant description
+- Quantity
+- Unit price
+- Discount
+- VAT rate
+- VAT amount
+- Line total
+- Billing address
+- Shipping address
+- Relevant company legal details
+
+Later changes must never rewrite historical orders.
+
+### Statuses
+
+Keep separate state machines for:
+
+- Order status
+- Payment status
+- Fulfilment status
+- Invoice status where applicable
+- Request status
+
+Do not overload one generic status field.
+
+---
+
+## KVK and VAT registration behavior
+
+Registration is for companies only.
+
+Expected flow:
+
+1. User enters the eight-digit KVK number
+2. Trusted server code queries the KVK API
+3. Returned company information is shown for confirmation
+4. User separately enters the VAT identification number
+5. VAT format and optional VIES verification are performed
+6. User enters contact, billing, and shipping details
+7. Terms acceptance and privacy acknowledgement are recorded
+8. Email verification completes
+9. Company activates as `product_customer`
+
+Do not assume the KVK API returns the VAT number.
+
+Do not derive or guess a VAT number from KVK or RSIN data.
+
+Track VAT verification explicitly, for example:
+
+- `unverified`
+- `valid`
+- `invalid`
+- `verification_unavailable`
+- `manually_approved`
+
+Company identifiers must never automatically grant service-client status, custom pricing, or invoice permission.
+
+---
+
+## Pricing
+
+All authoritative pricing must be calculated in trusted server code.
+
+The client may send only identifiers and quantities. Never trust client-submitted:
+
+- Unit price
+- Discount
+- Company price
+- VAT
+- Shipping
+- Total
+- Company type
+- Invoice eligibility
+- Payment status
+
+Recommended pricing precedence:
+
+1. Exact company-product override
+2. Assigned company price list
+3. Approved company/group discount
+4. Public base price
+
+Do not stack discounts unless an approved rule defines how.
+
+Recalculate prices when:
+
+- Cart loads
+- Quantity changes
+- Before checkout
+- Immediately before order/payment creation
+- Reordering
+
+Notify customers clearly when prices change.
+
+---
+
+## Products and inventory
+
+Use product lifecycle states such as:
+
+- `draft`
+- `active`
+- `archived`
+
+Archived products remain available to historical records but cannot be newly purchased.
+
+For exact stock:
+
+- Cart addition does not permanently reserve inventory
+- Checkout creates an approved time-limited reservation
+- Failed, cancelled, or expired payments release reservations
+- Successful payments finalize deductions
+- Invoice orders apply the approved stock rule
+- Every manual stock change creates an inventory movement
+- Use atomic operations or database locking to prevent overselling
+
+Never use an unprotected read-modify-write sequence for stock.
+
+---
+
+## Cart and checkout
+
+### Guest cart
+
+- May be stored locally
+- Contains no authoritative price
+- Is fully revalidated by the server
+- Supports online payment only
+
+### Registered-company cart
+
+- May persist in the database where included in scope
+- Uses company identity from authenticated membership
+- Uses current server-calculated pricing
+
+At checkout validate:
+
+- Product/variant is active
+- Quantity is permitted
+- Stock is available
+- Current price is valid
+- Company benefits remain active
+- Invoice permission remains active
+- VAT is correct
+- Shipping method/destination is valid
+- Required terms are accepted
+
+Order creation must be transactional and idempotent.
+
+Prevent duplicate submission and duplicate checkout execution.
+
+---
+
+## Mollie payments
+
+All Mollie API operations must run in trusted backend code.
+
+Required flow:
+
+1. Validate checkout
+2. Recalculate totals
+3. Create pending order
+4. Reserve stock if applicable
+5. Create Mollie payment server-side
+6. Store payment ID, expected amount, and currency
+7. Redirect customer to Mollie
+8. Receive webhook
+9. Retrieve current payment state directly from Mollie
+10. Verify relation, amount, currency, and state
+11. Apply an idempotent transition
+12. Finalize stock and fulfilment readiness
+13. Queue customer and admin notifications
+
+The return URL is never proof of payment.
+
+Assume webhooks may be duplicated, delayed, retried, or reordered.
+
+Never deduct stock twice, send duplicate confirmations, or create duplicate orders.
+
+Use Mollie test mode outside production. Preview deployments must never use live payment credentials.
+
+---
+
+## Invoice ordering
+
+Guests can never use invoice payment.
+
+Invoice checkout requires:
+
+- Authenticated user
+- Verified email
+- Active company membership
+- Server-side `invoice_allowed` permission
+- Company not blocked from invoice ordering
+- Valid payment terms
+- Current server-calculated totals
+
+Never trust client-supplied invoice eligibility.
+
+Manual payment marking must be restricted and audited.
+
+The legally authoritative invoice system must be explicitly documented. Do not accidentally create a legal invoice engine as a side effect of basic order confirmation.
+
+---
+
+## Customer portal and company experience
+
+Possible portal modules:
+
+- Overview
+- Orders and details
+- Reorder
+- Last bought
+- Frequently bought
+- Favorites
+- Saved lists
+- Addresses
+- Company details
+- Invoice/order documents
+- Website requests
+- Account security
+
+Reorders must use current products, prices, VAT, stock, quantity rules, and permissions.
+
+Saved lists store references and preferred quantities, not guaranteed prices.
+
+All catalogue products and public base prices remain publicly visible unless an approved requirement changes this.
+
+Company-specific lists are curated convenience views, not security boundaries by default.
+
+Do not assume every service client has every benefit.
+
+Audit changes to client type, prices, lists, invoice permission, and payment terms.
+
+---
+
+## Website forms and admin requests
+
+Existing forms should:
+
+1. Validate and rate-limit
+2. Apply spam protection where appropriate
+3. Save a structured request
+4. Queue an email notification
+5. Display the request in the admin dashboard
+6. Link it to a company only when authenticated membership proves the relationship
+
+Do not associate guest submissions with a company solely by matching an email address.
+
+Always escape customer-entered content when displaying it.
+
+---
+
+## Admin application
+
+Admin functionality is privileged and must be server-authorized.
+
+Potential modules:
+
+- Dashboard
+- Products and categories
+- Inventory
+- Companies and users
+- Service-client configuration
+- Pricing and price lists
+- Company product lists
+- Orders
+- Payments
+- Invoice orders
+- Shipments
+- Website requests
+- Reports
+- Audit logs
+- Staff and permissions
+- System settings
+
+Admin UX must:
+
+- Confirm destructive actions
+- Explain consequences
+- Show current and proposed values
+- Prevent duplicate submission
+- Include search, filtering, pagination, loading, empty, success, and recoverable error states
+- Hide unavailable controls for clarity while still enforcing permissions server-side
+- Require audit reasons for high-risk overrides where appropriate
+
+---
+
+## Premium design
+
+The platform must feel deliberate, trustworthy, modern, and premium—not like a generic template.
+
+### Design system
+
+Use consistent tokens for:
+
+- Typography
+- Spacing
+- Layout widths
+- Color
+- Borders
+- Radius
+- Elevation
+- Motion
+- Breakpoints
+
+Avoid one-off styling that bypasses the design system.
+
+Use a restrained visual language. Avoid excessive gradients, glass effects, shadows, decorative icons, animation, and dashboard clutter.
+
+Maintain:
+
+- Strong hierarchy
+- Excellent readability
+- Generous but efficient spacing
+- Consistent component behavior
+- High-quality responsive layouts
+- Realistic content lengths
+- Polished empty and error states
+
+### Interaction states
+
+Every interactive feature must handle:
+
+- Default
+- Hover
+- Keyboard focus
+- Loading
+- Empty
+- Success
+- Validation
+- Recoverable error
+- Disabled
+- Permission denied where relevant
+
+Give immediate feedback, prevent layout shift and double actions, and preserve form data after recoverable errors.
+
+Keep checkout focused and make repeat ordering fast.
+
+### Responsive behavior
+
+- Design mobile-first
+- Do not merely shrink desktop layouts
+- Give tables a deliberate mobile strategy
+- Ensure admin screens work on ordinary laptop widths
+- Use sufficiently large touch targets
+- Keep navigation keyboard and screen-reader accessible
+
+### Motion
+
+- Motion must communicate state or hierarchy
+- Keep transitions subtle and fast
+- Respect `prefers-reduced-motion`
+- Avoid decorative or blocking animation in checkout and admin workflows
+
+---
+
+## Accessibility
+
+Target WCAG 2.2 AA behavior.
+
+- Use semantic HTML
+- Maintain logical heading structure
+- Provide visible focus
+- Make every control keyboard operable
+- Use correct labels and accessible names
+- Do not rely on color alone
+- Maintain adequate contrast
+- Announce validation and asynchronous status changes
+- Use accessible dialogs, menus, tabs, tables, and comboboxes
+- Provide meaningful alt text
+- Support zoom and text resizing
+- Test critical flows with keyboard navigation
+- Run automated accessibility checks
+
+Accessibility regressions block completion.
+
+---
+
+## Performance and optimization
+
+Measure material changes.
+
+### Frontend
+
+- Minimize client-side JavaScript
+- Prefer server rendering or static generation where appropriate
+- Split storefront and admin bundles
+- Lazy-load noncritical functionality
+- Optimize images and define dimensions
+- Use responsive image sources
+- Avoid unnecessary third-party scripts
+- Avoid oversized libraries for isolated features
+- Prevent unnecessary rerenders
+- Memoize only when justified
+- Paginate large datasets
+- Virtualize only genuinely large lists
+- Debounce searches where appropriate
+- Avoid cumulative layout shift
+- Keep loading states stable
+
+### Backend and database
+
+- Avoid N+1 queries
+- Select only required columns
+- Add indexes based on actual query patterns
+- Use transactions for atomic behavior
+- Cache only with a clear invalidation strategy
+- Never cache company-specific prices or permissions across authorization boundaries
+- Move slow noncritical work to background jobs
+- Add timeouts and bounded retries for external services
+- Prevent retry storms
+- Monitor slow queries and provider latency
+
+Optimization must never create stale pricing, stale permissions, duplicate orders, or incorrect inventory.
+
+---
+
+## External integrations
+
+Keep KVK, VIES, Mollie, email, storage, and future providers behind adapter interfaces.
+
+- Use typed request/response contracts
+- Validate provider responses
+- Use explicit timeouts
+- Retry only idempotent or safely keyed operations
+- Use bounded exponential backoff
+- Handle outages gracefully
+- Record external identifiers and relevant status history
+- Make integrations mockable in tests
+- Never log secrets or unnecessary personal information
+- Use correlation IDs across checkout, order, payment, webhook, email, and logs
+
+---
+
+## Error handling and observability
+
+Use structured logs with safe metadata such as:
+
+- Correlation ID
+- Operation type
+- Safe user/staff reference
+- Company reference
+- Order/payment/request reference
+- Error code
+- Provider
+- Duration
+- Environment
+
+Never log passwords, session tokens, API keys, complete sensitive payloads, or unnecessary personal data.
+
+Monitor:
+
+- Frontend exceptions
+- Server errors
+- Database errors
+- Failed admin logins
+- Payment creation failures
+- Webhook failures
+- Email failures
+- Inventory inconsistencies
+- Background-job backlog
+- Unusual registration or form volume
+
+User-facing errors must be understandable without exposing internals.
+
+---
+
+## Email and background work
+
+Transactional email failure must not invalidate a correct order or payment.
+
+Use a durable outbox/background-job pattern where practical:
+
+1. Complete the business transaction
+2. Write an outbox/job record
+3. Process asynchronously
+4. Record attempts and result
+5. Retry transient failures with limits
+6. Surface persistent failures to administrators
+
+Configure SPF, DKIM, and DMARC before production.
+
+---
+
+## Testing
+
+### Unit tests
+
+Cover:
+
+- Pricing precedence
+- VAT calculations
+- Discounts
+- Invoice eligibility
+- State transitions
+- Due dates
+- Frequently bought logic
+- Validation
+- Permission decisions
+
+### Database tests
+
+Cover:
+
+- Constraints
+- Transactions
+- RLS policies
+- Cross-company isolation
+- Customer/admin separation
+- Payment-event deduplication
+- Inventory atomicity
+
+### Integration tests
+
+Cover:
+
+- Registration and email verification
+- KVK and VAT providers
+- Mollie payment creation
+- Webhook processing
+- Duplicate webhooks
+- Failed/cancelled/expired payments
+- Invoice checkout
+- Email outbox
+- Stock reserve/release
+- Form-to-admin request flow
+
+### End-to-end tests
+
+At minimum:
+
+1. Guest completes online checkout
+2. Company registers and verifies email
+3. Registered company completes online checkout
+4. Eligible company completes invoice checkout
+5. Ineligible company is denied invoice checkout
+6. Admin changes company to service client
+7. Service client receives correct price and product list
+8. Reorder uses current prices
+9. Website request appears in admin
+10. Customer cannot access admin
+11. Company A cannot access Company B data
+12. Duplicate webhook does not duplicate fulfilment
+
+Do not remove meaningful tests merely to make a build pass.
+
+---
+
+## Environments and deployment
+
+Maintain strict separation between:
+
+- Local development
+- Staging/client review
+- Production
+
+Each environment must have separate:
+
+- Database/project
+- Authentication configuration
+- Storage
+- Mollie credentials
+- Email configuration
+- Secrets
+- Test data
+- Origins and redirect URLs
+
+Rules:
+
+- Production branch deploys production
+- Staging branch deploys protected client review
+- Feature branches may use protected previews
+- Never connect normal previews to production data
+- Never use live Mollie credentials outside production
+- Protect previews from unauthorized access and indexing
+- Apply migrations through reviewed version-controlled processes
+- Document rollback
+- Prefer McCoy-owned production accounts with developer access granted explicitly
+
+---
+
+## Dependency and MCP safety
+
+Before adding a dependency, script, GitHub Action, Agent Skill, or MCP server:
+
+1. Confirm it is necessary
+2. Review source, maintainer, permissions, license, and security posture
+3. Prefer mature, focused tools
+4. Avoid abandoned or overprivileged packages
+5. Pin and lock versions
+6. Review major upgrades
+7. Run vulnerability and secret scans
+8. Remove unused dependencies
+
+MCP servers can read data or perform actions according to granted permissions. Never install one blindly or give it production credentials by default. Use least privilege.
+
+---
+
+## Privacy and legal-data behavior
+
+Do not present implementation choices as legal advice.
+
+Support approved policies through:
+
+- Terms acceptance records
+- Privacy acknowledgement
+- Separate optional marketing consent
+- Data export
+- Correction workflows
+- Account deactivation
+- Anonymization where legally permissible
+- Retention of required financial records
+- Configurable retention for nonfinancial requests
+- Processor/integration documentation
+- Cookie consent for nonessential tracking
+
+Do not delete legally required financial history during ordinary account deletion.
+
+Collect only needed data and restrict access by business need.
+
+---
+
+## Required workflow for every task
+
+1. Inspect relevant files
+2. Identify affected domain and security rules
+3. Provide a concise plan before broad or risky changes
+4. Implement the smallest complete vertical slice
+5. Add or update tests
+6. Run relevant lint, type-check, test, and build commands
+7. Review for:
+   - Cross-company leakage
+   - Broken authorization
+   - Client-controlled financial values
+   - Duplicate effects
+   - Data loss
+   - Accessibility
+   - Responsive design
+   - Performance regressions
+   - Unapproved scope growth
+8. Summarize:
+   - What changed
+   - Why
+   - Security impact
+   - Database/migration impact
+   - Tests run
+   - Known limitations
+
+Never claim completion without running the relevant checks.
+
+---
+
+## Definition of done
+
+A task is complete only when applicable requirements are satisfied:
+
+- Approved behavior is implemented
+- Authorization is enforced server-side
+- RLS and database permissions are updated and tested
+- Prices and totals are server-authoritative
+- Migrations and constraints are included
+- Loading, empty, success, validation, and error states exist
+- Responsive behavior is reviewed
+- Accessibility is reviewed
+- Performance impact is reasonable
+- Tests pass
+- Type checking, linting, and build pass
+- Audit/logging behavior is correct
+- Documentation is updated
+- No secrets, debug code, unsafe mocks, or production-data assumptions remain
+- Cross-company access was reviewed
+- Duplicate payment/order/email/stock effects were reviewed
+- Known limitations are documented
+
+---
+
+## Stop and ask
+
+Do not guess when a task requires a decision about:
+
+- VAT display or calculation
+- Shipping destinations or pricing
+- Invoice legality or numbering
+- Accounting-system ownership
+- Refunds or returns
+- Backorders or stock reservations
+- Custom-pricing precedence
+- Discount stacking
+- Service-client entitlements
+- Customer/staff permissions
+- Financial-record deletion or rewriting
+- Breaking schema/API changes
+- Production data migrations
+- New processors handling personal data
+- New tracking scripts
+- Material scope, time, or cost expansion
+
+Present options, consequences, security implications, and a recommendation.
+
+---
+
+## Prohibited shortcuts
+
+Never:
+
+- Trust client-submitted prices, totals, roles, company IDs, payment status, or invoice permission
+- Put privileged keys in frontend code
+- Disable RLS as a workaround
+- Use a service-role key from the browser
+- Mark an order paid from a redirect page
+- Process payment webhooks without idempotency
+- Rewrite historical order prices
+- Use floating-point money
+- Delete referenced financial records
+- Make undocumented production schema edits
+- Treat hidden UI as authorization
+- Use production data in development by default
+- Expose raw errors to users
+- Render customer content as unsafe HTML
+- Add an unreviewed dependency or MCP server
+- Claim completion without running relevant checks
+- Sacrifice security or accessibility for visual speed
+- Silently expand the approved MVP scope
+
+---
+
+## Final review mindset
+
+Before presenting work, review it as:
+
+- Senior full-stack engineer
+- Senior security engineer
+- Senior software architect
+- Senior database engineer
+- Senior ecommerce engineer
+- Senior UX/accessibility designer
+- Senior project manager responsible for scope and operational risk
+
+Ask:
+
+- Can a user manipulate this?
+- Can one company see another company’s data?
+- Can this create duplicate money, order, email, or stock effects?
+- What happens when a provider, network, database, or email service fails?
+- Is business state explicit and auditable?
+- Does the interface feel premium, accessible, responsive, and clear?
+- Can another experienced developer maintain it?
+- Is the behavior tested?
+- Is the work still within approved scope?
+```
+

@@ -1,0 +1,28 @@
+{
+  "name": "@mccoy/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mccoy/cms-schema": "*",
+    "@mccoy/domain": "*",
+    "@mccoy/notifications": "*",
+    "@mccoy/security": "*",
+    "@supabase/supabase-js": "^2.110.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

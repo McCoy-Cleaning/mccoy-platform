@@ -1,0 +1,252 @@
+-- Phase B3/B4 — Atomic CMS publish + outbox + rollback helpers
+-- Called from trusted server code via service_role / PostgREST RPC.
+
+create or replace function cms_publish_page(
+  p_site_id uuid,
+  p_page_id uuid,
+  p_payload jsonb,
+  p_published_locales text[],
+  p_changed_paths text[],
+  p_created_by uuid default null,
+  p_expected_draft_revision integer default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_page cms_pages%rowtype;
+  v_prev_revision_id uuid;
+  v_new_revision_id uuid;
+  v_revision_number integer;
+  v_event_id uuid := gen_random_uuid();
+  v_locale text;
+  v_paths jsonb;
+  v_locale_states jsonb;
+  v_path text;
+  v_public_path text;
+  v_pub_state text;
+  v_freshness text;
+  v_occurred_at timestamptz := now();
+begin
+  select * into v_page from cms_pages where id = p_page_id and site_id = p_site_id for update;
+  if not found then
+    raise exception 'cms_publish_page: page not found';
+  end if;
+
+  if p_expected_draft_revision is not null
+     and v_page.draft_revision_number is distinct from p_expected_draft_revision then
+    raise exception 'cms_publish_page: draft revision conflict (expected %, got %)',
+      p_expected_draft_revision, v_page.draft_revision_number
+      using errcode = '40001';
+  end if;
+
+  v_prev_revision_id := v_page.active_published_revision_id;
+
+  if v_prev_revision_id is not null then
+    update cms_page_revisions
+    set status = 'superseded'
+    where id = v_prev_revision_id and status = 'published';
+  end if;
+
+  select coalesce(max(revision_number), 0) + 1
+    into v_revision_number
+  from cms_page_revisions
+  where page_id = p_page_id;
+
+  insert into cms_page_revisions (
+    id, site_id, page_id, revision_number, status, payload, created_by, published_at
+  ) values (
+    gen_random_uuid(), p_site_id, p_page_id, v_revision_number, 'published',
+    p_payload, p_created_by, v_occurred_at
+  )
+  returning id into v_new_revision_id;
+
+  update cms_pages
+  set
+    active_published_revision_id = v_new_revision_id,
+    is_draft_only = false,
+    draft_revision_number = draft_revision_number + 1,
+    updated_at = v_occurred_at,
+    in_nav = coalesce((p_payload->>'inNav')::boolean, in_nav)
+  where id = p_page_id;
+
+  v_paths := coalesce(p_payload->'paths', '{}'::jsonb);
+  v_locale_states := coalesce(p_payload->'localeStates', '{}'::jsonb);
+
+  foreach v_locale in array p_published_locales
+  loop
+    v_path := coalesce(v_paths->>v_locale, v_paths->>'nl', '/');
+    if v_locale = 'en' then
+      if v_path like '/en%' then
+        v_public_path := v_path;
+      elsif v_path = '/' then
+        v_public_path := '/en';
+      else
+        v_public_path := '/en' || v_path;
+      end if;
+    else
+      v_public_path := v_path;
+    end if;
+
+    v_pub_state := coalesce(v_locale_states->v_locale->>'publicationState', 'published');
+    v_freshness := coalesce(v_locale_states->v_locale->>'freshness', 'current');
+
+    insert into cms_page_locale_states (
+      page_id, site_id, locale, publication_state, freshness, path, public_path
+    ) values (
+      p_page_id, p_site_id, v_locale, v_pub_state, v_freshness, v_path, v_public_path
+    )
+    on conflict (page_id, locale) do update set
+      publication_state = excluded.publication_state,
+      freshness = excluded.freshness,
+      path = excluded.path,
+      public_path = excluded.public_path;
+  end loop;
+
+  -- Upsert non-published locale rows from payload for query completeness
+  if v_locale_states ? 'en' and not ('en' = any (p_published_locales)) then
+    v_path := coalesce(v_paths->>'en', v_paths->>'nl', '/');
+    if v_path like '/en%' then
+      v_public_path := v_path;
+    elsif v_path = '/' then
+      v_public_path := '/en';
+    else
+      v_public_path := '/en' || v_path;
+    end if;
+    insert into cms_page_locale_states (
+      page_id, site_id, locale, publication_state, freshness, path, public_path
+    ) values (
+      p_page_id,
+      p_site_id,
+      'en',
+      coalesce(v_locale_states->'en'->>'publicationState', 'missing'),
+      coalesce(v_locale_states->'en'->>'freshness', 'unknown'),
+      v_path,
+      v_public_path
+    )
+    on conflict (page_id, locale) do update set
+      publication_state = excluded.publication_state,
+      freshness = excluded.freshness,
+      path = excluded.path,
+      public_path = excluded.public_path;
+  end if;
+
+  insert into cms_outbox (id, site_id, event_type, payload)
+  values (
+    v_event_id,
+    p_site_id,
+    'cms.page.published',
+    jsonb_build_object(
+      'eventId', v_event_id::text,
+      'siteId', p_site_id::text,
+      'pageId', p_page_id::text,
+      'revisionId', v_new_revision_id::text,
+      'publishedLocales', to_jsonb(p_published_locales),
+      'changedPaths', to_jsonb(p_changed_paths),
+      'occurredAt', to_char(v_occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+    )
+  );
+
+  update cms_sites set config_version = config_version + 1, updated_at = v_occurred_at
+  where id = p_site_id;
+
+  return jsonb_build_object(
+    'revisionId', v_new_revision_id,
+    'revisionNumber', v_revision_number,
+    'eventId', v_event_id,
+    'draftRevisionNumber', (select draft_revision_number from cms_pages where id = p_page_id)
+  );
+end;
+$$;
+
+revoke all on function cms_publish_page(uuid, uuid, jsonb, text[], text[], uuid, integer) from public;
+grant execute on function cms_publish_page(uuid, uuid, jsonb, text[], text[], uuid, integer) to service_role;
+
+create or replace function cms_rollback_page(
+  p_site_id uuid,
+  p_page_id uuid,
+  p_target_revision_id uuid,
+  p_created_by uuid default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_target cms_page_revisions%rowtype;
+  v_payload jsonb;
+  v_locales text[] := array[]::text[];
+  v_paths text[] := array[]::text[];
+  v_nl_state text;
+  v_en_state text;
+begin
+  select * into v_target
+  from cms_page_revisions
+  where id = p_target_revision_id and page_id = p_page_id and site_id = p_site_id;
+
+  if not found then
+    raise exception 'cms_rollback_page: target revision not found';
+  end if;
+
+  v_payload := v_target.payload;
+  v_nl_state := coalesce(v_payload->'localeStates'->'nl'->>'publicationState', 'published');
+  v_en_state := coalesce(v_payload->'localeStates'->'en'->>'publicationState', 'missing');
+
+  if v_nl_state = 'published' then
+    v_locales := array_append(v_locales, 'nl');
+    v_paths := array_append(v_paths, coalesce(v_payload->'paths'->>'nl', '/'));
+  end if;
+  if v_en_state = 'published' then
+    v_locales := array_append(v_locales, 'en');
+    v_paths := array_append(
+      v_paths,
+      coalesce(v_payload->'paths'->>'en', v_payload->'paths'->>'nl', '/')
+    );
+  end if;
+
+  return cms_publish_page(
+    p_site_id,
+    p_page_id,
+    v_payload,
+    v_locales,
+    v_paths,
+    p_created_by,
+    null
+  );
+end;
+$$;
+
+revoke all on function cms_rollback_page(uuid, uuid, uuid, uuid) from public;
+grant execute on function cms_rollback_page(uuid, uuid, uuid, uuid) to service_role;
+
+-- Optimistic concurrency bump for draft saves
+create or replace function cms_bump_draft_revision(
+  p_page_id uuid,
+  p_expected integer
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next integer;
+begin
+  update cms_pages
+  set draft_revision_number = draft_revision_number + 1, updated_at = now()
+  where id = p_page_id and draft_revision_number = p_expected
+  returning draft_revision_number into v_next;
+
+  if v_next is null then
+    raise exception 'cms_bump_draft_revision: conflict'
+      using errcode = '40001';
+  end if;
+  return v_next;
+end;
+$$;
+
+revoke all on function cms_bump_draft_revision(uuid, integer) from public;
+grant execute on function cms_bump_draft_revision(uuid, integer) to service_role;
