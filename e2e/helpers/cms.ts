@@ -81,10 +81,6 @@ export function editFrame(page: Page): FrameLocator {
   return page.frameLocator('iframe[title="edit"]');
 }
 
-export function previewFrame(page: Page): FrameLocator {
-  return page.frameLocator('iframe[title="preview"]');
-}
-
 export async function openPageEditor(page: Page, pageId: string) {
   // Prefer direct URL — hub listing can race with localStorage ↔ durable reconcile.
   await page.goto(`/admin/website/${pageId}`);
@@ -285,36 +281,6 @@ export async function setBlockTitle(page: Page, title: string) {
   await titleField.fill(title);
 }
 
-export function previewStatus(page: Page): Locator {
-  return page.locator("[data-cms-preview-status]");
-}
-
-export async function expectPreviewStatus(
-  page: Page,
-  status: "locked" | "outdated" | "up_to_date",
-) {
-  await expect(previewStatus(page)).toHaveAttribute("data-cms-preview-status", status);
-}
-
-export async function refreshPreview(page: Page) {
-  const dialogWait = page
-    .waitForEvent("dialog", { timeout: 3_000 })
-    .then(async (d) => {
-      await d.dismiss().catch(() => undefined);
-    })
-    .catch(() => undefined);
-  // Snapshot capture runs when opening the preview pane (“Toon preview”).
-  // Hide first if already open so a re-open refreshes an outdated snapshot.
-  const hideBtn = page.getByRole("button", { name: "Preview verbergen" });
-  if (await hideBtn.isVisible().catch(() => false)) {
-    await hideBtn.click();
-  }
-  await page.getByRole("button", { name: "Toon preview" }).click();
-  await dialogWait;
-  await expect(page.locator('iframe[title="preview"]')).toBeVisible({ timeout: 30_000 });
-  await expectPreviewStatus(page, "up_to_date");
-}
-
 export async function savePage(page: Page) {
   let alertMessage: string | null = null;
   let handling = true;
@@ -395,18 +361,6 @@ export async function expectEditCanvasText(page: Page, text: string) {
   });
 }
 
-export async function expectPreviewText(page: Page, text: string) {
-  await expect(previewFrame(page).getByText(text, { exact: false }).first()).toBeVisible({
-    timeout: 30_000,
-  });
-}
-
-export async function expectPreviewNotText(page: Page, text: string) {
-  await expect(previewFrame(page).getByText(text, { exact: false })).toHaveCount(0, {
-    timeout: 10_000,
-  });
-}
-
 export async function expectStorefrontText(page: Page, path: string, text: string) {
   await page.goto(`${STOREFRONT_ORIGIN}${path}`);
   await expect(page.getByText(text, { exact: false }).first()).toBeVisible({ timeout: 30_000 });
@@ -429,36 +383,21 @@ export async function runBlockLifecycle(
   await addCmsSection(page, opts.templateName);
   await setBlockTitle(page, opts.titleA);
   await expectEditCanvasText(page, opts.titleA);
-  await expectPreviewStatus(page, "locked");
-
-  await refreshPreview(page);
-  await expectPreviewText(page, opts.titleA);
 
   await setBlockTitle(page, opts.titleB);
   await expectEditCanvasText(page, opts.titleB);
-  await expectPreviewStatus(page, "outdated");
-  await expectPreviewText(page, opts.titleA);
-  await expectPreviewNotText(page, opts.titleB);
-
-  await refreshPreview(page);
-  await expectPreviewText(page, opts.titleB);
-
-  await setBlockTitle(page, `${opts.titleB} — draft-after-snap`);
-  await expectEditCanvasText(page, `${opts.titleB} — draft-after-snap`);
-  await expectPreviewStatus(page, "outdated");
-  await expectPreviewText(page, opts.titleB);
 
   await savePage(page);
-  await expectStorefrontText(page, opts.publicPath, `${opts.titleB} — draft-after-snap`);
+  await expectStorefrontText(page, opts.publicPath, opts.titleB);
   await page.reload();
-  await expect(page.getByText(`${opts.titleB} — draft-after-snap`, { exact: false }).first()).toBeVisible();
+  await expect(page.getByText(opts.titleB, { exact: false }).first()).toBeVisible();
 
   await openPageEditor(page, opts.pageId);
   await selectLayoutSection(page, opts.templateName);
   await setBlockTitle(page, "SHOULD_DISCARD");
   await expectEditCanvasText(page, "SHOULD_DISCARD");
   await discardDraft(page);
-  await expectEditCanvasText(page, `${opts.titleB} — draft-after-snap`);
+  await expectEditCanvasText(page, opts.titleB);
   await expect(editFrame(page).getByText("SHOULD_DISCARD")).toHaveCount(0);
 }
 

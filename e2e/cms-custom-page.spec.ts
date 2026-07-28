@@ -4,10 +4,8 @@ import {
   discardDraft,
   editFrame,
   expectEditCanvasText,
-  expectPreviewStatus,
   expectStorefrontText,
   openPageEditor,
-  refreshPreview,
   savePage,
   STOREFRONT_ORIGIN,
 } from "./helpers/cms";
@@ -35,15 +33,11 @@ test.describe("Custom page editing", () => {
     await expect(titleField).toBeVisible({ timeout: 15_000 });
     await titleField.fill(titleA);
     await expectEditCanvasText(page, titleA);
-    await expectPreviewStatus(page, "locked");
 
-    await refreshPreview(page);
     await openDrawer();
     await titleField.fill(titleB);
     await expectEditCanvasText(page, titleB);
-    await expectPreviewStatus(page, "outdated");
 
-    await refreshPreview(page);
     await savePage(page);
     await expectStorefrontText(page, "/e2e-custom", titleB);
 

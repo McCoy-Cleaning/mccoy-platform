@@ -6,22 +6,12 @@ import {
   RotateCcw,
   Monitor,
   Smartphone,
-  Pencil,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Columns2,
   Settings,
   Layers,
   X,
 } from "lucide-react";
-import {
-  CMS_PREVIEW_CHANNEL,
-  isPreviewChildMessage,
-  sanitizePreviewSnapshot,
-  type CmsPage,
-} from "@mccoy/cms-schema";
-import { cms, useCms, useEditablePage, usePreviewStatus } from "@/lib/cms/store";
+import { type CmsPage } from "@mccoy/cms-schema";
+import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { useCmsEditParentBridge } from "@/lib/cms/edit-bridge";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
 import { BuiltinLayoutEditor } from "@/components/admin/cms/BuiltinLayoutEditor";
@@ -177,76 +167,20 @@ function PageEditorRoute() {
   );
 }
 
-/** Session preview pane bridge — unrelated to the v2 live-edit protocol, left as-is. */
-function usePreviewBridge(pageId: string, iframeRef: React.RefObject<HTMLIFrameElement | null>) {
-  const previewStatus = usePreviewStatus(pageId);
-  const [iframeKey, setIframeKey] = React.useState(0);
-  const pendingSnap = React.useRef(false);
-
-  const sendSnapshot = React.useCallback(() => {
-    const iframe = iframeRef.current;
-    const snap = cms.getSessionPreviewSnapshot(pageId);
-    if (!iframe?.contentWindow || !snap) return;
-    const origin = storefrontOrigin();
-    iframe.contentWindow.postMessage(
-      {
-        channel: CMS_PREVIEW_CHANNEL,
-        type: "preview-snapshot",
-        snapshot: sanitizePreviewSnapshot(snap),
-      },
-      origin,
-    );
-  }, [iframeRef, pageId]);
-
-  React.useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== storefrontOrigin()) return;
-      if (!isPreviewChildMessage(event.data)) return;
-      if (event.data.pageId !== pageId) return;
-      if (pendingSnap.current || cms.getSessionPreviewSnapshot(pageId)) {
-        sendSnapshot();
-        pendingSnap.current = false;
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [pageId, sendSnapshot]);
-
-  const refreshPreview = React.useCallback(() => {
-    const snap = cms.capturePreviewSnapshot(pageId);
-    if (!snap) return;
-    pendingSnap.current = true;
-    setIframeKey((k) => k + 1);
-  }, [pageId]);
-
-  return {
-    previewStatus,
-    iframeKey,
-    refreshPreview,
-    previewSrc: `${storefrontOrigin()}/cms-preview?pageId=${encodeURIComponent(pageId)}`,
-  };
-}
-
 function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug: string; title: string }) {
   const state = useCms();
   const hasDraft = cms.hasDraft(pageId);
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
-  const [mobileTab, setMobileTab] = React.useState<"edit" | "preview">("edit");
-  /** Preview pane is hidden until the user opts in via “Toon preview”. */
-  const [showPreviewPane, setShowPreviewPane] = React.useState(false);
   const [sectionsOpen, setSectionsOpen] = React.useState(false);
   const editRef = React.useRef<HTMLIFrameElement>(null);
-  const previewRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
-  const { previewStatus, iframeKey, refreshPreview, previewSrc } = usePreviewBridge(pageId, previewRef);
 
   React.useEffect(() => {
     void cms.reconcileLocalCustomPagesWithServer();
   }, []);
 
   const editUrl = storefrontPageUrl(slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
-  const liveUrl = storefrontPageUrl(slug);
   const page = cms.getEditablePage(pageId) ?? state.pages.find((p) => p.id === pageId);
 
   // Re-push the revisioned draft whenever local admin state changes (layout ops,
@@ -278,16 +212,6 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
         });
         return;
       }
-      if (previewStatus === "outdated" && showPreviewPane) {
-        const ok = await appConfirm({
-          title: "Preview is verouderd",
-          description:
-            "De preview toont niet de laatste wijzigingen. Publiceren gaat wel door met de huidige conceptinhoud.",
-          confirmLabel: "Toch publiceren",
-          tone: "warning",
-        });
-        if (!ok) return;
-      }
       const result = await cms.savePage(pageId);
       if (!result.ok) {
         notifyToast({
@@ -312,24 +236,6 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
     })();
   };
 
-  const onSaveConcept = () => {
-    void (async () => {
-      const result = await cms.saveConcept(pageId);
-      if (!result.ok) {
-        notifyToast({
-          kind: "error",
-          title: "Concept opslaan mislukt",
-          description: result.reason,
-        });
-        return;
-      }
-      notifyToast({
-        kind: "success",
-        title: "Concept opgeslagen. Nog niet live — gebruik Opslaan & publiceren om te publiceren.",
-      });
-    })();
-  };
-
   const onDiscard = () => {
     void (async () => {
       if (
@@ -345,7 +251,6 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
       }
       cms.discardDraft(pageId);
       cms.clearPreviewSnapshot(pageId);
-      setShowPreviewPane(false);
       setTimeout(() => {
         try {
           editRef.current?.contentWindow?.location.reload();
@@ -356,33 +261,16 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
     })();
   };
 
-  const onTogglePreviewPane = () => {
-    if (showPreviewPane) {
-      setShowPreviewPane(false);
-      return;
-    }
-    refreshPreview();
-    setShowPreviewPane(true);
-    setMobileTab("preview");
-  };
-
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col animate-fade-in">
       <SplitToolbar
         title={title}
         slug={slug}
-        liveUrl={liveUrl}
         hasDraft={hasDraft}
-        previewStatus={previewStatus}
-        showPreviewPane={showPreviewPane}
-        onTogglePreviewPane={onTogglePreviewPane}
         onSave={onSave}
-        onSaveConcept={onSaveConcept}
         onDiscard={onDiscard}
         device={device}
         onDevice={setDevice}
-        mobileTab={mobileTab}
-        onMobileTab={setMobileTab}
         saveLabel="Opslaan & publiceren"
       />
 
@@ -404,17 +292,8 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "flex-1 min-h-0 grid gap-3 mt-3",
-          showPreviewPane ? "lg:grid-cols-2" : "lg:grid-cols-1",
-        )}
-      >
-        <PaneShell
-          label="Edit canvas"
-          tone="edit"
-          hidden={showPreviewPane && mobileTab !== "edit"}
-        >
+      <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
+        <PaneShell label="Edit canvas" tone="edit" hidden={false}>
           <div className="relative h-full min-h-0">
             <DeviceFrame device={device}>
               <EditCanvasIframe
@@ -436,24 +315,6 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
             />
           </div>
         </PaneShell>
-
-        {showPreviewPane && (
-          <PaneShell label="Preview pane" tone="preview" hidden={mobileTab !== "preview"}>
-            {previewStatus === "locked" ? (
-              <PreviewPlaceholder message="Preview wordt geladen…" />
-            ) : (
-              <DeviceFrame device={device}>
-                <iframe
-                  key={iframeKey}
-                  ref={previewRef}
-                  src={previewSrc}
-                  title="preview"
-                  className="h-full w-full border-0 bg-background"
-                />
-              </DeviceFrame>
-            )}
-          </PaneShell>
-        )}
       </div>
     </div>
   );
@@ -465,16 +326,11 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   const published = state.pages.find((p) => p.id === pageId)!;
   const editablePage = useEditablePage(pageId);
   const page = editablePage ?? published;
-  const [mobileTab, setMobileTab] = React.useState<"edit" | "preview">("edit");
-  const [showPreviewPane, setShowPreviewPane] = React.useState(false);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const editRef = React.useRef<HTMLIFrameElement>(null);
-  const previewRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
-  const { previewStatus, iframeKey, refreshPreview, previewSrc } = usePreviewBridge(pageId, previewRef);
   const hasDraft = cms.hasDraft(pageId) || page.isDraftOnly;
-  const liveUrl = storefrontPageUrl(page.slug);
   const editUrl = storefrontPageUrl(page.slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
 
   React.useEffect(() => {
@@ -501,16 +357,6 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
         });
         return;
       }
-      if (previewStatus === "outdated" && showPreviewPane) {
-        const ok = await appConfirm({
-          title: "Preview is verouderd",
-          description:
-            "De preview toont niet de laatste wijzigingen. Publiceren gaat wel door met de huidige conceptinhoud.",
-          confirmLabel: "Toch publiceren",
-          tone: "warning",
-        });
-        if (!ok) return;
-      }
       const result = await cms.savePage(pageId);
       if (!result.ok) {
         notifyToast({
@@ -534,23 +380,6 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       }, 50);
     })();
   };
-  const onSaveConcept = () => {
-    void (async () => {
-      const result = await cms.saveConcept(pageId);
-      if (!result.ok) {
-        notifyToast({
-          kind: "error",
-          title: "Concept opslaan mislukt",
-          description: result.reason,
-        });
-        return;
-      }
-      notifyToast({
-        kind: "success",
-        title: "Concept opgeslagen. Nog niet live — gebruik publiceren om live te zetten.",
-      });
-    })();
-  };
   const onDiscard = () => {
     void (async () => {
       if (
@@ -568,7 +397,6 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       const wasDraftOnly = page.isDraftOnly;
       cms.discardDraft(pageId);
       cms.clearPreviewSnapshot(pageId);
-      setShowPreviewPane(false);
       if (wasDraftOnly) {
         navigate({ to: "/admin/website" });
         return;
@@ -581,16 +409,6 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
         }
       }, 50);
     })();
-  };
-
-  const onTogglePreviewPane = () => {
-    if (showPreviewPane) {
-      setShowPreviewPane(false);
-      return;
-    }
-    refreshPreview();
-    setShowPreviewPane(true);
-    setMobileTab("preview");
   };
 
   const onMetaSave = (
@@ -606,18 +424,11 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       <SplitToolbar
         title={page.title}
         slug={page.slug}
-        liveUrl={liveUrl}
         hasDraft={!!hasDraft}
-        previewStatus={previewStatus}
-        showPreviewPane={showPreviewPane}
-        onTogglePreviewPane={onTogglePreviewPane}
         onSave={onSave}
-        onSaveConcept={onSaveConcept}
         onDiscard={onDiscard}
         device="desktop"
         onDevice={() => {}}
-        mobileTab={mobileTab}
-        onMobileTab={setMobileTab}
         showDevice={false}
         saveLabel={page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}
       />
@@ -638,17 +449,8 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
         />
       </div>
 
-      <div
-        className={cn(
-          "flex-1 min-h-0 grid gap-3 mt-3",
-          showPreviewPane ? "lg:grid-cols-2" : "lg:grid-cols-1",
-        )}
-      >
-        <PaneShell
-          label="Edit canvas"
-          tone="edit"
-          hidden={showPreviewPane && mobileTab !== "edit"}
-        >
+      <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
+        <PaneShell label="Edit canvas" tone="edit" hidden={false}>
           <div className="relative h-full min-h-0">
             <EditCanvasIframe
               iframeRef={editRef}
@@ -666,22 +468,6 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
             />
           </div>
         </PaneShell>
-
-        {showPreviewPane && (
-          <PaneShell label="Preview pane" tone="preview" hidden={mobileTab !== "preview"}>
-            {previewStatus === "locked" ? (
-              <PreviewPlaceholder message="Preview wordt geladen…" />
-            ) : (
-              <iframe
-                key={iframeKey}
-                ref={previewRef}
-                src={previewSrc}
-                title="preview"
-                className="h-full w-full border-0 bg-background min-h-[70vh]"
-              />
-            )}
-          </PaneShell>
-        )}
       </div>
     </div>
   );
@@ -919,59 +705,28 @@ function CustomPageMetaForm({
   );
 }
 
-function PreviewPlaceholder({ message }: { message: string }) {
-  return (
-    <div className="grid h-full min-h-[320px] place-items-center p-8 text-center">
-      <div className="max-w-sm space-y-4">
-        <Eye className="mx-auto h-8 w-8 text-white/30" />
-        <p className="text-sm text-white/50">{message}</p>
-      </div>
-    </div>
-  );
-}
-
 function SplitToolbar({
   title,
   slug,
-  liveUrl,
   hasDraft,
-  previewStatus,
-  showPreviewPane,
-  onTogglePreviewPane,
   onSave,
-  onSaveConcept,
   onDiscard,
   device,
   onDevice,
-  mobileTab,
-  onMobileTab,
   showDevice = true,
   saveLabel = "Opslaan & publiceren",
 }: {
   title: string;
   slug: string;
-  liveUrl: string;
   hasDraft: boolean;
-  previewStatus: "locked" | "outdated" | "up_to_date";
-  showPreviewPane: boolean;
-  onTogglePreviewPane: () => void;
   onSave: () => void;
-  onSaveConcept: () => void;
   onDiscard: () => void;
   device: "desktop" | "mobile";
   onDevice: (d: "desktop" | "mobile") => void;
-  mobileTab: "edit" | "preview";
-  onMobileTab: (t: "edit" | "preview") => void;
   showDevice?: boolean;
   saveLabel?: string;
 }) {
   const navigate = useNavigate();
-  const previewLabel =
-    previewStatus === "up_to_date"
-      ? "Preview actueel"
-      : previewStatus === "outdated"
-        ? "Preview verouderd"
-        : "Preview nog niet getoond";
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/60 p-2 backdrop-blur-xl">
@@ -1012,38 +767,9 @@ function SplitToolbar({
               Live
             </span>
           )}
-          <span
-            data-cms-preview-status={previewStatus}
-            aria-label={`Previewstatus: ${previewLabel}`}
-            className={cn(
-              "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-              previewStatus === "up_to_date" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
-              previewStatus === "outdated" && "border-amber-400/30 bg-amber-400/10 text-amber-300",
-              previewStatus === "locked" && "border-white/10 bg-white/5 text-white/50",
-            )}
-          >
-            {previewLabel}
-          </span>
         </div>
         <div className="truncate text-[11px] text-white/40 font-mono">{slug}</div>
       </div>
-
-      {showPreviewPane && (
-        <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-0.5 lg:hidden">
-          <button
-            onClick={() => onMobileTab("edit")}
-            className={cn("inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg", mobileTab === "edit" ? "bg-primary text-primary-foreground" : "text-white/70")}
-          >
-            <Pencil className="h-3 w-3" /> Edit
-          </button>
-          <button
-            onClick={() => onMobileTab("preview")}
-            className={cn("inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg", mobileTab === "preview" ? "bg-primary text-primary-foreground" : "text-white/70")}
-          >
-            <Eye className="h-3 w-3" /> Preview
-          </button>
-        </div>
-      )}
 
       {showDevice && (
         <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-0.5">
@@ -1058,34 +784,6 @@ function SplitToolbar({
 
       <button
         type="button"
-        onClick={onTogglePreviewPane}
-        data-cms-toolbar="toggle-preview"
-        aria-label={showPreviewPane ? "Preview verbergen" : "Toon preview"}
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium",
-          showPreviewPane
-            ? "border-primary/40 bg-primary/15 text-white"
-            : "border-white/10 bg-white/5 text-white/80 hover:text-white",
-        )}
-        title="Toon of verberg preview naast bewerken"
-      >
-        {showPreviewPane ? <EyeOff className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
-        {showPreviewPane ? "Preview verbergen" : "Toon preview"}
-      </button>
-
-      <a
-        href={liveUrl}
-        target="_blank"
-        rel="noreferrer"
-        data-cms-toolbar="live"
-        aria-label="Open live pagina"
-        className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:text-white"
-      >
-        <ExternalLink className="h-3.5 w-3.5" /> Live
-      </a>
-
-      <button
-        type="button"
         onClick={onDiscard}
         disabled={!hasDraft}
         data-cms-toolbar="discard"
@@ -1093,16 +791,6 @@ function SplitToolbar({
         className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
       >
         <RotateCcw className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Wijzigingen verwerpen</span>
-      </button>
-      <button
-        type="button"
-        onClick={onSaveConcept}
-        disabled={!hasDraft}
-        data-cms-toolbar="save-concept"
-        aria-label="Concept opslaan"
-        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-400/15 disabled:opacity-40 disabled:pointer-events-none"
-      >
-        <Save className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Concept opslaan</span>
       </button>
       <button
         type="button"

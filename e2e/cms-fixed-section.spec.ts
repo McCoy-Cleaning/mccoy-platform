@@ -4,20 +4,14 @@ import {
   discardDraft,
   editFrame,
   expectEditCanvasText,
-  expectPreviewNotText,
-  expectPreviewStatus,
-  expectPreviewText,
   expectStorefrontText,
   openPageEditor,
   openSections,
-  refreshPreview,
   savePage,
 } from "./helpers/cms";
 
 test.describe("Fixed built-in section editing", () => {
-  test("home hero section edits update canvas, gate preview, publish and discard", async ({
-    page,
-  }) => {
+  test("home hero section edits update canvas, publish and discard", async ({ page }) => {
     const stamp = Date.now();
     const titleA = `Hero A ${stamp}`;
     const titleB = `Hero B ${stamp}`;
@@ -33,19 +27,9 @@ test.describe("Fixed built-in section editing", () => {
     await expect(title).toBeVisible({ timeout: 15_000 });
     await title.fill(titleA);
     await expectEditCanvasText(page, titleA);
-    await expectPreviewStatus(page, "locked");
-
-    await refreshPreview(page);
-    await expectPreviewText(page, titleA);
 
     await title.fill(titleB);
     await expectEditCanvasText(page, titleB);
-    await expectPreviewStatus(page, "outdated");
-    await expectPreviewText(page, titleA);
-    await expectPreviewNotText(page, titleB);
-
-    await refreshPreview(page);
-    await expectPreviewText(page, titleB);
     await savePage(page);
     await expectStorefrontText(page, "/", titleB);
 

@@ -5,11 +5,7 @@ import {
   discardDraft,
   editFrame,
   expectEditCanvasText,
-  expectPreviewNotText,
-  expectPreviewStatus,
-  expectPreviewText,
   openPageEditor,
-  refreshPreview,
   savePage,
   selectLayoutSection,
   setBlockTitle,
@@ -17,7 +13,7 @@ import {
 import path from "node:path";
 
 test.describe("Gallery lifecycle", () => {
-  test("add → edit title → preview freeze → publish → discard", async ({ page }) => {
+  test("add → edit title → publish → discard", async ({ page }) => {
     const stamp = Date.now();
     const titleA = `Gallery A ${stamp}`;
     const titleB = `Gallery B ${stamp}`;
@@ -44,18 +40,9 @@ test.describe("Gallery lifecycle", () => {
     }
 
     await expectEditCanvasText(page, titleA);
-    await expectPreviewStatus(page, "locked");
-    await refreshPreview(page);
-    await expectPreviewText(page, titleA);
 
     await setBlockTitle(page, titleB);
     await expectEditCanvasText(page, titleB);
-    await expectPreviewStatus(page, "outdated");
-    await expectPreviewText(page, titleA);
-    await expectPreviewNotText(page, titleB);
-
-    await refreshPreview(page);
-    await expectPreviewText(page, titleB);
 
     if (!hasImage) {
       test.info().annotations.push({
