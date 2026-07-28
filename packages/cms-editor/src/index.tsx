@@ -15,11 +15,14 @@ import {
   type PartnersContent,
   type PageSectionContent,
   type ProductsMainContent,
+  type ProductsInfoContent,
   type ServicesMainContent,
   type StatsContent,
   type WorkGalleryContent,
   type ServiceCard,
   type ProductCard,
+  type LegalMainContent,
+  type LegalArticle,
   cmsLinkSchema,
   createItemId,
   externalImage,
@@ -1562,7 +1565,7 @@ function CardListEditor({
           <PrototypeImageField
             label={`Kaartfoto #${index + 1}`}
             compact
-            value={card.image}
+            value={card.image ?? PLACEHOLDER_IMAGE}
             projectImages={projectImages}
             assetBaseUrl={assetBaseUrl}
             uploadToMediaLibrary={uploadToMediaLibrary}
@@ -1746,80 +1749,286 @@ export function ProductsMainInspector({
   uploadToMediaLibrary,
   mediaLibraryItems,
   resolveProjectImage,
-  part,
 }: {
   content: ProductsMainContent;
-  onPatch: (patch: Partial<ProductsMainContent>) => void;
-  part?: string;
+  onPatch: (patch: Partial<{ [K in keyof ProductsMainContent]: ProductsMainContent[K] | null }>) => void;
 } & ImagePickerProps) {
-  const showHeader = !part || part === "header";
-  const showCards = !part || part === "cards";
   return (
     <div className="space-y-3">
-      {showHeader ? (
-        <>
-          <InspectTextField
-            label="Eyebrow"
-            value={content.eyebrow ?? ""}
-            onChange={(v) => onPatch({ eyebrow: v })}
-            fieldPath="section:products.main:eyebrow"
-            fieldHint="eyebrow"
-            maxChars={80}
-            enableAi={false}
-            showEnDraft={false}
-          />
-          <InspectTextField
-            label="Kop"
-            value={content.heading}
-            onChange={(v) => onPatch({ heading: v })}
-            fieldPath="section:products.main:heading"
-            fieldHint="heading"
-            maxChars={120}
-            enableAi={false}
-            showEnDraft={false}
-          />
-          <InspectTextField
-            label="Intro"
-            value={content.intro}
-            onChange={(v) => onPatch({ intro: v })}
-            fieldPath="section:products.main:intro"
-            fieldHint="intro"
-            multiline
-            maxChars={600}
-            enableAi={false}
-            showEnDraft={false}
-          />
-          <SectionAiToolbar
-            pathPrefix="section:products.main"
-            fields={collectShallowStringFields(
-              content as unknown as Record<string, unknown>,
-              ["eyebrow", "heading", "intro"],
-              { includeEmpty: true },
-            )}
-            fieldLabels={{ eyebrow: "Eyebrow", heading: "Kop", intro: "Intro" }}
-            onApplyDutch={(nl) => {
-              const patch: Partial<ProductsMainContent> = {};
-              if (typeof nl.eyebrow === "string") patch.eyebrow = nl.eyebrow;
-              if (typeof nl.heading === "string") patch.heading = nl.heading;
-              if (typeof nl.intro === "string") patch.intro = nl.intro;
-              onPatch(patch);
-            }}
-          />
-        </>
-      ) : null}
-      {showCards ? (
-        <CardListEditor
-          cards={content.cards}
+      <p className="text-[11px] leading-relaxed text-white/50">
+        Eén sectie: sectietitel, sectietekst, knoppen, webshop-notitie én flyer. Assortimentskaarten
+        staan apart in &quot;Producten-info&quot;.
+      </p>
+      <InspectTextField
+        label="Eyebrow"
+        value={content.eyebrow ?? ""}
+        onChange={(v) => onPatch({ eyebrow: v })}
+        fieldPath="section:products.main:eyebrow"
+        fieldHint="eyebrow"
+        maxChars={80}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <InspectTextField
+        label="Sectietitel"
+        value={content.heading}
+        onChange={(v) => onPatch({ heading: v })}
+        fieldPath="section:products.main:heading"
+        fieldHint="heading"
+        maxChars={160}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <InspectTextField
+        label="Sectietekst"
+        value={content.intro}
+        onChange={(v) => onPatch({ intro: v })}
+        fieldPath="section:products.main:intro"
+        fieldHint="intro"
+        multiline
+        maxChars={1200}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <p className="text-[11px] leading-relaxed text-white/40">
+        Gebruik een lege regel tussen alinea&apos;s voor meerdere paragrafen.
+      </p>
+      <InspectTextField
+        label="Extra sectietekst"
+        value={content.body ?? ""}
+        onChange={(v) => onPatch({ body: v })}
+        fieldPath="section:products.main:body"
+        fieldHint="body"
+        multiline
+        maxChars={500}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <p className="text-[11px] leading-relaxed text-white/40">
+        Extra sectietekst verschijnt als melding onder de knoppen (webshop-notitie).
+      </p>
+      {content.image ? (
+        <PrototypeImageField
+          label="Flyer"
+          value={content.image}
           projectImages={projectImages}
           assetBaseUrl={assetBaseUrl}
           uploadToMediaLibrary={uploadToMediaLibrary}
-              mediaLibraryItems={mediaLibraryItems}
-              resolveProjectImage={resolveProjectImage}
+          mediaLibraryItems={mediaLibraryItems}
+          resolveProjectImage={resolveProjectImage}
           preferTags={["products", "work"]}
-          enPathPrefix="section:products.main:cards"
-          onChange={(cards) => onPatch({ cards: cards as ProductCard[] })}
+          onChange={(image) => onPatch({ image })}
+          onClear={() => onPatch({ image: null })}
         />
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          className={addBtnClass}
+          onClick={() =>
+            onPatch({
+              image: localImage("/images/cms/products-flyer.png", "McCoy Cleaning Products flyer"),
+            })
+          }
+        >
+          Flyer toevoegen
+        </button>
+      )}
+      <SectionAiToolbar
+        pathPrefix="section:products.main"
+        fields={collectShallowStringFields(
+          content as unknown as Record<string, unknown>,
+          ["eyebrow", "heading", "intro", "body"],
+          { includeEmpty: true },
+        )}
+        fieldLabels={{
+          eyebrow: "Eyebrow",
+          heading: "Sectietitel",
+          intro: "Sectietekst",
+          body: "Extra sectietekst",
+        }}
+        onApplyDutch={(nl) => {
+          const patch: Partial<ProductsMainContent> = {};
+          if (typeof nl.eyebrow === "string") patch.eyebrow = nl.eyebrow;
+          if (typeof nl.heading === "string") patch.heading = nl.heading;
+          if (typeof nl.intro === "string") patch.intro = nl.intro;
+          if (typeof nl.body === "string") patch.body = nl.body;
+          onPatch(patch);
+        }}
+      />
+    </div>
+  );
+}
+
+export function ProductsInfoInspector({
+  content,
+  onPatch,
+}: {
+  content: ProductsInfoContent;
+  onPatch: (patch: Partial<ProductsInfoContent>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] leading-relaxed text-white/50">
+        Sectiekop + introtekst, daarna de assortimentskaarten. Kaarten hebben icoon + tekst (geen
+        foto&apos;s).
+      </p>
+      <InspectTextField
+        label="Eyebrow"
+        value={content.eyebrow ?? ""}
+        onChange={(v) => onPatch({ eyebrow: v })}
+        fieldPath="section:products.info:eyebrow"
+        fieldHint="eyebrow"
+        maxChars={80}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <InspectTextField
+        label="Sectietitel"
+        value={content.heading}
+        onChange={(v) => onPatch({ heading: v })}
+        fieldPath="section:products.info:heading"
+        fieldHint="heading"
+        maxChars={120}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <InspectTextField
+        label="Sectietekst"
+        value={content.intro ?? ""}
+        onChange={(v) => onPatch({ intro: v })}
+        fieldPath="section:products.info:intro"
+        fieldHint="intro"
+        multiline
+        maxChars={600}
+        enableAi={false}
+        showEnDraft={false}
+      />
+      <div className="space-y-3">
+        <p className="text-[11px] font-medium text-white/50">Kaarten ({content.cards.length})</p>
+        {content.cards.map((card, index) => (
+          <div key={card.id} className={listItemClass}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-white/40">#{index + 1}</span>
+              <RemoveIconButton
+                label={`Kaart ${index + 1} verwijderen`}
+                onClick={() => onPatch({ cards: removeById(content.cards, card.id) })}
+              />
+            </div>
+            <Field label="Titel">
+              <input
+                className={inputClass}
+                value={card.title}
+                onChange={(e) =>
+                  onPatch({ cards: updateCardAt(content.cards, card.id, { title: e.target.value }) })
+                }
+              />
+            </Field>
+            <ManualEnDraftField
+              fieldPath={`section:products.info:cards.${index}.title`}
+              label="Titel"
+            />
+            <Field label="Beschrijving">
+              <textarea
+                className={cn(inputClass, "min-h-[64px]")}
+                value={card.description}
+                onChange={(e) =>
+                  onPatch({
+                    cards: updateCardAt(content.cards, card.id, { description: e.target.value }),
+                  })
+                }
+              />
+            </Field>
+            <ManualEnDraftField
+              fieldPath={`section:products.info:cards.${index}.description`}
+              label="Beschrijving"
+              multiline
+            />
+            {card.link ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium text-white/50">Kaartlink</p>
+                  <button
+                    type="button"
+                    className={smallBtnClass}
+                    onClick={() => {
+                      onPatch({
+                        cards: content.cards.map((c) => {
+                          if (c.id !== card.id) return c;
+                          const { link: _removed, ...rest } = c;
+                          return rest;
+                        }),
+                      });
+                    }}
+                  >
+                    Link verwijderen
+                  </button>
+                </div>
+                <TypedLinkField
+                  label="Link"
+                  value={card.link}
+                  onChange={(link) =>
+                    onPatch({
+                      cards: updateCardAt(content.cards, card.id, { link: link ?? undefined }),
+                    })
+                  }
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={addBtnClass}
+                onClick={() =>
+                  onPatch({
+                    cards: updateCardAt(content.cards, card.id, {
+                      link: { type: "internal_route", route: "contact" },
+                    }),
+                  })
+                }
+              >
+                Link toevoegen
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          className={addBtnClass}
+          onClick={() =>
+            onPatch({
+              cards: [
+                ...content.cards,
+                {
+                  id: createItemId("card"),
+                  title: "Nieuwe kaart",
+                  description: "",
+                  link: { type: "internal_route", route: "contact" },
+                },
+              ],
+            })
+          }
+        >
+          Kaart toevoegen
+        </button>
+        {content.cards.length === 0 ? (
+          <p className="text-[11px] text-white/40">Nog geen kaarten — voeg hierboven een kaart toe.</p>
+        ) : null}
+      </div>
+      <SectionAiToolbar
+        pathPrefix="section:products.info"
+        fields={collectShallowStringFields(
+          content as unknown as Record<string, unknown>,
+          ["eyebrow", "heading", "intro"],
+          { includeEmpty: true },
+        )}
+        fieldLabels={{ eyebrow: "Eyebrow", heading: "Sectietitel", intro: "Sectietekst" }}
+        onApplyDutch={(nl) => {
+          const patch: Partial<ProductsInfoContent> = {};
+          if (typeof nl.eyebrow === "string") patch.eyebrow = nl.eyebrow;
+          if (typeof nl.heading === "string") patch.heading = nl.heading;
+          if (typeof nl.intro === "string") patch.intro = nl.intro;
+          onPatch(patch);
+        }}
+      />
     </div>
   );
 }
@@ -2483,6 +2692,145 @@ export function BlockDataInspector({
   );
 }
 
+/**
+ * Easy editor for privacy / terms: page title fields + reorderable text blocks.
+ * Users add/edit/remove “secties” or “artikelen” without learning the block system.
+ */
+export function LegalMainInspector({
+  content,
+  onPatch,
+  sectionKey,
+  itemNoun = "Sectie",
+  itemNounPlural,
+}: {
+  content: LegalMainContent;
+  onPatch: (patch: Partial<LegalMainContent>) => void;
+  sectionKey: "privacy.main" | "terms.main";
+  itemNoun?: string;
+  itemNounPlural?: string;
+}) {
+  const pathPrefix = `section:${sectionKey}`;
+  const plural = itemNounPlural ?? `${itemNoun}s`;
+
+  return (
+    <div className="space-y-5">
+      <p className="text-[11px] leading-relaxed text-white/50">
+        Bewerk de paginatitel en voeg tekstblokken toe. Elk blok is een kop met tekst — sleep
+        volgorde met omhoog/omlaag. Extra lay-outblokken kun je via &quot;Sectie toevoegen&quot; in
+        de lijst plaatsen.
+      </p>
+
+      <SectionAiToolbar
+        pathPrefix={pathPrefix}
+        fields={collectShallowStringFields(
+          content as unknown as Record<string, unknown>,
+          ["eyebrow", "heading", "updatedLabel"],
+          { includeEmpty: true },
+        )}
+        fieldLabels={{
+          eyebrow: "Eyebrow",
+          heading: "Paginakop",
+          updatedLabel: "Bijgewerkt-label",
+        }}
+        onApplyDutch={(nl) => {
+          const patch: Partial<LegalMainContent> = {};
+          if (typeof nl.eyebrow === "string") patch.eyebrow = nl.eyebrow;
+          if (typeof nl.heading === "string") patch.heading = nl.heading;
+          if (typeof nl.updatedLabel === "string") patch.updatedLabel = nl.updatedLabel;
+          onPatch(patch);
+        }}
+      />
+
+      <div className="space-y-3 rounded-xl border border-white/[0.08] bg-black/20 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+          Paginakop
+        </p>
+        <InspectTextField
+          label="Eyebrow"
+          value={content.eyebrow ?? ""}
+          onChange={(v) => onPatch({ eyebrow: v })}
+          fieldPath={`${pathPrefix}:eyebrow`}
+          fieldHint="eyebrow"
+          maxChars={60}
+          enableAi={false}
+          showEnDraft={false}
+        />
+        <InspectTextField
+          label="Paginakop"
+          value={content.heading}
+          onChange={(v) => onPatch({ heading: v })}
+          fieldPath={`${pathPrefix}:heading`}
+          fieldHint="heading"
+          maxChars={120}
+          enableAi={false}
+          showEnDraft={false}
+        />
+        <InspectTextField
+          label="Bijgewerkt-label"
+          value={content.updatedLabel ?? ""}
+          onChange={(v) => onPatch({ updatedLabel: v })}
+          fieldPath={`${pathPrefix}:updatedLabel`}
+          fieldHint="updatedLabel"
+          maxChars={160}
+          enableAi={false}
+          showEnDraft={false}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+            {plural} ({content.articles.length})
+          </p>
+        </div>
+        <ObjectListEditor<LegalArticle>
+          items={content.articles}
+          onChange={(articles) => onPatch({ articles })}
+          createItem={() => ({
+            id: createItemId("legal"),
+            title: `Nieuw ${itemNoun.toLowerCase()}`,
+            body: "",
+          })}
+          cloneItem={(item) => ({
+            ...item,
+            id: createItemId("legal"),
+            title: `${item.title} (kopie)`,
+          })}
+          addLabel={`${itemNoun} toevoegen`}
+          renderItem={(item, actions, index) => (
+            <div className="grid gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                {itemNoun} {index + 1}
+              </p>
+              <InspectTextField
+                label="Titel"
+                value={item.title}
+                onChange={(v) => actions.update({ ...item, title: v })}
+                fieldPath={`${pathPrefix}:articles.${index}.title`}
+                fieldHint="title"
+                maxChars={160}
+                enableAi={false}
+                showEnDraft={false}
+              />
+              <InspectTextField
+                label="Tekst"
+                value={item.body}
+                onChange={(v) => actions.update({ ...item, body: v })}
+                fieldPath={`${pathPrefix}:articles.${index}.body`}
+                fieldHint="body"
+                multiline
+                maxChars={8000}
+                enableAi={false}
+                showEnDraft={false}
+              />
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function SelectedSectionInspector({
   selection,
   sectionContent,
@@ -2615,7 +2963,14 @@ export function SelectedSectionInspector({
       <ProductsMainInspector
         content={content as ProductsMainContent}
         {...imageProps}
-        part={partId}
+        onPatch={(patch) => onSectionPatch(key, patch)}
+      />
+    );
+  }
+  if (key === "products.info") {
+    return (
+      <ProductsInfoInspector
+        content={content as ProductsInfoContent}
         onPatch={(patch) => onSectionPatch(key, patch)}
       />
     );
@@ -2637,6 +2992,17 @@ export function SelectedSectionInspector({
       <WorkGalleryInspector
         content={content as WorkGalleryContent}
         {...imageProps}
+        onPatch={(patch) => onSectionPatch(key, patch)}
+      />
+    );
+  }
+  if (key === "privacy.main" || key === "terms.main") {
+    return (
+      <LegalMainInspector
+        content={content as LegalMainContent}
+        sectionKey={key}
+        itemNoun={key === "terms.main" ? "Artikel" : "Sectie"}
+        itemNounPlural={key === "terms.main" ? "Artikelen" : "Secties"}
         onPatch={(patch) => onSectionPatch(key, patch)}
       />
     );

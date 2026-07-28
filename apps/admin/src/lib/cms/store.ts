@@ -17,8 +17,8 @@ import {
   setLayoutItemContentAlign,
   duplicateLayoutBlock,
   mergeSectionPatch,
-  parseSectionContent,
   getSectionContent,
+  SECTION_CONTENT_SCHEMAS,
   syncCustomLayoutFromBlocks,
   toggleFixedSection,
   toggleLayoutItemHidden,
@@ -263,7 +263,31 @@ const SEED_PAGES: Page[] = [
     inNav: true,
     pageKey: "offerte",
   }),
+  emptyBuiltin({
+    id: "page_privacy",
+    slug: "/privacy",
+    title: "Privacyverklaring",
+    description: "Privacyverklaring van McCoy Cleaning B.V.",
+    inNav: false,
+    pageKey: "privacy",
+  }),
+  emptyBuiltin({
+    id: "page_terms",
+    slug: "/terms",
+    title: "Algemene voorwaarden",
+    description: "Algemene voorwaarden van McCoy Schoonmaak en Reiniging.",
+    inNav: false,
+    pageKey: "terms",
+  }),
 ];
+
+/** Insert any newly seeded builtins that older localStorage snapshots lack. */
+function ensureSeedBuiltinPages(state: CmsPersistedState): { state: CmsPersistedState; changed: boolean } {
+  const ids = new Set(state.pages.map((p) => p.id));
+  const missing = SEED_PAGES.filter((p) => !ids.has(p.id));
+  if (missing.length === 0) return { state, changed: false };
+  return { state: { ...state, pages: [...state.pages, ...missing] }, changed: true };
+}
 
 function initial(): CmsPersistedState {
   return {
@@ -310,17 +334,20 @@ function loadFromDisk(): CmsPersistedState {
       return fallback;
     }
     const { state, changed } = sanitizeLoadedNavigation(result.state);
+    const ensured = ensureSeedBuiltinPages(state);
+    const next = ensured.state;
+    const shouldPersist = changed || ensured.changed;
     // Self-heal polluted navigation.links (e.g. triple Referenties) without asking
     // the operator to clear localStorage.
-    if (changed) {
+    if (shouldPersist) {
       try {
-        window.localStorage.setItem(KEY, JSON.stringify(persistable(state)));
+        window.localStorage.setItem(KEY, JSON.stringify(persistable(next)));
       } catch (e) {
         console.error("CMS nav self-heal persist failed:", e);
       }
     }
     localCustomPurgeDone = true;
-    return state;
+    return next;
   } catch (e) {
     console.error("CMS read error:", e);
     return initial();
@@ -960,10 +987,13 @@ export const cms = {
     }
     const current = getSectionContent(page, sectionKey) as Record<string, unknown>;
     const merged = mergeSectionPatch(current, patch);
-    const validated = parseSectionContent(sectionKey, merged);
-    if (!validated) {
-      return { ok: false, reason: `Ongeldige inhoud voor ${sectionKey}.` };
+    const parsed = SECTION_CONTENT_SCHEMAS[sectionKey].safeParse(merged);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.length ? ` (${issue.path.join(".")})` : "";
+      return { ok: false, reason: `Ongeldige inhoud voor ${sectionKey}${path}.` };
     }
+    const validated = parsed.data;
     const next = structuredClone(page);
     next.sectionContent = {
       ...(next.sectionContent ?? {}),

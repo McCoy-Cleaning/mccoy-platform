@@ -9,6 +9,8 @@ const BUILTIN_PAGES = [
   { id: "page_contact", label: /Contact/i },
   { id: "page_vacatures", label: /Vacatures/i },
   { id: "page_offerte", label: /Offerte/i },
+  { id: "page_privacy", label: /Privacyverklaring/i },
+  { id: "page_terms", label: /Algemene voorwaarden/i },
 ] as const;
 
 test.describe("CMS loading + section inventory", () => {

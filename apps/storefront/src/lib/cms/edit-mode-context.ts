@@ -32,6 +32,8 @@ export function pageIdForPath(path: string): string | null {
     "/contact": "page_contact",
     "/vacatures": "page_vacatures",
     "/offerte": "page_offerte",
+    "/privacy": "page_privacy",
+    "/terms": "page_terms",
   };
   return map[p] ?? null;
 }

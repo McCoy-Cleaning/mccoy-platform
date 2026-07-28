@@ -1,9 +1,10 @@
 import type { PageSectionRenderers } from "./PageLayoutRenderer";
 import { homeSectionRenderers } from "./homeSectionRenderers";
-import { About, Services, Products } from "./sections/SitePageSections";
+import { About, Services, ProductsMain, ProductsInfo } from "./sections/SitePageSections";
 import { ContactMainChrome, VacaturesMainChrome, OfferteMainChrome } from "./FormPageChrome";
 import { ContactFormSection, ContactInfoSection, OfferteInfoSection } from "./sections/ContactSections";
 import { OfferteFormSection } from "./sections/OfferteSections";
+import { PrivacyMainSection, TermsMainSection } from "./sections/LegalSections";
 
 /** Full builtin-page renderer map (about/services/products/forms + home). */
 export const pageSectionRenderers: PageSectionRenderers = {
@@ -15,7 +16,8 @@ export const pageSectionRenderers: PageSectionRenderers = {
     "services.main": Services,
   },
   products: {
-    "products.main": Products,
+    "products.main": ProductsMain,
+    "products.info": ProductsInfo,
   },
   contact: {
     "contact.main": ContactMainChrome,
@@ -29,5 +31,11 @@ export const pageSectionRenderers: PageSectionRenderers = {
     "offerte.main": OfferteMainChrome,
     "offerte.info": OfferteInfoSection,
     "offerte.form": OfferteFormSection,
+  },
+  privacy: {
+    "privacy.main": PrivacyMainSection,
+  },
+  terms: {
+    "terms.main": TermsMainSection,
   },
 };

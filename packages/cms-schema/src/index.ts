@@ -21,6 +21,7 @@ export * from "./layout-ops";
 export * from "./pipeline";
 export * from "./orphan-recovery";
 export * from "./content";
+export * from "./legal-defaults";
 export * from "./form-scope";
 export * from "./resolve-published-form";
 export * from "./navigation";

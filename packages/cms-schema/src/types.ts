@@ -57,7 +57,9 @@ export type BuiltinRouteKey =
   | "about"
   | "contact"
   | "vacatures"
-  | "offerte";
+  | "offerte"
+  | "privacy"
+  | "terms";
 
 export type CmsLink =
   | { type: "none" }

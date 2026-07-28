@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import wHoreca from "@/assets/work-horeca-new.jpg";
 import wRegular from "@/assets/work-regular.jpg";
-import flyerUrl from "@/assets/mccoy-products-flyer.jpg";
 import serviceGlass from "@/assets/mccoy-service-glass-van.jpg";
 import aboutMission from "@/assets/mccoy-mission-before-after.png";
 import aboutVisionChurch from "@/assets/mccoy-vision-church.jpg";
@@ -48,6 +47,7 @@ import {
   localizedServicesCopy,
 } from "@/lib/cms-i18n";
 import { cmsTextOrFallback, defaultSectionContent } from "@mccoy/cms-schema";
+import { CmsImageView } from "@mccoy/cms-renderer";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -520,40 +520,38 @@ export function About() {
 }
 
 /* ============= PRODUCTS ============= */
-export function Products() {
+export function ProductsMain() {
   const { t, lang } = useI18n();
   const content = useTypedSectionContent("page_products", "products.main");
   const isEn = lang === "en";
   const reduced = useReducedMotion();
-  const productsDef = defaultSectionContent("products.main") as {
-    eyebrow?: string;
-    heading?: string;
-    intro?: string;
-  };
+  const productsDef = defaultSectionContent("products.main") as import("@mccoy/cms-schema").ProductsMainContent;
 
   const eyebrow = cmsTextOrFallback(content.eyebrow, t.products.kicker, productsDef.eyebrow);
   const headingFallback = isEn
     ? "Fragrance products with a premium sanitary experience."
-    : "Geurproducten met een premium sanitaire beleving.";
+    : productsDef.heading;
   const heading = cmsTextOrFallback(content.heading, headingFallback, productsDef.heading);
   const introFallback = isEn
-    ? "An important part of McCoy Cleaning is McCoy Products, our wholesale division. In our range you will find: hygiene paper, professional soaps, cleaning agents for hospitality, and equipment and hardware for cleaning."
-    : "Een belangrijk onderdeel van McCoy Cleaning is McCoy Products, onze groothandel. In ons assortiment vind je: hygiëne papier, professionele zepen, reinigingsmiddelen voor horeca en apparatuur en hardware om schoon te maken.";
-  const intro = cmsTextOrFallback(content.intro, introFallback, productsDef.intro);
-
-  const range = isEn
-    ? [
-        { Icon: Package, label: "Hygiene paper" },
-        { Icon: Droplets, label: "Professional soaps" },
-        { Icon: SprayCan, label: "Hospitality cleaning agents" },
-        { Icon: Wrench, label: "Equipment & hardware" },
-      ]
-    : [
-        { Icon: Package, label: "Hygiëne papier" },
-        { Icon: Droplets, label: "Professionele zepen" },
-        { Icon: SprayCan, label: "Reinigingsmiddelen voor horeca" },
-        { Icon: Wrench, label: "Apparatuur & hardware" },
-      ];
+    ? "An important part of McCoy Cleaning is McCoy Products, our wholesale division. In our range you will find: hygiene paper, professional soaps, cleaning agents for hospitality, and equipment and hardware for cleaning.\n\nTo obtain our products, you can call or contact us via the contact form; we will be happy to help you."
+    : productsDef.intro;
+  // Empty CMS intro must stay empty — do not rehydrate factory/fallback copy.
+  const intro =
+    content.intro == null || content.intro === ""
+      ? ""
+      : cmsTextOrFallback(content.intro, introFallback, productsDef.intro);
+  const introParagraphs = intro
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const noticeFallback = isEn
+    ? "We are currently busy behind the scenes with the online webshop! Coming soon."
+    : productsDef.body ?? "";
+  const notice =
+    content.body == null || content.body === ""
+      ? ""
+      : cmsTextOrFallback(content.body, noticeFallback, productsDef.body);
+  const image = content.image ?? productsDef.image;
 
   const metrics = [
     { value: "100+", label: isEn ? "Products" : "Producten" },
@@ -567,8 +565,6 @@ export function Products() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-primary/8 via-transparent to-transparent" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Hero composition: copy + flyer */}
-        <CompositePartSelectChrome sectionKey="products.main" part="header" label="Intro">
         <div className="grid items-start gap-12 lg:grid-cols-12 lg:gap-16">
           <motion.div
             variants={fadeUp}
@@ -583,14 +579,18 @@ export function Products() {
             </h1>
             <div className="mt-5 h-0.5 w-14 rounded-full bg-primary" aria-hidden />
 
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]">
-              {intro}
-            </p>
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]">
-              {isEn
-                ? "To obtain our products, you can call or contact us via the contact form; we will be happy to help you."
-                : "Voor het verkrijgen van onze producten kunt u bellen of contact op nemen via het contactformulier, we helpen u dan graag."}
-            </p>
+            {introParagraphs.map((paragraph, index) => (
+              <p
+                key={`products-intro-${index}`}
+                className={
+                  index === 0
+                    ? "mt-6 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
+                    : "mt-4 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
+                }
+              >
+                {paragraph}
+              </p>
+            ))}
 
             <div className="mt-10 flex flex-wrap items-center gap-3 sm:gap-4">
               <Link
@@ -609,17 +609,15 @@ export function Products() {
               </a>
             </div>
 
-            <aside
-              className="mt-10 flex gap-3 border-l-2 border-primary/60 pl-5"
-              aria-label={isEn ? "Webshop notice" : "Webshop melding"}
-            >
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-              <p className="text-sm leading-relaxed text-white/80">
-                {isEn
-                  ? "We are currently busy behind the scenes with the online webshop! Coming soon."
-                  : "We zijn momenteel druk achter de schermen met de online webshop! Deze volgt binnenkort."}
-              </p>
-            </aside>
+            {notice ? (
+              <aside
+                className="mt-10 flex gap-3 border-l-2 border-primary/60 pl-5"
+                aria-label={isEn ? "Webshop notice" : "Webshop melding"}
+              >
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                <p className="text-sm leading-relaxed text-white/80">{notice}</p>
+              </aside>
+            ) : null}
           </motion.div>
 
           <motion.div
@@ -630,26 +628,18 @@ export function Products() {
             transition={reduced ? undefined : { delay: 0.12 }}
             className="lg:col-span-6"
           >
-            <figure className="relative">
-              <div
-                className="pointer-events-none absolute -inset-8 -z-10 rounded-full bg-primary/15 blur-3xl"
-                aria-hidden
-              />
-              <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
-                <img
-                  src={flyerUrl}
-                  alt="McCoy Cleaning Products flyer"
-                  width={720}
-                  height={960}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-auto w-full object-cover"
+            {image && !isCmsPlaceholderSrc(image.src) ? (
+              <figure className="relative">
+                <div
+                  className="pointer-events-none absolute -inset-8 -z-10 rounded-full bg-primary/15 blur-3xl"
+                  aria-hidden
                 />
-              </div>
-              <figcaption className="sr-only">
-                {heading}
-              </figcaption>
-            </figure>
+                <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
+                  <CmsImageView image={image} className="h-auto w-full object-cover" />
+                </div>
+                <figcaption className="sr-only">{image.alt || heading}</figcaption>
+              </figure>
+            ) : null}
 
             <dl className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10">
               {metrics.map((m) => (
@@ -663,77 +653,103 @@ export function Products() {
             </dl>
           </motion.div>
         </div>
-        </CompositePartSelectChrome>
+      </div>
+    </section>
+  );
+}
 
-        {/* Assortment — structured from existing range copy */}
-        <CompositePartSelectChrome sectionKey="products.main" part="cards" label="Productkaarten">
+/** Assortment cards — icon + text; movable above/below Intro. */
+export function ProductsInfo() {
+  const { t } = useI18n();
+  const content = useTypedSectionContent("page_products", "products.info");
+  const reduced = useReducedMotion();
+
+  const cardIcons = [Package, Droplets, SprayCan, Wrench] as const;
+  const productsInfoDef = defaultSectionContent("products.info") as import("@mccoy/cms-schema").ProductsInfoContent;
+  const eyebrow =
+    content.eyebrow == null || content.eyebrow === ""
+      ? ""
+      : cmsTextOrFallback(content.eyebrow, t.products.kicker, productsInfoDef.eyebrow);
+  const heading =
+    content.heading == null || content.heading === ""
+      ? ""
+      : cmsTextOrFallback(content.heading, t.products.title, productsInfoDef.heading);
+  const intro =
+    content.intro == null || content.intro === ""
+      ? ""
+      : cmsTextOrFallback(content.intro, t.products.desc, productsInfoDef.intro);
+
+  return (
+    <section id="products-info" className="relative overflow-hidden py-20 sm:py-24">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={fadeUp}
           initial={reduced ? false : "hidden"}
           whileInView="show"
           viewport={{ once: true }}
-          className="mt-20 sm:mt-24"
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {isEn ? "Our range" : "Ons assortiment"}
-              </p>
-              <h2 className="font-display mt-2 text-2xl text-white md:text-3xl">
-                {t.products.title}
-              </h2>
-            </div>
-            <p className="max-w-md text-sm leading-relaxed text-white/60">{t.products.desc}</p>
+          <div className="max-w-2xl">
+            {eyebrow ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+            ) : null}
+            {heading ? (
+              <h2 className="font-display mt-4 text-3xl text-white md:text-4xl">{heading}</h2>
+            ) : null}
+            {intro ? (
+              <p className="mt-4 text-base leading-relaxed text-white/65">{intro}</p>
+            ) : null}
           </div>
 
-          <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {content.cards.map((card, i) => {
-              const fallback = range[i];
-              const item = {
-                id: card.id,
-                label: card.title || fallback?.label || "",
-                description: card.description,
-                link: card.link,
-                Icon: fallback?.Icon ?? Package,
-              };
+              const Icon = cardIcons[i % cardIcons.length] ?? Package;
               return (
-              <li key={item.id}>
-                <motion.div
-                  initial={reduced ? false : { opacity: 0, y: 14 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={reduced ? { duration: 0 } : { delay: 0.06 * i, duration: 0.4 }}
-                  className="group flex h-full flex-col items-start gap-3 rounded-2xl border border-white/10 bg-card/50 px-5 py-5 transition hover:border-primary/35"
-                >
-                  <div className="flex w-full items-start gap-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <item.Icon className="h-5 w-5" aria-hidden />
+                <li key={card.id}>
+                  <motion.div
+                    initial={reduced ? false : { opacity: 0, y: 14 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={reduced ? { duration: 0 } : { delay: 0.06 * i, duration: 0.4 }}
+                    className="group flex h-full flex-col items-start gap-4 rounded-2xl border border-white/10 bg-card/50 px-5 py-6 transition hover:border-primary/35"
+                  >
+                    <div className="flex w-full items-start gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Icon className="h-5 w-5" aria-hidden />
+                      </div>
+                      <div className="min-w-0 pt-1">
+                        <h3 className="text-sm font-semibold leading-snug text-white/90">{card.title}</h3>
+                        {card.description ? (
+                          <p className="mt-1.5 text-sm leading-relaxed text-white/55">{card.description}</p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="min-w-0 pt-1">
-                      <span className="text-sm font-semibold leading-snug text-white/90">{item.label}</span>
-                      {item.description ? (
-                        <p className="mt-1 text-xs leading-relaxed text-white/55">{item.description}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  {item.link ? (
-                    <CmsLinkAnchor
-                      link={item.link}
-                      fallbackHref="/contact"
-                      className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
-                    >
-                      {t.products.cta}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </CmsLinkAnchor>
-                  ) : null}
-                </motion.div>
-              </li>
-            );
+                    {card.link ? (
+                      <CmsLinkAnchor
+                        link={card.link}
+                        fallbackHref="/contact"
+                        className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
+                      >
+                        {t.products.cta}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </CmsLinkAnchor>
+                    ) : null}
+                  </motion.div>
+                </li>
+              );
             })}
           </ul>
         </motion.div>
-        </CompositePartSelectChrome>
       </div>
     </section>
+  );
+}
+
+/** @deprecated Prefer ProductsMain + ProductsInfo. */
+export function Products() {
+  return (
+    <>
+      <ProductsMain />
+      <ProductsInfo />
+    </>
   );
 }

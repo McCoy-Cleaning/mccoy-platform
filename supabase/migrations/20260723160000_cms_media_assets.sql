@@ -92,6 +92,8 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+-- Historical: broad SELECT (allows Storage list API). Removed in
+-- 20260728180706_drop_cms_media_public_list_policy.sql (lint 0025).
 drop policy if exists "cms_media_public_read" on storage.objects;
 create policy "cms_media_public_read"
   on storage.objects

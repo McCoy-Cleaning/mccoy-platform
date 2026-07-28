@@ -44,10 +44,7 @@ export const COMPOSITE_SECTION_PARTS: Partial<
     { id: "header", label: "Intro", fields: ["eyebrow", "heading", "intro"] },
     { id: "cards", label: "Dienstkaarten", fields: ["cards"] },
   ],
-  "products.main": [
-    { id: "header", label: "Intro", fields: ["eyebrow", "heading", "intro"] },
-    { id: "cards", label: "Productkaarten", fields: ["cards"] },
-  ],
+  // products.main + products.info are separate movable fixed sections (not composite).
 };
 
 export function isCompositeSectionKey(key: FixedSectionKey): boolean {

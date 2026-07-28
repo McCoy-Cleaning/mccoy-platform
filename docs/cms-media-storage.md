@@ -15,8 +15,9 @@ Status: implemented (v1). Replaces prototype data-URL uploads with a path-canoni
 ## Schema
 
 - Table: `private.cms_media_assets` (service_role only; not PostgREST-exposed to browsers)
-- Bucket: `cms-media` (public **read**, no public write)
+- Bucket: `cms-media` (public **object URLs**, no public write, **no** client list/`SELECT` policy on `storage.objects`)
 - Migration: `supabase/migrations/20260723160000_cms_media_assets.sql`
+- Listing hardening: `supabase/migrations/20260728180706_drop_cms_media_public_list_policy.sql` (drops broad `cms_media_public_read` — lint [0025](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0025_public_bucket_allows_listing))
 
 ## Upload contract
 

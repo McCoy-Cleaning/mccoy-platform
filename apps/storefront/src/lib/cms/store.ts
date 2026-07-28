@@ -229,7 +229,30 @@ const SEED_PAGES: Page[] = [
     inNav: true,
     pageKey: "offerte",
   }),
+  emptyBuiltin({
+    id: "page_privacy",
+    slug: "/privacy",
+    title: "Privacyverklaring",
+    description: "Privacyverklaring van McCoy Cleaning B.V.",
+    inNav: false,
+    pageKey: "privacy",
+  }),
+  emptyBuiltin({
+    id: "page_terms",
+    slug: "/terms",
+    title: "Algemene voorwaarden",
+    description: "Algemene voorwaarden van McCoy Schoonmaak en Reiniging.",
+    inNav: false,
+    pageKey: "terms",
+  }),
 ];
+
+function ensureSeedBuiltinPages(state: CmsPersistedState): { state: CmsPersistedState; changed: boolean } {
+  const ids = new Set(state.pages.map((p) => p.id));
+  const missing = SEED_PAGES.filter((p) => !ids.has(p.id));
+  if (missing.length === 0) return { state, changed: false };
+  return { state: { ...state, pages: [...state.pages, ...missing] }, changed: true };
+}
 
 function initial(): CmsPersistedState {
   return {
@@ -427,16 +450,17 @@ function loadFromDisk(): CmsPersistedState {
       return fallback;
     }
     const { state, changed } = sanitizeLoadedNavigation(result.state);
-    // Self-heal: drop Referenties / local custom ghosts from edit-bridge localStorage.
-    if (changed) {
+    const ensured = ensureSeedBuiltinPages(state);
+    const next = ensured.state;
+    if (changed || ensured.changed) {
       try {
-        window.localStorage.setItem(KEY, JSON.stringify(persistable(state)));
+        window.localStorage.setItem(KEY, JSON.stringify(persistable(next)));
       } catch (e) {
         console.error("CMS nav self-heal persist failed:", e);
       }
     }
     editBridgePurgeDone = true;
-    return state;
+    return next;
   } catch (e) {
     console.error("CMS read error:", e);
     return publishedServerState ?? initial();

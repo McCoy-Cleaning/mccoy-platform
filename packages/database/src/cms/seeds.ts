@@ -95,6 +95,22 @@ export function builtinCmsSeedPages(): CmsPage[] {
       inNav: true,
       pageKey: "offerte",
     }),
+    emptyBuiltin({
+      id: "page_privacy",
+      slug: "/privacy",
+      title: "Privacyverklaring",
+      description: "Privacyverklaring van McCoy Cleaning B.V.",
+      inNav: false,
+      pageKey: "privacy",
+    }),
+    emptyBuiltin({
+      id: "page_terms",
+      slug: "/terms",
+      title: "Algemene voorwaarden",
+      description: "Algemene voorwaarden van McCoy Schoonmaak en Reiniging.",
+      inNav: false,
+      pageKey: "terms",
+    }),
   ];
 }
 

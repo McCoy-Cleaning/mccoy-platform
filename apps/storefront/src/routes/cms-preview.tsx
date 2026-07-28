@@ -121,6 +121,8 @@ const PAGE_KEY_BY_ID: Record<string, BuiltinPageKey> = {
   page_contact: "contact",
   page_vacatures: "vacatures",
   page_offerte: "offerte",
+  page_privacy: "privacy",
+  page_terms: "terms",
 };
 
 function PageFromSnapshot({ snapshot }: { snapshot: PreviewSnapshot }) {

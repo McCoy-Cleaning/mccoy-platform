@@ -9,6 +9,8 @@ export const BUILTIN_ROUTE_PATHS: Record<BuiltinRouteKey, string> = {
   contact: "/contact",
   vacatures: "/vacatures",
   offerte: "/offerte",
+  privacy: "/privacy",
+  terms: "/terms",
 };
 
 export const BUILTIN_ROUTE_LABELS: Record<BuiltinRouteKey, string> = {
@@ -19,6 +21,8 @@ export const BUILTIN_ROUTE_LABELS: Record<BuiltinRouteKey, string> = {
   contact: "Contact",
   vacatures: "Vacatures",
   offerte: "Offerte",
+  privacy: "Privacyverklaring",
+  terms: "Algemene voorwaarden",
 };
 
 /**
@@ -86,7 +90,17 @@ export const cmsLinkSchema: z.ZodType<CmsLink> = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("internal_route"),
-    route: z.enum(["home", "services", "products", "about", "contact", "vacatures", "offerte"]),
+    route: z.enum([
+      "home",
+      "services",
+      "products",
+      "about",
+      "contact",
+      "vacatures",
+      "offerte",
+      "privacy",
+      "terms",
+    ]),
     openInNewTab: z.boolean().optional(),
   }),
   z.object({

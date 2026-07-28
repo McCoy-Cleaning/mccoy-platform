@@ -1,6 +1,6 @@
 /** Page-qualified fixed section keys and capabilities (no React). */
 
-export const CURRENT_LAYOUT_VERSION = 3 as const;
+export const CURRENT_LAYOUT_VERSION = 6 as const;
 
 export type BuiltinPageKey =
   | "home"
@@ -9,7 +9,9 @@ export type BuiltinPageKey =
   | "products"
   | "contact"
   | "vacatures"
-  | "offerte";
+  | "offerte"
+  | "privacy"
+  | "terms";
 
 export type FixedSectionKey =
   | "home.hero"
@@ -19,13 +21,16 @@ export type FixedSectionKey =
   | "about.main"
   | "services.main"
   | "products.main"
+  | "products.info"
   | "contact.main"
   | "contact.info"
   | "contact.form"
   | "vacatures.main"
   | "offerte.main"
   | "offerte.info"
-  | "offerte.form";
+  | "offerte.form"
+  | "privacy.main"
+  | "terms.main";
 
 export type FixedSectionDefinition = {
   label: string;
@@ -44,10 +49,12 @@ export const FIXED_SECTIONS_BY_PAGE: Record<BuiltinPageKey, readonly FixedSectio
   home: ["home.hero", "home.partners", "home.stats", "home.workGallery"],
   about: ["about.main"],
   services: ["services.main"],
-  products: ["products.main"],
+  products: ["products.main", "products.info"],
   contact: ["contact.main", "contact.info", "contact.form"],
   vacatures: ["vacatures.main"],
   offerte: ["offerte.main", "offerte.info", "offerte.form"],
+  privacy: ["privacy.main"],
+  terms: ["terms.main"],
 } as const;
 
 /**
@@ -94,7 +101,13 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     required: false,
   },
   "products.main": {
-    label: "Producten",
+    label: "Intro",
+    movable: true,
+    hideable: true,
+    required: false,
+  },
+  "products.info": {
+    label: "Producten-info",
     movable: true,
     hideable: true,
     required: false,
@@ -141,6 +154,18 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     hideable: true,
     required: true,
   },
+  "privacy.main": {
+    label: "Privacyverklaring",
+    movable: true,
+    hideable: true,
+    required: false,
+  },
+  "terms.main": {
+    label: "Algemene voorwaarden",
+    movable: true,
+    hideable: true,
+    required: false,
+  },
 };
 
 /** Stable deterministic layout IDs for fixed sections. */
@@ -156,7 +181,9 @@ export function isBuiltinPageKey(value: string): value is BuiltinPageKey {
     value === "products" ||
     value === "contact" ||
     value === "vacatures" ||
-    value === "offerte"
+    value === "offerte" ||
+    value === "privacy" ||
+    value === "terms"
   );
 }
 
@@ -179,6 +206,8 @@ export function pageKeyFromPageId(id: string): BuiltinPageKey | null {
     page_contact: "contact",
     page_vacatures: "vacatures",
     page_offerte: "offerte",
+    page_privacy: "privacy",
+    page_terms: "terms",
   };
   return map[id] ?? null;
 }

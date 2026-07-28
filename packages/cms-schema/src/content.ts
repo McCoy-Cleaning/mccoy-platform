@@ -13,6 +13,7 @@ import {
 } from "./infer-logo-backdrop";
 import type { FormScopeSnapshot } from "./form-scope";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot } from "./form-scope";
+import { defaultPrivacyMainContent, defaultTermsMainContent } from "./legal-defaults";
 
 export type CmsImage = {
   assetId: string;
@@ -50,7 +51,8 @@ export type ServiceCard = IdItem & {
 export type ProductCard = IdItem & {
   title: string;
   description: string;
-  image: CmsImage;
+  /** Optional legacy field — Producten-info renders icons, not photos. */
+  image?: CmsImage;
   link?: CmsLink;
 };
 
@@ -111,7 +113,20 @@ export type ServicesMainContent = {
 export type ProductsMainContent = {
   eyebrow?: string;
   heading: string;
+  /** Primary section body copy under the title. */
   intro: string;
+  /** Extra callout under the CTAs (e.g. webshop coming-soon notice). */
+  body?: string;
+  /** Flyer / promo image shown beside intro copy, CTAs, and note. */
+  image?: CmsImage;
+};
+
+/** Assortment section: title + intro text + icon cards (no photos). */
+export type ProductsInfoContent = {
+  eyebrow?: string;
+  /** May be empty when cleared in the editor. */
+  heading: string;
+  intro?: string;
   cards: ProductCard[];
 };
 
@@ -153,6 +168,20 @@ export type ContactFormContent = {
   furnitureScope?: FormScopeSnapshot;
 };
 
+/** Shared shape for privacy / terms pages — header + ordered text blocks. */
+export type LegalArticle = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+export type LegalMainContent = {
+  eyebrow?: string;
+  heading: string;
+  updatedLabel?: string;
+  articles: LegalArticle[];
+};
+
 export type SectionContentMap = {
   "home.hero": HomeHeroContent;
   "home.partners": PartnersContent;
@@ -161,6 +190,7 @@ export type SectionContentMap = {
   "about.main": AboutMainContent;
   "services.main": ServicesMainContent;
   "products.main": ProductsMainContent;
+  "products.info": ProductsInfoContent;
   "contact.main": FormPageChromeContent;
   "contact.info": ContactInfoContent;
   "contact.form": ContactFormContent;
@@ -168,6 +198,8 @@ export type SectionContentMap = {
   "offerte.main": FormPageChromeContent;
   "offerte.info": ContactInfoContent;
   "offerte.form": ContactFormContent;
+  "privacy.main": LegalMainContent;
+  "terms.main": LegalMainContent;
 };
 
 export type PageSectionContent = Partial<{
@@ -180,6 +212,29 @@ function newId(prefix = "item"): string {
 
 export function createItemId(prefix = "item"): string {
   return newId(prefix);
+}
+
+function defaultProductCards(): ProductCard[] {
+  return [
+    {
+      id: "prod_hygiene",
+      title: "Hygiëne papier",
+      description: "Professioneel hygiënepapier voor sanitair, keukens en bedrijfspanden.",
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "prod_soaps",
+      title: "Professionele zepen",
+      description: "Hoogwaardige zepen en dispensers voor een frisse, representatieve sanitaire ruimte.",
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "prod_agents",
+      title: "Reinigingsmiddelen & hardware",
+      description: "Reinigingsmiddelen voor horeca plus apparatuur en hardware om schoon te maken.",
+      link: { type: "internal_route", route: "contact" },
+    },
+  ];
 }
 
 export const cmsImageSchema: z.ZodType<CmsImage> = z.object({
@@ -239,7 +294,7 @@ const productCardSchema = z.object({
   id: z.string().min(1),
   title: z.string(),
   description: z.string(),
-  image: cmsImageSchema,
+  image: cmsImageSchema.optional(),
   link: cmsLinkSchema.optional(),
 });
 
@@ -299,6 +354,15 @@ export const productsMainContentSchema: z.ZodType<ProductsMainContent> = z.objec
   eyebrow: z.string().optional(),
   heading: z.string().min(1),
   intro: z.string(),
+  body: z.string().optional(),
+  image: cmsImageSchema.optional(),
+});
+
+export const productsInfoContentSchema: z.ZodType<ProductsInfoContent> = z.object({
+  eyebrow: z.string().optional(),
+  /** Empty string is allowed — editors may clear the title on purpose. */
+  heading: z.string(),
+  intro: z.string().optional(),
   cards: z.array(productCardSchema),
 });
 
@@ -338,6 +402,19 @@ export const contactFormContentSchema: z.ZodType<ContactFormContent> = z.object(
   furnitureScope: formScopeSnapshotSchema.optional(),
 });
 
+export const legalArticleSchema: z.ZodType<LegalArticle> = z.object({
+  id: z.string().min(1),
+  title: z.string(),
+  body: z.string(),
+});
+
+export const legalMainContentSchema: z.ZodType<LegalMainContent> = z.object({
+  eyebrow: z.string().optional(),
+  heading: z.string(),
+  updatedLabel: z.string().optional(),
+  articles: z.array(legalArticleSchema),
+});
+
 export const SECTION_CONTENT_SCHEMAS: {
   [K in FixedSectionKey]: z.ZodType<SectionContentMap[K]>;
 } = {
@@ -348,6 +425,7 @@ export const SECTION_CONTENT_SCHEMAS: {
   "about.main": aboutMainContentSchema,
   "services.main": servicesMainContentSchema,
   "products.main": productsMainContentSchema,
+  "products.info": productsInfoContentSchema,
   "contact.main": formPageChromeContentSchema,
   "contact.info": contactInfoContentSchema,
   "contact.form": contactFormContentSchema,
@@ -355,6 +433,8 @@ export const SECTION_CONTENT_SCHEMAS: {
   "offerte.main": formPageChromeContentSchema,
   "offerte.info": contactInfoContentSchema,
   "offerte.form": contactFormContentSchema,
+  "privacy.main": legalMainContentSchema,
+  "terms.main": legalMainContentSchema,
 };
 
 export function localImage(path: string, alt: string, decorative = false): CmsImage {
@@ -633,32 +713,19 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "products.main":
       return {
         eyebrow: "Producten",
-        heading: "McCoy Products",
-        intro: "Hygiënepapier, zepen, reinigingsmiddelen en meer.",
-        cards: [
-          {
-            id: "prod_hygiene",
-            title: "Hygiëne papier",
-            description: "Professioneel hygiënepapier voor sanitair, keukens en bedrijfspanden.",
-            image: localImage("/images/cms/products-flyer.png", "Hygiëne papier"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "prod_soaps",
-            title: "Professionele zepen",
-            description: "Hoogwaardige zepen en dispensers voor een frisse, representatieve sanitaire ruimte.",
-            image: localImage("/images/cms/products-flyer.png", "Professionele zepen"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "prod_agents",
-            title: "Reinigingsmiddelen & hardware",
-            description: "Reinigingsmiddelen voor horeca plus apparatuur en hardware om schoon te maken.",
-            image: localImage("/images/cms/products-flyer.png", "Reinigingsmiddelen & hardware"),
-            link: { type: "internal_route", route: "contact" },
-          },
-        ],
+        heading: "Geurproducten met een premium sanitaire beleving.",
+        intro:
+          "Een belangrijk onderdeel van McCoy Cleaning is McCoy Products, onze groothandel. In ons assortiment vind je: hygiëne papier, professionele zepen, reinigingsmiddelen voor horeca en apparatuur en hardware om schoon te maken.\n\nVoor het verkrijgen van onze producten kunt u bellen of contact op nemen via het contactformulier, we helpen u dan graag.",
+        body: "We zijn momenteel druk achter de schermen met de online webshop! Deze volgt binnenkort.",
+        image: localImage("/images/cms/products-flyer.png", "McCoy Cleaning Products flyer"),
       } satisfies ProductsMainContent;
+    case "products.info":
+      return {
+        eyebrow: "Ons assortiment",
+        heading: "McCoy Cleaning Products",
+        intro: "Hygiënepapier, professionele zepen, reinigingsmiddelen en hardware voor een frisse, representatieve omgeving.",
+        cards: defaultProductCards(),
+      } satisfies ProductsInfoContent;
     case "contact.main":
       return {
         eyebrow: "Contact",
@@ -743,6 +810,10 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
       } satisfies ContactInfoContent;
     case "offerte.form":
       return {} satisfies ContactFormContent;
+    case "privacy.main":
+      return defaultPrivacyMainContent();
+    case "terms.main":
+      return defaultTermsMainContent();
   }
 }
 
