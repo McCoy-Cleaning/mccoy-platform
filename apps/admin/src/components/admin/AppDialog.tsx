@@ -97,12 +97,14 @@ export function FormDialog({
       }}
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+          <Button type="button" variant="outline" size="lg" className="min-h-12 rounded-xl px-5 text-[15px]" onClick={onCancel} disabled={pending}>
             {cancelLabel}
           </Button>
           <Button
             type="button"
+            size="lg"
             variant={tone === "destructive" ? "destructive" : "primary"}
+            className="min-h-12 rounded-xl px-5 text-[15px] font-semibold"
             loading={pending}
             disabled={!canSubmit}
             onClick={() => void onConfirm(value.trim())}
@@ -113,7 +115,7 @@ export function FormDialog({
       }
     >
       <div className="space-y-2">
-        <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+        <label htmlFor={inputId} className="text-base font-medium text-foreground">
           {label}
         </label>
         <input
@@ -122,7 +124,7 @@ export function FormDialog({
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           disabled={pending}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-12 w-full rounded-xl border border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         {error ? (
           <p role="alert" className="text-sm text-destructive">

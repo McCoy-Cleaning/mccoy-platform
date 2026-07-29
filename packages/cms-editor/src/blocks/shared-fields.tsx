@@ -9,7 +9,7 @@ import { StructuredLinkField, PAGE_DESTINATION_LINK_KINDS } from "./StructuredLi
 import { EnDraftFor } from "./en-draft-fields";
 
 export const inputClass =
-  "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50";
+  "w-full rounded-xl border border-white/15 bg-black/40 px-4 py-2.5 text-[15px] text-white outline-none placeholder:text-white/35 focus-visible:ring-2 focus-visible:ring-sky-400/50";
 
 export const selectClass = `${inputClass} cursor-pointer`;
 
@@ -27,12 +27,12 @@ export function Field({
     ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
     : children;
   return (
-    <div className="block space-y-1">
-      <label htmlFor={id} className="text-[10px] uppercase tracking-wider text-white/40">
+    <div className="block space-y-1.5">
+      <label htmlFor={id} className="text-[13px] font-medium text-white/65">
         {label}
       </label>
       {control}
-      {hint ? <span className="block text-[10px] text-white/35">{hint}</span> : null}
+      {hint ? <span className="block text-xs text-white/40">{hint}</span> : null}
     </div>
   );
 }
@@ -46,14 +46,14 @@ export function Section({
 }) {
   return (
     <section className="space-y-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-white/50">{title}</h4>
+      <h4 className="text-[13px] font-semibold uppercase tracking-wider text-white/55">{title}</h4>
       {children}
     </section>
   );
 }
 
 export function EmptyHint({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-white/15 px-3 py-4 text-xs text-white/45">{children}</p>;
+  return <p className="rounded-xl border border-dashed border-white/15 px-4 py-4 text-[13px] leading-relaxed text-white/50">{children}</p>;
 }
 
 /** Typed internal/external link — delegates to shared StructuredLinkField. */
@@ -226,13 +226,13 @@ export function BlockImageField({
   };
 
   return (
-    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+    <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">{label}</p>
+        <p className="text-[13px] font-semibold uppercase tracking-wider text-white/60">{label}</p>
         {value ? (
           <button
             type="button"
-            className="text-[11px] text-red-300"
+            className="rounded-lg px-2 py-1 text-[13px] font-medium text-red-300 transition hover:bg-red-500/10 hover:text-red-200"
             onClick={() => onChange(undefined)}
           >
             Verwijderen
@@ -260,15 +260,15 @@ export function BlockImageField({
       )}
 
       {uploadToMediaLibrary ? (
-        <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/20 p-2">
+        <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
           <button
             type="button"
-            className="inline-flex w-full items-center justify-center rounded-lg border border-sky-400/35 bg-sky-400/10 px-3 py-2 text-[12px] font-semibold text-sky-100 hover:bg-sky-400/15 disabled:opacity-50"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-sky-400/35 bg-sky-400/10 px-4 text-[15px] font-semibold text-sky-100 hover:bg-sky-400/15 disabled:opacity-50"
             disabled={uploadBusy}
             aria-busy={uploadBusy}
             onClick={() => fileInputRef.current?.click()}
           >
-            {uploadBusy ? "Uploaden…" : "Bestand uploaden naar mediabibliotheek"}
+            {uploadBusy ? "Uploaden…" : "Foto uploaden vanaf uw apparaat"}
           </button>
           <input
             ref={fileInputRef}
@@ -280,12 +280,12 @@ export function BlockImageField({
             onChange={(e) => void onUploadFile(e.target.files)}
           />
           {uploadStatus ? (
-            <p className="text-[11px] text-emerald-300/90" role="status">
+            <p className="text-[13px] text-emerald-300/90" role="status">
               {uploadStatus}
             </p>
           ) : null}
           {uploadError ? (
-            <p className="text-[11px] text-red-300" role="alert">
+            <p className="text-[13px] text-red-300" role="alert">
               {uploadError}
             </p>
           ) : null}
@@ -293,9 +293,9 @@ export function BlockImageField({
       ) : null}
 
       {projectImages.length > 0 ? (
-        <div className="space-y-1.5">
-          <p className="text-[10px] text-white/45">Projectfoto&apos;s</p>
-          <div className="grid grid-cols-4 gap-1.5" role="listbox" aria-label={`${label} kiezen`}>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-white/50">Of kies een bestaande projectfoto:</p>
+          <div className="grid grid-cols-4 gap-2" role="listbox" aria-label={`${label} kiezen`}>
             {(preferTags.length > 0
               ? [
                   ...projectImages.filter((p) => preferTags.some((t) => p.tags?.includes(t))),
@@ -315,8 +315,8 @@ export function BlockImageField({
                     aria-selected={selected}
                     title={item.label}
                     onClick={() => applyLocalPath(item.path, item.label)}
-                    className={`h-12 overflow-hidden rounded-md border bg-black/50 ${
-                      selected ? "border-sky-400 ring-1 ring-sky-400/50" : "border-white/10 hover:border-white/35"
+                    className={`h-14 overflow-hidden rounded-lg border bg-black/50 ${
+                      selected ? "border-sky-400 ring-2 ring-sky-400/50" : "border-white/10 hover:border-white/35"
                     }`}
                   >
                     <img src={mediaSrc(src)} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -327,8 +327,8 @@ export function BlockImageField({
         </div>
       ) : null}
 
-      <details className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
-        <summary className="cursor-pointer text-[11px] text-white/55 hover:text-white/80">
+      <details className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+        <summary className="cursor-pointer text-[13px] text-white/60 hover:text-white/85">
           Pad of https-URL
         </summary>
         <div className="mt-2 space-y-2 pb-1">
@@ -363,7 +363,7 @@ export function BlockImageField({
             />
           </Field>
           {srcError ? (
-            <p className="text-[11px] text-amber-200" role="alert">
+            <p className="text-[13px] text-amber-200" role="alert">
               {srcError}
             </p>
           ) : null}
@@ -383,9 +383,10 @@ export function BlockImageField({
         />
       </Field>
       <EnDraftFor fieldPath={enAltPath} label="Alt-tekst" />
-      <label className="flex items-center gap-2 text-xs text-white/70">
+      <label className="flex items-center gap-2.5 text-[13px] text-white/75">
         <input
           type="checkbox"
+          className="h-5 w-5 rounded border-white/20 accent-sky-500"
           checked={value?.decorative === true}
           onChange={(e) => {
             if (!value) return;
@@ -398,7 +399,7 @@ export function BlockImageField({
       {!value ? (
         <button
           type="button"
-          className="text-xs text-sky-300"
+          className="rounded-lg px-2 py-1 text-[13px] font-medium text-sky-300 transition hover:bg-sky-400/10"
           onClick={() => onChange({ ...PLACEHOLDER })}
         >
           Standaard placeholder gebruiken

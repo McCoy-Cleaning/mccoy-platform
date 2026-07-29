@@ -90,11 +90,11 @@ export function LayoutList({
                 aria-hidden
               />
 
-              <div className={cn("relative z-0 flex items-center gap-2.5", compact ? "px-3 py-2.5" : "p-3.5")}>
+              <div className={cn("relative z-0 flex items-center gap-3", compact ? "px-4 py-3.5" : "p-4")}>
                 <span
                   className={cn(
-                    "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[11px] font-semibold tabular-nums",
-                    expanded ? "bg-sky-400/20 text-sky-200" : "bg-white/[0.05] text-white/35",
+                    "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-bold tabular-nums",
+                    expanded ? "bg-sky-400/20 text-sky-200" : "bg-white/[0.05] text-white/40",
                   )}
                 >
                   {index + 1}
@@ -108,12 +108,12 @@ export function LayoutList({
                   aria-expanded={expanded}
                 >
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-[13px] font-semibold leading-tight tracking-tight text-white">
+                    <p className="truncate text-[15px] font-semibold leading-tight tracking-tight text-white">
                       {row.label}
                     </p>
                     <span
                       className={cn(
-                        "shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]",
+                        "shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]",
                         isAddable
                           ? "bg-sky-400/12 text-sky-200/90"
                           : "bg-white/[0.06] text-white/45",
@@ -122,25 +122,25 @@ export function LayoutList({
                       {isAddable ? "Sectie" : "Vast"}
                     </span>
                     {row.hidden ? (
-                      <span className="shrink-0 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-200/90">
+                      <span className="shrink-0 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-amber-200/90">
                         Verborgen
                       </span>
                     ) : (
                       <span className="sr-only">Zichtbaar</span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-[10px] text-white/35">
+                  <p className="mt-1 truncate text-[13px] text-white/45">
                     {row.summary
                       ? row.summary
                       : expanded
                         ? "Inhoud bewerken"
                         : row.canEdit
-                          ? "Klik om te bewerken"
+                          ? "Tik om te bewerken"
                           : "Alleen volgorde"}
                   </p>
                 </button>
 
-                <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-white/[0.06] bg-black/25 p-0.5">
+                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/[0.06] bg-black/25 p-1">
                   <IconButton
                     label={`${row.label} omhoog`}
                     disabled={!row.canMoveUp}
@@ -187,7 +187,7 @@ export function LayoutList({
               </div>
 
               {expanded && renderExpanded ? (
-                <div className="relative z-10 border-t border-white/[0.06] bg-black/15 px-3.5 py-3.5 pointer-events-auto">
+                <div className="relative z-10 border-t border-white/[0.06] bg-black/15 px-4 py-4 pointer-events-auto">
                   {renderExpanded(row.id)}
                 </div>
               ) : null}
@@ -200,9 +200,9 @@ export function LayoutList({
         <button
           type="button"
           onClick={onAdd}
-          className="group mt-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-3 py-3 text-[12px] font-semibold text-white/55 transition hover:border-sky-400/45 hover:bg-sky-400/[0.08] hover:text-sky-100"
+          className="group mt-1 inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 text-[15px] font-semibold text-white/60 transition hover:border-sky-400/45 hover:bg-sky-400/[0.08] hover:text-sky-100"
         >
-          <span className="grid h-6 w-6 place-items-center rounded-lg bg-white/[0.06] text-white/70 transition group-hover:bg-sky-400/20 group-hover:text-sky-200">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] text-white/70 transition group-hover:bg-sky-400/20 group-hover:text-sky-200">
             <PlusIcon />
           </span>
           {addLabel}
@@ -233,10 +233,11 @@ function IconButton({
     <button
       type="button"
       aria-label={label}
+      title={label}
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "grid h-8 w-8 place-items-center rounded-lg text-white/50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed disabled:opacity-25",
+        "grid h-11 w-11 place-items-center rounded-xl text-white/55 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed disabled:opacity-25",
         "hover:bg-white/10 hover:text-white",
         danger && "hover:bg-red-500/15 hover:text-red-300",
         tone === "warn" && "text-amber-200/80 hover:bg-amber-400/10 hover:text-amber-100",
@@ -250,7 +251,7 @@ function IconButton({
 
 function ChevronUpIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -258,7 +259,7 @@ function ChevronUpIcon() {
 
 function ChevronDownIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -266,7 +267,7 @@ function ChevronDownIcon() {
 
 function EyeIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"
         stroke="currentColor"
@@ -280,7 +281,7 @@ function EyeIcon() {
 
 function EyeOffIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M3 3l18 18M10.6 10.6a3 3 0 004.2 4.2M9.9 5.1A10.4 10.4 0 0112 5c6.5 0 10 7 10 7a18.4 18.4 0 01-4.2 4.8M6.1 6.1C3.7 7.8 2 12 2 12s3.5 7 10 7c1.3 0 2.5-.2 3.6-.6"
         stroke="currentColor"
@@ -294,7 +295,7 @@ function EyeOffIcon() {
 
 function PencilIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
         stroke="currentColor"
@@ -308,7 +309,7 @@ function PencilIcon() {
 
 function TrashIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
         stroke="currentColor"
@@ -322,7 +323,7 @@ function TrashIcon() {
 
 function CopyIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
       <path
         d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
@@ -336,7 +337,7 @@ function CopyIcon() {
 
 function PlusIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );

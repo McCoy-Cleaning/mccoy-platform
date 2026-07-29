@@ -33,11 +33,11 @@ type NavItem = {
 };
 
 export const ADMIN_NAV: NavItem[] = [
-  { to: "/admin", label: "Overzicht", icon: LayoutDashboard, hint: "Dashboard" },
-  { to: "/admin/website", label: "Website", icon: Globe2, hint: "Content & pagina's" },
-  { to: "/admin/inquiries", label: "Aanvragen", icon: Inbox, hint: "Inkomende berichten" },
-  { to: "/admin/users", label: "Gebruikers", icon: Users, hint: "Teamleden & rollen" },
-  { to: "/admin/products", label: "Producten", icon: Package, hint: "Catalogus" },
+  { to: "/admin", label: "Overzicht", icon: LayoutDashboard, hint: "Start — wat er speelt" },
+  { to: "/admin/website", label: "Website", icon: Globe2, hint: "Pagina's, teksten & foto's" },
+  { to: "/admin/inquiries", label: "Aanvragen", icon: Inbox, hint: "Berichten van klanten" },
+  { to: "/admin/users", label: "Gebruikers", icon: Users, hint: "Wie mag er in het beheer" },
+  { to: "/admin/products", label: "Producten", icon: Package, hint: "Uw catalogus" },
 ];
 
 function AdminLayout() {
@@ -126,10 +126,10 @@ function AdminLayout() {
 
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px] gap-6 px-4 py-4 lg:px-6 lg:py-6">
         {/* Desktop sidebar */}
-        <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl lg:flex">
+        <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-72 shrink-0 flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_32px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:flex">
           <SidebarBrand />
           <NavList pathname={pathname} onNavigate={() => {}} requestsUnread={requestsUnread} />
-          <div className="mt-auto">
+          <div className="mt-auto pt-4">
             <UserCard
               username={session.username}
               onSignOut={() => {
@@ -141,14 +141,14 @@ function AdminLayout() {
 
         <main className="min-w-0 flex-1">
           {/* Mobile top bar */}
-          <header className="mb-4 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 backdrop-blur-xl lg:hidden">
+          <header className="mb-4 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-xl lg:hidden">
             <SidebarBrand compact />
             <div className="flex items-center gap-2">
               <NotificationCentre />
               <button
                 onClick={() => setMobileOpen(true)}
                 aria-label="Menu openen"
-                className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 transition hover:bg-white/10"
+                className="a-icon-btn"
               >
                 <Menu className="h-5 w-5" />
               </button>
@@ -172,7 +172,7 @@ function AdminLayout() {
         />
         <aside
           className={cn(
-            "absolute inset-y-0 left-0 flex w-[85%] max-w-xs flex-col border-r border-white/10 bg-[#0a0a0f] p-4 shadow-2xl transition-transform duration-300",
+            "absolute inset-y-0 left-0 flex w-[88%] max-w-sm flex-col border-r border-white/10 bg-[#0a0a0f] p-5 shadow-2xl transition-transform duration-300",
             mobileOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -181,7 +181,7 @@ function AdminLayout() {
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Menu sluiten"
-              className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5"
+              className="a-icon-btn"
             >
               <X className="h-5 w-5" />
             </button>
@@ -203,7 +203,7 @@ function AdminLayout() {
       </div>
 
       {/* Mobile bottom dock — always visible for out-of-the-box mobile UX */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-white/10 bg-black/70 p-1.5 backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-white/10 bg-black/80 p-2 backdrop-blur-xl lg:hidden">
         <ul className="grid grid-cols-5 gap-1">
           {ADMIN_NAV.map((item) => {
             const active = pathname === item.to;
@@ -214,18 +214,18 @@ function AdminLayout() {
                 <Link
                   to={item.to}
                   className={cn(
-                    "relative flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-medium transition-all",
+                    "relative flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2.5 text-[11px] font-semibold transition-all",
                     active
                       ? "bg-[#1e88e5] text-white shadow-lg shadow-[#1e88e5]/30"
-                      : "text-white/60 hover:text-white",
+                      : "text-white/65 hover:text-white",
                   )}
                 >
                   <span className="relative">
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-5 w-5" />
                     {badge > 0 && (
                       <span
                         aria-hidden="true"
-                        className="absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full bg-[#ef4444] ring-2 ring-[#0a0a0f]"
+                        className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-[#0a0a0f]"
                       />
                     )}
                   </span>
@@ -239,7 +239,7 @@ function AdminLayout() {
       </nav>
 
       {/* padding so content isn't hidden under dock */}
-      <div className="h-20 lg:hidden" />
+      <div className="h-24 lg:hidden" />
     </div>
   );
 }
@@ -250,13 +250,13 @@ function SidebarBrand({ compact }: { compact?: boolean }) {
       <img
         src={logoUrl}
         alt="McCoy Cleaning"
-        className={cn("w-auto object-contain", compact ? "h-8" : "h-9")}
+        className={cn("w-auto object-contain", compact ? "h-9" : "h-11")}
         draggable={false}
       />
       {!compact && (
         <div className="min-w-0">
-          <div className="truncate text-sm font-bold tracking-tight">McCoy Admin</div>
-          <div className="truncate text-[11px] text-white/50">Control center</div>
+          <div className="truncate text-base font-bold tracking-tight">McCoy Beheer</div>
+          <div className="truncate text-xs text-white/55">Uw website & aanvragen</div>
         </div>
       )}
     </Link>
@@ -273,7 +273,7 @@ function NavList({
   requestsUnread?: number;
 }) {
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col gap-1.5">
       {ADMIN_NAV.map((item) => {
         const active = pathname === item.to;
         const Icon = item.icon;
@@ -284,25 +284,34 @@ function NavList({
               to={item.to}
               onClick={onNavigate}
               className={cn(
-                "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all",
+                "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 transition-all",
                 active
-                  ? "bg-gradient-to-r from-[#1e88e5]/20 to-transparent text-white shadow-inner"
-                  : "text-white/60 hover:bg-white/5 hover:text-white",
+                  ? "bg-gradient-to-r from-[#1e88e5]/25 via-[#1e88e5]/10 to-transparent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  : "text-white/65 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-[#1e88e5]" />
+                <span className="absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2f9ff0]" />
               )}
-              <Icon
+              <span
                 className={cn(
-                  "h-4 w-4 transition-transform group-hover:scale-110",
-                  active && "text-[#1e88e5]",
+                  "grid h-10 w-10 shrink-0 place-items-center rounded-xl transition",
+                  active
+                    ? "bg-[#1e88e5] text-white shadow-lg shadow-[#1e88e5]/40"
+                    : "bg-white/[0.06] text-white/60 group-hover:text-white",
                 )}
-              />
-              <span className="flex-1 truncate font-medium">{item.label}</span>
+              >
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold leading-tight">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-white/45">{item.hint}</span>
+              </span>
               {badge > 0 && (
                 <span
-                  className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ef4444] px-1.5 text-[10px] font-semibold text-white"
+                  className="ml-auto inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#ef4444] px-1.5 text-xs font-bold text-white"
                   aria-label={`${badge} ongelezen aanvragen`}
                 >
                   {badge > 99 ? "99+" : badge}
@@ -318,30 +327,33 @@ function NavList({
 
 function UserCard({ username, onSignOut }: { username: string; onSignOut: () => void }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#1e88e5] to-[#7c3aed] text-xs font-bold uppercase">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#1e88e5] to-[#7c3aed] text-sm font-bold uppercase shadow-lg shadow-[#1e88e5]/25">
           {username.slice(0, 2)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{username}</div>
-          <div className="truncate text-[11px] text-white/50">Beheerder</div>
+          <div className="truncate text-[15px] font-semibold">{username}</div>
+          <div className="truncate text-xs text-white/50">Beheerder</div>
         </div>
-        <NotificationCentre className="h-8 w-8" />
+        <NotificationCentre className="h-11 w-11" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <Link
           to="/admin/settings"
           aria-label="Instellingen"
-          title="Instellingen"
-          className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-3 text-sm font-semibold text-white/85 transition hover:border-white/30 hover:bg-white/10 hover:text-white"
         >
           <Settings className="h-4 w-4" />
+          Instellingen
         </Link>
         <button
           onClick={onSignOut}
           aria-label="Uitloggen"
-          className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 text-sm font-semibold text-red-200 transition hover:border-red-400/50 hover:bg-red-500/20 hover:text-red-100"
         >
           <LogOut className="h-4 w-4" />
+          Uitloggen
         </button>
       </div>
     </div>

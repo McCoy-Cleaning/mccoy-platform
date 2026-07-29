@@ -19,31 +19,31 @@ function UsersPage() {
         icon={Users}
         accent="#a78bfa"
         title="Gebruikers"
-        subtitle="Teamleden en toegangsrollen voor het admin control center."
-        actions={[{ label: "Uitnodigen", icon: UserPlus }]}
+        subtitle="Wie mag er in het beheer? Hier staan alle teamleden en hun rol."
+        actions={[{ label: "Teamlid uitnodigen", icon: UserPlus }]}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {USERS.map((u) => (
           <div
             key={u.email}
-            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/20"
+            className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
           >
-            <div className="flex items-center gap-3">
-              <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br ${u.tone} text-sm font-bold text-white shadow-lg`}>
+            <div className="flex items-center gap-4">
+              <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br ${u.tone} text-base font-bold text-white shadow-lg`}>
                 {u.initials}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{u.name}</div>
-                <div className="truncate text-xs text-white/50">{u.email}</div>
+                <div className="truncate text-lg font-bold tracking-tight">{u.name}</div>
+                <div className="truncate text-sm text-white/50">{u.email}</div>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80">
-                <Shield className="h-3 w-3" />
+            <div className="mt-5 flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-sm font-medium text-white/85">
+                <Shield className="h-4 w-4" />
                 {u.role}
               </span>
-              <span className="text-[11px] text-emerald-300">● Actief</span>
+              <span className="text-sm font-medium text-emerald-300">● Actief</span>
             </div>
           </div>
         ))}

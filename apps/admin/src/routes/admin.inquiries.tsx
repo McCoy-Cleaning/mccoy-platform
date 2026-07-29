@@ -245,7 +245,7 @@ function InquiriesPage() {
         icon={Inbox}
         accent="#22d3ee"
         title="Aanvragen"
-        subtitle="Websiteformulieren uit de Microsoft 365- of IMAP-mailbox, gefilterd op type en scope."
+        subtitle="Alle berichten die klanten via de website sturen. Tik op een bericht om te lezen en te antwoorden."
         actions={[
           {
             label: "Vernieuwen",
@@ -271,7 +271,7 @@ function InquiriesPage() {
       ) : (
         <>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40" />
             <label className="sr-only" htmlFor="inquiry-search">
               Zoek e-mails
             </label>
@@ -279,8 +279,8 @@ function InquiriesPage() {
               id="inquiry-search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Zoek op onderwerp, afzender of e-mail…"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-10 py-2.5 text-sm outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+              placeholder="Zoek op naam, e-mail of onderwerp…"
+              className="w-full rounded-2xl border border-white/15 bg-white/[0.04] py-3.5 pl-12 pr-4 text-base outline-none transition placeholder:text-white/35 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
             />
           </div>
 
@@ -300,13 +300,13 @@ function InquiriesPage() {
                   aria-selected={isActive}
                   onClick={() => setKind(f.id)}
                   className={cn(
-                    "group relative flex shrink-0 snap-start items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-all",
+                    "group relative flex shrink-0 snap-start items-center gap-2.5 rounded-2xl border px-5 py-3 text-[15px] font-semibold transition-all",
                     isActive
                       ? "border-transparent bg-white text-[#0a0a0f] shadow-lg"
-                      : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white",
+                      : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25 hover:text-white",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                   {f.label}
                 </button>
               );
@@ -316,14 +316,14 @@ function InquiriesPage() {
           {scopeFacets.length > 0 ? (
             useScopeSelect ? (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label htmlFor="inquiry-scope" className="text-xs font-medium text-white/50">
+                <label htmlFor="inquiry-scope" className="text-sm font-medium text-white/60">
                   Scope
                 </label>
                 <select
                   id="inquiry-scope"
                   value={scopeKey}
                   onChange={(e) => setScopeKey(e.target.value as ScopeFilter)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm outline-none focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 sm:max-w-xs"
+                  className="w-full rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base outline-none focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 sm:max-w-xs"
                 >
                   <option value="all">Alle scopes</option>
                   {scopeFacets.map((s) => (
@@ -345,10 +345,10 @@ function InquiriesPage() {
                   aria-selected={scopeKey === "all"}
                   onClick={() => setScopeKey("all")}
                   className={cn(
-                    "shrink-0 snap-start rounded-xl border px-3.5 py-2 text-sm font-medium transition-all",
+                    "shrink-0 snap-start rounded-2xl border px-5 py-3 text-[15px] font-semibold transition-all",
                     scopeKey === "all"
                       ? "border-transparent bg-white text-[#0a0a0f] shadow-lg"
-                      : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white",
+                      : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25 hover:text-white",
                   )}
                 >
                   Alle scopes
@@ -363,10 +363,10 @@ function InquiriesPage() {
                       aria-selected={isActive}
                       onClick={() => setScopeKey(s.key)}
                       className={cn(
-                        "shrink-0 snap-start rounded-xl border px-3.5 py-2 text-sm font-medium transition-all",
+                        "shrink-0 snap-start rounded-2xl border px-5 py-3 text-[15px] font-semibold transition-all",
                         isActive
                           ? "border-transparent bg-white text-[#0a0a0f] shadow-lg"
-                          : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white",
+                          : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25 hover:text-white",
                       )}
                     >
                       {s.label}
@@ -377,49 +377,49 @@ function InquiriesPage() {
             )
           ) : null}
 
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
+          <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
             {listState === "loading" && (
-              <div className="flex items-center justify-center gap-2 p-10 text-sm text-white/50">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Mailbox laden…
+              <div className="flex items-center justify-center gap-3 p-12 text-base text-white/55">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Berichten laden…
               </div>
             )}
             {listState === "error" && (
-              <div role="alert" className="space-y-3 p-8 text-center">
+              <div role="alert" className="space-y-4 p-10 text-center">
                 {listErrorCode === "config" ? (
                   <>
-                    <AlertTriangle className="mx-auto h-8 w-8 text-amber-300/80" />
-                    <p className="text-sm font-medium text-amber-100">
+                    <AlertTriangle className="mx-auto h-10 w-10 text-amber-300/80" />
+                    <p className="text-base font-semibold text-amber-100">
                       Mailbox niet geconfigureerd
                     </p>
-                    <p className="mx-auto max-w-md text-xs text-white/50">
+                    <p className="mx-auto max-w-md text-sm leading-relaxed text-white/55">
                       {listError}. Zet{" "}
-                      <code className="text-white/70">FORM_INBOX_PROVIDER=imap</code> terwijl Graph
+                      <code className="text-white/75">FORM_INBOX_PROVIDER=imap</code> terwijl Graph
                       nog niet klaar is, plus SMTP_* / FORM_INBOX_* (IMAP lezen + SMTP versturen).
                       Of configureer Microsoft Graph. Zie docs/apps-and-hosts.md.
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-red-300">{listError ?? "Er ging iets mis."}</p>
+                  <p className="text-base text-red-300">{listError ?? "Er ging iets mis."}</p>
                 )}
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => void loadList()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium hover:bg-white/10"
+                    className="a-btn a-btn-secondary"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw className="h-4 w-4" />
                     Opnieuw proberen
                   </button>
                 </div>
               </div>
             )}
             {listState === "ready" && items.length === 0 && (
-              <div className="p-10 text-center">
-                <Mail className="mx-auto mb-3 h-8 w-8 text-white/30" />
-                <p className="text-sm font-medium text-white/70">Geen formulier-e-mails gevonden</p>
-                <p className="mt-1 text-xs text-white/40">
-                  Alleen berichten die matchen op bekende formulieronderwerpen worden getoond.
+              <div className="p-12 text-center">
+                <Mail className="mx-auto mb-4 h-10 w-10 text-white/30" />
+                <p className="text-lg font-semibold text-white/80">Geen berichten gevonden</p>
+                <p className="mt-2 text-[15px] text-white/50">
+                  Zodra een klant een formulier op de website invult, verschijnt het hier.
                 </p>
               </div>
             )}
@@ -433,46 +433,46 @@ function InquiriesPage() {
                       <button
                         type="button"
                         onClick={() => void loadDetail(m.id)}
-                        className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1e88e5]"
+                        className="group flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1e88e5]"
                       >
                         <div
-                          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10"
+                          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10"
                           style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
                         >
-                          <Icon className="h-4 w-4" />
+                          <Icon className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <div className="truncate text-sm font-semibold">
+                            <div className="truncate text-base font-semibold">
                               {m.submitterName ?? m.submitterEmail ?? m.from}
                             </div>
                             {m.unread && (
-                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1e88e5] shadow-[0_0_8px_rgba(30,136,229,0.9)]" />
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-[#2f9ff0] shadow-[0_0_8px_rgba(30,136,229,0.9)]" aria-label="Ongelezen" />
                             )}
-                            <span className="hidden rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/50 sm:inline">
+                            <span className="hidden rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/55 sm:inline">
                               {KIND_LABELS[m.kind]}
                             </span>
                             {m.scopeLabel || m.scopeKey ? (
-                              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-100">
+                              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs text-cyan-100">
                                 {m.scopeLabel || m.scopeKey}
                               </span>
                             ) : null}
                           </div>
-                          <div className="truncate text-xs text-white/50">
+                          <div className="mt-0.5 truncate text-sm text-white/55">
                             {m.submitterName && m.submitterEmail
                               ? m.submitterEmail
                               : KIND_LABELS[m.kind]}
                           </div>
                           {m.snippet && m.snippet !== m.submitterEmail && (
-                            <div className="mt-0.5 truncate text-[11px] text-white/35">
+                            <div className="mt-0.5 truncate text-sm text-white/40">
                               {m.snippet}
                             </div>
                           )}
                         </div>
-                        <div className="shrink-0 text-right text-xs text-white/40">
+                        <div className="shrink-0 text-right text-sm text-white/45">
                           <div>{relativeWhen(m.date)}</div>
                           {m.requestNumber && (
-                            <div className="mt-0.5 font-mono text-[10px] text-white/30">
+                            <div className="mt-0.5 font-mono text-xs text-white/35">
                               {m.requestNumber}
                             </div>
                           )}
@@ -547,15 +547,15 @@ function InboxDetail({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+        className="a-btn a-btn-secondary"
       >
         <ArrowLeft className="h-4 w-4" />
         Terug naar overzicht
       </button>
 
       {state === "loading" && (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-sm text-white/50">
-          <Loader2 className="h-4 w-4 animate-spin" />
+        <div className="flex items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-base text-white/55">
+          <Loader2 className="h-5 w-5 animate-spin" />
           Bericht laden…
         </div>
       )}
@@ -563,7 +563,7 @@ function InboxDetail({
       {state === "error" && (
         <div
           role="alert"
-          className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-sm text-red-300"
+          className="rounded-3xl border border-red-500/30 bg-red-500/10 p-6 text-base text-red-200"
         >
           {error ?? "Kon details niet laden."}
         </div>
@@ -571,14 +571,14 @@ function InboxDetail({
 
       {detail && state !== "loading" && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
-          <section className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl">
+          <section className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
             <div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-white/45">
                 <span>{KIND_LABELS[detail.kind]}</span>
                 {detail.scopeLabel || detail.scopeKey ? (
                   <>
                     <span>·</span>
-                    <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">
+                    <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs text-cyan-100">
                       {detail.scopeLabel || detail.scopeKey}
                     </span>
                   </>
@@ -590,22 +590,22 @@ function InboxDetail({
                   </>
                 )}
               </div>
-              <h2 className="mt-1 text-xl font-bold tracking-tight break-words">
+              <h2 className="mt-1.5 text-2xl font-bold tracking-tight break-words">
                 {detail.submitterName ??
                   detail.fields.find((f) => f.key === "name")?.value ??
                   detail.subject}
               </h2>
-              <p className="mt-1 text-xs text-white/40">{formatWhen(detail.date)}</p>
+              <p className="mt-1 text-sm text-white/45">{formatWhen(detail.date)}</p>
             </div>
 
-            <dl className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 text-sm sm:grid-cols-2">
+            <dl className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-[15px] sm:grid-cols-2">
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/40">Van</dt>
-                <dd className="break-all text-white/85">{detail.from}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-white/45">Van</dt>
+                <dd className="mt-0.5 break-all text-white/85">{detail.from}</dd>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/40">Antwoord naar</dt>
-                <dd className="break-all text-white/85">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-white/45">Antwoord naar</dt>
+                <dd className="mt-0.5 break-all text-white/85">
                   {detail.submitterEmail ?? "Niet gevonden"}
                 </dd>
               </div>
@@ -613,16 +613,16 @@ function InboxDetail({
 
             {detail.fields.length > 0 ? (
               <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-                  Formuliergegevens
+                <h3 className="mb-2.5 text-sm font-semibold uppercase tracking-wider text-white/55">
+                  Ingevulde gegevens
                 </h3>
-                <dl className="divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                <dl className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                   {detail.fields.map((field) => (
                     <div
                       key={`${field.key}-${field.label}`}
-                      className="grid gap-1 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4"
+                      className="grid gap-1 px-4 py-3.5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4"
                     >
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-white/45">
+                      <dt className="text-sm font-semibold uppercase tracking-wide text-white/50">
                         {FIELD_LABELS_NL[field.key] ?? field.label}
                       </dt>
                       <dd className="min-w-0">
@@ -638,11 +638,11 @@ function InboxDetail({
               </div>
             ) : (
               <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+                <h3 className="mb-2.5 text-sm font-semibold uppercase tracking-wider text-white/55">
                   Inhoud
                 </h3>
-                <div className="max-h-[20rem] overflow-auto rounded-xl border border-white/10 bg-black/20 p-4">
-                  <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-white/85">
+                <div className="max-h-[20rem] overflow-auto rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-relaxed text-white/85">
                     {detail.textBody || "(geen tekstinhoud)"}
                   </pre>
                 </div>
@@ -654,16 +654,16 @@ function InboxDetail({
             <ConversationThread thread={detail.thread} rootId={detail.id} />
           </section>
 
-          <section className="h-fit rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl">
-            <h3 className="text-sm font-semibold">Antwoorden</h3>
-            <p className="mt-1 text-xs text-white/45">
+          <section className="h-fit rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+            <h3 className="text-xl font-bold tracking-tight">Antwoorden</h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/55">
               {detail.submitterEmail
-                ? `Stuur een e-mail naar de indiener (${detail.submitterEmail}). Het gesprek verschijnt hieronder in de thread.`
+                ? `Uw antwoord gaat als e-mail naar ${detail.submitterEmail}. Het gesprek blijft hier bewaard.`
                 : "Geen submitter-e-mail gevonden — antwoorden is niet mogelijk."}
             </p>
 
-            <label className="mt-4 block">
-              <span className="mb-1.5 block text-xs font-medium text-white/70">Bericht</span>
+            <label className="mt-5 block">
+              <span className="a-label">Uw bericht</span>
               <textarea
                 value={reply}
                 onChange={(e) => {
@@ -673,15 +673,15 @@ function InboxDetail({
                 rows={8}
                 maxLength={8000}
                 disabled={!detail.submitterEmail}
-                placeholder="Typ je antwoord…"
-                className="w-full resize-y rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 disabled:opacity-50"
+                placeholder="Typ hier uw antwoord…"
+                className="w-full resize-y rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-base outline-none transition placeholder:text-white/35 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 disabled:opacity-50"
               />
             </label>
 
             {replySuccess && (
               <div
                 role="status"
-                className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300"
+                className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
               >
                 {replySuccess}
               </div>
@@ -690,11 +690,11 @@ function InboxDetail({
             <Button
               type="button"
               size="lg"
-              className="mt-4 w-full"
+              className="mt-4 min-h-14 w-full rounded-xl text-base font-semibold"
               onClick={() => setConfirmOpen(true)}
               disabled={busy || !detail.submitterEmail || reply.trim().length < 2}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
               Verstuur antwoord
             </Button>
 
@@ -740,23 +740,23 @@ function FormFieldValue({
     COLLAPSE_FIELD_KEYS.has(fieldKey) && value.trim().length > COLLAPSE_CHAR_THRESHOLD;
 
   if (!shouldCollapse) {
-    return <p className="whitespace-pre-wrap break-words text-sm text-white/90">{value}</p>;
+    return <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-white/90">{value}</p>;
   }
 
   const preview = value.trim().slice(0, COLLAPSE_CHAR_THRESHOLD).trimEnd();
 
   return (
     <div className="space-y-2">
-      <p className="whitespace-pre-wrap break-words text-sm text-white/90">
+      <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-white/90">
         {preview}
         <span className="text-white/40">…</span>
       </p>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e88e5]"
+        className="inline-flex items-center rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e88e5]"
       >
-        Uitklappen
+        Alles lezen
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-hidden border-white/10 bg-[#0f172a] text-white sm:rounded-2xl">
@@ -765,7 +765,7 @@ function FormFieldValue({
             <DialogDescription className="sr-only">Volledige tekst van {label}</DialogDescription>
           </DialogHeader>
           <div className="max-h-[min(60vh,28rem)] overflow-y-auto rounded-xl border border-white/10 bg-black/30 p-4">
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-white/90">
+            <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-white/90">
               {value}
             </p>
           </div>
@@ -838,19 +838,19 @@ function AttachmentsBlock({
 
   return (
     <div>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-        <Paperclip className="h-3.5 w-3.5" />
+      <h3 className="mb-2.5 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/55">
+        <Paperclip className="h-4 w-4" />
         Bijlagen
       </h3>
       <ul className="space-y-2">
         {attachments.map((att) => (
           <li
             key={`${att.filename}-${att.size}`}
-            className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
           >
             <div className="min-w-0">
-              <div className="truncate text-sm text-white/90">{att.filename}</div>
-              <div className="text-[11px] text-white/40">
+              <div className="truncate text-[15px] text-white/90">{att.filename}</div>
+              <div className="text-xs text-white/45">
                 {att.contentType}
                 {att.size > 0 ? ` · ${Math.round(att.size / 1024)} KB` : ""}
               </div>
@@ -859,12 +859,12 @@ function AttachmentsBlock({
               type="button"
               onClick={() => void download(att)}
               disabled={busyName === att.filename}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/10 disabled:opacity-50"
             >
               {busyName === att.filename ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-3.5 w-3.5" />
+                <Download className="h-4 w-4" />
               )}
               Download
             </button>
@@ -872,7 +872,7 @@ function AttachmentsBlock({
         ))}
       </ul>
       {error && (
-        <p className="mt-2 text-xs text-red-300" role="alert">
+        <p className="mt-2 text-sm text-red-300" role="alert">
           {error}
         </p>
       )}
@@ -894,8 +894,8 @@ function ConversationThread({ thread, rootId }: { thread: FormInboxThreadItem[];
 
   return (
     <div>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-        <MessageSquare className="h-3.5 w-3.5" />
+      <h3 className="mb-2.5 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/55">
+        <MessageSquare className="h-4 w-4" />
         Gesprek ({thread.length})
       </h3>
       <ol className="space-y-3">
@@ -903,20 +903,20 @@ function ConversationThread({ thread, rootId }: { thread: FormInboxThreadItem[];
           <li
             key={item.id}
             className={cn(
-              "rounded-xl border p-3",
+              "rounded-2xl border p-4",
               item.direction === "admin" && "border-[#1e88e5]/30 bg-[#1e88e5]/10",
               item.direction === "customer" && "border-emerald-500/25 bg-emerald-500/10",
               item.direction === "form" && "border-white/10 bg-black/20",
             )}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/45">
-              <span className="font-semibold text-white/70">{directionLabel[item.direction]}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/50">
+              <span className="font-semibold text-white/75">{directionLabel[item.direction]}</span>
               <span>{formatWhen(item.date)}</span>
             </div>
-            <div className="mt-1 text-xs text-white/40">
+            <div className="mt-1 text-xs text-white/45">
               {item.from} → {item.to}
             </div>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/85">
+            <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-white/85">
               {item.direction === "form"
                 ? "(Oorspronkelijke formulieraanvraag — zie velden hierboven)"
                 : item.textBody || "(geen tekst)"}

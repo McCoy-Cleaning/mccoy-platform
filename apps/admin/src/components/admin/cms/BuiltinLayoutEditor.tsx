@@ -280,7 +280,7 @@ export function BuiltinLayoutEditor({
         aria-label="Secties"
         data-cms-toolbar="sections"
         className={cn(
-          "absolute bottom-5 right-5 z-40 inline-flex items-center gap-2.5 rounded-full border px-4 py-2.5 text-xs font-semibold shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl transition",
+          "absolute bottom-5 right-5 z-40 inline-flex items-center gap-3 rounded-full border px-5 py-3 text-[15px] font-semibold shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl transition",
           open
             ? "border-sky-400/50 bg-sky-500 text-white"
             : "border-white/12 bg-[#0d1017]/92 text-white/90 hover:border-white/25 hover:bg-[#141824]",
@@ -288,16 +288,16 @@ export function BuiltinLayoutEditor({
       >
         <span
           className={cn(
-            "grid h-7 w-7 place-items-center rounded-full",
+            "grid h-8 w-8 place-items-center rounded-full",
             open ? "bg-white/20" : "bg-white/10",
           )}
         >
-          <Layers className="h-3.5 w-3.5" />
+          <Layers className="h-4 w-4" />
         </span>
         Secties
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] tabular-nums",
+            "rounded-full px-2.5 py-1 text-xs tabular-nums",
             open ? "bg-black/20 text-white" : "bg-white/10 text-white/70",
           )}
         >
@@ -320,7 +320,7 @@ export function BuiltinLayoutEditor({
         aria-label="Paginaindeling"
         aria-hidden={!open}
         className={cn(
-          "absolute inset-y-0 right-0 z-30 flex w-[min(100%,min(28rem,90vw))] flex-col overflow-hidden border-l border-white/[0.08] transition-transform duration-300 ease-out",
+          "absolute inset-y-0 right-0 z-30 flex w-[min(100%,min(32rem,94vw))] flex-col overflow-hidden border-l border-white/[0.08] transition-transform duration-300 ease-out",
           "bg-[#0b0d12] shadow-[-24px_0_80px_-30px_rgba(0,0,0,0.85)]",
           open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none",
         )}
@@ -334,37 +334,38 @@ export function BuiltinLayoutEditor({
           aria-hidden
         />
 
-        <header className="relative shrink-0 border-b border-white/[0.07] px-4 pb-4 pt-4">
+        <header className="relative shrink-0 border-b border-white/[0.07] px-5 pb-5 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
                 Website editor
               </p>
-              <h3 className="mt-1 font-display text-xl font-semibold tracking-tight text-white">
+              <h3 className="mt-1 font-display text-2xl font-semibold tracking-tight text-white">
                 Secties
               </h3>
-              <p className="mt-1.5 max-w-[16rem] text-[12px] leading-relaxed text-white/45">
-                Bewerk tekst en afbeeldingen per sectie. Wijzigingen zie je direct op het canvas.
+              <p className="mt-2 max-w-[22rem] text-sm leading-relaxed text-white/55">
+                Uw pagina bestaat uit blokken ("secties"). Tik op een sectie om de tekst of
+                foto's aan te passen — u ziet het resultaat meteen in het voorbeeld.
               </p>
             </div>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               aria-label="Secties sluiten"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-white/55 transition hover:bg-white/10 hover:text-white"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white/60 transition hover:bg-white/10 hover:text-white"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex gap-2.5">
             <StatChip label="Totaal" value={rows.length} />
             <StatChip label="Zichtbaar" value={visibleCount} tone="ok" />
             {hiddenCount > 0 ? <StatChip label="Verborgen" value={hiddenCount} tone="warn" /> : null}
           </div>
         </header>
 
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <LayoutList
             compact
             rows={rows}
@@ -488,21 +489,21 @@ export function BuiltinLayoutEditor({
           />
         </div>
 
-        <footer className="relative shrink-0 border-t border-white/[0.07] bg-[#0b0d12]/95 px-3 py-3 backdrop-blur-md">
+        <footer className="relative shrink-0 border-t border-white/[0.07] bg-[#0b0d12]/95 px-4 py-4 backdrop-blur-md">
           {missingFixed.length > 0 ? (
-            <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+            <div className="mb-3 space-y-2.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">
                 Verwijderde vaste secties
               </p>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {missingFixed.map((key) => (
-                  <li key={key} className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-white/70">
+                  <li key={key} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-white/75">
                       {FIXED_SECTION_DEFS[key]?.label ?? key}
                     </span>
                     <button
                       type="button"
-                      className="rounded-lg border border-sky-400/30 bg-sky-500/15 px-2.5 py-1 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                      className="rounded-xl border border-sky-400/30 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                       onClick={() => {
                         const result = cms.addFixedLayoutItem(pageId, key);
                         if (result.ok) {
@@ -529,13 +530,13 @@ export function BuiltinLayoutEditor({
             onClick={openPicker}
             aria-label="Sectie toevoegen"
             data-cms-action="add-section"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-3 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_30px_-12px_rgba(14,165,233,0.8)] transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d12]"
+            className="inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-sky-500 px-4 text-base font-semibold text-white shadow-[0_10px_30px_-12px_rgba(14,165,233,0.8)] transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d12]"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-5 w-5" />
             Sectie toevoegen
           </button>
-          <p className="mt-2 text-center text-[10px] text-white/30">
-            Herbruikbare paginasecties — zelfde sectietypes als op de website.
+          <p className="mt-2.5 text-center text-xs text-white/40">
+            Voeg een nieuw blok toe aan deze pagina — bijvoorbeeld tekst, foto's of een galerij.
           </p>
         </footer>
       </aside>
@@ -588,16 +589,16 @@ function StatChip({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-1 flex-col rounded-xl border px-2.5 py-2",
+        "flex min-w-0 flex-1 flex-col rounded-xl border px-3 py-2.5",
         tone === "neutral" && "border-white/[0.07] bg-white/[0.03]",
         tone === "ok" && "border-emerald-400/20 bg-emerald-400/[0.08]",
         tone === "warn" && "border-amber-400/20 bg-amber-400/[0.08]",
       )}
     >
-      <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/40">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{label}</span>
       <span
         className={cn(
-          "mt-0.5 text-sm font-semibold tabular-nums",
+          "mt-0.5 text-lg font-semibold tabular-nums",
           tone === "ok" && "text-emerald-200",
           tone === "warn" && "text-amber-200",
           tone === "neutral" && "text-white/85",

@@ -100,27 +100,27 @@ function AdminLoginPage() {
           <img
             src={logoUrl}
             alt="McCoy Cleaning"
-            className="mb-5 h-14 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-16"
+            className="mb-6 h-16 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-20"
             draggable={false}
           />
-          <h1 className="text-2xl font-bold tracking-tight text-white">McCoy Admin</h1>
-          <p className="mt-1 text-sm text-white/60">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-white">McCoy Beheer</h1>
+          <p className="mt-2 text-base text-white/60">
             {useSupabaseUi
               ? "Log in met je staff e-mailadres en wachtwoord"
-              : "Log in om het control center te openen"}
+              : "Log in om het beheer te openen"}
           </p>
         </div>
 
         <form
           onSubmit={onSubmit}
-          className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur-xl"
+          className="rounded-3xl border border-white/10 bg-white/[0.05] p-7 shadow-2xl backdrop-blur-xl"
         >
-          <label className="mb-4 block">
-            <span className="mb-1.5 block text-xs font-medium text-white/70">
+          <label className="mb-5 block">
+            <span className="a-label">
               {useSupabaseUi ? "E-mailadres" : "Gebruikersnaam"}
             </span>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+              <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40" />
               <input
                 type={useSupabaseUi ? "email" : "text"}
                 value={identifier}
@@ -128,21 +128,21 @@ function AdminLoginPage() {
                 required
                 autoFocus
                 autoComplete={useSupabaseUi ? "username" : "username"}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-10 py-2.5 text-sm text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+                className="w-full rounded-xl border border-white/15 bg-black/30 py-3.5 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-white/35 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
                 placeholder={useSupabaseUi ? "naam@bedrijf.nl" : "admin"}
               />
             </div>
           </label>
 
-          <label className="mb-4 block">
-            <span className="mb-1.5 block text-xs font-medium text-white/70">Wachtwoord</span>
+          <label className="mb-5 block">
+            <span className="a-label">Wachtwoord</span>
             <PasswordInput
               showLockIcon
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full rounded-xl border border-white/10 bg-black/30 py-2.5 text-sm text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+              className="w-full rounded-xl border border-white/15 bg-black/30 py-3.5 text-base text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
               placeholder="••••••••"
             />
           </label>
@@ -150,7 +150,7 @@ function AdminLoginPage() {
           {error && (
             <div
               role="alert"
-              className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+              className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
             >
               {error}
             </div>
@@ -159,20 +159,20 @@ function AdminLoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1e88e5] to-[#7c3aed] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#1e88e5]/30 transition hover:shadow-[#1e88e5]/50 disabled:opacity-60"
+            className="group flex min-h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#2f9ff0] to-[#1e88e5] px-5 text-lg font-semibold text-white shadow-lg shadow-[#1e88e5]/30 transition hover:shadow-[#1e88e5]/50 hover:brightness-110 disabled:opacity-60"
           >
             {busy ? "Bezig..." : "Inloggen"}
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
           </button>
 
           {authMode && !authMode.supabaseEnabled && authMode.legacyEnabled && (
-            <div className="mt-5 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-3 text-[11px] leading-relaxed text-white/50">
-              <span className="font-semibold text-white/70">Demo credentials:</span>{" "}
-              <code className="rounded bg-white/10 px-1 py-0.5 text-white/80">
+            <div className="mt-6 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm leading-relaxed text-white/55">
+              <span className="font-semibold text-white/75">Demo credentials:</span>{" "}
+              <code className="rounded bg-white/10 px-1.5 py-0.5 text-white/85">
                 {ADMIN_DEMO_CREDENTIALS.username}
               </code>
               {" / "}
-              <code className="rounded bg-white/10 px-1 py-0.5 text-white/80">
+              <code className="rounded bg-white/10 px-1.5 py-0.5 text-white/85">
                 {ADMIN_DEMO_CREDENTIALS.password}
               </code>
             </div>

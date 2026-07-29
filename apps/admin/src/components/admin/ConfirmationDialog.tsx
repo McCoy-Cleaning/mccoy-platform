@@ -65,7 +65,7 @@ export function ConfirmationDialog({
         </AlertDialogHeader>
         {requireText ? (
           <div className="space-y-2">
-            <label htmlFor={inputId} className="text-sm font-medium">
+            <label htmlFor={inputId} className="text-base font-medium">
               Typ <span className="font-mono">{requireText}</span> om te bevestigen
             </label>
             <input
@@ -74,7 +74,7 @@ export function ConfirmationDialog({
               onChange={(e) => setTyped(e.target.value)}
               disabled={pending}
               autoComplete="off"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-h-12 w-full rounded-xl border border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
         ) : null}
@@ -84,13 +84,14 @@ export function ConfirmationDialog({
           </p>
         ) : null}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending} onClick={onCancel}>
+          <AlertDialogCancel disabled={pending} onClick={onCancel} className="min-h-12 rounded-xl px-5 text-[15px]">
             {cancelLabel}
           </AlertDialogCancel>
           <Button
             type="button"
+            size="lg"
             variant={tone === "destructive" ? "destructive" : tone === "warning" ? "outline" : "primary"}
-            className={cn(tone === "warning" && "border-amber-500/50 text-amber-200")}
+            className={cn("min-h-12 rounded-xl px-5 text-[15px] font-semibold", tone === "warning" && "border-amber-500/50 text-amber-200")}
             loading={pending}
             disabled={!canConfirm}
             onClick={() => void onConfirm()}

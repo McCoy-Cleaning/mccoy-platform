@@ -16,36 +16,34 @@ export function PageHeader({
   actions?: Action[];
 }) {
   return (
-    <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-4">
         <div
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 shadow-lg"
+          className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl border border-white/10 shadow-lg"
           style={{ backgroundColor: `${accent}22`, color: accent, boxShadow: `0 10px 30px -12px ${accent}66` }}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-8 w-8" />
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
-          {subtitle && <p className="truncate text-xs text-white/50 sm:text-sm">{subtitle}</p>}
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+          {subtitle && <p className="mt-1.5 text-[15px] leading-relaxed text-white/55 sm:text-base">{subtitle}</p>}
         </div>
       </div>
       {actions.length > 0 && (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {actions.map((a) => {
             const AIcon = a.icon;
-            const cls =
-              "inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white";
             if (a.href) {
               return (
-                <a key={a.label} href={a.href} className={cls} target={a.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
-                  <AIcon className="h-3.5 w-3.5" />
+                <a key={a.label} href={a.href} className="a-btn a-btn-secondary" target={a.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+                  <AIcon className="h-4 w-4" />
                   {a.label}
                 </a>
               );
             }
             return (
-              <button key={a.label} onClick={a.onClick} className={cls}>
-                <AIcon className="h-3.5 w-3.5" />
+              <button key={a.label} onClick={a.onClick} className="a-btn a-btn-secondary">
+                <AIcon className="h-4 w-4" />
                 {a.label}
               </button>
             );
@@ -68,17 +66,17 @@ export function PlaceholderPanel({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5">
-          <Icon className="h-4 w-4 text-white/70" />
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+      <div className="flex items-center gap-4">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5">
+          <Icon className="h-6 w-6 text-white/70" />
         </div>
         <div>
-          <div className="text-xs text-white/50">{title}</div>
-          <div className="text-lg font-bold">{value}</div>
+          <div className="text-sm text-white/55">{title}</div>
+          <div className="text-2xl font-bold tracking-tight">{value}</div>
         </div>
       </div>
-      {hint && <div className="mt-3 text-xs text-white/40">{hint}</div>}
+      {hint && <div className="mt-4 text-sm leading-relaxed text-white/45">{hint}</div>}
     </div>
   );
 }

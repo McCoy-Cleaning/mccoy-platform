@@ -24,26 +24,26 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
       {/* Toolbar */}
       {!embedded && (
       <div className="sticky top-0 z-30 -mx-4 lg:-mx-0 px-4 lg:px-0 backdrop-blur-xl">
-        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/60 p-2">
-          <Link to="/admin/website" className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
-            <ArrowLeft className="h-4 w-4" />
+        <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-black/60 p-2.5">
+          <Link to="/admin/website" aria-label="Terug naar alle pagina's" className="a-icon-btn">
+            <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{page.title}</div>
-            <div className="truncate text-[11px] text-white/40">{page.slug} · {page.blocks.length} secties</div>
+            <div className="truncate text-base font-semibold">{page.title}</div>
+            <div className="truncate text-sm text-white/45">{page.slug} · {page.blocks.length} secties</div>
           </div>
           <button
             onClick={() => setPreviewMode((v) => !v)}
-            className={cn("hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition", previewMode ? "border-[#1e88e5] bg-[#1e88e5]/20 text-white" : "border-white/10 bg-white/5 text-white/70 hover:text-white")}
+            className={cn("hidden sm:inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition", previewMode ? "border-[#1e88e5] bg-[#1e88e5]/20 text-white" : "border-white/10 bg-white/5 text-white/70 hover:text-white")}
           >
-            {previewMode ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {previewMode ? "Bewerken" : "Preview"}
+            {previewMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {previewMode ? "Bewerken" : "Voorbeeld"}
           </button>
           <button
             onClick={() => setSettingsOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white"
           >
-            <Settings className="h-3.5 w-3.5" /><span className="hidden sm:inline">Instellingen</span>
+            <Settings className="h-4 w-4" /><span className="hidden sm:inline">Instellingen</span>
           </button>
         </div>
       </div>
@@ -67,9 +67,25 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
               )}
             >
               {!previewMode && (
-                <div className="absolute -top-3 right-4 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={() => cms.moveBlock(page.id, block.id, -1)} disabled={i === 0} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-black/80 text-white/70 hover:text-white disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => cms.moveBlock(page.id, block.id, 1)} disabled={i === page.blocks.length - 1} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-black/80 text-white/70 hover:text-white disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
+                <div className="absolute -top-3 right-4 z-10 flex items-center gap-1.5">
+                  <button
+                    onClick={() => cms.moveBlock(page.id, block.id, -1)}
+                    disabled={i === 0}
+                    aria-label="Sectie omhoog verplaatsen"
+                    title="Omhoog"
+                    className="grid h-9 w-9 place-items-center rounded-xl border border-white/15 bg-black/85 text-white/75 shadow-lg transition hover:bg-black hover:text-white disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => cms.moveBlock(page.id, block.id, 1)}
+                    disabled={i === page.blocks.length - 1}
+                    aria-label="Sectie omlaag verplaatsen"
+                    title="Omlaag"
+                    className="grid h-9 w-9 place-items-center rounded-xl border border-white/15 bg-black/85 text-white/75 shadow-lg transition hover:bg-black hover:text-white disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={() => {
                       void (async () => {
@@ -87,9 +103,11 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
                         cms.deleteBlock(page.id, block.id);
                       })();
                     }}
-                    className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-black/80 text-white/70 hover:text-red-300"
+                    aria-label="Sectie verwijderen"
+                    title="Verwijderen"
+                    className="grid h-9 w-9 place-items-center rounded-xl border border-red-400/25 bg-black/85 text-white/75 shadow-lg transition hover:bg-red-500/20 hover:text-red-200"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -103,8 +121,10 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
           </React.Fragment>
         ))}
         {page.blocks.length === 0 && !previewMode && (
-          <div className="text-center py-16 rounded-2xl border border-dashed border-white/15 bg-white/[0.02]">
-            <div className="text-white/50 text-sm">Nog geen secties. Klik hierboven om er één toe te voegen.</div>
+          <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] py-16 text-center">
+            <div className="text-base text-white/55">
+              Nog geen secties. Klik hierboven op “Sectie toevoegen” om te beginnen.
+            </div>
           </div>
         )}
       </div>
@@ -127,9 +147,9 @@ function AddButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/12 py-2.5 text-[12px] font-medium text-white/40 transition hover:border-sky-400/45 hover:bg-sky-400/[0.06] hover:text-sky-100"
+      className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 text-[15px] font-semibold text-white/50 transition hover:border-sky-400/45 hover:bg-sky-400/[0.06] hover:text-sky-100"
     >
-      <Plus className="h-3.5 w-3.5" /> Sectie toevoegen
+      <Plus className="h-4 w-4" /> Sectie toevoegen
     </button>
   );
 }
@@ -188,8 +208,8 @@ function PageSettings({ page, onClose }: { page: Page; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border border-white/10 bg-[#0a0a0f] p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-bold">Pagina instellingen</h3>
+      <div className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border border-white/10 bg-[#0a0a0f] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-2xl font-bold tracking-tight">Pagina instellingen</h3>
         <InspectTextField
           label="Titel (voor SEO)"
           value={title}
@@ -207,26 +227,26 @@ function PageSettings({ page, onClose }: { page: Page; onClose: () => void }) {
           multiline
           maxChars={160}
         />
-        <span className="text-[10px] text-white/40">{description.length}/160 tekens</span>
+        <span className="block text-xs text-white/40">{description.length}/160 tekens</span>
         {page.isCustom && (
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-wider text-white/50">URL slug</span>
-            <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-mono outline-none focus:border-[#1e88e5]" />
+          <label className="block">
+            <span className="a-label">Webadres (URL)</span>
+            <input value={slug} onChange={(e) => setSlug(e.target.value)} className="a-input font-mono" />
           </label>
         )}
         <label
           className={cn(
-            "flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3",
+            "flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4",
             inNavDisabled && "opacity-60",
           )}
         >
           <div>
-            <div className="text-sm font-medium">Toon in navigatie</div>
-            <div className="text-xs text-white/40">
+            <div className="text-[15px] font-semibold">Tonen in het menu</div>
+            <div className="mt-1 text-sm text-white/50">
               Maximaal {cms.getMaxExtraCustomNavPages()} extra pagina’s naast het standaardmenu.
             </div>
             {inNavDisabled || navError ? (
-              <div className="mt-1 text-xs text-amber-300/90">
+              <div className="mt-2 text-sm text-amber-300/90">
                 {navError ?? (!inNavCap.ok ? inNavCap.reason : null)}
               </div>
             ) : null}
@@ -242,21 +262,21 @@ function PageSettings({ page, onClose }: { page: Page; onClose: () => void }) {
               setNavError(null);
             }}
             className={cn(
-              "relative h-7 w-12 shrink-0 rounded-full transition",
+              "relative h-8 w-14 shrink-0 rounded-full transition",
               inNav ? "bg-[#1e88e5]" : "bg-white/15",
             )}
           >
             <span
               className={cn(
-                "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition",
-                inNav && "translate-x-5",
+                "absolute top-1 left-1 h-6 w-6 rounded-full bg-white transition",
+                inNav && "translate-x-6",
               )}
             />
           </button>
         </label>
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm">Annuleren</button>
-          <button onClick={save} className="rounded-xl bg-[#1e88e5] px-4 py-2 text-sm font-semibold">Opslaan</button>
+        <div className="flex gap-2.5 justify-end pt-2">
+          <button onClick={onClose} className="a-btn a-btn-secondary">Annuleren</button>
+          <button onClick={save} className="a-btn a-btn-primary">Opslaan</button>
         </div>
       </div>
     </div>

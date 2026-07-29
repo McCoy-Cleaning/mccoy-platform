@@ -293,7 +293,7 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
       ) : null}
 
       <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
-        <PaneShell label="Edit canvas" tone="edit" hidden={false}>
+        <PaneShell label="Voorbeeld van uw website" tone="edit" hidden={false}>
           <div className="relative h-full min-h-0">
             <DeviceFrame device={device}>
               <EditCanvasIframe
@@ -450,7 +450,7 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       </div>
 
       <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
-        <PaneShell label="Edit canvas" tone="edit" hidden={false}>
+        <PaneShell label="Voorbeeld van uw website" tone="edit" hidden={false}>
           <div className="relative h-full min-h-0">
             <EditCanvasIframe
               iframeRef={editRef}
@@ -499,13 +499,13 @@ function CustomPageDrawer({
         aria-label="Pagina"
         data-cms-toolbar="custom-page"
         className={cn(
-          "absolute bottom-4 right-4 z-20 inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold shadow-lg backdrop-blur-md transition",
+          "absolute bottom-5 right-5 z-20 inline-flex items-center gap-2.5 rounded-full border px-5 py-3 text-[15px] font-semibold shadow-xl backdrop-blur-md transition",
           open
             ? "border-primary/40 bg-primary text-primary-foreground"
             : "border-white/15 bg-black/75 text-white hover:border-white/30 hover:bg-black/85",
         )}
       >
-        <Layers className="h-3.5 w-3.5" />
+        <Layers className="h-5 w-5" />
         Pagina
       </button>
 
@@ -528,31 +528,31 @@ function CustomPageDrawer({
           open ? "translate-x-0" : "translate-x-full pointer-events-none",
         )}
       >
-        <header className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3.5">
+        <header className="flex items-center justify-between gap-2 border-b border-white/10 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300/80">
               Pagina-editor
             </p>
-            <div className="mt-1.5 inline-flex rounded-xl border border-white/10 bg-white/5 p-0.5">
+            <div className="mt-2 inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
               <button
                 type="button"
                 onClick={() => setTab("sections")}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium",
-                  tab === "sections" ? "bg-primary text-primary-foreground" : "text-white/70",
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
+                  tab === "sections" ? "bg-primary text-primary-foreground" : "text-white/70 hover:text-white",
                 )}
               >
-                <Layers className="h-3.5 w-3.5" /> Secties
+                <Layers className="h-4 w-4" /> Secties
               </button>
               <button
                 type="button"
                 onClick={() => setTab("settings")}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium",
-                  tab === "settings" ? "bg-primary text-primary-foreground" : "text-white/70",
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
+                  tab === "settings" ? "bg-primary text-primary-foreground" : "text-white/70 hover:text-white",
                 )}
               >
-                <Settings className="h-3.5 w-3.5" /> Instellingen
+                <Settings className="h-4 w-4" /> Instellingen
               </button>
             </div>
           </div>
@@ -560,9 +560,9 @@ function CustomPageDrawer({
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label="Sluiten"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white/50 hover:bg-white/10 hover:text-white"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white/60 transition hover:bg-white/10 hover:text-white"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -580,7 +580,7 @@ function CustomPageDrawer({
 }
 
 const metaInputClass =
-  "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm outline-none focus:border-primary/50";
+  "w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/35 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30";
 
 function CustomPageMetaForm({
   page,
@@ -625,43 +625,43 @@ function CustomPageMetaForm({
   };
 
   return (
-    <div className="space-y-4 p-5">
-      <label className="block space-y-1.5">
-        <span className="text-[11px] font-medium text-white/50">Titel (voor SEO)</span>
+    <div className="space-y-5 p-5">
+      <label className="block">
+        <span className="a-label">Titel (voor Google)</span>
         <input className={metaInputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
-      <label className="block space-y-1.5">
-        <span className="text-[11px] font-medium text-white/50">URL slug</span>
+      <label className="block">
+        <span className="a-label">Webadres (URL)</span>
         <input
           className={cn(metaInputClass, "font-mono")}
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
         />
       </label>
-      <label className="block space-y-1.5">
-        <span className="text-[11px] font-medium text-white/50">Meta beschrijving</span>
+      <label className="block">
+        <span className="a-label">Korte beschrijving (voor Google)</span>
         <textarea
-          className={cn(metaInputClass, "min-h-[88px]")}
+          className={cn(metaInputClass, "min-h-[96px]")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={160}
         />
-        <span className="text-[10px] text-white/35">{description.length}/160 tekens</span>
+        <span className="mt-1 block text-xs text-white/40">{description.length}/160 tekens</span>
       </label>
       <label
         className={cn(
-          "flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3",
+          "flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4",
           inNavDisabled && "opacity-60",
         )}
       >
         <div className="min-w-0">
-          <div className="text-sm font-medium text-white">Toon in navigatie</div>
-          <div className="text-xs text-white/40">
-            Verschijnt als menu-item in de hoofdnavigatie. Maximaal {cms.getMaxExtraCustomNavPages()}{" "}
-            extra pagina’s naast Home, Diensten, enz.
+          <div className="text-[15px] font-semibold text-white">Tonen in het menu</div>
+          <div className="mt-1 text-sm leading-relaxed text-white/50">
+            Deze pagina verschijnt als knop bovenaan de website. Maximaal{" "}
+            {cms.getMaxExtraCustomNavPages()} extra pagina’s naast Home, Diensten, enz.
           </div>
           {inNavDisabled || navError ? (
-            <div className="mt-1 text-xs text-amber-300/90">
+            <div className="mt-2 text-sm text-amber-300/90">
               {navError ?? (!inNavCap.ok ? inNavCap.reason : null)}
             </div>
           ) : null}
@@ -677,27 +677,23 @@ function CustomPageMetaForm({
             setNavError(null);
           }}
           className={cn(
-            "relative h-7 w-12 shrink-0 rounded-full transition",
+            "relative h-8 w-14 shrink-0 rounded-full transition",
             showInNav ? "bg-primary" : "bg-white/15",
           )}
         >
           <span
             className={cn(
-              "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition",
-              showInNav && "translate-x-5",
+              "absolute top-1 left-1 h-6 w-6 rounded-full bg-white transition",
+              showInNav && "translate-x-6",
             )}
           />
         </button>
       </label>
-      <button
-        type="button"
-        onClick={save}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20"
-      >
-        <Save className="h-3.5 w-3.5" /> Instellingen bijwerken
+      <button type="button" onClick={save} className="a-btn a-btn-primary w-full">
+        <Save className="h-4 w-4" /> Instellingen bijwerken
       </button>
       {savedFlash ? (
-        <p className="text-center text-xs text-emerald-300/90">
+        <p className="text-center text-sm text-emerald-300/90">
           Concept bijgewerkt ✓ — klik op “{page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}” hierboven om dit live te zetten.
         </p>
       ) : null}
@@ -729,79 +725,109 @@ function SplitToolbar({
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/60 p-2 backdrop-blur-xl">
-      <Link
-        to="/admin/website"
-        onClick={(e) => {
-          if (!hasDraft) return;
-          e.preventDefault();
-          void (async () => {
-            if (
-              !(await appConfirm({
-                title: "Pagina verlaten?",
-                description:
-                  "Er zijn niet-opgeslagen wijzigingen. Het concept blijft bewaard tot je het opslaat of verwerpt — je kunt later terugkomen.",
-                confirmLabel: "Verlaten",
-                tone: "warning",
-              }))
-            ) {
-              return;
-            }
-            void navigate({ to: "/admin/website" });
-          })();
-        }}
-        className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10"
-      >
-        <ArrowLeft className="h-4 w-4" />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="truncate text-sm font-semibold">{title}</div>
-          {hasDraft ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Concept — nog niet live
-            </span>
-          ) : (
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-              Live
-            </span>
-          )}
+    <div className="rounded-3xl border border-white/10 bg-black/60 p-3 shadow-[0_24px_60px_-32px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          to="/admin/website"
+          onClick={(e) => {
+            if (!hasDraft) return;
+            e.preventDefault();
+            void (async () => {
+              if (
+                !(await appConfirm({
+                  title: "Pagina verlaten?",
+                  description:
+                    "Er zijn niet-opgeslagen wijzigingen. Het concept blijft bewaard tot je het opslaat of verwerpt — je kunt later terugkomen.",
+                  confirmLabel: "Verlaten",
+                  tone: "warning",
+                }))
+              ) {
+                return;
+              }
+              void navigate({ to: "/admin/website" });
+            })();
+          }}
+          aria-label="Terug naar alle pagina's"
+          title="Terug naar alle pagina's"
+          className="a-icon-btn"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="truncate text-lg font-bold tracking-tight">{title}</div>
+            {hasDraft ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Concept — nog niet live
+              </span>
+            ) : (
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                Live
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 truncate text-sm text-white/40 font-mono">{slug}</div>
         </div>
-        <div className="truncate text-[11px] text-white/40 font-mono">{slug}</div>
+
+        {showDevice && (
+          <div
+            className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1"
+            role="group"
+            aria-label="Voorbeeldweergave"
+          >
+            <button
+              onClick={() => onDevice("desktop")}
+              aria-label="Desktop"
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-lg transition",
+                device === "desktop" ? "bg-[#1e88e5] text-white shadow" : "text-white/55 hover:text-white",
+              )}
+              title="Bekijk als computer"
+            >
+              <Monitor className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => onDevice("mobile")}
+              aria-label="Mobiel"
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-lg transition",
+                device === "mobile" ? "bg-[#1e88e5] text-white shadow" : "text-white/55 hover:text-white",
+              )}
+              title="Bekijk als telefoon"
+            >
+              <Smartphone className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onDiscard}
+          disabled={!hasDraft}
+          data-cms-toolbar="discard"
+          aria-label="Verwerpen"
+          title="Niet-opgeslagen wijzigingen ongedaan maken"
+          className="a-btn a-btn-secondary"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span className="hidden md:inline">Verwerpen</span>
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!hasDraft}
+          data-cms-toolbar="save"
+          aria-label={saveLabel}
+          className="a-btn a-btn-primary"
+        >
+          <Save className="h-4 w-4" /> {saveLabel}
+        </button>
       </div>
-
-      {showDevice && (
-        <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-0.5">
-          <button onClick={() => onDevice("desktop")} aria-label="Desktop" className={cn("grid h-8 w-8 place-items-center rounded-lg", device === "desktop" ? "bg-white/10 text-white" : "text-white/50")} title="Desktop">
-            <Monitor className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => onDevice("mobile")} aria-label="Mobiel" className={cn("grid h-8 w-8 place-items-center rounded-lg", device === "mobile" ? "bg-white/10 text-white" : "text-white/50")} title="Mobiel">
-            <Smartphone className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onDiscard}
-        disabled={!hasDraft}
-        data-cms-toolbar="discard"
-        aria-label="Verwerpen"
-        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
-      >
-        <RotateCcw className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Wijzigingen verwerpen</span>
-      </button>
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={!hasDraft}
-        data-cms-toolbar="save"
-        aria-label={saveLabel}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-40 disabled:pointer-events-none"
-      >
-        <Save className="h-3.5 w-3.5" /> {saveLabel}
-      </button>
+      <p className="mt-2.5 border-t border-white/5 px-1 pt-2.5 text-[13px] leading-snug text-white/45">
+        U kijkt naar een voorbeeld. Pas gerust aan — er gaat niets live voordat u op{" "}
+        <span className="font-semibold text-white/70">“{saveLabel}”</span> klikt.
+      </p>
     </div>
   );
 }
@@ -820,10 +846,10 @@ function PaneShell({
   scroll?: boolean;
 }) {
   return (
-    <div className={cn("min-h-0 rounded-2xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex")}>
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
-        <span className={cn("h-1.5 w-1.5 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")} />
-        <span className="text-white/60">{label}</span>
+    <div className={cn("min-h-0 rounded-3xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex")}>
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
+        <span className={cn("h-2 w-2 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")} />
+        <span className="text-sm font-semibold text-white/70">{label}</span>
       </div>
       <div className={cn("flex-1 min-h-0", scroll && "overflow-auto")}>{children}</div>
     </div>

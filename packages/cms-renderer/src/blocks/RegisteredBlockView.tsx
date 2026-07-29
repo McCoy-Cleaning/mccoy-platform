@@ -104,6 +104,36 @@ function OptionalImage({ image, className }: { image?: CmsImage; className?: str
   return <CmsImageView image={image} className={className} />;
 }
 
+/**
+ * Framed content image that always fits — the whole photo stays visible inside
+ * a fixed aspect box (object-contain on a soft backdrop), never cropped/zoomed.
+ */
+function FitImage({
+  image,
+  aspectClass,
+  className,
+  imgClassName,
+}: {
+  image?: CmsImage;
+  /** Aspect-ratio frame, e.g. "aspect-[4/3]". */
+  aspectClass: string;
+  className?: string;
+  imgClassName?: string;
+}) {
+  if (!image) return null;
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center overflow-hidden bg-white/[0.03]",
+        aspectClass,
+        className,
+      )}
+    >
+      <CmsImageView image={image} className={cn("h-full w-full object-contain", imgClassName)} />
+    </div>
+  );
+}
+
 function OptionalCta({
   cta,
   pages,
@@ -194,12 +224,10 @@ export function RegisteredBlockView({
                 className="inline-flex rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
               />
             </div>
-            <OptionalImage
+            <FitImage
               image={image}
-              className={cn(
-                "aspect-[4/3] w-full rounded-3xl object-cover ring-1 ring-white/10",
-                alignCenter && "max-w-3xl",
-              )}
+              aspectClass="aspect-[4/3]"
+              className={cn("w-full rounded-3xl ring-1 ring-white/10", alignCenter && "max-w-3xl")}
             />
           </div>
         </SectionShell>
@@ -251,9 +279,10 @@ export function RegisteredBlockView({
               ) : null}
             </div>
             {image ? (
-              <OptionalImage
+              <FitImage
                 image={image}
-                className="aspect-[4/3] w-full rounded-3xl object-cover ring-1 ring-white/10"
+                aspectClass="aspect-[4/3]"
+                className="w-full rounded-3xl ring-1 ring-white/10"
               />
             ) : (
               <div
@@ -578,7 +607,7 @@ export function RegisteredBlockView({
                 <div key={img.id} className="mb-6 break-inside-avoid sm:mb-8 lg:mb-10">
                   <OptionalImage
                     image={img.image}
-                    className="block w-full rounded-3xl object-cover ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
+                    className="block w-full rounded-3xl object-contain ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
                   />
                 </div>
               ))}
@@ -599,9 +628,10 @@ export function RegisteredBlockView({
                   key={img.id}
                   className="group relative overflow-hidden rounded-3xl ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
                 >
-                  <OptionalImage
+                  <FitImage
                     image={img.image}
-                    className="aspect-square w-full object-cover transition duration-700 group-hover:scale-105"
+                    aspectClass="aspect-square"
+                    className="w-full"
                   />
                 </div>
               ))}
@@ -639,13 +669,15 @@ export function RegisteredBlockView({
         <SectionShell blockType={type}>
           {typeof d.title === "string" && d.title ? <SectionTitle>{d.title}</SectionTitle> : null}
           <div className={cn(SECTION_GRID, "md:grid-cols-2")}>
-            <OptionalImage
+            <FitImage
               image={d.before as CmsImage | undefined}
-              className="aspect-[4/3] w-full rounded-3xl object-cover ring-1 ring-white/10"
+              aspectClass="aspect-[4/3]"
+              className="w-full rounded-3xl ring-1 ring-white/10"
             />
-            <OptionalImage
+            <FitImage
               image={d.after as CmsImage | undefined}
-              className="aspect-[4/3] w-full rounded-3xl object-cover ring-1 ring-white/10"
+              aspectClass="aspect-[4/3]"
+              className="w-full rounded-3xl ring-1 ring-white/10"
             />
           </div>
         </SectionShell>
@@ -669,9 +701,10 @@ export function RegisteredBlockView({
                   key={s.id}
                   className="w-[min(100%,20rem)] shrink-0 snap-start rounded-3xl border border-white/10 bg-white/[0.02] p-5 transition hover:border-white/20 focus-within:border-white/25 sm:w-[22rem] sm:p-6"
                 >
-                  <OptionalImage
+                  <FitImage
                     image={s.image}
-                    className="mb-4 aspect-video w-full rounded-2xl object-cover ring-1 ring-white/10"
+                    aspectClass="aspect-video"
+                    className="mb-4 w-full rounded-2xl ring-1 ring-white/10"
                   />
                   <h3 className="font-display text-lg font-semibold text-white">{s.title}</h3>
                   {s.body ? <p className="mt-2 text-sm leading-relaxed text-white/70">{s.body}</p> : null}
@@ -809,9 +842,10 @@ export function RegisteredBlockView({
                 className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] transition duration-300 hover:border-white/20 hover:bg-white/[0.045]"
               >
                 <div className="relative overflow-hidden bg-black/30">
-                  <OptionalImage
+                  <FitImage
                     image={m.photo}
-                    className="aspect-[4/5] w-full object-cover transition duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                    aspectClass="aspect-[4/5]"
+                    className="w-full"
                   />
                   <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/55 to-transparent"
@@ -853,9 +887,10 @@ export function RegisteredBlockView({
           <article className="mx-auto grid max-w-5xl items-center gap-8 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] md:gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-14">
             <div className="relative mx-auto w-full max-w-[20rem] overflow-hidden rounded-3xl border border-white/10 bg-black/25 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] md:mx-0">
               {photo ? (
-                <OptionalImage
+                <FitImage
                   image={photo}
-                  className="aspect-[4/5] w-full object-cover"
+                  aspectClass="aspect-[4/5]"
+                  className="w-full"
                 />
               ) : (
                 <div
@@ -963,7 +998,7 @@ export function RegisteredBlockView({
           <div className={cn(SECTION_GRID, "sm:grid-cols-2 lg:grid-cols-3")}>
             {projects.map((p) => (
               <div key={p.id} className="overflow-hidden rounded-2xl border border-white/10">
-                <OptionalImage image={p.image} className="aspect-video w-full object-cover" />
+                <FitImage image={p.image} aspectClass="aspect-video" className="w-full" />
                 <div className="p-4">
                   <h3 className="font-semibold text-white">{p.title}</h3>
                   {p.category ? <p className="text-xs text-white/50">{p.category}</p> : null}
@@ -996,7 +1031,7 @@ export function RegisteredBlockView({
           <div className={cn(SECTION_GRID, "md:grid-cols-2")}>
             {posts.map((p) => (
               <article key={p.id} className="rounded-2xl border border-white/10 p-4">
-                <OptionalImage image={p.image} className="mb-3 aspect-video w-full rounded-xl object-cover" />
+                <FitImage image={p.image} aspectClass="aspect-video" className="mb-3 w-full rounded-xl" />
                 {p.date ? <p className="text-xs text-white/45">{p.date}</p> : null}
                 <h3 className="font-semibold text-white">{p.title}</h3>
                 {p.excerpt ? <p className="mt-1 text-sm text-white/70">{p.excerpt}</p> : null}
