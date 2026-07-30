@@ -15,6 +15,7 @@ import {
 } from "@/lib/api/staff-identity.functions";
 import { getAdminBrowserSupabase, hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
 import { clearStaffInviteAuthCallbackFromUrl } from "@/lib/staff-invite-callback";
+import { establishBrowserSessionFromAuthCallback } from "@/lib/auth-callback-session";
 import logoUrl from "@/assets/logo-mccoy.png";
 import { staffPasswordStrengthError } from "@mccoy/domain";
 
@@ -107,39 +108,36 @@ function AdminInvitePage() {
         return;
       }
 
-      // Invite links may use hash tokens (implicit) or ?code= (PKCE).
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-      if (code) {
-        const exchanged = await supabase.auth.exchangeCodeForSession(code);
-        if (exchanged.error) {
-          if (!cancelled) {
-            setPhase("missing_session");
-            setError("Uitnodigingslink is ongeldig of verlopen. Vraag een nieuwe uitnodiging aan.");
-          }
-          return;
+      // Invite emails redirect with hash tokens (implicit) or ?code= / ?token_hash=.
+      // PKCE-default clients often miss the hash — parse explicitly.
+      const fromLink = await establishBrowserSessionFromAuthCallback(supabase);
+      if (fromLink.error && !fromLink.session) {
+        if (!cancelled) {
+          setPhase("missing_session");
+          setError(fromLink.error);
         }
-        url.searchParams.delete("code");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
       }
 
-      // detectSessionInUrl handles #access_token=…&type=invite
-      await new Promise((resolve) => {
-        const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-          if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+      let session = fromLink.session;
+      if (!session) {
+        // Brief wait for detectSessionInUrl race on slow mobiles.
+        await new Promise((resolve) => {
+          const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+            if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+              sub.subscription.unsubscribe();
+              resolve(undefined);
+            }
+          });
+          window.setTimeout(() => {
             sub.subscription.unsubscribe();
             resolve(undefined);
-          }
+          }, 1500);
         });
-        window.setTimeout(() => {
-          sub.subscription.unsubscribe();
-          resolve(undefined);
-        }, 2500);
-      });
+        session = (await supabase.auth.getSession()).data.session;
+      }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        // Server cookie session may already exist from a prior establish.
+      if (!session) {
         const existing = await fetchAdminSession().catch(() => null);
         if (existing?.userId) {
           if (!cancelled) await loadContext();
@@ -148,7 +146,7 @@ function AdminInvitePage() {
         if (!cancelled) {
           setPhase("missing_session");
           setError(
-            "Open de uitnodiging via de knop in je e-mail. Deze pagina werkt alleen met een geldige uitnodigingslink.",
+            "Geen geldige uitnodigingssessie gevonden. Open de link opnieuw via de knop in je e-mail (bij voorkeur in Safari of Chrome, niet in de e-mail-app). Oude links werken niet meer — vraag zo nodig een nieuwe uitnodiging.",
           );
         }
         return;
@@ -156,9 +154,9 @@ function AdminInvitePage() {
 
       const established = await adminEstablishSession({
         data: {
-          accessToken: sessionData.session.access_token,
-          refreshToken: sessionData.session.refresh_token,
-          clientKey: sessionData.session.user.email ?? undefined,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          clientKey: session.user.email ?? undefined,
         },
       });
 
