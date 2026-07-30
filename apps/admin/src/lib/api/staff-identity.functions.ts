@@ -30,7 +30,6 @@ import { normalizeEmail } from "@mccoy/domain";
 import {
   isStaffInviteEmailConfigured,
   sendStaffInviteEmail,
-  shouldPreferBrandedStaffInviteFirst,
 } from "@mccoy/email/server";
 import {
   AdminAuthError,
@@ -67,11 +66,80 @@ function authErrorResult(error: unknown) {
   throw error;
 }
 
-function staffInviteRedirectUrl(): string {
-  const explicit = readServerEnv("STAFF_INVITE_REDIRECT_URL")?.trim();
-  if (explicit) return explicit;
-  const origin = (readServerEnv("VITE_ADMIN_ORIGIN") || "http://localhost:5174").replace(/\/$/, "");
-  return `${origin}/admin/invite`;
+/**
+ * Absolute redirect for Auth invite/recovery links.
+ * Supabase rejects relative redirect_to values — missing `https://` produces
+ * `{"error":"requested path is invalid"}` (host treated as a path on *.supabase.co).
+ */
+function normalizeInviteOrigin(raw: string): string | null {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  if (!trimmed) return null;
+
+  let candidate = trimmed;
+  if (!/^https?:\/\//i.test(candidate)) {
+    const isLocal =
+      /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(candidate) ||
+      /^\[::1\](:\d+)?$/i.test(candidate);
+    candidate = `${isLocal ? "http" : "https"}://${candidate}`;
+  }
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedInviteOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+    if (host.endsWith(".vercel.app")) return true;
+    if (host === "admin.mccoy.nl" || host.endsWith(".mccoy.nl")) return true;
+    const configured = normalizeInviteOrigin(readServerEnv("VITE_ADMIN_ORIGIN") || "");
+    if (configured && configured === origin) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Always ends with `/admin/invite`.
+ * Never return a bare origin — that sends Auth to the app root → login.
+ * If `STAFF_INVITE_REDIRECT_URL` is set to an origin only (common on Vercel),
+ * we still append `/admin/invite` (older deploys returned the env value as-is).
+ */
+function staffInviteRedirectUrl(preferredOrigin?: string | null): string {
+  const explicitRaw = (readServerEnv("STAFF_INVITE_REDIRECT_URL") || "").trim();
+  if (explicitRaw) {
+    const origin = normalizeInviteOrigin(explicitRaw);
+    if (origin) return `${origin}/admin/invite`;
+  }
+
+  const preferred = preferredOrigin ? normalizeInviteOrigin(preferredOrigin) : null;
+  if (preferred && isAllowedInviteOrigin(preferred)) {
+    return `${preferred}/admin/invite`;
+  }
+
+  const configured =
+    normalizeInviteOrigin(readServerEnv("VITE_ADMIN_ORIGIN") || "") ||
+    normalizeInviteOrigin(readServerEnv("VERCEL_URL") || "") ||
+    "http://localhost:5174";
+  return `${configured}/admin/invite`;
+}
+
+/** Force `redirect_to` on Auth action links (manual CTAs / generateLink). */
+function withInviteRedirectTo(actionLink: string, redirectTo: string): string {
+  try {
+    const url = new URL(actionLink);
+    url.searchParams.set("redirect_to", redirectTo);
+    return url.toString();
+  } catch {
+    return actionLink;
+  }
 }
 
 function invitationAcceptErrorMessage(
@@ -122,7 +190,11 @@ async function generateStaffInviteActionLink(input: {
   let authUserId = inviteLink.data?.user?.id ?? null;
   let actionLink = inviteLink.data?.properties?.action_link ?? null;
   if (authUserId && actionLink) {
-    return { authUserId, actionLink, errorMessage: null };
+    return {
+      authUserId,
+      actionLink: withInviteRedirectTo(actionLink, input.redirectTo),
+      errorMessage: null,
+    };
   }
 
   const recoveryLink = await input.supabase.auth.admin.generateLink({
@@ -134,7 +206,11 @@ async function generateStaffInviteActionLink(input: {
   actionLink = recoveryLink.data?.properties?.action_link ?? actionLink;
   const errorMessage =
     recoveryLink.error?.message || inviteLink.error?.message || null;
-  return { authUserId, actionLink, errorMessage };
+  return {
+    authUserId,
+    actionLink: actionLink ? withInviteRedirectTo(actionLink, input.redirectTo) : null,
+    errorMessage,
+  };
 }
 
 export const listStaffUsersFn = createServerFn({ method: "POST" }).handler(async () => {
@@ -162,7 +238,8 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
       const emailNormalized = normalizeEmail(email);
       const fullName = data.fullName?.trim() || null;
       const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
-      const redirectTo = staffInviteRedirectUrl();
+      const redirectTo = staffInviteRedirectUrl(data.acceptOrigin);
+      console.info("[inviteAdmin] redirectTo", redirectTo);
 
       const existingStaff = await getStaffUserByEmail(emailNormalized);
       const inviteDecision = decideStaffInviteForExistingEmail(existingStaff);
@@ -284,7 +361,10 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
           email,
           options: { redirectTo },
         });
-        const actionLink = recoveryLink.data?.properties?.action_link ?? null;
+        const actionLinkRaw = recoveryLink.data?.properties?.action_link ?? null;
+        const actionLink = actionLinkRaw
+          ? withInviteRedirectTo(actionLinkRaw, redirectTo)
+          : null;
         manualInviteUrl = actionLink;
 
         let brandedOk = false;
@@ -311,99 +391,69 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
         }
 
         if (!brandedOk) {
-          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo,
-          });
-          if (resetError) {
+          // Do not call resetPasswordForEmail — it burns the Auth mail quota.
+          // Manual recovery link is enough; optional Auth mail only when no link.
+          if (actionLink) {
             emailDelivered = false;
-            emailRateLimited = isAuthEmailRateLimitError(resetError.message);
-            delivery = manualInviteUrl ? "manual_link" : "supabase_auth";
-            console.error("[inviteAdmin] recovery email failed after reinstate", {
-              email: emailNormalized,
-              authUserId,
-              error: resetError.message,
-            });
+            delivery = "manual_link";
           } else {
-            emailDelivered = true;
-            delivery = "supabase_auth";
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo,
+            });
+            if (resetError) {
+              emailDelivered = false;
+              emailRateLimited = isAuthEmailRateLimitError(resetError.message);
+              delivery = "supabase_auth";
+              console.error("[inviteAdmin] recovery email failed after reinstate", {
+                email: emailNormalized,
+                authUserId,
+                error: resetError.message,
+              });
+            } else {
+              emailDelivered = true;
+              delivery = "supabase_auth";
+            }
           }
         }
       } else {
-        // Resolve Auth user first. Orphans from prior generateLink attempts must not call
-        // inviteUserByEmail again (already registered + burns Supabase email rate limit).
+        // Prefer generateLink (no Auth email) so we never burn the ~2/hour built-in
+        // Supabase mail quota. inviteUserByEmail is last resort only.
         authUserId = await findAuthUserIdByEmail(email);
+        emailDelivered = false;
+        delivery = "manual_link";
 
-        if (authUserId) {
-          // Auth orphan / prior invite — do not call inviteUserByEmail or
-          // resetPasswordForEmail (both send Auth mail and hit rate limits).
-          // generateLink builds a usable CTA without sending email.
-          emailDelivered = false;
-          const linked = await generateStaffInviteActionLink({
-            supabase,
-            email,
-            redirectTo,
-            userMeta,
+        const linked = await generateStaffInviteActionLink({
+          supabase,
+          email,
+          redirectTo,
+          userMeta,
+        });
+        authUserId = linked.authUserId ?? authUserId;
+        manualInviteUrl = linked.actionLink;
+
+        if (authUserId && manualInviteUrl && isStaffInviteEmailConfigured()) {
+          const branded = await sendStaffInviteEmail({
+            to: email,
+            inviteUrl: manualInviteUrl,
+            invitedByName: actor.fullName,
+            invitedByEmail: actor.email,
+            inviteeFullName: fullName,
+            expiresAt,
           });
-          authUserId = linked.authUserId ?? authUserId;
-          manualInviteUrl = linked.actionLink;
-          delivery = "manual_link";
-
-          if (manualInviteUrl && isStaffInviteEmailConfigured()) {
-            const branded = await sendStaffInviteEmail({
-              to: email,
-              inviteUrl: manualInviteUrl,
-              invitedByName: actor.fullName,
-              invitedByEmail: actor.email,
-              inviteeFullName: fullName,
-              expiresAt,
-            });
-            if (branded.ok) {
-              delivery = branded.delivery;
-              emailDelivered = true;
-            } else {
-              console.warn("[inviteAdmin] branded send failed for existing Auth user; manual link ready", {
-                email: emailNormalized,
-                authUserId,
-                error: branded.error,
-              });
-            }
-          }
-        } else if (shouldPreferBrandedStaffInviteFirst()) {
-          const linked = await generateStaffInviteActionLink({
-            supabase,
-            email,
-            redirectTo,
-            userMeta,
-          });
-          authUserId = linked.authUserId;
-          manualInviteUrl = linked.actionLink;
-
-          if (authUserId && manualInviteUrl) {
-            const branded = await sendStaffInviteEmail({
-              to: email,
-              inviteUrl: manualInviteUrl,
-              invitedByName: actor.fullName,
-              invitedByEmail: actor.email,
-              inviteeFullName: fullName,
-              expiresAt,
-            });
-            if (branded.ok) {
-              delivery = branded.delivery;
-              emailDelivered = true;
-            } else {
-              emailDelivered = false;
-              delivery = "manual_link";
-              console.error("[inviteAdmin] branded invite failed; using manual link", {
-                email: emailNormalized,
-                error: branded.error,
-              });
-            }
+          if (branded.ok) {
+            delivery = branded.delivery;
+            emailDelivered = true;
           } else {
-            // generateLink failed — fall through to inviteUserByEmail below
-            emailDelivered = false;
+            console.warn("[inviteAdmin] branded send failed; manual link ready (Auth mail skipped)", {
+              email: emailNormalized,
+              authUserId,
+              error: branded.error,
+            });
           }
         }
 
+        // Last resort: Auth invite mail. Skipped when we already have a usable link —
+        // built-in Supabase SMTP is ~2 emails/hour and often blocks external addresses.
         if (!authUserId) {
           const { data: invited, error: inviteError } =
             await supabase.auth.admin.inviteUserByEmail(email, {
@@ -425,14 +475,14 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
             });
 
             if (authUserId && !manualInviteUrl) {
-              const linked = await generateStaffInviteActionLink({
+              const retry = await generateStaffInviteActionLink({
                 supabase,
                 email,
                 redirectTo,
                 userMeta,
               });
-              manualInviteUrl = linked.actionLink;
-              authUserId = linked.authUserId ?? authUserId;
+              manualInviteUrl = retry.actionLink;
+              authUserId = retry.authUserId ?? authUserId;
             }
           } else if (authUserId) {
             emailDelivered = true;
@@ -449,8 +499,9 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
           return {
             ok: false as const,
             error: emailRateLimited
-              ? "Supabase Auth e-maillimiet bereikt. Wacht ongeveer een uur en probeer opnieuw, of nodig een ander e-mailadres uit."
-              : "Uitnodiging kon niet worden verzonden. Probeer het later opnieuw.",
+              ? "Supabase Auth e-maillimiet bereikt. Stel custom SMTP in (Auth → SMTP) of Graph Mail.Send, of wacht ~1 uur."
+              : linked.errorMessage ||
+                "Uitnodiging kon niet worden verzonden. Probeer het later opnieuw.",
           };
         }
 
@@ -532,6 +583,7 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
         emailDelivered,
         emailRateLimited,
         inviteUrl: emailDelivered ? null : manualInviteUrl,
+        redirectTo,
         reinstated: Boolean(isReinstate),
       };
     } catch (error) {

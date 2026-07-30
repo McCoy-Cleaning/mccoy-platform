@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as React from "react";
 import {
   Outlet,
   Link,
@@ -14,6 +15,7 @@ import logoUrl from "@/assets/logo-mccoy.png";
 import { EditProvider } from "@/lib/cms/edit-context";
 import { Toaster } from "@/components/ui/sonner";
 import { AppDialogProvider } from "@/components/admin/AppDialogProvider";
+import { redirectStaffInviteAuthCallbackIfNeeded } from "@/lib/staff-invite-callback";
 
 function NotFoundComponent() {
   return (
@@ -200,6 +202,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  React.useEffect(() => {
+    redirectStaffInviteAuthCallbackIfNeeded();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -345,6 +345,7 @@ function SettingsPage() {
         data: {
           email: inviteEmail,
           fullName: inviteName.trim() || undefined,
+          acceptOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
         },
       });
       if (!result.ok) {
@@ -372,7 +373,7 @@ function SettingsPage() {
             "Gebruiker toegevoegd. De automatische uitnodigingsmail is niet verzonden.",
             rateHint.trim(),
             link
-              ? "Kopieer en deel deze uitnodigingslink met de medewerker:"
+              ? "Open deze eenmalige link in de browser (niet doorsturen via chat die de URL inkort). De link moet naar https://…/admin/invite gaan — niet naar supabase.co:"
               : "Probeer later opnieuw voor een mail, of gebruik een ander e-mailadres.",
             link,
             reinstateHint.trim(),

@@ -9,6 +9,7 @@ import {
   useAdminSession,
 } from "@/lib/admin-auth";
 import { hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
+import { redirectStaffInviteAuthCallbackIfNeeded } from "@/lib/staff-invite-callback";
 import logoUrl from "@/assets/logo-mccoy.png";
 
 export const Route = createFileRoute("/admin/login")({
@@ -37,6 +38,10 @@ function AdminLoginPage() {
   } | null>(null);
 
   React.useEffect(() => {
+    if (redirectStaffInviteAuthCallbackIfNeeded()) return;
+  }, []);
+
+  React.useEffect(() => {
     void fetchAdminAuthMode()
       .then(setAuthMode)
       .catch(() =>
@@ -52,8 +57,14 @@ function AdminLoginPage() {
 
   React.useEffect(() => {
     if (!ready || !session) return;
+    if (redirectStaffInviteAuthCallbackIfNeeded()) return;
     if (session.mfaRequired || session.nextStep === "mfa_enroll" || session.nextStep === "mfa_verify") {
       navigate({ to: "/admin/mfa", replace: true });
+      return;
+    }
+    // Invited staff must finish /admin/invite before the main shell.
+    if (session.status === "invited") {
+      navigate({ to: "/admin/invite", replace: true });
       return;
     }
     navigate({ to: "/admin", replace: true });

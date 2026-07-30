@@ -1,4 +1,4 @@
-export { createUuidV5 } from "./uuid-v5";
+export { createUuidV5 } from "./uuidV5";
 export {
   CMS_MIGRATION_NAMESPACE,
   BLOCKS_ONLY_LAYOUT_VERSION,

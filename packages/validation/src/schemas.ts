@@ -206,6 +206,12 @@ export const staffChangePasswordSchema = z.object({
 export const staffInviteAdminSchema = z.object({
   email: z.string().trim().email().max(320),
   fullName: z.string().trim().max(200).optional(),
+  /**
+   * Browser origin where the inviter is logged in (e.g. http://localhost:5174).
+   * Used so manual/Auth invite links land on the same admin host, not a stale
+   * VITE_ADMIN_ORIGIN from another environment.
+   */
+  acceptOrigin: z.string().url().max(500).optional(),
   requestId: z.string().uuid().optional(),
 });
 

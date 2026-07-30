@@ -1,4 +1,4 @@
-import { createUuidV5 } from "./uuid-v5";
+import { createUuidV5 } from "./uuidV5";
 
 /**
  * Stable CMS migration namespace (UUID). Never change — regenerating would

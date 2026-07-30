@@ -82,6 +82,10 @@ function AdminLayout() {
       navigate({ to: "/admin/login", replace: true });
       return;
     }
+    if (session && !isInviteRoute && session.status === "invited") {
+      navigate({ to: "/admin/invite", replace: true });
+      return;
+    }
     if (
       session &&
       !isMfaRoute &&
