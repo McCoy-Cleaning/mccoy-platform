@@ -18,7 +18,7 @@ function cn(...parts: Array<string | false | null | undefined>) {
 /**
  * Constrained content column that honors layout `contentAlign` from context.
  *
- * Structure: page rail (gutters + max-w-7xl) → align row → column.
+ * Structure: page rail (gutters + max-w-[96rem]) → align row → column.
  * Align shifts the column within the page content width, not the viewport.
  */
 export function SectionInner({

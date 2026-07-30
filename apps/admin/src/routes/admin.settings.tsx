@@ -358,12 +358,39 @@ function SettingsPage() {
       const reinstateHint = "reinstated" in result && result.reinstated
         ? " Geblokkeerd account hersteld; 2FA moet opnieuw worden ingesteld."
         : "";
-      setInviteMessage(
-        (result.delivery === "smtp"
-          ? "Uitnodiging verzonden (McCoy e-mail via SMTP)."
-          : "Uitnodiging verzonden. Controleer of de Auth Invite-template in Supabase is aangepast.") +
-          reinstateHint,
-      );
+      if ("emailDelivered" in result && result.emailDelivered === false) {
+        const rateHint =
+          "emailRateLimited" in result && result.emailRateLimited
+            ? " Supabase Auth e-maillimiet is bereikt — automatische mail werkt weer over ~1 uur."
+            : "";
+        const link =
+          "inviteUrl" in result && typeof result.inviteUrl === "string" && result.inviteUrl
+            ? result.inviteUrl
+            : null;
+        setInviteMessage(
+          [
+            "Gebruiker toegevoegd. De automatische uitnodigingsmail is niet verzonden.",
+            rateHint.trim(),
+            link
+              ? "Kopieer en deel deze uitnodigingslink met de medewerker:"
+              : "Probeer later opnieuw voor een mail, of gebruik een ander e-mailadres.",
+            link,
+            reinstateHint.trim(),
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+        );
+      } else {
+        const deliveryHint =
+          result.delivery === "graph"
+            ? "Uitnodiging verzonden via Microsoft Graph."
+            : result.delivery === "smtp"
+              ? "Uitnodiging verzonden (McCoy e-mail via SMTP)."
+              : result.delivery === "manual_link"
+                ? "Gebruiker toegevoegd. Deel de uitnodigingslink handmatig."
+                : "Uitnodiging verzonden via Supabase Auth. Controleer de inbox (en spam) van de uitgenodigde.";
+        setInviteMessage(deliveryHint + reinstateHint);
+      }
       void loadOverview();
     } catch {
       setInviteState("error");
@@ -964,7 +991,7 @@ function FormFeedback({ state, message }: { state: FormState; message: string | 
       role="status"
       aria-live="polite"
       className={cn(
-        "flex items-start gap-2 rounded-xl border px-3 py-2 text-xs",
+        "flex items-start gap-2 rounded-xl border px-3 py-2 text-xs whitespace-pre-wrap break-all",
         ok
           ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
           : "border-red-400/30 bg-red-500/10 text-red-100",

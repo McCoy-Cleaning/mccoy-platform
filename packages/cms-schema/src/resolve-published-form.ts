@@ -13,6 +13,10 @@ import {
   type ContactFormBlockData,
   type NewsletterBlockData,
 } from "./blocks";
+import {
+  CANONICAL_FORM_SOURCE_KEYS,
+  resolveCanonicalFormSourceKey,
+} from "./form-source";
 
 export type ResolvedPublishedForm = {
   formId: string;
@@ -27,15 +31,17 @@ export type ResolvePublishedFormResult =
   | { ok: false; reason: string; code: "not_found" | "hidden" | "kind_mismatch" | "invalid" };
 
 function findLayoutItem(page: CmsPage, sourceId: string): LayoutItem | null {
-  return page.layout.find((item) => {
-    if (item.kind === "fixed") {
-      return item.id === sourceId || fixedLayoutId(item.key) === sourceId;
-    }
-    if (item.kind === "block") {
-      return item.blockId === sourceId || item.id === sourceId;
-    }
-    return false;
-  }) ?? null;
+  return (
+    page.layout.find((item) => {
+      if (item.kind === "fixed") {
+        return item.id === sourceId || fixedLayoutId(item.key) === sourceId;
+      }
+      if (item.kind === "block") {
+        return item.blockId === sourceId || item.id === sourceId;
+      }
+      return false;
+    }) ?? null
+  );
 }
 
 function sectionScope(
@@ -48,9 +54,18 @@ function sectionScope(
   return content.scope ?? null;
 }
 
+function findFormBlockByType(
+  page: CmsPage,
+  type: "contactForm" | "quoteRequestForm",
+): { blockId: string } | null {
+  const block = page.blocks.find((b) => b.type === type);
+  return block ? { blockId: block.id } : null;
+}
+
 /**
  * Resolve authoritative form scope from a published CMS page.
- * Client-supplied scope must never override this result.
+ * Legacy fixed:* aliases and canonical builtin:* sourceKeys both resolve.
+ * Historical formId continues to use FIXED_FORM_SOURCE_IDS for Aanvragen continuity.
  */
 export function resolvePublishedFormScope(
   page: CmsPage | null | undefined,
@@ -68,57 +83,105 @@ export function resolvePublishedFormScope(
   }
 
   const formId = composeWebsiteFormId(pageId, sourceId);
+  const canonical = resolveCanonicalFormSourceKey(sourceId);
 
-  // Fixed contact form
-  if (sourceId === FIXED_FORM_SOURCE_IDS.contactForm) {
+  if (
+    sourceId === FIXED_FORM_SOURCE_IDS.contactForm ||
+    canonical === CANONICAL_FORM_SOURCE_KEYS.contact
+  ) {
     if (kind !== "inquiry") {
       return { ok: false, reason: "Ongeldig formuliertype.", code: "kind_mismatch" };
     }
     const layoutId = fixedLayoutId("contact.form");
-    const item = findLayoutItem(page, layoutId) ?? findLayoutItem(page, sourceId);
-    if (!item) return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
-    if (isLayoutItemHidden(item)) {
+    const fixedItem =
+      findLayoutItem(page, layoutId) ??
+      findLayoutItem(page, FIXED_FORM_SOURCE_IDS.contactForm);
+    const migrated = findFormBlockByType(page, "contactForm");
+    if (!fixedItem && !migrated) {
+      return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
+    }
+    if (fixedItem && isLayoutItemHidden(fixedItem)) {
       return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
+    }
+    if (migrated) {
+      const layoutItem =
+        page.layout.find((item) => item.kind === "block" && item.blockId === migrated.blockId) ??
+        null;
+      if (layoutItem && isLayoutItemHidden(layoutItem)) {
+        return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
+      }
+      const block = page.blocks.find((b) => b.id === migrated.blockId);
+      if (block?.type === "contactForm") {
+        const def = getBlockDataDefinition("contactForm");
+        const data = def.normalize(block.data) as ContactFormBlockData;
+        return {
+          ok: true,
+          form: {
+            formId: composeWebsiteFormId(pageId, FIXED_FORM_SOURCE_IDS.contactForm),
+            pageId,
+            sourceId: FIXED_FORM_SOURCE_IDS.contactForm,
+            kind,
+            scope: data.scope ?? null,
+          },
+        };
+      }
     }
     const content = page.sectionContent?.["contact.form"] as ContactFormContent | undefined;
     return {
       ok: true,
       form: {
-        formId,
+        formId: composeWebsiteFormId(pageId, FIXED_FORM_SOURCE_IDS.contactForm),
         pageId,
-        sourceId,
+        sourceId: FIXED_FORM_SOURCE_IDS.contactForm,
         kind,
         scope: sectionScope(content, kind),
       },
     };
   }
 
-  // Fixed offerte (glass / furniture share one section, scopes differ by kind)
-  if (sourceId === FIXED_FORM_SOURCE_IDS.offerteForm) {
+  if (
+    sourceId === FIXED_FORM_SOURCE_IDS.offerteForm ||
+    canonical === CANONICAL_FORM_SOURCE_KEYS.offerte
+  ) {
     if (kind !== "glass_washing" && kind !== "furniture_cleaning") {
       return { ok: false, reason: "Ongeldig formuliertype.", code: "kind_mismatch" };
     }
     const layoutId = fixedLayoutId("offerte.form");
-    const item = findLayoutItem(page, layoutId) ?? findLayoutItem(page, sourceId);
-    if (!item) return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
-    if (isLayoutItemHidden(item)) {
+    const fixedItem =
+      findLayoutItem(page, layoutId) ??
+      findLayoutItem(page, FIXED_FORM_SOURCE_IDS.offerteForm);
+    const migrated = findFormBlockByType(page, "quoteRequestForm");
+    if (!fixedItem && !migrated) {
+      return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
+    }
+    if (fixedItem && isLayoutItemHidden(fixedItem)) {
       return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
+    }
+    if (migrated) {
+      const layoutItem =
+        page.layout.find((item) => item.kind === "block" && item.blockId === migrated.blockId) ??
+        null;
+      if (layoutItem && isLayoutItemHidden(layoutItem)) {
+        return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
+      }
     }
     const content = page.sectionContent?.["offerte.form"] as ContactFormContent | undefined;
     return {
       ok: true,
       form: {
-        formId,
+        formId: composeWebsiteFormId(pageId, FIXED_FORM_SOURCE_IDS.offerteForm),
         pageId,
-        sourceId,
+        sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
         kind,
         scope: sectionScope(content, kind),
       },
     };
   }
 
-  // Vacatures application form (synthetic source; scope on vacatures.main)
-  if (sourceId === FIXED_FORM_SOURCE_IDS.vacaturesApplication) {
+  if (
+    sourceId === FIXED_FORM_SOURCE_IDS.vacaturesApplication ||
+    canonical === CANONICAL_FORM_SOURCE_KEYS.vacatures
+  ) {
     if (kind !== "job_application") {
       return { ok: false, reason: "Ongeldig formuliertype.", code: "kind_mismatch" };
     }
@@ -130,16 +193,15 @@ export function resolvePublishedFormScope(
     return {
       ok: true,
       form: {
-        formId,
+        formId: composeWebsiteFormId(pageId, FIXED_FORM_SOURCE_IDS.vacaturesApplication),
         pageId,
-        sourceId,
+        sourceId: FIXED_FORM_SOURCE_IDS.vacaturesApplication,
         kind,
         scope: content?.applicationScope ?? null,
       },
     };
   }
 
-  // Flexible CMS blocks (contactForm / newsletter)
   const block = page.blocks.find((b) => b.id === sourceId);
   if (!block) {
     return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };

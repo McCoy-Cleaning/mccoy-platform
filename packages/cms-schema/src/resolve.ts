@@ -13,6 +13,7 @@ import {
 import type { CmsPage } from "./types";
 import { ensurePageLocaleFields } from "./migrate-locale";
 import { localizeCmsPageForLocale } from "./en-field-drafts";
+import { normalizeCmsPage } from "./pipeline";
 
 export type ResolvedSection = {
   key: string;
@@ -56,11 +57,14 @@ export type ResolvePublishedCmsPageResult =
 /**
  * Build one immutable public snapshot. Head and body must consume this object only.
  * Never falls back to Dutch body when locale is `en`.
+ *
+ * Normalizes the page so required fixed sections (e.g. contact.info / contact.form)
+ * are restored even when an older published revision omitted them.
  */
 export function resolvePublishedCmsPage(
   input: ResolvePublishedCmsPageInput,
 ): ResolvePublishedCmsPageResult {
-  const page = ensurePageLocaleFields(input.page);
+  const page = normalizeCmsPage(ensurePageLocaleFields(input.page));
   const localeStates = page.localeStates ?? {
     nl: { publicationState: "published" as const, freshness: "current" as const },
   };
@@ -69,7 +73,24 @@ export function resolvePublishedCmsPage(
     return { ok: false, reason: "locale_not_published" };
   }
 
-  const localeContent = page.localeContent?.[input.locale];
+  // EN may be marked published before localeContent.en exists (older revisions /
+  // missing SEO bag). Prefer EN meta drafts, then NL bag title/description.
+  let localeContent = page.localeContent?.[input.locale];
+  if (!localeContent && input.locale === "en") {
+    const enTitle =
+      page.enFieldDrafts?.["page:meta:title"]?.trim() ||
+      page.localeContent?.nl?.pageTitle ||
+      page.title;
+    const enDesc =
+      page.enFieldDrafts?.["page:meta:description"]?.trim() ||
+      page.localeContent?.nl?.seo.description ||
+      page.description;
+    localeContent = {
+      navigationLabel: enTitle,
+      pageTitle: enTitle,
+      seo: { title: enTitle, description: enDesc },
+    };
+  }
   if (!localeContent) {
     return { ok: false, reason: "missing_content" };
   }

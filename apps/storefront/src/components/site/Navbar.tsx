@@ -12,6 +12,8 @@ import { useI18n } from "@/lib/i18n";
 import { localizedNavLabel } from "@/lib/cms-i18n";
 import { localWebpSibling, NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
 import { useMobileLiteMotion } from "@/lib/use-mobile-lite-motion";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const cmsState = useCms();
@@ -43,7 +45,7 @@ export function Navbar() {
         className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]"
       >
         <div
-          className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8"
+          className={cn(SECTION_PAGE_RAIL, "flex items-center justify-between gap-3")}
           style={{ minHeight: Math.max(80, logoHeightPx + 24) }}
         >
           <Link to="/" className="flex items-center gap-2">

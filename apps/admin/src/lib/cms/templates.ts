@@ -26,10 +26,19 @@ import {
   MessageSquare,
   PanelTop,
 } from "lucide-react";
-import { assertPickerTypesMatchRegistry } from "@mccoy/cms-schema";
+import {
+  assertPickerTypesMatchRegistry,
+  productAssortmentTemplateData,
+  productIntroTemplateData,
+} from "@mccoy/cms-schema";
 import type { BlockCategory, BlockType } from "./types";
 
 export type TemplateDef = {
+  /**
+   * Stable picker identity — required when multiple starters share a BlockType.
+   * Defaults to `type` when omitted.
+   */
+  id?: string;
   type: BlockType;
   name: string;
   description: string;
@@ -37,6 +46,10 @@ export type TemplateDef = {
   icon: React.ComponentType<{ className?: string }>;
   defaultData: Record<string, any>;
 };
+
+export function templateId(t: TemplateDef): string {
+  return t.id ?? t.type;
+}
 
 export const TEMPLATES: TemplateDef[] = [
   {
@@ -82,8 +95,9 @@ export const TEMPLATES: TemplateDef[] = [
     },
   },
   {
+    id: "textImage",
     type: "textImage",
-    name: "Tekst + afbeelding",
+    name: "Tekst met afbeelding",
     description: "Tweekoloms sectie met tekst en een beeld ernaast.",
     category: "Content",
     icon: Columns3,
@@ -93,6 +107,15 @@ export const TEMPLATES: TemplateDef[] = [
       image: "",
       reverse: false,
     },
+  },
+  {
+    id: "productIntro",
+    type: "textImage",
+    name: "Productintro met flyer",
+    description: "Producten-intro starter met flyer — bruikbaar op elke pagina.",
+    category: "Content",
+    icon: Columns3,
+    defaultData: { ...productIntroTemplateData },
   },
   {
     type: "columns",
@@ -224,9 +247,10 @@ export const TEMPLATES: TemplateDef[] = [
     },
   },
   {
+    id: "featureGrid",
     type: "featureGrid",
-    name: "Feature grid",
-    description: "Icoon + titel + beschrijving cards.",
+    name: "Kenmerkenraster",
+    description: "Generiek icoon + titel + beschrijving raster.",
     category: "Structure",
     icon: Sparkles,
     defaultData: {
@@ -238,6 +262,15 @@ export const TEMPLATES: TemplateDef[] = [
         { icon: "leaf", title: "Duurzaam", body: "Verantwoorde middelen." },
       ],
     },
+  },
+  {
+    id: "productAssortment",
+    type: "featureGrid",
+    name: "Assortiment / kenmerken",
+    description: "Producten-assortiment starter — bruikbaar op elke pagina.",
+    category: "Structure",
+    icon: Sparkles,
+    defaultData: { ...productAssortmentTemplateData },
   },
   {
     type: "spacer",
@@ -396,6 +429,71 @@ export const TEMPLATES: TemplateDef[] = [
     icon: Newspaper,
     defaultData: {},
   },
+  {
+    type: "partnersMarquee",
+    name: "Partners",
+    description: "Logo-strip van partners met toegankelijke stilstaande fallback.",
+    category: "Showcase",
+    icon: GalleryHorizontal,
+    defaultData: { eyebrow: "Partners", heading: "Vertrouwd door", animate: true, items: [] },
+  },
+  {
+    type: "statsCounters",
+    name: "Statistieken",
+    description: "KPI-band met prefix, waarde, suffix en labels.",
+    category: "Content",
+    icon: Sparkles,
+    defaultData: {
+      heading: "McCoy in getallen",
+      items: [{ id: "stat_1", value: "25", suffix: "+", label: "jaar ervaring", animate: true }],
+    },
+  },
+  {
+    type: "contactInfoCards",
+    name: "Contactkaarten",
+    description: "Adres, telefoon, e-mail en openingstijden.",
+    category: "Conversion",
+    icon: MessageSquare,
+    defaultData: {
+      heading: "Contactgegevens",
+      items: [
+        {
+          id: "cinfo_1",
+          type: "phone",
+          label: "Telefoon",
+          value: "+31 00 000 0000",
+          action: { kind: "tel", href: "tel:+31000000000" },
+        },
+      ],
+    },
+  },
+  {
+    type: "quoteRequestForm",
+    name: "Offerteformulier",
+    description: "Presentatie voor offerte-aanvraag (server bepaalt bron).",
+    category: "Conversion",
+    icon: Mail,
+    defaultData: {
+      heading: "Offerte aanvragen",
+      enabledScopes: ["glass_cleaning", "furniture_cleaning"],
+      defaultScope: "glass_cleaning",
+      submitLabel: "Verstuur aanvraag",
+      successMessage: "Bedankt — we nemen zo snel mogelijk contact op.",
+    },
+  },
+  {
+    type: "legalArticles",
+    name: "Juridische artikelen",
+    description: "Privacy / voorwaarden met ankers.",
+    category: "Content",
+    icon: Type,
+    defaultData: {
+      heading: "Juridische informatie",
+      articles: [
+        { id: "legal_1", heading: "Artikel 1", anchor: "artikel-1", content: "Inhoud." },
+      ],
+    },
+  },
 ];
 
 export const CATEGORY_ORDER: BlockCategory[] = [
@@ -430,6 +528,10 @@ export const PAGE_PARITY_BLOCK_TYPES: BlockType[] = [
 
 export function getTemplate(type: BlockType): TemplateDef | undefined {
   return TEMPLATES.find((t) => t.type === type);
+}
+
+export function getTemplateById(id: string): TemplateDef | undefined {
+  return TEMPLATES.find((t) => templateId(t) === id);
 }
 
 assertPickerTypesMatchRegistry(TEMPLATES.map((t) => t.type));

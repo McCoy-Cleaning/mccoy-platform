@@ -5,8 +5,10 @@ import {
   enqueueNotificationOutbox,
   getWebsiteRequest,
   hasSupabaseServiceConfig,
+  isNotificationOutboxUnavailableMessage,
   listWebsiteRequests,
   markAllNotificationsRead,
+  NotificationOutboxUnavailableError,
   notificationUnreadCount,
   processNotificationOutbox,
   requireAdminSession,
@@ -110,6 +112,16 @@ async function reportMailboxConnectionOk(): Promise<void> {
     });
     await processNotificationOutbox(5);
   } catch (notifyError) {
+    if (
+      notifyError instanceof NotificationOutboxUnavailableError ||
+      (notifyError instanceof Error &&
+        isNotificationOutboxUnavailableMessage(notifyError.message))
+    ) {
+      console.warn(
+        "[admin-requests] mailbox-restored notification skipped — notification_outbox missing; apply migration 20260725120000_platform_notifications.sql",
+      );
+      return;
+    }
     console.error("[admin-requests] mailbox-restored notification enqueue failed", notifyError);
   }
 }
@@ -137,6 +149,16 @@ async function reportMailboxConnectionFailed(error: unknown): Promise<void> {
     });
     await processNotificationOutbox(5);
   } catch (notifyError) {
+    if (
+      notifyError instanceof NotificationOutboxUnavailableError ||
+      (notifyError instanceof Error &&
+        isNotificationOutboxUnavailableMessage(notifyError.message))
+    ) {
+      console.warn(
+        "[admin-requests] mailbox-failed notification skipped — notification_outbox missing; apply migration 20260725120000_platform_notifications.sql",
+      );
+      return;
+    }
     console.error("[admin-requests] mailbox-failed notification enqueue failed", notifyError);
   }
 }

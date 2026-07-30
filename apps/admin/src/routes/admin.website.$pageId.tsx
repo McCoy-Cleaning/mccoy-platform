@@ -14,7 +14,10 @@ import { type CmsPage } from "@mccoy/cms-schema";
 import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { useCmsEditParentBridge } from "@/lib/cms/edit-bridge";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
-import { BuiltinLayoutEditor } from "@/components/admin/cms/BuiltinLayoutEditor";
+import {
+  BuiltinLayoutEditor,
+  SectiesOpenButton,
+} from "@/components/admin/cms/BuiltinLayoutEditor";
 import {
   LegacyCmsImagesPanel,
   pageHasLegacyEmbeddedImages,
@@ -176,9 +179,19 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
 
+  // Run Producten layout ensure on open. Do NOT depend on draft[pageId]
+  // (ensure writes draft; that dependency caused an ensure→commit→effect OOM loop).
+  // Call ensure immediately AND after reconcile — Strict Mode can cancel in-flight work.
   React.useEffect(() => {
-    void cms.reconcileLocalCustomPagesWithServer();
-  }, []);
+    if (pageId === "page_products") {
+      cms.ensureProductsBlocksMigration(pageId);
+    }
+    void cms.reconcileLocalCustomPagesWithServer().then(() => {
+      if (pageId === "page_products") {
+        cms.ensureProductsBlocksMigration(pageId);
+      }
+    });
+  }, [pageId]);
 
   const editUrl = storefrontPageUrl(slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
   const page = cms.getEditablePage(pageId) ?? state.pages.find((p) => p.id === pageId);
@@ -292,9 +305,31 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
         </div>
       ) : null}
 
-      <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
-        <PaneShell label="Voorbeeld van uw website" tone="edit" hidden={false}>
-          <div className="relative h-full min-h-0">
+      {/* One shared shell: preview + Secties bind as a single composition. */}
+      <div className="relative mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary/30 bg-primary/[0.03]">
+        <div className="flex shrink-0 items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          <span className="text-sm font-semibold text-white/70">Voorbeeld van uw website</span>
+          {sectionsOpen ? (
+            <>
+              <span className="mx-1 hidden h-4 w-px bg-white/15 xl:block" aria-hidden />
+              <span className="hidden text-sm font-semibold text-sky-200/80 xl:inline">Secties</span>
+            </>
+          ) : null}
+        </div>
+
+        <div
+          className={cn(
+            "relative min-h-0 flex-1 xl:grid",
+            // Docked push only from xl (1280px); below that Secties is an overlay sheet.
+            "xl:transition-[grid-template-columns] xl:duration-500 xl:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "motion-reduce:xl:transition-none",
+            sectionsOpen
+              ? "xl:grid-cols-[minmax(0,1fr)_clamp(460px,34vw,560px)]"
+              : "xl:grid-cols-[minmax(0,1fr)_0px]",
+          )}
+        >
+          <div className="relative min-h-0 min-w-0 overflow-hidden">
             <DeviceFrame device={device}>
               <EditCanvasIframe
                 iframeRef={editRef}
@@ -304,17 +339,35 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
                 className="h-full w-full border-0 bg-background"
               />
             </DeviceFrame>
+            {!sectionsOpen ? (
+              <SectiesOpenButton
+                count={page?.layout.length ?? 0}
+                onClick={() => setSectionsOpen(true)}
+              />
+            ) : null}
+          </div>
+
+          <div
+            className={cn(
+              "min-h-0 min-w-0 overflow-hidden border-white/10",
+              sectionsOpen
+                ? "absolute inset-0 z-30 border-0 xl:relative xl:inset-auto xl:border-l"
+                : "pointer-events-none max-xl:hidden",
+            )}
+          >
             <BuiltinLayoutEditor
               pageId={pageId}
               open={sectionsOpen}
               onOpenChange={setSectionsOpen}
+              showOpenButton={false}
+              docked
               canvasSelection={bridge.selection}
               onSelectLayoutItem={(selection) => {
                 bridge.setSelection(selection);
               }}
             />
           </div>
-        </PaneShell>
+        </div>
       </div>
     </div>
   );
@@ -838,15 +891,17 @@ function PaneShell({
   hidden,
   children,
   scroll = false,
+  className,
 }: {
   label: string;
   tone: "edit" | "preview";
   hidden: boolean;
   children: React.ReactNode;
   scroll?: boolean;
+  className?: string;
 }) {
   return (
-    <div className={cn("min-h-0 rounded-3xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex")}>
+    <div className={cn("min-h-0 rounded-3xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex", className)}>
       <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
         <span className={cn("h-2 w-2 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")} />
         <span className="text-sm font-semibold text-white/70">{label}</span>
@@ -856,21 +911,66 @@ function PaneShell({
   );
 }
 
+/** Desktop storefront layout width used when the preview pane is narrower than this. */
+const DESKTOP_CANVAS_WIDTH = 1280;
+
+/**
+ * Desktop: render at a real desktop width, then scale to fit the pane so Secties
+ * never forces horizontal scrolling. Mobile: phone chrome as before.
+ */
 function DeviceFrame({ device, children }: { device: "desktop" | "mobile"; children: React.ReactNode }) {
+  const hostRef = React.useRef<HTMLDivElement>(null);
+  const [scale, setScale] = React.useState(1);
+  const [hostHeight, setHostHeight] = React.useState(0);
+
+  React.useLayoutEffect(() => {
+    if (device !== "desktop") return;
+    const el = hostRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      setHostHeight(h);
+      setScale(w > 0 ? Math.min(1, w / DESKTOP_CANVAS_WIDTH) : 1);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [device]);
+
   if (device === "mobile") {
     return (
-      <div className="flex h-full items-start justify-center p-4 overflow-auto">
-        <div className="w-[390px] h-[calc(100%-1rem)] max-h-[820px] rounded-[2rem] border-4 border-white/10 overflow-hidden shadow-2xl">
+      <div className="flex h-full items-start justify-center overflow-auto p-4">
+        <div className="h-[calc(100%-1rem)] max-h-[820px] w-[390px] overflow-hidden rounded-[2rem] border-4 border-white/10 shadow-2xl">
           {children}
         </div>
       </div>
     );
   }
-  // Keep a desktop canvas width so sections render the large layout even when the
-  // Secties drawer narrows the pane — horizontal scroll instead of a cramped mobile variant.
+
+  const needsScale = scale < 0.999;
+  const innerHeight = scale > 0 && hostHeight > 0 ? hostHeight / scale : "100%";
+
   return (
-    <div className="h-full w-full overflow-auto">
-      <div className="h-full min-w-[1080px] w-full">{children}</div>
+    <div ref={hostRef} className="h-full w-full min-w-0 overflow-hidden bg-background">
+      {needsScale ? (
+        <div
+          className="origin-top-left will-change-transform motion-reduce:transition-none"
+          style={{
+            width: DESKTOP_CANVAS_WIDTH,
+            height: innerHeight,
+            transform: `scale(${scale})`,
+            transition: "transform 480ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
+          {children}
+        </div>
+      ) : (
+        <div className="h-full w-full">{children}</div>
+      )}
     </div>
   );
 }

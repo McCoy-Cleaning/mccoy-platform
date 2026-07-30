@@ -134,6 +134,8 @@ export function supabaseLogoSrc(
 
 export const HERO_IMAGE_SIZES = "(min-width: 1024px) 28rem, min(92vw, 28rem)";
 export const PARTNER_LOGO_SIZES = "(min-width: 640px) 12rem, 10rem";
-export const GALLERY_IMAGE_SIZES = "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw";
+/** Wider page rail (max ~96rem) — keep mosaic tiles from requesting oversized originals. */
+export const GALLERY_IMAGE_SIZES =
+  "(min-width: 1536px) 480px, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw";
 export const NAV_LOGO_WIDTH = 480;
 export const NAV_LOGO_HEIGHT = 320;

@@ -41,7 +41,13 @@ export type PartnerItem = IdItem & {
   /** Cached logo-box CSS color (`#rrggbb`) from plate strip or white default. */
   resolvedBackdrop?: LogoBackdropResolved;
 };
-export type GalleryItem = IdItem & { title: string; image: CmsImage; caption?: string };
+export type GalleryItem = IdItem & {
+  title: string;
+  image: CmsImage;
+  caption?: string;
+  /** Featured mosaic tile shape — omit to keep classic Ons-werk spans. */
+  shape?: "wide" | "square" | "tall";
+};
 export type ServiceCard = IdItem & {
   title: string;
   description: string;
@@ -280,6 +286,7 @@ const galleryItemSchema = z.object({
   title: z.string(),
   image: cmsImageSchema,
   caption: z.string().optional(),
+  shape: z.enum(["wide", "square", "tall"]).optional(),
 });
 
 const serviceCardSchema = z.object({

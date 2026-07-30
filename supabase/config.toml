@@ -20,3 +20,9 @@ enabled = true
 [auth]
 enabled = true
 enable_signup = false
+
+# Local Auth invite template (hosted projects: apply via
+# `npm run apply:auth-invite-template` or Dashboard → Authentication → Email Templates).
+[auth.email.template.invite]
+subject = "Uitnodiging voor McCoy Admin"
+content_path = "./supabase/templates/invite.html"

@@ -1,6 +1,6 @@
 import * as React from "react";
-import type { BuiltinPageKey, CmsPage, FixedSectionKey, LayoutItem } from "@mccoy/cms-schema";
-import { resolveLayoutItemContentAlign } from "@mccoy/cms-schema";
+import type { BuiltinPageKey, BuiltinCmsPage, CmsPage, FixedSectionKey, LayoutItem } from "@mccoy/cms-schema";
+import { resolveLayoutItemContentAlign, suppressedProductsFixedKeys } from "@mccoy/cms-schema";
 import { ContentAlignProvider } from "@mccoy/cms-renderer";
 import { BlocksView } from "@/components/site/BlockView";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
@@ -275,6 +275,10 @@ export function PageLayoutRenderer({
     const map = new Map(page.blocks.map((b) => [b.id, b]));
     return map;
   }, [page.blocks]);
+  const suppressFixed =
+    page.kind === "builtin"
+      ? suppressedProductsFixedKeys(page as BuiltinCmsPage)
+      : new Set<FixedSectionKey>();
 
   return (
     <>
@@ -287,6 +291,7 @@ export function PageLayoutRenderer({
           blockById={blockById}
           mode={mode}
           respectHidden={respectHidden}
+          suppressFixed={suppressFixed}
         />
       ))}
     </>
@@ -300,6 +305,7 @@ function LayoutItemView({
   blockById,
   mode,
   respectHidden,
+  suppressFixed,
 }: {
   item: LayoutItem;
   pageId: string;
@@ -307,10 +313,13 @@ function LayoutItemView({
   blockById: Map<string, CmsPage["blocks"][number]>;
   mode: SectionRenderMode;
   respectHidden: boolean;
+  suppressFixed: Set<FixedSectionKey>;
 }) {
   const contentAlign = resolveLayoutItemContentAlign(item);
 
   if (item.kind === "fixed") {
+    // Producten dual-read: blocks win — never render fixed + migrated block together.
+    if (suppressFixed.has(item.key)) return null;
     if (respectHidden && item.hidden) return null;
     const Comp = registry[item.key];
     if (!Comp) {

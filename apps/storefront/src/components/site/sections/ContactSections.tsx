@@ -8,10 +8,18 @@ import type {
   FixedSectionKey,
 } from "@mccoy/cms-schema";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
+import { localizedContactInfoContent } from "@/lib/cms-i18n";
 import { useI18n } from "@/lib/i18n";
 import { submitSiteForm } from "@/lib/forms/submit-client";
 import { useClientReady } from "@/lib/use-client-ready";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
+import {
+  SECTION_PAGE_RAIL,
+  SectionAmbient,
+  SectionEyebrow,
+  SectionSurface,
+} from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 const INFO_ICONS: Record<ContactInfoIcon, LucideIcon> = {
   mail: Mail,
@@ -27,11 +35,16 @@ function InfoCardsSection({
   pageId: string;
   sectionKey: Extract<FixedSectionKey, "contact.info" | "offerte.info">;
 }) {
-  const content = useTypedSectionContent(pageId, sectionKey) as ContactInfoContent;
+  const { t } = useI18n();
+  const raw = useTypedSectionContent(pageId, sectionKey) as ContactInfoContent;
+  const content = localizedContactInfoContent(sectionKey, raw, t);
 
   return (
     <section
-      className="mx-auto mt-16 grid max-w-7xl gap-4 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8"
+      className={cn(
+        SECTION_PAGE_RAIL,
+        "mt-10 mb-6 grid gap-4 sm:mt-14 sm:mb-8 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4",
+      )}
       data-cms-section={sectionKey}
     >
       {content.items.map((c, i) => {
@@ -42,8 +55,10 @@ function InfoCardsSection({
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-white/50">{c.label}</div>
-              <div className="mt-1 whitespace-pre-line text-sm text-white">{c.value}</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {c.label}
+              </div>
+              <div className="mt-1 whitespace-pre-line text-sm text-foreground">{c.value}</div>
             </div>
           </>
         );
@@ -56,16 +71,18 @@ function InfoCardsSection({
             transition={{ duration: 0.5, delay: i * 0.05 }}
           >
             {c.href ? (
-              <a
-                href={c.href}
-                className="flex h-full items-start gap-4 rounded-3xl border border-white/10 bg-card/60 p-5 transition hover:border-primary/40"
-              >
-                {Inner}
+              <a href={c.href} className="block h-full transition hover:opacity-95">
+                <SectionSurface
+                  variant="outlined"
+                  className="flex h-full items-start gap-4 p-5 hover:border-primary/40"
+                >
+                  {Inner}
+                </SectionSurface>
               </a>
             ) : (
-              <div className="flex h-full items-start gap-4 rounded-3xl border border-white/10 bg-card/60 p-5">
+              <SectionSurface variant="outlined" className="flex h-full items-start gap-4 p-5">
                 {Inner}
-              </div>
+              </SectionSurface>
             )}
           </motion.div>
         );
@@ -94,57 +111,48 @@ export function ContactFormSection() {
 
   return (
     <section
-      className="relative mx-auto max-w-7xl px-4 pb-28 pt-16 sm:px-6 lg:px-8"
+      className="relative isolate overflow-hidden px-0 pb-24 pt-10 sm:pb-28 sm:pt-14"
       data-cms-section="contact.form"
     >
+      <SectionAmbient />
       <div
-        className="pointer-events-none absolute inset-x-0 top-8 h-64 bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent blur-2xl"
-        aria-hidden
-      />
-
-      <div className="relative grid items-start gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)] lg:gap-14">
+        className={cn(
+          "relative grid items-start gap-10",
+          SECTION_PAGE_RAIL,
+          "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)] lg:gap-14",
+        )}
+      >
         <div className="max-w-xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            {t.contact.kicker}
-          </p>
-          <h2 className="font-display mt-4 text-3xl leading-tight text-white md:text-4xl lg:text-[2.75rem]">
+          <SectionEyebrow>{t.contact.kicker}</SectionEyebrow>
+          <h2 className="font-display mt-4 text-3xl leading-tight text-foreground md:text-4xl lg:text-[2.75rem]">
             {heading}
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-white/65 md:text-lg">{t.contact.sub}</p>
-          <ul className="mt-8 space-y-3 text-sm text-white/70">
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">{t.contact.sub}</p>
+          <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
             <li className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
               </span>
-              Persoonlijk antwoord binnen één werkdag
+              {t.contact.responseWithin}
             </li>
             <li className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
                 <Mail className="h-3.5 w-3.5" aria-hidden />
               </span>
-              Aanvragen verschijnen in het admin-portaal
+              {t.contact.requestsInPortal}
             </li>
           </ul>
         </div>
 
-        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-card/90 via-card/70 to-card/40 p-6 shadow-[0_40px_120px_-48px_rgba(63,182,242,0.35)] backdrop-blur-xl sm:p-8 md:p-10">
-          <div
-            className="pointer-events-none absolute -right-16 top-0 h-56 w-56 rounded-full bg-primary/15 blur-3xl"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl"
-            aria-hidden
-          />
-
+        <SectionSurface variant="form">
           {sent ? (
-            <div className="relative flex flex-col items-center gap-4 py-14 text-center">
+            <div className="flex flex-col items-center gap-4 py-14 text-center">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
                 <CheckCircle2 className="h-8 w-8" aria-hidden />
               </div>
-              <p className="font-display text-2xl text-white md:text-3xl">{t.contact.success}</p>
-              <p className="max-w-sm text-sm text-white/55">
-                We hebben uw bericht ontvangen en nemen zo snel mogelijk contact op.
+              <p className="font-display text-2xl text-foreground md:text-3xl">{t.contact.success}</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                {t.contact.receivedMessage}
               </p>
             </div>
           ) : (
@@ -179,19 +187,25 @@ export function ContactFormSection() {
                 aria-hidden="true"
                 className="absolute -left-[9999px] h-0 w-0 opacity-0"
               />
-              <Field label={t.contact.name} name="name" required autoComplete="name" placeholder="Uw naam" />
+              <Field
+                label={t.contact.name}
+                name="name"
+                required
+                autoComplete="name"
+                placeholder={t.contact.placeholderName}
+              />
               <Field
                 label={t.contact.company}
                 name="company"
                 autoComplete="organization"
-                placeholder="Optioneel"
+                placeholder={t.contact.placeholderCompany}
               />
               <Field
                 label={t.contact.phone}
                 name="phone"
                 type="tel"
                 autoComplete="tel"
-                placeholder="06 …"
+                placeholder={t.contact.placeholderPhone}
               />
               <Field
                 label={t.contact.email}
@@ -199,12 +213,12 @@ export function ContactFormSection() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="naam@bedrijf.nl"
+                placeholder={t.contact.placeholderEmail}
               />
               <TextArea
                 label={t.contact.message}
                 name="message"
-                placeholder="Waar kunnen we u mee helpen?"
+                placeholder={t.contact.placeholderMessage}
               />
               {error ? (
                 <p
@@ -216,7 +230,7 @@ export function ContactFormSection() {
               ) : null}
               <div className="sm:col-span-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs leading-relaxed text-white/45">
-                  Door te versturen stemt u in met verwerking van uw gegevens voor deze aanvraag.
+                  {t.contact.consent}
                 </p>
                 <button
                   type="submit"
@@ -224,7 +238,7 @@ export function ContactFormSection() {
                   aria-disabled={!clientReady || submitting}
                   className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-[1.02] hover:shadow-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  {submitting ? "Bezig…" : t.contact.submit}
+                  {submitting ? t.contact.submitting : t.contact.submit}
                   {!submitting ? (
                     <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
                   ) : null}
@@ -232,7 +246,7 @@ export function ContactFormSection() {
               </div>
             </form>
           )}
-        </div>
+        </SectionSurface>
       </div>
     </section>
   );

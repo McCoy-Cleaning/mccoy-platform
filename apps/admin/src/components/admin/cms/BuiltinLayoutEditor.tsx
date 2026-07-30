@@ -11,6 +11,7 @@ import {
   missingFixedSectionKeys,
   parseCompositeEditorRowId,
   resolveLayoutItemContentAlign,
+  parseProductsBlocksMigrationState,
   type FixedSectionKey,
 } from "@mccoy/cms-schema";
 import { ContentAlignControl, SelectedSectionInspector } from "@mccoy/cms-editor";
@@ -34,40 +35,103 @@ export type SectiesSelection =
  * Premium slide-over section inspector — layout + typed content editing.
  * Composite pages (about/services/products) expand into per-part rows.
  */
+export function SectiesOpenButton({
+  count,
+  onClick,
+}: {
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={false}
+      aria-controls="cms-sections-panel"
+      aria-label="Secties"
+      data-cms-toolbar="sections"
+      className="absolute bottom-5 right-5 z-40 inline-flex items-center gap-3 rounded-full border border-white/12 bg-[#0d1017]/92 px-5 py-3 text-[15px] font-semibold text-white/90 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl transition hover:border-white/25 hover:bg-[#141824]"
+    >
+      <span className="grid h-8 w-8 place-items-center rounded-full bg-white/10">
+        <Layers className="h-4 w-4" />
+      </span>
+      Secties
+      <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs tabular-nums text-white/70">
+        {count}
+      </span>
+    </button>
+  );
+}
+
 export function BuiltinLayoutEditor({
   pageId,
   open,
   onOpenChange,
   canvasSelection,
   onSelectLayoutItem,
+  /** When false, host the open FAB outside (grid push layout). Default true. */
+  showOpenButton = true,
+  /** Desktop: sit inside the shared preview shell (no separate card chrome). */
+  docked = false,
 }: {
   pageId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canvasSelection?: SectiesSelection;
   onSelectLayoutItem?: (selection: SectiesSelection) => void;
+  showOpenButton?: boolean;
+  docked?: boolean;
 }) {
   const page = useEditablePage(pageId);
   const [pickerAt, setPickerAt] = React.useState<number | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [lastSelectionSource, setLastSelectionSource] = React.useState<
+    "canvas" | "section-list" | "programmatic"
+  >("programmatic");
   const [liveMessage, setLiveMessage] = React.useState("");
   const imagePickerProps = useCmsImagePickerProps();
 
   React.useEffect(() => {
     if (!page || !canvasSelection) return;
+    // Canvas-driven selection expands inspector; do not reopen after manual collapse
+    // unless the selected target changed.
+    let nextId: string | null = null;
     if (canvasSelection.kind === "fixed") {
       const match = page.layout.find((i) => i.kind === "fixed" && i.key === canvasSelection.sectionKey);
       if (!match) return;
-      if (canvasSelection.part) {
-        setExpandedId(`${match.id}#${canvasSelection.part}`);
-      } else {
-        setExpandedId(match.id);
-      }
-      return;
+      nextId = canvasSelection.part ? `${match.id}#${canvasSelection.part}` : match.id;
+    } else {
+      nextId = canvasSelection.layoutItemId;
     }
-    setExpandedId(canvasSelection.layoutItemId);
+    setLastSelectionSource("canvas");
+    setExpandedId(nextId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally ignore `page` identity
   }, [canvasSelection]);
+
+  // Repair incomplete Producten drafts when Secties opens (pageId-only ensure can miss HMR).
+  const lastEnsureAttemptKey = React.useRef("");
+  React.useEffect(() => {
+    if (!page || page.kind !== "builtin" || page.pageKey !== "products") return;
+    const presentations = page.layout.map((item) => {
+      if (item.kind === "fixed") return `fixed:${item.key}`;
+      const block = page.blocks.find((b) => b.id === item.blockId);
+      const data =
+        block?.data && typeof block.data === "object"
+          ? (block.data as Record<string, unknown>)
+          : {};
+      return `${block?.type ?? "missing"}:${String(data.presentation ?? "none")}`;
+    });
+    const hasIntro = presentations.some((p) => p.includes(":productsIntro"));
+    const hasAssortment = presentations.some((p) => p.includes(":productsAssortment"));
+    if (hasIntro && hasAssortment) return;
+    const key = JSON.stringify({
+      presentations,
+      migration: page.productsBlocksMigration ?? null,
+    });
+    if (lastEnsureAttemptKey.current === key) return;
+    lastEnsureAttemptKey.current = key;
+    cms.ensureProductsBlocksMigration(pageId);
+  }, [page, pageId]);
 
   if (!page || page.kind !== "builtin") return null;
 
@@ -83,7 +147,22 @@ export function BuiltinLayoutEditor({
     },
     minMovableIndex: page.pageKey ? minInsertIndex(page.pageKey) : 0,
   });
-  const missingFixed = page.pageKey ? missingFixedSectionKeys(page.pageKey, page.layout) : [];
+  const productsMigration =
+    page.kind === "builtin" ? parseProductsBlocksMigrationState(page.productsBlocksMigration) : null;
+  const productsMigrated =
+    productsMigration?.status === "migrated" || productsMigration?.status === "verified";
+  const missingFixed = (
+    page.pageKey ? missingFixedSectionKeys(page.pageKey, page.layout) : []
+  ).filter((key) => {
+    // After Producten migration, restore via Sectie toevoegen (blocks), not fixed keys.
+    if (productsMigrated && (key === "products.main" || key === "products.info")) return false;
+    return true;
+  });
+  const showProductsEmptyHelper =
+    page.kind === "builtin" &&
+    page.pageKey === "products" &&
+    productsMigrated &&
+    page.layout.length === 0;
   const rows: LayoutListRow[] = editorRows.map((r) => {
     const layoutId = r.layoutItemId;
     const layoutItem = page.layout.find((i) => i.id === layoutId);
@@ -240,6 +319,7 @@ export function BuiltinLayoutEditor({
 
   const onEdit = (id: string) => {
     const nextExpanded = expandedId === id ? null : id;
+    setLastSelectionSource("section-list");
     setExpandedId(nextExpanded);
     if (!nextExpanded) return;
 
@@ -272,42 +352,14 @@ export function BuiltinLayoutEditor({
   return (
     <AdminCmsContentAiProvider pageId={pageId}>
     <>
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        aria-controls="cms-sections-panel"
-        aria-label="Secties"
-        data-cms-toolbar="sections"
-        className={cn(
-          "absolute bottom-5 right-5 z-40 inline-flex items-center gap-3 rounded-full border px-5 py-3 text-[15px] font-semibold shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl transition",
-          open
-            ? "border-sky-400/50 bg-sky-500 text-white"
-            : "border-white/12 bg-[#0d1017]/92 text-white/90 hover:border-white/25 hover:bg-[#141824]",
-        )}
-      >
-        <span
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-full",
-            open ? "bg-white/20" : "bg-white/10",
-          )}
-        >
-          <Layers className="h-4 w-4" />
-        </span>
-        Secties
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-xs tabular-nums",
-            open ? "bg-black/20 text-white" : "bg-white/10 text-white/70",
-          )}
-        >
-          {rows.length}
-        </span>
-      </button>
+      {showOpenButton && !open ? (
+        <SectiesOpenButton count={rows.length} onClick={() => onOpenChange(true)} />
+      ) : null}
 
+      {/* Mobile sheet overlay — desktop uses push layout from parent */}
       <div
         className={cn(
-          "absolute inset-0 z-10 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200",
+          "absolute inset-0 z-10 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 xl:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         aria-hidden={!open}
@@ -319,33 +371,67 @@ export function BuiltinLayoutEditor({
         role="dialog"
         aria-label="Paginaindeling"
         aria-hidden={!open}
+        data-cms-selection-source={lastSelectionSource}
         className={cn(
-          "absolute inset-y-0 right-0 z-30 flex w-[min(100%,min(32rem,94vw))] flex-col overflow-hidden border-l border-white/[0.08] transition-transform duration-300 ease-out",
-          "bg-[#0b0d12] shadow-[-24px_0_80px_-30px_rgba(0,0,0,0.85)]",
-          open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none",
+          "z-30 flex h-full flex-col overflow-hidden",
+          // <xl: slide-over sheet. xl+: fills the shared shell column (clamp width from parent).
+          "absolute inset-y-0 right-0 w-[min(100%,min(40rem,96vw))] shadow-[-24px_0_80px_-30px_rgba(0,0,0,0.85)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          docked
+            ? "border-0 bg-[#0b0d12] xl:static xl:inset-auto xl:w-full xl:max-w-none xl:bg-transparent xl:shadow-none xl:transition-none"
+            : "border-l border-white/[0.08] bg-[#0b0d12] xl:static xl:inset-auto xl:w-full xl:max-w-none xl:shadow-none xl:transition-none",
+          open
+            ? "translate-x-0 pointer-events-auto"
+            : "translate-x-full pointer-events-none xl:translate-x-0",
         )}
       >
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-500/[0.14] via-transparent to-transparent"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -right-16 top-24 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl"
-          aria-hidden
-        />
+        {!docked ? (
+          <>
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-500/[0.14] via-transparent to-transparent"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute -right-16 top-24 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl"
+              aria-hidden
+            />
+          </>
+        ) : (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-sky-500/[0.1] via-transparent to-transparent xl:from-sky-500/[0.08]"
+            aria-hidden
+          />
+        )}
 
-        <header className="relative shrink-0 border-b border-white/[0.07] px-5 pb-5 pt-5">
+        <header
+          className={cn(
+            "relative shrink-0 border-b border-white/[0.07]",
+            docked ? "px-4 pb-3 pt-3.5" : "px-5 pb-5 pt-5",
+          )}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
-                Website editor
-              </p>
-              <h3 className="mt-1 font-display text-2xl font-semibold tracking-tight text-white">
+              {!docked ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+                  Website editor
+                </p>
+              ) : null}
+              <h3
+                className={cn(
+                  "font-display font-semibold tracking-tight text-white",
+                  docked ? "text-xl" : "mt-1 text-2xl",
+                )}
+              >
                 Secties
               </h3>
-              <p className="mt-2 max-w-[22rem] text-sm leading-relaxed text-white/55">
-                Uw pagina bestaat uit blokken ("secties"). Tik op een sectie om de tekst of
-                foto's aan te passen — u ziet het resultaat meteen in het voorbeeld.
+              <p
+                className={cn(
+                  "leading-relaxed text-white/55",
+                  docked ? "mt-1 text-xs" : "mt-2 max-w-[22rem] text-sm",
+                )}
+              >
+                {docked
+                  ? "Tik op een sectie — het voorbeeld links werkt mee."
+                  : "Uw pagina bestaat uit blokken (\"secties\"). Tik op een sectie om de tekst of foto's aan te passen — u ziet het resultaat meteen in het voorbeeld."}
               </p>
             </div>
             <button
@@ -358,7 +444,7 @@ export function BuiltinLayoutEditor({
             </button>
           </div>
 
-          <div className="mt-4 flex gap-2.5">
+          <div className={cn("flex gap-2.5", docked ? "mt-3" : "mt-4")}>
             <StatChip label="Totaal" value={rows.length} />
             <StatChip label="Zichtbaar" value={visibleCount} tone="ok" />
             {hiddenCount > 0 ? <StatChip label="Verborgen" value={hiddenCount} tone="warn" /> : null}
@@ -525,6 +611,11 @@ export function BuiltinLayoutEditor({
               </ul>
             </div>
           ) : null}
+          {showProductsEmptyHelper ? (
+            <p className="mb-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/70">
+              Voeg ‘Assortiment / kenmerken’ toe via Sectie toevoegen.
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={openPicker}
@@ -546,11 +637,11 @@ export function BuiltinLayoutEditor({
           open
           page={page}
           onClose={() => setPickerAt(null)}
-          onPick={(type) => {
+          onPick={(type, templateId) => {
             const min = page.pageKey ? minInsertIndex(page.pageKey) : 0;
             const at = Math.max(pickerAt, min);
             const beforeIds = new Set(page.blocks.map((b) => b.id));
-            const result = cms.addLayoutBlock(pageId, type, at);
+            const result = cms.addLayoutBlock(pageId, type, at, { templateId });
             if (result.ok) {
               const nextPage = result.page;
               const added = nextPage.blocks.find((b) => !beforeIds.has(b.id));

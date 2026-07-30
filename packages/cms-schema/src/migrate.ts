@@ -69,6 +69,15 @@ const pageSchema = z.object({
   enFieldDrafts: z.record(z.string()).optional(),
   /** NL sources paired with enFieldDrafts for stale detection. */
   enFieldDraftSources: z.record(z.string()).optional(),
+  /** Producten fixed→blocks pilot — never infer from empty layout. */
+  productsBlocksMigration: z
+    .object({
+      version: z.literal(1),
+      status: z.enum(["not_started", "migrated", "verified"]),
+      migratedAt: z.string().optional(),
+      sources: z.array(z.enum(["products.main", "products.info"])).optional(),
+    })
+    .optional(),
 });
 
 const pageDraftSchema = z.object({
@@ -213,6 +222,7 @@ export function migratePage(raw: z.infer<typeof pageSchema>): CmsPage {
     isDraftOnly: raw.isDraftOnly,
     enFieldDrafts: raw.enFieldDrafts,
     enFieldDraftSources: raw.enFieldDraftSources,
+    productsBlocksMigration: raw.productsBlocksMigration,
     // Pass extras through once so normalize can merge if layout was empty defaults path
     extraBlocks: extras.length ? extras : undefined,
     paths: (raw.paths as CmsPage["paths"]) ?? { nl: raw.slug },

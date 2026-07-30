@@ -34,12 +34,9 @@ export function DeliveryImage({
   const widths = variant === "hero" ? [640, 960, 1280] : [480, 800, 1200];
 
   const localHero = variant === "hero" ? heroWebpSrcSet(src) : undefined;
-  // Hero: contain so CMS transforms don’t cover-crop. Gallery keeps default cover fill.
-  const remote = supabasePhotoSrcSets(
-    src,
-    widths,
-    variant === "hero" ? { resize: "contain" } : { resize: "cover" },
-  );
+  // Width-only + `cover` can still over-crop some CDN variants; deliver the full
+  // frame and let CSS (`object-cover` / `object-contain`) decide the tile crop.
+  const remote = supabasePhotoSrcSets(src, widths, { resize: "contain" });
   const webpSrcSet = webpSrcSetProp ?? localHero ?? remote?.webpSrcSet;
 
   // Prefer a WebP URL as <img src> so Chromium doesn’t paint the heavy JPEG

@@ -46,6 +46,13 @@ import {
   PopupBlockEditor,
 } from "./ConversionBlockEditors";
 import {
+  ContactInfoCardsBlockEditor,
+  LegalArticlesBlockEditor,
+  PartnersMarqueeBlockEditor,
+  QuoteRequestFormBlockEditor,
+  StatsCountersBlockEditor,
+} from "./NewSectionsBlockEditors";
+import {
   BenefitsBlockEditor,
   ColumnsBlockEditor,
   ComparisonTableBlockEditor,
@@ -58,8 +65,13 @@ import {
 import type { CmsImagePickerProps } from "../image-picker-props";
 import type {
   ContactFormBlockData,
+  ContactInfoCardsBlockData,
+  LegalArticlesBlockData,
   NewsletterBlockData,
+  PartnersMarqueeBlockData,
   PopupBlockData,
+  QuoteRequestFormBlockData,
+  StatsCountersBlockData,
 } from "@mccoy/cms-schema";
 
 export type BlockEditorProps<T = unknown> = {
@@ -116,12 +128,30 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
   featureGrid: def(
     FeatureGridBlockEditor as ComponentType<BlockEditorProps<FeatureGridBlockData>>,
     "dedicated",
-    ["title", "features", "features.id", "features.icon", "features.title", "features.body"],
+    [
+      "title",
+      "eyebrow",
+      "intro",
+      "presentation",
+      "features",
+      "features.id",
+      "features.icon",
+      "features.title",
+      "features.body",
+    ],
   ),
   textImage: def(
     TextImageBlockEditor as ComponentType<BlockEditorProps<TextImageBlockData>>,
     "dedicated",
-    ["title", "body", "reverse", ...imageSupportedPaths("image")],
+    [
+      "title",
+      "body",
+      "eyebrow",
+      "notice",
+      "presentation",
+      "reverse",
+      ...imageSupportedPaths("image"),
+    ],
   ),
   gallery: def(
     GalleryBlockEditor as ComponentType<BlockEditorProps<GalleryBlockData>>,
@@ -135,6 +165,7 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
       "images.id",
       "images.title",
       "images.caption",
+      "images.shape",
       ...imageSupportedPaths("images.image"),
     ],
   ),
@@ -304,6 +335,83 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
     "posts.date",
     ...imageSupportedPaths("posts.image"),
   ]),
+  partnersMarquee: def(
+    PartnersMarqueeBlockEditor as ComponentType<BlockEditorProps<PartnersMarqueeBlockData>>,
+    "dedicated",
+    [
+      "eyebrow",
+      "heading",
+      "animate",
+      "items",
+      "items.id",
+      "items.name",
+      "items.href",
+      "items.logoBackdrop",
+      ...imageSupportedPaths("items.logo"),
+    ],
+  ),
+  statsCounters: def(
+    StatsCountersBlockEditor as ComponentType<BlockEditorProps<StatsCountersBlockData>>,
+    "dedicated",
+    [
+      "eyebrow",
+      "heading",
+      "body",
+      "items",
+      "items.id",
+      "items.prefix",
+      "items.value",
+      "items.suffix",
+      "items.label",
+      "items.supportingText",
+      "items.animate",
+    ],
+  ),
+  contactInfoCards: def(
+    ContactInfoCardsBlockEditor as ComponentType<BlockEditorProps<ContactInfoCardsBlockData>>,
+    "dedicated",
+    [
+      "eyebrow",
+      "heading",
+      "items",
+      "items.id",
+      "items.type",
+      "items.label",
+      "items.value",
+      "items.secondaryValue",
+      "items.icon",
+      "items.action",
+      "items.action.kind",
+      "items.action.href",
+      "items.action.label",
+    ],
+  ),
+  quoteRequestForm: def(
+    QuoteRequestFormBlockEditor as ComponentType<BlockEditorProps<QuoteRequestFormBlockData>>,
+    "dedicated",
+    [
+      "heading",
+      "description",
+      "enabledScopes",
+      "defaultScope",
+      "submitLabel",
+      "successMessage",
+    ],
+  ),
+  legalArticles: def(
+    LegalArticlesBlockEditor as ComponentType<BlockEditorProps<LegalArticlesBlockData>>,
+    "dedicated",
+    [
+      "heading",
+      "updatedLabel",
+      "updatedAt",
+      "articles",
+      "articles.id",
+      "articles.heading",
+      "articles.anchor",
+      "articles.content",
+    ],
+  ),
 };
 
 // Keep typed aliases available for callers that need them.

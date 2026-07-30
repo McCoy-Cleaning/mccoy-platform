@@ -90,74 +90,92 @@ export function LayoutList({
                 aria-hidden
               />
 
-              <div className={cn("relative z-0 flex items-center gap-3", compact ? "px-4 py-3.5" : "p-4")}>
-                <span
-                  className={cn(
-                    "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-bold tabular-nums",
-                    expanded ? "bg-sky-400/20 text-sky-200" : "bg-white/[0.05] text-white/40",
-                  )}
-                >
-                  {index + 1}
-                </span>
+              <div
+                className={cn(
+                  "relative z-0",
+                  compact ? "flex flex-col gap-2.5 px-3.5 py-3" : "flex items-center gap-3 p-4",
+                )}
+              >
+                <div className={cn("flex min-w-0 items-start gap-2.5", !compact && "min-w-0 flex-1")}>
+                  <span
+                    className={cn(
+                      "grid shrink-0 place-items-center rounded-xl text-sm font-bold tabular-nums",
+                      compact ? "h-8 w-8 text-[13px]" : "h-9 w-9",
+                      expanded ? "bg-sky-400/20 text-sky-200" : "bg-white/[0.05] text-white/40",
+                    )}
+                  >
+                    {index + 1}
+                  </span>
 
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => onEdit?.(row.id)}
-                  disabled={!row.canEdit || !onEdit}
-                  aria-expanded={expanded}
-                >
-                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => onEdit?.(row.id)}
+                    disabled={!row.canEdit || !onEdit}
+                    aria-expanded={expanded}
+                  >
                     <p className="truncate text-[15px] font-semibold leading-tight tracking-tight text-white">
                       {row.label}
                     </p>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]",
-                        isAddable
-                          ? "bg-sky-400/12 text-sky-200/90"
-                          : "bg-white/[0.06] text-white/45",
-                      )}
-                    >
-                      {isAddable ? "Sectie" : "Vast"}
-                    </span>
-                    {row.hidden ? (
-                      <span className="shrink-0 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-amber-200/90">
-                        Verborgen
+                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                          isAddable
+                            ? "bg-sky-400/12 text-sky-200/90 ring-1 ring-inset ring-sky-400/20"
+                            : "bg-white/[0.05] text-white/50 ring-1 ring-inset ring-white/10",
+                        )}
+                      >
+                        {isAddable ? "Sectie" : "Vast"}
                       </span>
-                    ) : (
-                      <span className="sr-only">Zichtbaar</span>
-                    )}
-                  </div>
-                  <p className="mt-1 truncate text-[13px] text-white/45">
-                    {row.summary
-                      ? row.summary
-                      : expanded
-                        ? "Inhoud bewerken"
-                        : row.canEdit
-                          ? "Tik om te bewerken"
-                          : "Alleen volgorde"}
-                  </p>
-                </button>
+                      {row.hidden ? (
+                        <span className="inline-flex shrink-0 items-center rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/90 ring-1 ring-inset ring-amber-400/25">
+                          Verborgen
+                        </span>
+                      ) : (
+                        <span className="sr-only">Zichtbaar</span>
+                      )}
+                      <span className="min-w-0 truncate text-[12px] text-white/40">
+                        {row.summary
+                          ? row.summary
+                          : expanded
+                            ? "Inhoud bewerken"
+                            : row.canEdit
+                              ? "Tik om te bewerken"
+                              : "Alleen volgorde"}
+                      </span>
+                    </div>
+                  </button>
+                </div>
 
-                <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/[0.06] bg-black/25 p-1">
-                  <IconButton
-                    label={`${row.label} omhoog`}
-                    disabled={!row.canMoveUp}
-                    onClick={() => onMoveUp(row.id)}
-                  >
-                    <ChevronUpIcon />
-                  </IconButton>
-                  <IconButton
-                    label={`${row.label} omlaag`}
-                    disabled={!row.canMoveDown}
-                    onClick={() => onMoveDown(row.id)}
-                  >
-                    <ChevronDownIcon />
-                  </IconButton>
+                <div
+                  className={cn(
+                    "flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-black/25 p-0.5",
+                    compact ? "self-end" : "shrink-0",
+                  )}
+                >
+                  {row.canMoveUp ? (
+                    <IconButton
+                      label={`${row.label} omhoog`}
+                      compact={compact}
+                      onClick={() => onMoveUp(row.id)}
+                    >
+                      <ChevronUpIcon />
+                    </IconButton>
+                  ) : null}
+                  {row.canMoveDown ? (
+                    <IconButton
+                      label={`${row.label} omlaag`}
+                      compact={compact}
+                      onClick={() => onMoveDown(row.id)}
+                    >
+                      <ChevronDownIcon />
+                    </IconButton>
+                  ) : null}
                   {row.canHide && onToggleHide ? (
                     <IconButton
                       label={row.hidden ? `${row.label} tonen` : `${row.label} verbergen`}
+                      compact={compact}
                       onClick={() => onToggleHide(row.id)}
                       tone={row.hidden ? "warn" : "default"}
                     >
@@ -165,13 +183,18 @@ export function LayoutList({
                     </IconButton>
                   ) : null}
                   {row.canDuplicate && onDuplicate ? (
-                    <IconButton label={`${row.label} dupliceren`} onClick={() => onDuplicate(row.id)}>
+                    <IconButton
+                      label={`${row.label} dupliceren`}
+                      compact={compact}
+                      onClick={() => onDuplicate(row.id)}
+                    >
                       <CopyIcon />
                     </IconButton>
                   ) : null}
                   {row.canEdit && onEdit ? (
                     <IconButton
                       label={`${row.label} bewerken`}
+                      compact={compact}
                       onClick={() => onEdit(row.id)}
                       active={expanded}
                     >
@@ -179,7 +202,12 @@ export function LayoutList({
                     </IconButton>
                   ) : null}
                   {row.canDelete && onDelete ? (
-                    <IconButton label={`${row.label} verwijderen`} danger onClick={() => onDelete(row.id)}>
+                    <IconButton
+                      label={`${row.label} verwijderen`}
+                      compact={compact}
+                      danger
+                      onClick={() => onDelete(row.id)}
+                    >
                       <TrashIcon />
                     </IconButton>
                   ) : null}
@@ -220,6 +248,7 @@ function IconButton({
   danger,
   active,
   tone = "default",
+  compact = false,
 }: {
   label: string;
   children: React.ReactNode;
@@ -228,6 +257,7 @@ function IconButton({
   danger?: boolean;
   active?: boolean;
   tone?: "default" | "warn";
+  compact?: boolean;
 }) {
   return (
     <button
@@ -237,7 +267,8 @@ function IconButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "grid h-11 w-11 place-items-center rounded-xl text-white/55 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed disabled:opacity-25",
+        "grid place-items-center rounded-lg text-white/55 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed disabled:opacity-25",
+        compact ? "h-9 w-9" : "h-11 w-11 rounded-xl",
         "hover:bg-white/10 hover:text-white",
         danger && "hover:bg-red-500/15 hover:text-red-300",
         tone === "warn" && "text-amber-200/80 hover:bg-amber-400/10 hover:text-amber-100",

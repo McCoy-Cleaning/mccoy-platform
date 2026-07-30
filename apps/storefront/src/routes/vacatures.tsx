@@ -1,23 +1,46 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState, useRef, forwardRef, useMemo } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, CheckCircle2, Briefcase, Upload, FileText, PlayCircle } from "lucide-react";
-import { normalizeJobs, allowLegacyVacancyFallback, warnLegacyVacancyFallback } from "@mccoy/cms-schema";
+import {
+  normalizeJobs,
+  allowLegacyVacancyFallback,
+  warnLegacyVacancyFallback,
+} from "@mccoy/cms-schema";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { pageSectionRenderers } from "@/components/site/pageSectionRenderers";
-import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
-import { useEdit } from "@/lib/cms/edit-context";
+import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
+import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
+import { useEdit } from "@/lib/cms/edit-mode-context";
 import { useI18n } from "@/lib/i18n";
 import { submitSiteForm } from "@/lib/forms/submit-client";
 import { useClientReady } from "@/lib/use-client-ready";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
+import { SECTION_PAGE_RAIL, SectionSurface } from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 const facebookVideoUrl = "https://www.facebook.com/McCoyCleaning/videos/4269581773264540/";
 const facebookShareUrl = "https://www.facebook.com/share/v/1E8ftFTuKV/";
 
 export const Route = createFileRoute("/vacatures")({
+  loader: async () => {
+    const { loadPublishedPageForPath } = await import("@/lib/api/cms-published.functions");
+    const { resultJson } = await loadPublishedPageForPath({ data: { pathname: "/vacatures" } });
+    const result = JSON.parse(resultJson) as Awaited<
+      ReturnType<typeof import("@/lib/cms/load-published-page.server").loadPublishedPageSnapshot>
+    >;
+    if (result.kind === "redirect") {
+      throw redirect({ href: result.toPath, statusCode: result.statusCode });
+    }
+    // Builtin page — always seeded + published; a missing snapshot means the CMS
+    // store is broken, not that the page is legitimately absent.
+    if (result.kind !== "snapshot") {
+      throw new Error("cms: vacatures loader must return a snapshot");
+    }
+    return { snapshot: result.snapshot };
+  },
   head: () => ({
     meta: [
       { title: "Vacatures Schoonmaak Twente — Werken bij McCoy Cleaning" },
@@ -122,8 +145,20 @@ export const Route = createFileRoute("/vacatures")({
 });
 
 function VacaturesPage() {
+  const { snapshot } = Route.useLoaderData();
+  return (
+    <RoutePublishedPageProvider page={snapshot.page}>
+      <VacaturesPageBody />
+    </RoutePublishedPageProvider>
+  );
+}
+
+function VacaturesPageBody() {
+  const { snapshot } = Route.useLoaderData();
   const { t } = useI18n();
-  const page = useCmsPageForView("page_vacatures");
+  // Prefer the SSR-resolved loader snapshot over the client-only CMS seed store so
+  // the first client render matches the server HTML (avoids hydration mismatch).
+  const page = useCmsPageForView("page_vacatures") ?? snapshot.page;
   const { mode } = useEdit();
   const editing = mode === "edit";
   const clientReady = useClientReady();
@@ -196,7 +231,7 @@ function VacaturesPage() {
         </div>
 
         {/* application + video grid */}
-        <section id="apply" className="mx-auto mt-16 max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <section id="apply" className={cn(SECTION_PAGE_RAIL, "mt-16 pb-24")}>
           <div className="grid gap-8 lg:grid-cols-12">
             {/* form */}
             <motion.div
@@ -204,166 +239,168 @@ function VacaturesPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="rounded-[2rem] border border-white/10 bg-card/60 p-7 md:p-10 lg:col-span-7"
+              className="lg:col-span-7"
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {t.jobs.formTitle}
-              </p>
-              <h2 className="font-display mt-3 text-3xl text-white md:text-4xl">
-                {activeRoleTitle}
-              </h2>
-              <p className="mt-2 text-sm text-white/60">{t.jobs.formSub}</p>
+              <SectionSurface variant="form" className="p-7 md:p-10">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                  {t.jobs.formTitle}
+                </p>
+                <h2 className="font-display mt-3 text-3xl text-foreground md:text-4xl">
+                  {activeRoleTitle}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">{t.jobs.formSub}</p>
 
-              {sent ? (
-                <div className="flex flex-col items-center gap-3 py-12 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-primary" />
-                  <p className="font-display text-2xl text-white">{t.jobs.success}</p>
-                </div>
-              ) : (
-                <form
-                  data-testid={clientReady ? "site-form-ready" : "site-form-pending"}
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!clientReady || submitting) return;
-                    setSubmitting(true);
-                    setError(null);
-                    const extraFiles: File[] = [];
-                    const cv = cvRef.current?.files?.[0];
-                    const letter = letterRef.current?.files?.[0];
-                    if (cv) extraFiles.push(cv);
-                    if (letter) extraFiles.push(letter);
-                    const result = await submitSiteForm({
-                      kind: "job_application",
-                      pageId: "page_vacatures",
-                      sourceId: FIXED_FORM_SOURCE_IDS.vacaturesApplication,
-                      form: e.currentTarget,
-                      extras: {
-                        vacancyId: activeVacancyId,
-                        vacancyTitleSnapshot: activeRoleTitle,
-                        // Legacy display field for email templates; server prefers vacancyId.
-                        role: activeRoleTitle,
-                      },
-                      extraFiles,
-                    });
-                    setSubmitting(false);
-                    if (!result.ok) {
-                      setError(result.error);
-                      return;
-                    }
-                    setSent(true);
-                  }}
-                  className="mt-8 grid gap-4 sm:grid-cols-2"
-                >
-                  <input
-                    type="text"
-                    name="website"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    aria-hidden="true"
-                    className="absolute -left-[9999px] h-0 w-0 opacity-0"
-                  />
-                  {/* role picker as small animated cards inside the form */}
-                  <div className="sm:col-span-2">
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-white/60">
-                      {t.jobs.role}
-                    </label>
-                    <div className="grid gap-2.5 sm:grid-cols-3">
-                      {applicationRoles.map((r, i) => {
-                        const active = safeRoleIndex === i;
-                        return (
-                          <motion.button
-                            type="button"
-                            key={r.id}
-                            onClick={() => setActiveRoleIndex(i)}
-                            whileHover={{ y: -2 }}
-                            whileTap={{ scale: 0.98 }}
-                            transition={{ type: "spring", stiffness: 320, damping: 24 }}
-                            className={`relative overflow-hidden rounded-2xl border p-3 text-left transition ${
-                              active
-                                ? "border-primary/60 bg-primary/10"
-                                : "border-white/10 bg-background/40 hover:border-primary/40"
-                            }`}
-                          >
-                            {active && (
-                              <motion.span
-                                layoutId="role-glow"
-                                className="pointer-events-none absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/30 blur-2xl"
-                                transition={{ type: "spring", stiffness: 220, damping: 30 }}
-                              />
-                            )}
-                            <div className="relative flex items-center gap-2.5">
-                              <span
-                                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
-                                  active
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-primary/15 text-primary"
-                                }`}
-                              >
-                                <Briefcase className="h-4 w-4" />
-                              </span>
-                              <span className="min-w-0 font-display text-sm leading-tight text-white">
-                                {r.title}
-                              </span>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
+                {sent ? (
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <CheckCircle2 className="h-12 w-12 text-primary" />
+                    <p className="font-display text-2xl text-white">{t.jobs.success}</p>
                   </div>
-
-                  <Field label={t.contact.name} name="name" required />
-                  <Field label={t.contact.email} name="email" type="email" required />
-                  <Field label={t.contact.phone} name="phone" type="tel" />
-
-                  <FileDrop
-                    label={t.jobs.cv}
-                    icon={FileText}
-                    name="cv"
-                    ref={cvRef}
-                    fileName={cvName}
-                    onPick={(f) => setCvName(f?.name ?? null)}
-                    pick={t.jobs.cvPick}
-                  />
-                  <FileDrop
-                    label={t.jobs.letter}
-                    icon={Upload}
-                    name="letter"
-                    ref={letterRef}
-                    fileName={letterName}
-                    onPick={(f) => setLetterName(f?.name ?? null)}
-                    pick={t.jobs.cvPick}
-                  />
-
-                  <div className="sm:col-span-2">
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60">
-                      {t.jobs.motivation}
-                    </label>
-                    <textarea
-                      name="motivation"
-                      rows={5}
-                      maxLength={1000}
-                      className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-primary"
-                    />
-                  </div>
-                  {error ? (
-                    <p
-                      className="sm:col-span-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
-                      role="alert"
-                    >
-                      {error}
-                    </p>
-                  ) : null}
-                  <button
-                    type="submit"
-                    disabled={!clientReady || submitting}
-                    aria-disabled={!clientReady || submitting}
-                    className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+                ) : (
+                  <form
+                    data-testid={clientReady ? "site-form-ready" : "site-form-pending"}
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!clientReady || submitting) return;
+                      setSubmitting(true);
+                      setError(null);
+                      const extraFiles: File[] = [];
+                      const cv = cvRef.current?.files?.[0];
+                      const letter = letterRef.current?.files?.[0];
+                      if (cv) extraFiles.push(cv);
+                      if (letter) extraFiles.push(letter);
+                      const result = await submitSiteForm({
+                        kind: "job_application",
+                        pageId: "page_vacatures",
+                        sourceId: FIXED_FORM_SOURCE_IDS.vacaturesApplication,
+                        form: e.currentTarget,
+                        extras: {
+                          vacancyId: activeVacancyId,
+                          vacancyTitleSnapshot: activeRoleTitle,
+                          // Legacy display field for email templates; server prefers vacancyId.
+                          role: activeRoleTitle,
+                        },
+                        extraFiles,
+                      });
+                      setSubmitting(false);
+                      if (!result.ok) {
+                        setError(result.error);
+                        return;
+                      }
+                      setSent(true);
+                    }}
+                    className="mt-8 grid gap-4 sm:grid-cols-2"
                   >
-                    {submitting ? "..." : t.jobs.submit}
-                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                  </button>
-                </form>
-              )}
+                    <input
+                      type="text"
+                      name="website"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                    />
+                    {/* role picker as small animated cards inside the form */}
+                    <div className="sm:col-span-2">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-white/60">
+                        {t.jobs.role}
+                      </label>
+                      <div className="grid gap-2.5 sm:grid-cols-3">
+                        {applicationRoles.map((r, i) => {
+                          const active = safeRoleIndex === i;
+                          return (
+                            <motion.button
+                              type="button"
+                              key={r.id}
+                              onClick={() => setActiveRoleIndex(i)}
+                              whileHover={{ y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              transition={{ type: "spring", stiffness: 320, damping: 24 }}
+                              className={`relative overflow-hidden rounded-2xl border p-3 text-left transition ${
+                                active
+                                  ? "border-primary/60 bg-primary/10"
+                                  : "border-white/10 bg-background/40 hover:border-primary/40"
+                              }`}
+                            >
+                              {active && (
+                                <motion.span
+                                  layoutId="role-glow"
+                                  className="pointer-events-none absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/30 blur-2xl"
+                                  transition={{ type: "spring", stiffness: 220, damping: 30 }}
+                                />
+                              )}
+                              <div className="relative flex items-center gap-2.5">
+                                <span
+                                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
+                                    active
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-primary/15 text-primary"
+                                  }`}
+                                >
+                                  <Briefcase className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 font-display text-sm leading-tight text-white">
+                                  {r.title}
+                                </span>
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Field label={t.contact.name} name="name" required />
+                    <Field label={t.contact.email} name="email" type="email" required />
+                    <Field label={t.contact.phone} name="phone" type="tel" />
+
+                    <FileDrop
+                      label={t.jobs.cv}
+                      icon={FileText}
+                      name="cv"
+                      ref={cvRef}
+                      fileName={cvName}
+                      onPick={(f) => setCvName(f?.name ?? null)}
+                      pick={t.jobs.cvPick}
+                    />
+                    <FileDrop
+                      label={t.jobs.letter}
+                      icon={Upload}
+                      name="letter"
+                      ref={letterRef}
+                      fileName={letterName}
+                      onPick={(f) => setLetterName(f?.name ?? null)}
+                      pick={t.jobs.cvPick}
+                    />
+
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60">
+                        {t.jobs.motivation}
+                      </label>
+                      <textarea
+                        name="motivation"
+                        rows={5}
+                        maxLength={1000}
+                        className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-primary"
+                      />
+                    </div>
+                    {error ? (
+                      <p
+                        className="sm:col-span-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+                        role="alert"
+                      >
+                        {error}
+                      </p>
+                    ) : null}
+                    <button
+                      type="submit"
+                      disabled={!clientReady || submitting}
+                      aria-disabled={!clientReady || submitting}
+                      className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+                    >
+                      {submitting ? "..." : t.jobs.submit}
+                      <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                    </button>
+                  </form>
+                )}
+              </SectionSurface>
             </motion.div>
 
             {/* video */}

@@ -9,7 +9,8 @@ const repoRoot = join(here, "..", "..", "..");
 
 function extractTemplateTypes(filePath: string): string[] {
   const content = readFileSync(filePath, "utf8");
-  const types = [...content.matchAll(/^\s+type:\s*"([a-zA-Z]+)"/gm)].map((m) => m[1]!);
+  // Only top-level TEMPLATES entries (4-space indent), not nested defaultData fields.
+  const types = [...content.matchAll(/^ {4}type:\s*"([a-zA-Z]+)"/gm)].map((m) => m[1]!);
   return [...new Set(types)];
 }
 

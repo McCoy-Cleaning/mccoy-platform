@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Admin-uitnodiging</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f5f8;font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f8;padding:40px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+            <tr>
+              <td style="background:#0b1220;padding:28px 32px;">
+                <div style="margin:0 0 16px;">
+                  <img src="https://www.mccoy.nl/images/cms/logo-mccoy.png" alt="McCoy Cleaning" width="168" height="auto" style="display:block;width:168px;max-width:70%;height:auto;border:0;outline:none;text-decoration:none;" />
+                </div>
+                <div style="color:#ffffff;font-size:24px;font-weight:700;margin-top:4px;letter-spacing:-0.02em;line-height:1.25;">Admin-uitnodiging</div>
+                <div style="color:#94a3b8;font-size:13px;line-height:1.5;margin-top:8px;">Beveiligde toegang tot het McCoy control center</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px 8px;color:#1f2937;font-size:15px;line-height:1.65;">
+                <p style="margin:0 0 16px;">Beste collega,</p>
+                <p style="margin:0 0 16px;">
+                  <strong style="color:#111827;">een McCoy superbeheerder</strong> nodigt je uit als
+                  <strong style="color:#111827;">beheerder</strong> in McCoy Admin.
+                </p>
+                <p style="margin:0 0 16px;color:#4b5563;">
+                  Je krijgt toegang tot het McCoy control center. Volledige toegang volgt pas na
+                  wachtwoordinstelling en tweestapsverificatie.
+                </p>
+                <p style="margin:0 0 10px;color:#374151;font-size:14px;font-weight:600;">Na acceptatie doorloop je:</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+                  <tr>
+                    <td style="padding:6px 0;vertical-align:top;width:28px;">
+                      <div style="width:22px;height:22px;border-radius:999px;background:#e8f3fc;color:#1e88e5;font-size:12px;font-weight:700;line-height:22px;text-align:center;">1</div>
+                    </td>
+                    <td style="padding:6px 0 6px 8px;color:#374151;font-size:14px;line-height:1.45;">Stel een sterk wachtwoord in (en bevestig het)</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;vertical-align:top;width:28px;">
+                      <div style="width:22px;height:22px;border-radius:999px;background:#e8f3fc;color:#1e88e5;font-size:12px;font-weight:700;line-height:22px;text-align:center;">2</div>
+                    </td>
+                    <td style="padding:6px 0 6px 8px;color:#374151;font-size:14px;line-height:1.45;">Vul je naam in als die nog ontbreekt</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;vertical-align:top;width:28px;">
+                      <div style="width:22px;height:22px;border-radius:999px;background:#e8f3fc;color:#1e88e5;font-size:12px;font-weight:700;line-height:22px;text-align:center;">3</div>
+                    </td>
+                    <td style="padding:6px 0 6px 8px;color:#374151;font-size:14px;line-height:1.45;">Activeer verplichte tweestapsverificatie (TOTP)</td>
+                  </tr>
+                </table>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 8px;">
+                  <tr>
+                    <td align="center" bgcolor="#1e88e5" style="border-radius:10px;background-color:#1e88e5;">
+                      <a href="{{ .ConfirmationURL }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;font-weight:700;line-height:1.2;text-decoration:none;border-radius:10px;">
+                        Uitnodiging accepteren
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin:16px 0 0;color:#6b7280;font-size:12px;line-height:1.55;">
+                  <p style="margin:0 0 8px;">Werkt de knop niet? Kopieer deze link naar je browser:</p>
+                  <p style="margin:0;color:#1e88e5;word-break:break-all;">{{ .ConfirmationURL }}</p>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;">
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;color:#6b7280;font-size:12px;line-height:1.55;">
+                  <strong style="display:block;color:#111827;font-size:12px;margin-bottom:6px;">Beveiliging</strong>
+                  Negeer dit bericht als je geen uitnodiging verwachtte. Deel de link met niemand.
+                  McCoy vraagt nooit om je wachtwoord of authenticatiecode per e-mail.
+                </div>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:20px 0 0;color:#9ca3af;font-size:11px;line-height:1.5;">McCoy Cleaning · Vertrouwelijk · Alleen bedoeld voor de uitgenodigde ontvanger</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

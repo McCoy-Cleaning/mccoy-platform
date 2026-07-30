@@ -4,34 +4,54 @@ import type { BlockType, CmsPage } from "./types";
  * Page-level layout policy for block instance limits.
  * Keep separate from global block capabilities (duplicable/removable/publishable).
  *
- * Vacatures ownership: exactly one jobs block after migration.
- * During migration, ensureVacaturesJobsBlock seeds the block (public listing
- * hidden by default); picker/add is blocked when one already exists.
- * Removable is false so admins cannot permanently remove it — vacancy data
- * still drives the application form and /vacatures/$slug.
- *
- * FALLBACK REMOVAL (legacy t.jobs.roles): default path no longer uses static roles.
- * Keep `allowLegacyVacancyFallback` / `warnLegacyVacancyFallback` only while older
- * environments may lack a published jobs block; remove when checklist in
- * docs/architecture/page-section-builder-gaps.md is complete.
+ * Editor may temporarily create an invalid local composition;
+ * publication must fail with an exact block-policy error.
  */
 export type PageBlockTypePolicy = {
   minInstances: number;
   maxInstances: number;
   removable: boolean;
+  /** When false, block type cannot be added via picker on this page. */
+  duplicable?: boolean;
 };
 
 export const pageBlockPolicies: Record<
   string,
   Partial<Record<BlockType, PageBlockTypePolicy>>
 > = {
+  // home.workGallery remains a required *fixed* section until verified migration (Gate 5+).
+  // After migration, re-enable gallery minInstances: 1 here.
+  page_contact: {
+    contactForm: {
+      minInstances: 1,
+      maxInstances: 1,
+      removable: false,
+      duplicable: false,
+    },
+  },
+  page_offerte: {
+    quoteRequestForm: {
+      minInstances: 1,
+      maxInstances: 1,
+      removable: false,
+      duplicable: false,
+    },
+  },
   page_vacatures: {
     jobs: {
       minInstances: 1,
       maxInstances: 1,
       removable: false,
+      duplicable: false,
     },
   },
+};
+
+/** Privileged form blocks disallowed outside their builtin page. */
+const PRIVILEGED_FORM_BLOCKS: Partial<
+  Record<BlockType, { allowedPageIds: readonly string[] }>
+> = {
+  quoteRequestForm: { allowedPageIds: ["page_offerte"] },
 };
 
 export function getPageBlockPolicy(
@@ -47,8 +67,15 @@ export function countBlocksOfType(page: CmsPage, blockType: BlockType): number {
 
 /** Whether the page may add another instance of this block type. */
 export function canAddBlockType(page: CmsPage, blockType: BlockType): boolean {
+  const privileged = PRIVILEGED_FORM_BLOCKS[blockType];
+  if (privileged && !privileged.allowedPageIds.includes(page.id)) {
+    return false;
+  }
   const policy = getPageBlockPolicy(page.id, blockType);
   if (!policy) return true;
+  if (policy.duplicable === false && countBlocksOfType(page, blockType) >= 1) {
+    return false;
+  }
   return countBlocksOfType(page, blockType) < policy.maxInstances;
 }
 
@@ -63,13 +90,71 @@ export function canRemoveBlockType(page: CmsPage, blockType: BlockType): boolean
 /** Block types that have hit their max instance count on this page. */
 export function blockedBlockTypesForPage(page: CmsPage): BlockType[] {
   const policies = pageBlockPolicies[page.id];
-  if (!policies) return [];
   const blocked: BlockType[] = [];
-  for (const [type, policy] of Object.entries(policies)) {
-    if (!policy) continue;
-    if (countBlocksOfType(page, type as BlockType) >= policy.maxInstances) {
+  if (policies) {
+    for (const [type, policy] of Object.entries(policies)) {
+      if (!policy) continue;
+      if (countBlocksOfType(page, type as BlockType) >= policy.maxInstances) {
+        blocked.push(type as BlockType);
+      }
+    }
+  }
+  for (const [type, rule] of Object.entries(PRIVILEGED_FORM_BLOCKS)) {
+    if (!rule) continue;
+    if (!rule.allowedPageIds.includes(page.id)) {
       blocked.push(type as BlockType);
     }
   }
-  return blocked;
+  return [...new Set(blocked)];
+}
+
+export type PageBlockPolicyIssue = {
+  code: "BLOCK_POLICY_MIN" | "BLOCK_POLICY_MAX" | "BLOCK_POLICY_PAGE";
+  message: string;
+  blockType: BlockType;
+};
+
+/** Fail-closed publish checks for page block policies. */
+export function validatePageBlockPolicies(page: CmsPage): PageBlockPolicyIssue[] {
+  const issues: PageBlockPolicyIssue[] = [];
+  const policies = pageBlockPolicies[page.id];
+  // Until pages are blocks-only (layoutVersion >= 7), skip min checks that
+  // would false-fail hybrid fixed+block layouts (contact form still fixed).
+  const enforceMins =
+    typeof page.layoutVersion === "number" && page.layoutVersion >= 7;
+
+  if (policies) {
+    for (const [type, policy] of Object.entries(policies)) {
+      if (!policy) continue;
+      const blockType = type as BlockType;
+      const count = countBlocksOfType(page, blockType);
+      if (enforceMins && count < policy.minInstances) {
+        issues.push({
+          code: "BLOCK_POLICY_MIN",
+          blockType,
+          message: `Pagina vereist minstens ${policy.minInstances}× ${blockType} (nu ${count}).`,
+        });
+      }
+      if (count > policy.maxInstances) {
+        issues.push({
+          code: "BLOCK_POLICY_MAX",
+          blockType,
+          message: `Pagina staat maximaal ${policy.maxInstances}× ${blockType} toe (nu ${count}).`,
+        });
+      }
+    }
+  }
+  for (const [type, rule] of Object.entries(PRIVILEGED_FORM_BLOCKS)) {
+    if (!rule) continue;
+    const blockType = type as BlockType;
+    const count = countBlocksOfType(page, blockType);
+    if (count > 0 && !rule.allowedPageIds.includes(page.id)) {
+      issues.push({
+        code: "BLOCK_POLICY_PAGE",
+        blockType,
+        message: `${blockType} is niet toegestaan op deze pagina.`,
+      });
+    }
+  }
+  return issues;
 }

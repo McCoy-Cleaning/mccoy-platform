@@ -166,6 +166,16 @@ const translations = {
       addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
       photosLabel: "Foto's van de situatie (optioneel)",
       photosHelp: "JPG, PNG of PDF — meerdere bestanden toegestaan",
+      responseWithin: "Persoonlijk antwoord binnen één werkdag",
+      requestsInPortal: "Aanvragen verschijnen in het admin-portaal",
+      receivedMessage: "We hebben uw bericht ontvangen en nemen zo snel mogelijk contact op.",
+      consent: "Door te versturen stemt u in met verwerking van uw gegevens voor deze aanvraag.",
+      submitting: "Bezig…",
+      placeholderName: "Uw naam",
+      placeholderCompany: "Optioneel",
+      placeholderPhone: "06 …",
+      placeholderEmail: "naam@bedrijf.nl",
+      placeholderMessage: "Waar kunnen we u mee helpen?",
       sections: {
         general: {
           tag: "01 — Reguliere schoonmaak",
@@ -408,6 +418,16 @@ const translations = {
       addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
       photosLabel: "Photos of the situation (optional)",
       photosHelp: "JPG, PNG or PDF — multiple files allowed",
+      responseWithin: "Personal reply within one working day",
+      requestsInPortal: "Requests appear in the admin portal",
+      receivedMessage: "We have received your message and will get back to you as soon as possible.",
+      consent: "By submitting, you agree to the processing of your details for this request.",
+      submitting: "Sending…",
+      placeholderName: "Your name",
+      placeholderCompany: "Optional",
+      placeholderPhone: "06 …",
+      placeholderEmail: "name@company.com",
+      placeholderMessage: "How can we help you?",
       sections: {
         general: {
           tag: "01 — Recurring cleaning",
@@ -552,4 +572,12 @@ export function useI18n() {
   const ctx = useContext(I18nContext);
   if (!ctx) throw new Error("useI18n must be used within I18nProvider");
   return ctx;
+}
+
+// Context identity cannot survive Fast Refresh of this module (Provider +
+// createContext share one file). Invalidate so importers remount together.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot?.invalidate();
+  });
 }

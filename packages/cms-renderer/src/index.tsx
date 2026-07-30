@@ -10,7 +10,13 @@ export type { LinkResolverPages };
 export { CmsImageView, CmsButtonView };
 export { RegisteredBlockView, CmsBlockView } from "./blocks/RegisteredBlockView";
 export type { RegisteredBlockViewProps } from "./blocks/RegisteredBlockView";
-export { WorkMosaicGallery, workMosaicTileClass } from "./blocks/WorkMosaicGallery";
+export {
+  WorkMosaicGallery,
+  workMosaicShapeClass,
+  workMosaicLegacyIndexClass,
+} from "./blocks/WorkMosaicGallery";
+/** @deprecated Prefer shape-based `workMosaicShapeClass` or `workMosaicLegacyIndexClass`. */
+export { workMosaicLegacyIndexClass as workMosaicTileClass } from "./blocks/WorkMosaicGallery";
 export type { WorkMosaicGalleryItem, WorkMosaicGalleryProps } from "./blocks/WorkMosaicGallery";
 export { JobsSectionView } from "./blocks/JobsSectionView";
 export type { JobsSectionViewProps, JobsRenderMode } from "./blocks/JobsSectionView";
@@ -37,6 +43,12 @@ export {
   SECTION_INNER,
   SECTION_INNER_BASE,
   SECTION_PAGE_RAIL,
+  SECTION_READING_RAIL,
+  SECTION_WIDE_READING_RAIL,
+  SECTION_FORM_RAIL,
+  SECTION_MEDIA_RAIL,
+  SECTION_FULL_BLEED,
+  SECTION_MEDIA_SIZES,
   SECTION_SHELL_Y,
   SECTION_SHELL_Y_COMPACT,
   SECTION_SHELL_Y_HERO,
@@ -47,10 +59,31 @@ export {
   sectionInnerAlignRowClass,
   sectionInnerClass,
   sectionInnerColumnClass,
+  sectionWidthModeToInnerMax,
 } from "./sectionLayout";
-export type { SectionInnerMaxWidth } from "./sectionLayout";
+export type { SectionInnerMaxWidth, SectionWidthMode } from "./sectionLayout";
 export { ContentAlignProvider, useContentAlign } from "./contentAlign";
 export { SectionInner } from "./SectionInner";
+export { FullBleed } from "./FullBleed";
+export { SectionShell } from "./SectionShell";
+export type { SectionShellProps, SectionShellTone } from "./SectionShell";
+export {
+  BLOCK_CHROME_CONFIG,
+  getBlockChromeConfig,
+} from "./sectionChrome";
+export type {
+  SectionChromeConfig,
+  SectionHeaderMode,
+  SectionSurfaceMode,
+  SectionSurfaceVariant,
+} from "./sectionChrome";
+export {
+  SectionAmbient,
+  SectionEyebrow,
+  SectionHeader,
+  SectionIndex,
+  SectionSurface,
+} from "./sectionChromeUi";
 
 export function HomeHeroView({
   content,

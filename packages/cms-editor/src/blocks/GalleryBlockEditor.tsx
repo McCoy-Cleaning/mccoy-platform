@@ -125,6 +125,8 @@ export function GalleryBlockEditor({
                 id: createItemId("img"),
                 title: u.label,
                 image: { ...u.image, alt: u.label, decorative: false },
+                // Featured mosaic: omit shape → classic Ons-werk spans until chosen.
+                ...(featured ? {} : { shape: "square" as const }),
               }));
               onChange({ ...value, images: [...value.images, ...added] });
               if (added[0]) setSelectedId(added[0].id);
@@ -147,6 +149,7 @@ export function GalleryBlockEditor({
             id: createItemId("img"),
             title: "Nieuwe foto",
             image: localImage("/images/hero-placeholder.jpg", "Galerijfoto") as CmsImage,
+            ...(featured ? {} : { shape: "square" as const }),
           })}
           addLabel="Afbeelding toevoegen"
           renderItem={(item, actions, index) => (
@@ -169,6 +172,62 @@ export function GalleryBlockEditor({
                   actions.update({ ...item, image });
                 }}
               />
+              {featured ? (
+                <Field label="Vorm (tegel)">
+                  <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tegelvorm">
+                    {(
+                      [
+                        { id: "wide", label: "Breed", hint: "2×2 groot" },
+                        { id: "square", label: "Vierkant", hint: "1×1" },
+                        { id: "tall", label: "Hoog", hint: "2 rijen" },
+                      ] as const
+                    ).map((opt) => {
+                      const selected = item.shape === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => actions.update({ ...item, shape: opt.id })}
+                          className={
+                            selected
+                              ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-2 py-2 text-left"
+                              : "rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2 text-left hover:border-white/25"
+                          }
+                        >
+                          <span
+                            className="mb-1.5 block w-full rounded-md border border-white/15 bg-white/5"
+                            style={{
+                              aspectRatio:
+                                opt.id === "wide" ? "1/1" : opt.id === "tall" ? "3/4" : "1/1",
+                              maxWidth: opt.id === "square" ? "50%" : undefined,
+                            }}
+                            aria-hidden
+                          />
+                          <span className="block text-xs font-semibold text-white">{opt.label}</span>
+                          <span className="block text-[10px] text-white/45">{opt.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-white/45">
+                    Geen keuze = klassieke collage-indeling. Breed = 2×2 (zoals Reguliere schoonmaak).
+                  </p>
+                  {item.shape ? (
+                    <button
+                      type="button"
+                      className="mt-1.5 text-[11px] font-medium text-sky-300/90 hover:text-sky-200"
+                      onClick={() => {
+                        const { shape: _removed, ...rest } = item;
+                        actions.update(rest);
+                      }}
+                    >
+                      Herstel klassieke plaatsing
+                    </button>
+                  ) : null}
+                </Field>
+              ) : null}
               {featured ? (
                 <>
                   <Field label="Titel op foto">

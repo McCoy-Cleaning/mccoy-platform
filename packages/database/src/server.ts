@@ -44,6 +44,8 @@ export {
   countSuperAdmins,
   countActiveSuperAdmins,
   insertStaffProfile,
+  ensureStaffProfileForInvite,
+  findAuthUserIdByEmail,
   activateStaffUser,
   blockStaffUser,
   reinstateBlockedStaffUser,
@@ -111,6 +113,8 @@ export {
   getFileCmsStore,
   createFileCmsStore,
   createSupabaseCmsStore,
+  isSupabaseConnectivityError,
+  markSupabaseCmsUnreachable,
   resolvePublicCmsRequest,
   buildPublishedSitemapEntries,
   buildCmsHeadFromSnapshot,
@@ -167,6 +171,8 @@ export {
 } from "./cms";
 
 export {
+  NotificationOutboxUnavailableError,
+  isNotificationOutboxUnavailableMessage,
   enqueueNotificationOutbox,
   listUnprocessedNotificationOutbox,
   markNotificationOutboxProcessed,

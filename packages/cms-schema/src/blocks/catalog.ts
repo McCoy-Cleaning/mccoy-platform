@@ -15,6 +15,13 @@ import {
   type TextListItem,
 } from "./text-list";
 import { timelineDefinition } from "./timeline";
+import {
+  contactInfoCardsDefinition,
+  legalArticlesDefinition,
+  partnersMarqueeDefinition,
+  quoteRequestFormDefinition,
+  statsCountersDefinition,
+} from "./new-sections";
 
 export type {
   JobsBlockData,
@@ -60,6 +67,48 @@ function bool(rec: Record<string, unknown>, key: string, fallback = false): bool
   return typeof rec[key] === "boolean" ? (rec[key] as boolean) : fallback;
 }
 
+/** Default Producten intro metrics strip (NL). Seeded when productsIntro lacks metrics. */
+export const DEFAULT_PRODUCTS_INTRO_METRICS = [
+  { id: "metric_products", value: "100+", label: "Producten" },
+  { id: "metric_b2b", value: "B2B", label: "Groothandel" },
+  { id: "metric_contact", value: "24/7", label: "Contact" },
+] as const;
+
+export type ProductsIntroMetric = {
+  id: string;
+  value: string;
+  label: string;
+};
+
+export function normalizeProductsIntroMetrics(
+  value: unknown,
+  seedDefaults: boolean,
+): ProductsIntroMetric[] | undefined {
+  if (Array.isArray(value) && value.length > 0) {
+    const metrics: ProductsIntroMetric[] = [];
+    for (const row of value) {
+      if (!row || typeof row !== "object") continue;
+      const rec = row as Record<string, unknown>;
+      const valueText = typeof rec.value === "string" ? rec.value.trim() : "";
+      const labelText = typeof rec.label === "string" ? rec.label.trim() : "";
+      if (!valueText && !labelText) continue;
+      metrics.push({
+        id:
+          typeof rec.id === "string" && rec.id.trim()
+            ? rec.id.trim()
+            : createItemId("metric"),
+        value: valueText,
+        label: labelText,
+      });
+    }
+    if (metrics.length > 0) return metrics.slice(0, 6);
+  }
+  if (seedDefaults) {
+    return DEFAULT_PRODUCTS_INTRO_METRICS.map((m) => ({ ...m }));
+  }
+  return undefined;
+}
+
 function def<TType extends BlockType, TData>(
   d: CmsBlockDataDefinition<TType, TData>,
 ): CmsBlockDataDefinition<TType, TData> {
@@ -67,19 +116,34 @@ function def<TType extends BlockType, TData>(
 }
 
 // —— Hero ——
+export type HeroHeadingAccent = {
+  beforeAccent?: string;
+  accent?: string;
+  afterAccent?: string;
+};
 export type HeroBlockData = {
   eyebrow?: string;
   title: string;
+  /** Semantic accent parts — never raw HTML. */
+  headingAccent?: HeroHeadingAccent;
   subtitle?: string;
   cta?: CmsButton;
+  secondaryCta?: CmsButton;
   image?: CmsImage;
   align?: "left" | "center";
 };
+const heroHeadingAccentSchema = z.object({
+  beforeAccent: z.string().optional(),
+  accent: z.string().optional(),
+  afterAccent: z.string().optional(),
+});
 const heroSchema: z.ZodType<HeroBlockData> = z.object({
   eyebrow: z.string().optional(),
   title: z.string(),
+  headingAccent: heroHeadingAccentSchema.optional(),
   subtitle: z.string().optional(),
   cta: cmsButtonSchema.optional(),
+  secondaryCta: cmsButtonSchema.optional(),
   image: z.custom<CmsImage | undefined>((v) => v === undefined || normalizeCmsImage(v) != null).optional(),
   align: z.enum(["left", "center"]).optional(),
 });
@@ -92,13 +156,39 @@ function createDefaultHero(): HeroBlockData {
     align: "left",
   };
 }
+function normalizeHeroHeadingAccent(raw: unknown): HeroHeadingAccent | undefined {
+  if (!raw || typeof raw !== "object") {
+    if (typeof raw === "string" && raw.trim()) {
+      // Legacy string accent → treat as accent substring only (no HTML).
+      return { accent: raw.replace(/<[^>]+>/g, "").trim() || undefined };
+    }
+    return undefined;
+  }
+  const rec = raw as Record<string, unknown>;
+  const accent: HeroHeadingAccent = {
+    beforeAccent: str(rec, "beforeAccent") || undefined,
+    accent: str(rec, "accent") || undefined,
+    afterAccent: str(rec, "afterAccent") || undefined,
+  };
+  if (!accent.beforeAccent && !accent.accent && !accent.afterAccent) return undefined;
+  return accent;
+}
 function normalizeHero(value: unknown): HeroBlockData {
   const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const secondary =
+    rec.secondaryCta && typeof rec.secondaryCta === "object"
+      ? (() => {
+          const parsed = cmsButtonSchema.safeParse(rec.secondaryCta);
+          return parsed.success ? parsed.data : undefined;
+        })()
+      : undefined;
   const data: HeroBlockData = {
     eyebrow: str(rec, "eyebrow") || undefined,
     title: str(rec, "title", "Titel"),
+    headingAccent: normalizeHeroHeadingAccent(rec.headingAccent),
     subtitle: str(rec, "subtitle") || undefined,
     cta: legacyCta(rec),
+    secondaryCta: secondary,
     image: normalizeCmsImage(rec.image),
     align: rec.align === "center" ? "center" : "left",
   };
@@ -216,11 +306,14 @@ export function normalizeQuoteBlockData(value: unknown): QuoteBlockData {
 }
 
 // —— Gallery ——
+export type GalleryImageShape = "wide" | "square" | "tall";
 export type GalleryImageItem = {
   id: string;
   image: CmsImage;
   title?: string;
   caption?: string;
+  /** Tile shape for featured mosaic — default square. */
+  shape?: GalleryImageShape;
 };
 export type GalleryBlockData = {
   title: string;
@@ -230,6 +323,18 @@ export type GalleryBlockData = {
   /** `featured` = homepage Ons-werk mosaic. */
   layout?: "grid" | "masonry" | "featured";
 };
+
+/** Span classes for the featured mosaic grid (`auto-rows-[220px]` × 4 cols). */
+export const galleryShapeConfig = {
+  /** Same footprint as classic “Reguliere schoonmaak”: 2×2. */
+  wide: { aspectRatio: "1 / 1", className: "col-span-2 row-span-2" },
+  square: { aspectRatio: "1 / 1", className: "" },
+  tall: { aspectRatio: "3 / 4", className: "row-span-2" },
+} as const;
+
+export function normalizeGalleryShape(raw: unknown): GalleryImageShape {
+  return raw === "wide" || raw === "tall" ? raw : "square";
+}
 
 // —— Video ——
 export type VideoBlockData = {
@@ -270,8 +375,25 @@ export type ComparisonTableBlockData = {
 };
 
 // —— Feature grid ——
-export type FeatureItem = { id: string; icon: string; title: string; body: string };
-export type FeatureGridBlockData = { title: string; features: FeatureItem[] };
+export type FeatureItem = {
+  id: string;
+  icon: string;
+  title: string;
+  body: string;
+  /** Optional CTA on assortment cards (Producten presentation). */
+  link?: CmsLink;
+};
+export type FeatureGridPresentation = "default" | "productsAssortment";
+export type FeatureGridBlockData = {
+  title: string;
+  features: FeatureItem[];
+  /** Producten assortment chrome — eyebrow/intro + card grid layout. */
+  presentation?: FeatureGridPresentation;
+  eyebrow?: string;
+  intro?: string;
+};
+
+export type TextImagePresentation = "default" | "productsIntro";
 
 // —— Spacer ——
 export type SpacerSize = "xs" | "sm" | "md" | "lg" | "xl";
@@ -388,7 +510,7 @@ export const catalogDefinitions = {
     label: "Hero",
     category: "Hero & intro",
     description: "Grote intro-sectie",
-    dataVersion: 1,
+    dataVersion: 2,
     schema: heroSchema,
     createDefault: createDefaultHero,
     normalize: normalizeHero,
@@ -423,7 +545,7 @@ export const catalogDefinitions = {
   }),
   textImage: def({
     type: "textImage",
-    label: "Tekst + afbeelding",
+    label: "Tekst met afbeelding",
     category: "Content",
     dataVersion: 1,
     schema: z.object({
@@ -431,6 +553,21 @@ export const catalogDefinitions = {
       body: z.string().optional(),
       image: z.custom<CmsImage | undefined>().optional(),
       reverse: z.boolean().optional(),
+      /** Producten intro chrome (flyer + CTAs + notice). */
+      presentation: z.enum(["default", "productsIntro"]).optional(),
+      eyebrow: z.string().optional(),
+      /** Webshop / aside notice — separate from intro `body` paragraphs. */
+      notice: z.string().optional(),
+      /** Producten intro metrics strip (value + label pairs). */
+      metrics: z
+        .array(
+          z.object({
+            id: z.string(),
+            value: z.string(),
+            label: z.string(),
+          }),
+        )
+        .optional(),
     }),
     createDefault: () => ({
       title: "Waarom voor ons kiezen",
@@ -439,11 +576,18 @@ export const catalogDefinitions = {
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const presentation =
+        rec.presentation === "productsIntro" ? ("productsIntro" as const) : undefined;
+      const metrics = normalizeProductsIntroMetrics(rec.metrics, presentation === "productsIntro");
       return {
         title: str(rec, "title", "Titel"),
         body: str(rec, "body") || undefined,
         image: normalizeCmsImage(rec.image),
         reverse: bool(rec, "reverse"),
+        ...(presentation ? { presentation } : {}),
+        ...(str(rec, "eyebrow") ? { eyebrow: str(rec, "eyebrow") } : {}),
+        ...(str(rec, "notice") ? { notice: str(rec, "notice") } : {}),
+        ...(metrics ? { metrics } : {}),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
@@ -517,7 +661,7 @@ export const catalogDefinitions = {
     type: "gallery",
     label: "Galerij",
     category: "Media",
-    dataVersion: 2,
+    dataVersion: 3,
     schema: z.object({
       title: z.string(),
       eyebrow: z.string().optional(),
@@ -528,6 +672,7 @@ export const catalogDefinitions = {
           image: z.custom<CmsImage>((v) => normalizeCmsImage(v) != null),
           title: z.string().optional(),
           caption: z.string().optional(),
+          shape: z.enum(["wide", "square", "tall"]).optional(),
         }),
       ),
       layout: z.enum(["grid", "masonry", "featured"]).optional(),
@@ -546,7 +691,7 @@ export const catalogDefinitions = {
         for (const entry of rec.images) {
           if (typeof entry === "string") {
             const img = normalizeCmsImage(entry);
-            if (img) images.push({ id: createItemId("img"), image: img });
+            if (img) images.push({ id: createItemId("img"), image: img, shape: "square" });
           } else if (entry && typeof entry === "object") {
             const row = entry as Record<string, unknown>;
             const img = normalizeCmsImage(row.image ?? row.src ?? row);
@@ -556,6 +701,7 @@ export const catalogDefinitions = {
                 image: img,
                 title: str(row, "title") || undefined,
                 caption: str(row, "caption") || undefined,
+                shape: normalizeGalleryShape(row.shape),
               });
             }
           }
@@ -737,7 +883,7 @@ export const catalogDefinitions = {
   }),
   featureGrid: def({
     type: "featureGrid",
-    label: "Feature grid",
+    label: "Kenmerkenraster",
     category: "Structure",
     dataVersion: 1,
     schema: z.object({
@@ -748,9 +894,14 @@ export const catalogDefinitions = {
           icon: z.string(),
           title: z.string(),
           body: z.string(),
+          link: cmsLinkSchema.optional(),
         }),
       ),
+      presentation: z.enum(["default", "productsAssortment"]).optional(),
+      eyebrow: z.string().optional(),
+      intro: z.string().optional(),
     }),
+    // Generic defaults — Producten starters live in picker templates only.
     createDefault: (): FeatureGridBlockData => ({
       title: "Kenmerken",
       features: [
@@ -760,14 +911,25 @@ export const catalogDefinitions = {
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const presentation =
+        rec.presentation === "productsAssortment"
+          ? ("productsAssortment" as const)
+          : undefined;
       return {
         title: str(rec, "title", "Kenmerken"),
-        features: mapIdList(rec.features, (row, id) => ({
-          id,
-          icon: str(row, "icon", "sparkles"),
-          title: str(row, "title"),
-          body: str(row, "body"),
-        })),
+        features: mapIdList(rec.features, (row, id) => {
+          const link = parseCmsLink(row.link);
+          return {
+            id,
+            icon: str(row, "icon", "sparkles"),
+            title: str(row, "title"),
+            body: str(row, "body") || str(row, "description"),
+            ...(link && link.type !== "none" ? { link } : {}),
+          };
+        }),
+        ...(presentation ? { presentation } : {}),
+        ...(str(rec, "eyebrow") ? { eyebrow: str(rec, "eyebrow") } : {}),
+        ...(str(rec, "intro") ? { intro: str(rec, "intro") } : {}),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
@@ -1070,6 +1232,11 @@ export const catalogDefinitions = {
   roadmap: roadmapDefinition,
   timeline: timelineDefinition,
   plans: plansDefinition,
+  partnersMarquee: partnersMarqueeDefinition,
+  statsCounters: statsCountersDefinition,
+  contactInfoCards: contactInfoCardsDefinition,
+  quoteRequestForm: quoteRequestFormDefinition,
+  legalArticles: legalArticlesDefinition,
 } as const satisfies Record<BlockType, CmsBlockDataDefinition>;
 
 export type CatalogDefinitions = typeof catalogDefinitions;

@@ -16,7 +16,12 @@ async function ensureSeeded() {
     const store = db.getCmsStore();
     await store.seedBuiltinsIfEmpty(db.builtinCmsSeedPages());
     return store;
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[cms] ensureSeeded: primary store failed", message);
+    if (db.isSupabaseConnectivityError(error)) {
+      db.markSupabaseCmsUnreachable(message);
+    }
     const store = db.getFileCmsStore();
     await store.seedBuiltinsIfEmpty(db.builtinCmsSeedPages());
     return store;

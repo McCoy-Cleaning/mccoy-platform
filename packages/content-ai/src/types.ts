@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONTENT_AI_PROMPT_VERSION = "v1" as const;
+export const CONTENT_AI_PROMPT_VERSION = "v2" as const;
 
 export const contentAiToneSchema = z.enum([
   "professional",

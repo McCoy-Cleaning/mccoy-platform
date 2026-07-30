@@ -2457,6 +2457,72 @@ export function WorkGalleryInspector({
               })
             }
           />
+          <Field label="Vorm (tegel)">
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tegelvorm">
+              {(
+                [
+                  { id: "wide" as const, label: "Breed", hint: "2×2 groot" },
+                  { id: "square" as const, label: "Vierkant", hint: "1×1" },
+                  { id: "tall" as const, label: "Hoog", hint: "2 rijen" },
+                ] as const
+              ).map((opt) => {
+                const selected = item.shape === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() =>
+                      onPatch({
+                        items: content.items.map((g) =>
+                          g.id === item.id ? { ...g, shape: opt.id } : g,
+                        ),
+                      })
+                    }
+                    className={
+                      selected
+                        ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-2 py-2 text-left"
+                        : "rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2 text-left hover:border-white/25"
+                    }
+                  >
+                    <span
+                      className="mb-1.5 block w-full rounded-md border border-white/15 bg-white/5"
+                      style={{
+                        aspectRatio:
+                          opt.id === "wide" ? "1/1" : opt.id === "tall" ? "3/4" : "1/1",
+                        maxWidth: opt.id === "square" ? "50%" : undefined,
+                      }}
+                      aria-hidden
+                    />
+                    <span className="block text-xs font-semibold text-white">{opt.label}</span>
+                    <span className="block text-[10px] text-white/45">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-white/45">
+              Laat leeg voor de klassieke collage-indeling. Kies een vorm om deze tegel zelf te
+              plaatsen. Breed = zelfde grootte als Reguliere schoonmaak (2×2).
+            </p>
+            {item.shape ? (
+              <button
+                type="button"
+                className="mt-1.5 text-[11px] font-medium text-sky-300/90 hover:text-sky-200"
+                onClick={() =>
+                  onPatch({
+                    items: content.items.map((g) => {
+                      if (g.id !== item.id) return g;
+                      const { shape: _shape, ...rest } = g;
+                      return rest;
+                    }),
+                  })
+                }
+              >
+                Herstel klassieke plaatsing
+              </button>
+            ) : null}
+          </Field>
           <Field label="Titel">
             <input
               className={inputClass}

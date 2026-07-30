@@ -84,7 +84,7 @@ test.describe("CMS pixel screenshots (targeted)", () => {
     await awaitCmsToastGone(page);
     await expect(dialog).toHaveScreenshot("hero-editor.png");
 
-    await addCmsSection(page, "Tekst + afbeelding");
+    await addCmsSection(page, "Tekst met afbeelding");
     await awaitCmsToastGone(page);
     await expect(dialog).toHaveScreenshot("text-image-editor.png");
 

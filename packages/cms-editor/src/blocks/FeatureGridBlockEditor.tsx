@@ -14,6 +14,9 @@ export type FeatureGridItem = {
 export type FeatureGridBlockData = {
   title: string;
   features: FeatureGridItem[];
+  presentation?: "default" | "productsAssortment";
+  eyebrow?: string;
+  intro?: string;
 };
 
 export function FeatureGridBlockEditor({
@@ -31,6 +34,15 @@ export function FeatureGridBlockEditor({
   return (
     <div className="space-y-6">
       <Section title="Kop">
+        {value.presentation === "productsAssortment" ? (
+          <NlEnField label="Eyebrow" enPath={blockEnPath(blockId, "eyebrow")}>
+            <input
+              className={inputClass}
+              value={value.eyebrow ?? ""}
+              onChange={(e) => onChange({ ...value, eyebrow: e.target.value })}
+            />
+          </NlEnField>
+        ) : null}
         <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
           <input
             className={inputClass}
@@ -38,6 +50,15 @@ export function FeatureGridBlockEditor({
             onChange={(e) => onChange({ ...value, title: e.target.value })}
           />
         </NlEnField>
+        {value.presentation === "productsAssortment" ? (
+          <NlEnField label="Intro" enPath={blockEnPath(blockId, "intro")} multiline>
+            <textarea
+              className={`${inputClass} min-h-[3rem]`}
+              value={value.intro ?? ""}
+              onChange={(e) => onChange({ ...value, intro: e.target.value })}
+            />
+          </NlEnField>
+        ) : null}
       </Section>
       <Section title="Kenmerken">
         {value.features.length === 0 ? (

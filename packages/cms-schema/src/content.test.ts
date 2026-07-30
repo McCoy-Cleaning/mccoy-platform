@@ -179,7 +179,7 @@ describe("section content", () => {
 
   it("does not remap Supabase Storage URLs back to local /images paths", () => {
     const seedBase =
-      "https://bwrktdwnnlgxdpefecmv.supabase.co/storage/v1/object/public/cms-media/media/a0000000-0000-4000-8000-000000000001";
+      "https://example.supabase.co/storage/v1/object/public/cms-media/media/a0000000-0000-4000-8000-000000000001";
     const regularSrc = `${seedBase}/66ca60d5-3e8f-45d6-924b-0ae30446eb62.jpg`;
     const glassSrc = `${seedBase}/23323708-7f6d-44c3-83f8-622f2494ec71.jpg`;
     const heroSrc = `${seedBase}/134be222-7354-472a-852f-68584c9ee3c2.jpg`;

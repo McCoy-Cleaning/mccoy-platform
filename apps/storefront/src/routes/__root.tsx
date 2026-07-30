@@ -212,7 +212,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
         </noscript>
       </head>
       <body translate="no" className="notranslate">
-        {children}
+        {/* Above CatchBoundary so leaf useCmsPageForView/useI18n always have context. */}
+        <I18nProvider>{children}</I18nProvider>
         <Scripts />
       </body>
     </html>
@@ -224,13 +225,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <PublishedCmsProvider>
-          <DeferredCmsEditShell>
-            <Outlet />
-          </DeferredCmsEditShell>
-        </PublishedCmsProvider>
-      </I18nProvider>
+      <PublishedCmsProvider>
+        <DeferredCmsEditShell>
+          <Outlet />
+        </DeferredCmsEditShell>
+      </PublishedCmsProvider>
     </QueryClientProvider>
   );
 }

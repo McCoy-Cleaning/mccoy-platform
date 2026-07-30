@@ -407,6 +407,7 @@ export function SectionAiToolbar({
   onApplyDutch?: (nlFields: Record<string, string>) => void;
 }) {
   const ai = useCmsAiAssist();
+  const [panelOpen, setPanelOpen] = React.useState(false);
   const [brief, setBrief] = React.useState("");
   const [state, setState] = React.useState<
     | { kind: "idle" }
@@ -533,10 +534,28 @@ export function SectionAiToolbar({
 
   return (
     <div className="space-y-2.5 rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-2 text-left"
+        aria-expanded={panelOpen}
+        onClick={() => setPanelOpen((o) => !o)}
+      >
         <div className="min-w-0">
           <p className="text-[12px] font-semibold tracking-tight text-white/85">Genereer met AI</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-white/40">
+            Optioneel — uitklappen om AI-hulp te gebruiken.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/55">
+          {panelOpen ? "Inklappen" : "Uitklappen"}
+        </span>
+      </button>
+
+      {panelOpen ? (
+        <>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] leading-relaxed text-white/40">
             Nederlandse tekst voor deze sectie, daarna automatisch EN-concepten. Niet publiceren.
           </p>
         </div>
@@ -570,18 +589,52 @@ export function SectionAiToolbar({
         </button>
       </div>
 
+      <div
+        className="rounded-xl border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
+        role="note"
+        aria-label="Tips voor een goede AI-briefing"
+      >
+        <p className="text-[11px] font-semibold text-sky-100/95">Zo formuleert u het beste</p>
+        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-white/55">
+          <li>
+            Noem <span className="text-white/75">doelgroep</span>,{" "}
+            <span className="text-white/75">doel van de sectie</span> en{" "}
+            <span className="text-white/75">toon</span> (bijv. kort &amp; krachtig).
+          </li>
+          <li>
+            Geef <span className="text-white/75">concrete feiten</span> die waar mogen blijven
+            (regio, USP, dienst) — AI verzint geen cijfers of claims.
+          </li>
+          <li>
+            Tip: zet ook een idee in de velden hieronder; dat stuurt de AI sterker dan alleen een
+            lege briefing.
+          </li>
+        </ul>
+        <p className="mt-2 border-t border-white/10 pt-2 text-[11px] leading-relaxed text-white/45">
+          <span className="font-medium text-white/60">Goed:</span>{" "}
+          “Hero voor kantoren in Twente; vast eigen team; toon zelfverzekerd; CTA naar offerte.”
+          <br />
+          <span className="font-medium text-white/60">Zwak:</span> “Maak iets moois over schoonmaak.”
+        </p>
+      </div>
+
       <label className="block space-y-1">
         <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/35">
-          Briefing (optioneel)
+          Briefing
         </span>
-        <input
-          className={cn(inputClass, "py-2 text-[13px]")}
+        <textarea
+          className={cn(inputClass, "min-h-[88px] py-2 text-[13px] leading-relaxed")}
           value={brief}
-          placeholder="Bijv. hero voor zakelijke schoonmaak, kort en krachtig"
+          placeholder="Bijv. Hero voor zakelijke klanten in Twente. Benadruk vast eigen team en zichtbaar resultaat. Toon: kort en zelfverzekerd. Geen prijsclaims."
           onChange={(e) => setBrief(e.target.value)}
           disabled={busy}
           maxLength={2000}
+          aria-describedby="cms-ai-brief-hint"
         />
+        <p id="cms-ai-brief-hint" className="text-[10px] leading-snug text-white/35">
+          Hoe specifieker de briefing, hoe beter het resultaat. Leeg laten kan — dan gebruikt AI de
+          bestaande veldteksten of algemene McCoy-copy.
+        </p>
       </label>
 
       {!configured ? (
@@ -764,6 +817,8 @@ export function SectionAiToolbar({
           ) : null}
         </div>
       </details>
+        </>
+      ) : null}
     </div>
   );
 }

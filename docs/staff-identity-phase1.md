@@ -155,28 +155,23 @@ Site URL may remain the admin origin; invite `redirectTo` must match an allow-li
 
 - Disable public signup (invites only).
 
-### Auth Invite email template (fallback when SMTP is unset)
+### Auth Invite email template (required while Graph/SMTP cannot send branded mail)
 
-Dashboard → **Authentication → Email Templates → Invite user**.
+Invites currently go through Supabase `inviteUserByEmail`, which uses the **Dashboard** Auth template — not the in-app Graph/SMTP HTML — until Graph has `Mail.Send`.
 
-Use Dutch copy and point the CTA at `{{ .ConfirmationURL }}` (Supabase builds this with your `redirectTo`).
+Apply the McCoy template (logo + Dutch copy + steps) in one of these ways:
 
-Example HTML (paste into the Invite template body):
+1. **Script (recommended)**  
+   - Create a token at https://supabase.com/dashboard/account/tokens  
+   - Set `SUPABASE_ACCESS_TOKEN` in `.env`  
+   - Run: `npm run apply:auth-invite-template`
 
-```html
-<h2>McCoy Admin — uitnodiging</h2>
-<p>Je bent uitgenodigd als <strong>beheerder</strong> in McCoy Admin.</p>
-<p>Na acceptatie stel je een wachtwoord in en activeer je verplichte tweestapsverificatie (TOTP).</p>
-<p><a href="{{ .ConfirmationURL }}">Uitnodiging accepteren</a></p>
-<p style="color:#666;font-size:12px;">
-  Negeer dit bericht als je geen uitnodiging verwachtte. Deel deze link met niemand.
-  McCoy vraagt nooit om je wachtwoord per e-mail.
-</p>
-```
+2. **Dashboard**  
+   - Open Authentication → Email Templates → **Invite user**  
+   - Subject: `Uitnodiging voor McCoy Admin`  
+   - Body: paste [`supabase/templates/invite.html`](../supabase/templates/invite.html) (same as [`docs/email/staff-invite-supabase-auth.html`](../email/staff-invite-supabase-auth.html))
 
-Subject suggestion: `Uitnodiging voor McCoy Admin`.
-
-When SMTP is configured, McCoy sends its own branded email and this Dashboard template is not used for staff invites.
+Source of truth for Graph/SMTP later: `buildStaffInviteEmail()` / `buildStaffInviteSupabaseAuthTemplate()` in `@mccoy/email`.
 
 ## Blocking
 

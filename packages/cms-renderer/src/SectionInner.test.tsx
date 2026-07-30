@@ -13,7 +13,7 @@ describe("SectionInner contentAlign structure", () => {
     );
     expect(html).toContain('data-cms-section-rail=""');
     expect(html).toContain('data-cms-content-align="center"');
-    expect(html).toContain("mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8");
+    expect(html).toContain("mx-auto w-full max-w-[96rem] px-5 sm:px-8 lg:px-10 xl:px-12");
     expect(html).toContain("flex w-full justify-center");
     expect(html).toContain('data-cms-section-inner=""');
     expect(html).not.toContain("justify-start");
@@ -76,7 +76,7 @@ describe("RegisteredBlockView richText contentAlign structure", () => {
       expect(html).toContain('data-cms-block-type="richText"');
       expect(html).toContain(`data-cms-content-align="${align}"`);
       expect(html).toContain('data-cms-section-rail=""');
-      expect(html).toContain("mx-auto w-full max-w-7xl px-4");
+      expect(html).toContain("mx-auto w-full max-w-[96rem] px-5");
       expect(html).toContain('data-cms-section-align=""');
       expect(html).toContain("min-w-0 w-fit max-w-3xl");
       // Padding only on rail — column must not re-pad (that offset the visual center).

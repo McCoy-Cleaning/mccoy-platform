@@ -13,34 +13,9 @@ import {
   type VacancyItem,
 } from "@mccoy/cms-schema";
 
-import {
-  SECTION_GRID,
-  SECTION_PAGE_RAIL,
-  SECTION_SHELL_Y,
-  SECTION_TITLE,
-  sectionInnerAlignRowClass,
-  sectionInnerColumnClass,
-} from "../sectionLayout";
-import { useContentAlign } from "../contentAlign";
-
-function SectionShell({ children }: { children: React.ReactNode }) {
-  const contentAlign = useContentAlign();
-  return (
-    <section
-      data-cms-block-type="jobs"
-      data-cms-content-align={contentAlign}
-      className={SECTION_SHELL_Y}
-    >
-      <div className={SECTION_PAGE_RAIL} data-cms-section-rail="">
-        <div className={sectionInnerAlignRowClass(contentAlign)} data-cms-section-align="">
-          <div className={sectionInnerColumnClass()} data-cms-section-inner="">
-            {children}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+import { SECTION_GRID } from "../sectionLayout";
+import { SectionShell } from "../SectionShell";
+import { SectionHeader, SectionSurface } from "../sectionChromeUi";
 
 export type JobsRenderMode = "preview" | "storefront";
 
@@ -203,16 +178,17 @@ function VacancyCard({
     ) : null;
 
   return (
-    <article
+    <SectionSurface
+      variant={layout === "cards" ? "elevated" : "outlined"}
       className={
         layout === "cards"
-          ? "flex h-full flex-col rounded-2xl border border-white/10 bg-card/40 p-5"
-          : "flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-white/10 p-4"
+          ? "flex h-full flex-col p-5"
+          : "flex flex-wrap items-start justify-between gap-4 p-4"
       }
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold text-white">{vacancy.title}</h3>
+          <h3 className="font-semibold text-foreground">{vacancy.title}</h3>
           {vacancy.featured ? (
             <span className="rounded-md bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
               Uitgelicht
@@ -224,17 +200,17 @@ function VacancyCard({
             </span>
           ) : null}
         </div>
-        {meta ? <p className="mt-1 text-xs text-white/50">{meta}</p> : null}
-        {hours ? <p className="mt-1 text-xs text-white/60">{hours}</p> : null}
-        {rate ? <p className="mt-0.5 text-xs font-medium text-white/80">{rate}</p> : null}
+        {meta ? <p className="mt-1 text-xs text-muted-foreground">{meta}</p> : null}
+        {hours ? <p className="mt-1 text-xs text-muted-foreground">{hours}</p> : null}
+        {rate ? <p className="mt-0.5 text-xs font-medium text-foreground/90">{rate}</p> : null}
         {vacancy.salaryText && !rate ? (
-          <p className="mt-0.5 text-xs font-medium text-white/80">{vacancy.salaryText}</p>
+          <p className="mt-0.5 text-xs font-medium text-foreground/90">{vacancy.salaryText}</p>
         ) : null}
         {vacancy.shortDescription ? (
-          <p className="mt-3 text-sm leading-relaxed text-white/70">{vacancy.shortDescription}</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{vacancy.shortDescription}</p>
         ) : null}
         {vacancy.applicationDeadline ? (
-          <p className="mt-2 text-xs text-white/45">
+          <p className="mt-2 text-xs text-muted-foreground">
             Solliciteren tot{" "}
             {new Intl.DateTimeFormat("nl-NL", { dateStyle: "medium" }).format(
               new Date(vacancy.applicationDeadline),
@@ -244,7 +220,7 @@ function VacancyCard({
         {details}
       </div>
       {applyControl ? <div className={layout === "cards" ? "mt-4" : "shrink-0"}>{applyControl}</div> : null}
-    </article>
+    </SectionSurface>
   );
 }
 
@@ -281,11 +257,12 @@ export function JobsSectionView({
   const locations = [...new Set(jobs.vacancies.map((v) => v.location).filter(Boolean))].sort();
 
   return (
-    <SectionShell>
-      <h2 className={SECTION_TITLE}>{jobs.heading}</h2>
-      {jobs.introduction ? (
-        <p className="mb-10 max-w-2xl text-sm leading-relaxed text-white/70 sm:mb-14">{jobs.introduction}</p>
-      ) : null}
+    <SectionShell blockType="jobs">
+      <SectionHeader
+        title={jobs.heading}
+        body={jobs.introduction || undefined}
+        className="mb-10 sm:mb-14"
+      />
 
       {jobs.showFilters ? (
         <div className="mb-10 flex flex-wrap gap-3 sm:mb-14">

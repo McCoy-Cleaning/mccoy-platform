@@ -88,6 +88,54 @@ export async function insertStaffProfile(input: InsertStaffProfileInput): Promis
   return mapUser(data as UsersRow);
 }
 
+/**
+ * Insert staff profile, or return the existing row when this Auth user was already
+ * provisioned (e.g. previous invite where email send failed after Auth create).
+ */
+export async function ensureStaffProfileForInvite(
+  input: InsertStaffProfileInput,
+): Promise<StaffUserProfile> {
+  const existing = await getStaffUserById(input.id);
+  if (existing) {
+    if (normalizeEmail(existing.email) !== normalizeEmail(input.email)) {
+      throw new Error("ensureStaffProfileForInvite: auth user email mismatch");
+    }
+    return existing;
+  }
+  try {
+    return await insertStaffProfile(input);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Unique violation / race: re-read and accept if it matches.
+    if (/duplicate|unique|already exists/i.test(message)) {
+      const raced = await getStaffUserById(input.id);
+      if (raced && normalizeEmail(raced.email) === normalizeEmail(input.email)) {
+        return raced;
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Resolve an Auth user id by email (paginated admin list).
+ * Used when invite/generateLink created the user but the API returned an email error.
+ */
+export async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+  const supabase = createSupabaseServiceClient();
+  const target = normalizeEmail(email);
+  const perPage = 200;
+  for (let page = 1; page <= 25; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`findAuthUserIdByEmail failed: ${error.message}`);
+    const users = data?.users ?? [];
+    const match = users.find((u) => normalizeEmail(u.email ?? "") === target);
+    if (match?.id) return match.id;
+    if (users.length < perPage) break;
+  }
+  return null;
+}
+
 export async function updateStaffFullName(
   userId: string,
   fullName: string | null,

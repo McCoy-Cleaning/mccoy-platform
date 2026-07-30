@@ -38,7 +38,12 @@ export type BlockType =
   | "popup"
   | "portfolio"
   | "jobs"
-  | "latestPosts";
+  | "latestPosts"
+  | "partnersMarquee"
+  | "statsCounters"
+  | "contactInfoCards"
+  | "quoteRequestForm"
+  | "legalArticles";
 
 export type BlockCategory =
   | "Hero & intro"
@@ -137,6 +142,17 @@ export type BuiltinCmsPage = PageBase & {
   layoutVersion: number;
   /** Typed fixed-section content keyed by FixedSectionKey. */
   sectionContent: PageSectionContent;
+  /**
+   * Producten fixed→blocks pilot state. Never infer migration from empty layout.
+   * Persisted by admin after resolveProductsBlocksLayout; storefront reads only.
+   */
+  productsBlocksMigration?: {
+    version: 1;
+    status: "not_started" | "migrated" | "verified";
+    migratedAt?: string;
+    /** Fixed keys converted on first migrate — used to avoid recreating intentionally deleted blocks. */
+    sources?: Array<"products.main" | "products.info">;
+  };
 };
 
 export type CustomCmsPage = PageBase & {

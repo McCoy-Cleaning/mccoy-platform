@@ -286,6 +286,9 @@ let lastHydratedServerCustomIds: Set<string> | null = null;
 /** Opslaan → file publish race only. Older chrome-only ghosts must not resurrect deleted pages. */
 const PENDING_CUSTOM_MAX_AGE_MS = 120_000;
 
+/** True after {@link hydratePublishedCmsState} from the published bundle (not seed). */
+let publishedCmsBundleHydrated = false;
+
 /**
  * Hydrate public CMS from the server-published store.
  * Does not write localStorage.
@@ -297,6 +300,7 @@ export function hydratePublishedCmsState(input: {
   pages: CmsPage[];
   navigation?: SiteNavigationContent;
 }): void {
+  publishedCmsBundleHydrated = true;
   const serverPages = input.pages.map((p) => normalizeCmsPage(p));
   const current = memoryState ?? publishedServerState;
   const currentById = new Map((current?.pages ?? []).map((p) => [p.id, p] as const));
@@ -1004,6 +1008,11 @@ export function useCms(): CmsPersistedState {
     };
   }, []);
   return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+/** Whether the public store has received a real published bundle (not SEED_PAGES). */
+export function isPublishedCmsBundleHydrated(): boolean {
+  return publishedCmsBundleHydrated;
 }
 
 export function usePreviewStatus(pageId: string): PagePreviewStatus {

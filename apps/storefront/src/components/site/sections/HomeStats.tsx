@@ -3,6 +3,13 @@ import { useI18n } from "@/lib/i18n";
 import { CountUp } from "../CountUp";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { localizedStatsCopy } from "@/lib/cms-i18n";
+import {
+  SECTION_PAGE_RAIL,
+  SectionAmbient,
+  SectionEyebrow,
+  SectionSurface,
+} from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -22,11 +29,12 @@ export function Stats() {
   const items = copy.items;
 
   return (
-    <section className="relative py-24">
-      <div className="mx-auto grid max-w-7xl gap-16 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+    <section className="relative isolate overflow-hidden py-24">
+      <SectionAmbient />
+      <div className={cn("relative", SECTION_PAGE_RAIL, "grid gap-16 lg:grid-cols-2")}>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-          <h2 className="font-display mt-4 text-4xl leading-tight text-white md:text-5xl lg:text-6xl">
+          <SectionEyebrow>{eyebrow}</SectionEyebrow>
+          <h2 className="font-display mt-4 text-4xl leading-tight text-foreground md:text-5xl lg:text-6xl">
             {copy.heading ? (
               copy.heading
             ) : (
@@ -35,7 +43,7 @@ export function Stats() {
               </>
             )}
           </h2>
-          <p className="mt-6 max-w-lg text-white/65">{body}</p>
+          <p className="mt-6 max-w-lg text-muted-foreground">{body}</p>
         </motion.div>
 
         <div className="grid grid-cols-1 gap-4 self-center sm:grid-cols-3">
@@ -46,13 +54,13 @@ export function Stats() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.55, delay: i * 0.1 }}
-              className="relative overflow-hidden rounded-3xl border border-white/10 bg-card p-6 transition hover:border-primary/40"
             >
-              <div className="absolute -top-12 -right-12 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
-              <div className="font-display text-5xl text-primary md:text-6xl">
-                <CountUp value={s.value} duration={2.0 + i * 0.15} />
-              </div>
-              <div className="mt-2 text-sm font-bold text-white/65">{s.label}</div>
+              <SectionSurface variant="outlined" className="h-full p-6 transition hover:border-primary/40">
+                <div className="font-display text-5xl text-primary md:text-6xl">
+                  <CountUp value={s.value} duration={2.0 + i * 0.15} />
+                </div>
+                <div className="mt-2 text-sm font-bold text-muted-foreground">{s.label}</div>
+              </SectionSurface>
             </motion.div>
           ))}
         </div>

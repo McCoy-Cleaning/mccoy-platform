@@ -5,18 +5,35 @@
 
 export {
   isSmtpConfigured,
+  isSmtpUsableForOutbound,
   sendSmtpMail,
   defaultTransactionalFrom,
+  getSmtpConfig,
 } from "./smtp";
 export { FormSubmitError, sendWebsiteFormEmail } from "./send-form";
 export { sendAdminReplyEmail } from "./send-reply";
 export {
   buildStaffInviteEmail,
+  buildStaffInviteSupabaseAuthTemplate,
   sendStaffInviteEmail,
   isStaffInviteEmailConfigured,
+  shouldPreferBrandedStaffInviteFirst,
   type StaffInviteEmailInput,
+  type StaffInviteDelivery,
   type SendStaffInviteEmailResult,
 } from "./staff-invite";
+export {
+  EMAIL_BRAND,
+  EMAIL_BRAND_LOGO_PATH,
+  EMAIL_BRAND_LOGO_PRODUCTION_URL,
+  resolveEmailBrandLogoUrl,
+  renderTransactionalEmailHtml,
+  renderTransactionalEmailText,
+  formatEmailDateNl,
+  type EmailBrandLogoInput,
+  type TransactionalCta,
+  type TransactionalEmailLayoutInput,
+} from "./transactional-layout";
 export {
   FormInboxConfigError,
   FormInboxError,

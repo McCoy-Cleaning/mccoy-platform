@@ -16,6 +16,7 @@ import { useHomeHeroContent } from "@/lib/cms/use-section-content";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
 import { localizedHeroCopy } from "@/lib/cms-i18n";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
 
 /** Public optimized hero — avoid bundling the ~430KB JPEG into the home chunk. */
 const HERO_PUBLIC_JPG = "/images/cms/hero-cleaning.jpg";
@@ -143,7 +144,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-12 lg:px-8">
+      <div className={cn(SECTION_PAGE_RAIL, "grid w-full items-center gap-12 py-20 lg:grid-cols-12")}>
         <div className="lg:col-span-7">
           <motion.div
             initial={softMotion ? false : { opacity: 0, y: 16 }}

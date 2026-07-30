@@ -83,6 +83,25 @@ export function isSmtpConfigured(): boolean {
   return getSmtpConfig() !== null;
 }
 
+/**
+ * True when SMTP is likely usable for outbound mail.
+ * Microsoft 365 usually has SmtpClientAuthentication disabled — treating those
+ * hosts as "configured" previously stole invites from working Supabase Auth mail.
+ */
+export function isSmtpUsableForOutbound(): boolean {
+  const config = getSmtpConfig();
+  if (!config) return false;
+  const host = config.host.toLowerCase();
+  if (
+    host.includes("office365.com") ||
+    host.includes("outlook.com") ||
+    host.includes("outlook.office.com")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function getTransport(): Transporter {
   const config = getSmtpConfig();
   if (!config) {

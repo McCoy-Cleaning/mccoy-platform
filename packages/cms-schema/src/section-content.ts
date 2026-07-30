@@ -65,21 +65,47 @@ export function migrateProductsMainText(content: PageSectionContent): PageSectio
       : intro;
 
   // Only rewrite the short-lived contact-as-body mistake; leave empty body cleared.
-  const nextBody =
+  let nextBody =
     body.trim() === LEGACY_PRODUCTS_MAIN_BODY_CONTACT ? (defaults.body ?? "") : body;
 
-  if (nextHeading === heading && nextIntro === intro && nextBody === body) {
+  const upgradedLegacyCopy =
+    nextHeading !== heading || nextIntro !== intro || nextBody !== body;
+
+  // Incomplete legacy Producten rows often omitted the flyer + webshop notice.
+  const existingImage =
+    raw.image && typeof raw.image === "object" ? (raw.image as CmsImage) : undefined;
+  const nextImage = existingImage ?? (upgradedLegacyCopy ? defaults.image : undefined);
+  if (upgradedLegacyCopy && !nextBody.trim() && defaults.body) {
+    nextBody = defaults.body;
+  }
+
+  const nextEyebrow =
+    typeof raw.eyebrow === "string" && raw.eyebrow.trim()
+      ? raw.eyebrow
+      : upgradedLegacyCopy
+        ? defaults.eyebrow
+        : typeof raw.eyebrow === "string"
+          ? raw.eyebrow
+          : defaults.eyebrow;
+
+  if (
+    nextHeading === heading &&
+    nextIntro === intro &&
+    nextBody === body &&
+    nextImage === existingImage &&
+    nextEyebrow === raw.eyebrow
+  ) {
     return content;
   }
 
   return {
     ...content,
     "products.main": {
-      eyebrow: typeof raw.eyebrow === "string" ? raw.eyebrow : defaults.eyebrow,
+      eyebrow: nextEyebrow,
       heading: nextHeading || defaults.heading,
       intro: nextIntro,
       body: nextBody || undefined,
-      image: raw.image && typeof raw.image === "object" ? (raw.image as CmsImage) : undefined,
+      image: nextImage,
     } satisfies ProductsMainContent,
   };
 }

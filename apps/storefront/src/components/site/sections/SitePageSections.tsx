@@ -1,7 +1,6 @@
 import { motion, useScroll, useTransform, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
   Sparkles,
@@ -11,7 +10,6 @@ import {
   Sofa,
   GlassWater,
   Building2,
-  ShoppingBag,
   CheckCircle2,
   X,
   Award,
@@ -21,12 +19,8 @@ import {
   ShieldCheck,
   Leaf,
   History,
-  Phone,
-  Droplets,
-  Package,
-  SprayCan,
-  Wrench,
 } from "lucide-react";
+import { ProductsAssortmentView, ProductsIntroView } from "./ProductsBlockViews";
 import wHoreca from "@/assets/work-horeca-new.jpg";
 import wRegular from "@/assets/work-regular.jpg";
 import serviceGlass from "@/assets/mccoy-service-glass-van.jpg";
@@ -47,7 +41,14 @@ import {
   localizedServicesCopy,
 } from "@/lib/cms-i18n";
 import { cmsTextOrFallback, defaultSectionContent } from "@mccoy/cms-schema";
-import { CmsImageView } from "@mccoy/cms-renderer";
+import {
+  CmsImageView,
+  SECTION_PAGE_RAIL,
+  SectionAmbient,
+  SectionEyebrow,
+  SectionSurface,
+} from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -119,13 +120,14 @@ export function Services() {
     };
   }, [open]);
   return (
-    <section id="services" className="relative py-20 sm:py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="services" className="relative isolate overflow-hidden py-20 sm:py-24">
+      <SectionAmbient />
+      <div className={cn("relative", SECTION_PAGE_RAIL)}>
         <CompositePartSelectChrome sectionKey="services.main" part="header" label="Intro">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-          <h1 className="font-display mt-4 text-4xl text-white md:text-5xl">{heading}</h1>
-          {intro ? <p className="mt-4 text-white/65">{intro}</p> : null}
+          <SectionEyebrow>{eyebrow}</SectionEyebrow>
+          <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">{heading}</h1>
+          {intro ? <p className="mt-4 text-muted-foreground">{intro}</p> : null}
         </div>
         </CompositePartSelectChrome>
 
@@ -134,10 +136,12 @@ export function Services() {
           {cards.map((card, i) => {
             const Icon = card.Icon;
             return (
-              <article
+              <SectionSurface
                 key={card.id}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-card/70 transition hover:border-primary/40"
+                variant="media"
+                className="group relative transition hover:border-primary/40"
               >
+              <article>
                 <div className="relative h-44 overflow-hidden">
                   <img
                     src={card.imageSrc}
@@ -155,14 +159,14 @@ export function Services() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="font-display text-2xl text-white">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/65">{card.desc}</p>
+                  <h3 className="font-display text-2xl text-foreground">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
 
                   <div className="mt-5 flex flex-wrap items-center gap-4">
                     <button
                       type="button"
                       onClick={() => setOpen(i)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white/80 transition hover:border-primary/40 hover:text-white"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-foreground/80 transition hover:border-primary/40 hover:text-foreground"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       {t.services.readMore}
@@ -180,6 +184,7 @@ export function Services() {
                   </div>
                 </div>
               </article>
+              </SectionSurface>
             );
           })}
         </div>
@@ -420,7 +425,7 @@ export function About() {
   return (
     <section id="about" className="relative overflow-hidden py-24 sm:py-28">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className={SECTION_PAGE_RAIL}>
         {/* Header */}
         <CompositePartSelectChrome sectionKey="about.main" part="header" label="Kop">
         <div className="grid gap-10 lg:grid-cols-12">
@@ -524,7 +529,6 @@ export function ProductsMain() {
   const { t, lang } = useI18n();
   const content = useTypedSectionContent("page_products", "products.main");
   const isEn = lang === "en";
-  const reduced = useReducedMotion();
   const productsDef = defaultSectionContent("products.main") as import("@mccoy/cms-schema").ProductsMainContent;
 
   const eyebrow = cmsTextOrFallback(content.eyebrow, t.products.kicker, productsDef.eyebrow);
@@ -540,10 +544,6 @@ export function ProductsMain() {
     content.intro == null || content.intro === ""
       ? ""
       : cmsTextOrFallback(content.intro, introFallback, productsDef.intro);
-  const introParagraphs = intro
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
   const noticeFallback = isEn
     ? "We are currently busy behind the scenes with the online webshop! Coming soon."
     : productsDef.body ?? "";
@@ -553,123 +553,33 @@ export function ProductsMain() {
       : cmsTextOrFallback(content.body, noticeFallback, productsDef.body);
   const image = content.image ?? productsDef.image;
 
-  const metrics = [
-    { value: "100+", label: isEn ? "Products" : "Producten" },
-    { value: "B2B", label: isEn ? "Wholesale" : "Groothandel" },
-    { value: "24/7", label: isEn ? "Support" : "Contact" },
-  ];
-
   return (
-    <section id="products" className="relative overflow-hidden py-24 sm:py-28">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-primary/8 via-transparent to-transparent" />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid items-start gap-12 lg:grid-cols-12 lg:gap-16">
-          <motion.div
-            variants={fadeUp}
-            initial={reduced ? false : "hidden"}
-            whileInView="show"
-            viewport={{ once: true }}
-            className="lg:col-span-6"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-            <h1 className="font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl">
-              {heading}
-            </h1>
-            <div className="mt-5 h-0.5 w-14 rounded-full bg-primary" aria-hidden />
-
-            {introParagraphs.map((paragraph, index) => (
-              <p
-                key={`products-intro-${index}`}
-                className={
-                  index === 0
-                    ? "mt-6 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
-                    : "mt-4 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
-                }
-              >
-                {paragraph}
-              </p>
-            ))}
-
-            <div className="mt-10 flex flex-wrap items-center gap-3 sm:gap-4">
-              <Link
-                to="/contact"
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <ShoppingBag className="h-4 w-4" aria-hidden />
-                {t.products.cta}
-              </Link>
-              <a
-                href="tel:+31541534982"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-primary/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <Phone className="h-4 w-4 text-primary" aria-hidden />
-                0541 534 982
-              </a>
-            </div>
-
-            {notice ? (
-              <aside
-                className="mt-10 flex gap-3 border-l-2 border-primary/60 pl-5"
-                aria-label={isEn ? "Webshop notice" : "Webshop melding"}
-              >
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                <p className="text-sm leading-relaxed text-white/80">{notice}</p>
-              </aside>
-            ) : null}
-          </motion.div>
-
-          <motion.div
-            variants={fadeUp}
-            initial={reduced ? false : "hidden"}
-            whileInView="show"
-            viewport={{ once: true }}
-            transition={reduced ? undefined : { delay: 0.12 }}
-            className="lg:col-span-6"
-          >
-            {image && !isCmsPlaceholderSrc(image.src) ? (
-              <figure className="relative">
-                <div
-                  className="pointer-events-none absolute -inset-8 -z-10 rounded-full bg-primary/15 blur-3xl"
-                  aria-hidden
-                />
-                <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
-                  <CmsImageView image={image} className="h-auto w-full object-cover" />
-                </div>
-                <figcaption className="sr-only">{image.alt || heading}</figcaption>
-              </figure>
-            ) : null}
-
-            <dl className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10">
-              {metrics.map((m) => (
-                <div key={m.value} className="bg-card/80 px-3 py-4 text-center sm:px-4 sm:py-5">
-                  <dd className="font-display text-xl text-white sm:text-2xl">{m.value}</dd>
-                  <dt className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/55 sm:text-xs">
-                    {m.label}
-                  </dt>
-                </div>
-              ))}
-            </dl>
-          </motion.div>
-        </div>
-      </div>
-    </section>
+    <ProductsIntroView
+      eyebrow={eyebrow}
+      heading={heading}
+      intro={intro}
+      notice={notice}
+      image={image}
+      ctaLabel={t.products.cta}
+      isEn={isEn}
+    />
   );
 }
 
 /** Assortment cards — icon + text; movable above/below Intro. */
 export function ProductsInfo() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const content = useTypedSectionContent("page_products", "products.info");
-  const reduced = useReducedMotion();
-
-  const cardIcons = [Package, Droplets, SprayCan, Wrench] as const;
   const productsInfoDef = defaultSectionContent("products.info") as import("@mccoy/cms-schema").ProductsInfoContent;
+  const isEn = lang === "en";
   const eyebrow =
     content.eyebrow == null || content.eyebrow === ""
       ? ""
-      : cmsTextOrFallback(content.eyebrow, t.products.kicker, productsInfoDef.eyebrow);
+      : cmsTextOrFallback(
+          content.eyebrow,
+          isEn ? "Our range" : productsInfoDef.eyebrow,
+          productsInfoDef.eyebrow,
+        );
   const heading =
     content.heading == null || content.heading === ""
       ? ""
@@ -677,70 +587,54 @@ export function ProductsInfo() {
   const intro =
     content.intro == null || content.intro === ""
       ? ""
-      : cmsTextOrFallback(content.intro, t.products.desc, productsInfoDef.intro);
+      : cmsTextOrFallback(
+          content.intro,
+          isEn
+            ? "Hygiene paper, professional soaps, cleaning agents and hardware for a fresh, presentable environment."
+            : productsInfoDef.intro,
+          productsInfoDef.intro,
+        );
+
+  const cardEn: Record<string, { title: string; body: string }> = {
+    prod_hygiene: {
+      title: "Hygiene paper",
+      body: "Professional hygiene paper for washrooms, kitchens and commercial buildings.",
+    },
+    prod_soaps: {
+      title: "Professional soaps",
+      body: "High-quality soaps and dispensers for a fresh, presentable sanitary space.",
+    },
+    prod_agents: {
+      title: "Cleaning agents & hardware",
+      body: "Cleaning agents for hospitality plus equipment and hardware for cleaning.",
+    },
+  };
 
   return (
-    <section id="products-info" className="relative overflow-hidden py-20 sm:py-24">
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          variants={fadeUp}
-          initial={reduced ? false : "hidden"}
-          whileInView="show"
-          viewport={{ once: true }}
-        >
-          <div className="max-w-2xl">
-            {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-            ) : null}
-            {heading ? (
-              <h2 className="font-display mt-4 text-3xl text-white md:text-4xl">{heading}</h2>
-            ) : null}
-            {intro ? (
-              <p className="mt-4 text-base leading-relaxed text-white/65">{intro}</p>
-            ) : null}
-          </div>
-
-          <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {content.cards.map((card, i) => {
-              const Icon = cardIcons[i % cardIcons.length] ?? Package;
-              return (
-                <li key={card.id}>
-                  <motion.div
-                    initial={reduced ? false : { opacity: 0, y: 14 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={reduced ? { duration: 0 } : { delay: 0.06 * i, duration: 0.4 }}
-                    className="group flex h-full flex-col items-start gap-4 rounded-2xl border border-white/10 bg-card/50 px-5 py-6 transition hover:border-primary/35"
-                  >
-                    <div className="flex w-full items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="h-5 w-5" aria-hidden />
-                      </div>
-                      <div className="min-w-0 pt-1">
-                        <h3 className="text-sm font-semibold leading-snug text-white/90">{card.title}</h3>
-                        {card.description ? (
-                          <p className="mt-1.5 text-sm leading-relaxed text-white/55">{card.description}</p>
-                        ) : null}
-                      </div>
-                    </div>
-                    {card.link ? (
-                      <CmsLinkAnchor
-                        link={card.link}
-                        fallbackHref="/contact"
-                        className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
-                      >
-                        {t.products.cta}
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </CmsLinkAnchor>
-                    ) : null}
-                  </motion.div>
-                </li>
-              );
-            })}
-          </ul>
-        </motion.div>
-      </div>
-    </section>
+    <ProductsAssortmentView
+      eyebrow={eyebrow}
+      heading={heading}
+      intro={intro}
+      ctaLabel={t.products.cta}
+      cards={content.cards.map((card) => {
+        const factory = productsInfoDef.cards.find((c) => c.id === card.id);
+        const en = cardEn[card.id];
+        return {
+          id: card.id,
+          title: cmsTextOrFallback(
+            card.title,
+            isEn && en ? en.title : card.title,
+            factory?.title,
+          ),
+          description: cmsTextOrFallback(
+            card.description ?? "",
+            isEn && en ? en.body : card.description ?? "",
+            factory?.description,
+          ),
+          link: card.link,
+        };
+      })}
+    />
   );
 }
 

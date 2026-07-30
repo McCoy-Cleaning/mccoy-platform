@@ -4,8 +4,40 @@ import {
   RegisteredBlockView,
   type CmsFormAdapters,
 } from "@mccoy/cms-renderer";
-import type { Block } from "@mccoy/cms-schema";
+import {
+  cmsTextOrFallback,
+  parseBlockData,
+  productAssortmentTemplateData,
+  productIntroTemplateData,
+  type Block,
+  type CmsImage,
+  type CmsLink,
+} from "@mccoy/cms-schema";
 import { submitWebsiteForm } from "@/lib/api/forms.functions";
+import { useI18n } from "@/lib/i18n";
+import {
+  ProductsAssortmentView,
+  ProductsIntroView,
+} from "@/components/site/sections/ProductsBlockViews";
+
+const ASSORTMENT_CARD_EN: Record<string, { title: string; body: string }> = {
+  prod_hygiene: {
+    title: "Hygiene paper",
+    body: "Professional hygiene paper for washrooms, kitchens and commercial buildings.",
+  },
+  prod_soaps: {
+    title: "Professional soaps",
+    body: "High-quality soaps and dispensers for a fresh, presentable sanitary space.",
+  },
+  prod_agents: {
+    title: "Cleaning agents & hardware",
+    body: "Cleaning agents for hospitality plus equipment and hardware for cleaning.",
+  },
+};
+
+const ASSORTMENT_INTRO_EN =
+  "Hygiene paper, professional soaps, cleaning agents and hardware for a fresh, presentable environment.";
+const ASSORTMENT_EYEBROW_EN = "Our range";
 
 const storefrontFormAdapters: CmsFormAdapters = {
   async submitNewsletter(input) {
@@ -43,6 +75,115 @@ const storefrontFormAdapters: CmsFormAdapters = {
   },
 };
 
+function ProductsPresentationBlock({ block }: { block: Block }) {
+  const { t, lang } = useI18n();
+  const parsed = parseBlockData(block.type, block.data);
+  if (!parsed.ok) return null;
+  const d = parsed.data as Record<string, unknown>;
+
+  if (block.type === "textImage" && d.presentation === "productsIntro") {
+    const isEn = lang === "en";
+    const def = productIntroTemplateData;
+    const metrics = Array.isArray(d.metrics)
+      ? (d.metrics as Array<{ id?: string; value?: string; label?: string }>).map((m) => ({
+          id: typeof m.id === "string" ? m.id : undefined,
+          value: typeof m.value === "string" ? m.value : "",
+          label: typeof m.label === "string" ? m.label : "",
+        }))
+      : null;
+    const rawEyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+    const rawTitle = String(d.title ?? "");
+    const rawBody = typeof d.body === "string" ? d.body : "";
+    const rawNotice = typeof d.notice === "string" ? d.notice : "";
+    const headingFallback = isEn
+      ? "Fragrance products with a premium sanitary experience."
+      : def.title;
+    const introFallback = isEn
+      ? "An important part of McCoy Cleaning is McCoy Products, our wholesale division. In our range you will find: hygiene paper, professional soaps, cleaning agents for hospitality, and equipment and hardware for cleaning.\n\nTo obtain our products, you can call or contact us via the contact form; we will be happy to help you."
+      : def.body;
+    const noticeFallback = isEn
+      ? "We are currently busy behind the scenes with the online webshop! Coming soon."
+      : def.notice;
+    return (
+      <ProductsIntroView
+        eyebrow={cmsTextOrFallback(rawEyebrow, t.products.kicker, def.eyebrow)}
+        heading={cmsTextOrFallback(rawTitle, headingFallback, def.title)}
+        intro={
+          rawBody === "" ? "" : cmsTextOrFallback(rawBody, introFallback, def.body)
+        }
+        notice={
+          rawNotice === "" ? "" : cmsTextOrFallback(rawNotice, noticeFallback, def.notice)
+        }
+        image={(d.image as CmsImage | undefined) ?? null}
+        ctaLabel={t.products.cta}
+        isEn={isEn}
+        metrics={metrics}
+      />
+    );
+  }
+
+  if (block.type === "featureGrid" && d.presentation === "productsAssortment") {
+    const isEn = lang === "en";
+    const def = productAssortmentTemplateData;
+    const features =
+      (d.features as Array<{
+        id: string;
+        title: string;
+        body: string;
+        link?: CmsLink;
+      }>) ?? [];
+    const rawEyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+    const rawTitle = String(d.title ?? "");
+    const rawIntro = typeof d.intro === "string" ? d.intro : "";
+    const eyebrowFallback = isEn ? ASSORTMENT_EYEBROW_EN : def.eyebrow;
+    const introFallback = isEn ? ASSORTMENT_INTRO_EN : def.intro;
+    const cards = features.map((f) => {
+      const factory = def.features.find((item) => item.id === f.id);
+      const enCard = ASSORTMENT_CARD_EN[f.id];
+      const titleFallback = isEn && enCard ? enCard.title : f.title;
+      const bodyFallback = isEn && enCard ? enCard.body : f.body;
+      return {
+        id: f.id,
+        title: cmsTextOrFallback(f.title, titleFallback, factory?.title),
+        description: cmsTextOrFallback(f.body, bodyFallback, factory?.body),
+        link: f.link,
+      };
+    });
+
+    return (
+      <ProductsAssortmentView
+        eyebrow={
+          rawEyebrow === ""
+            ? ""
+            : cmsTextOrFallback(rawEyebrow, eyebrowFallback, def.eyebrow)
+        }
+        heading={
+          rawTitle === ""
+            ? ""
+            : cmsTextOrFallback(rawTitle, t.products.title, def.title)
+        }
+        intro={
+          rawIntro === "" ? "" : cmsTextOrFallback(rawIntro, introFallback, def.intro)
+        }
+        ctaLabel={t.products.cta}
+        cards={cards}
+      />
+    );
+  }
+
+  return null;
+}
+
+function usesProductsPresentation(block: Block): boolean {
+  const parsed = parseBlockData(block.type, block.data);
+  if (!parsed.ok) return false;
+  const presentation = (parsed.data as { presentation?: string }).presentation;
+  return (
+    (block.type === "textImage" && presentation === "productsIntro") ||
+    (block.type === "featureGrid" && presentation === "productsAssortment")
+  );
+}
+
 /** Public + preview block renderer — single implementation via cms-renderer. */
 export function BlockView({
   block,
@@ -53,10 +194,15 @@ export function BlockView({
   adminMode?: boolean;
   pageId?: string;
 }) {
-  const inner = <RegisteredBlockView block={block} adminMode={adminMode} />;
+  const rendered = usesProductsPresentation(block) ? (
+    <ProductsPresentationBlock block={block} />
+  ) : (
+    <RegisteredBlockView block={block} adminMode={adminMode} />
+  );
+
   const withAdapters = (
     <CmsFormAdaptersProvider adapters={adminMode ? {} : storefrontFormAdapters}>
-      {inner}
+      {rendered}
     </CmsFormAdaptersProvider>
   );
   if (!pageId) return withAdapters;

@@ -1,6 +1,13 @@
 /** Page-qualified fixed section keys and capabilities (no React). */
 
+/**
+ * Current publishable layout version for fixed+block hybrid layouts.
+ * Blocks-only target is {@link BLOCKS_ONLY_LAYOUT_VERSION} in migration/ — applied only after verified migration (Gate 5+).
+ */
 export const CURRENT_LAYOUT_VERSION = 6 as const;
+
+/** @deprecated Use CURRENT_LAYOUT_VERSION — alias documenting the last fixed-section layout era. */
+export const FIXED_SECTIONS_LAYOUT_VERSION = CURRENT_LAYOUT_VERSION;
 
 export type BuiltinPageKey =
   | "home"
@@ -122,7 +129,7 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     label: "Contactgegevens",
     movable: true,
     hideable: true,
-    required: false,
+    required: true,
   },
   "contact.form": {
     label: "Contactformulier",
@@ -146,7 +153,7 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     label: "Contactgegevens",
     movable: true,
     hideable: true,
-    required: false,
+    required: true,
   },
   "offerte.form": {
     label: "Offerteformulier",

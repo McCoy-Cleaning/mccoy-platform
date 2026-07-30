@@ -3,6 +3,7 @@ import {
   defaultSectionContent,
   defaultSiteNavigation,
   type CmsLink,
+  type ContactInfoContent,
   type FormPageChromeContent,
   type HomeHeroContent,
   type ServicesMainContent,
@@ -207,5 +208,41 @@ export function localizedFormChromeCopy(
     eyebrow: cmsTextOrFallback(content.eyebrow, cat.eyebrow, def.eyebrow),
     heading: cmsTextOrFallback(content.heading, cat.heading, def.heading),
     body: content.body ? cmsTextOrFallback(content.body, cat.body, def.body) : undefined,
+  };
+}
+
+/**
+ * Contact / offerte info cards: factory Dutch defaults follow the active locale
+ * catalog; editor-customized labels/values stay as stored (until EN drafts cover them).
+ */
+export function localizedContactInfoContent(
+  sectionKey: "contact.info" | "offerte.info",
+  content: ContactInfoContent,
+  t: I18nDict,
+): ContactInfoContent {
+  const def = defaultSectionContent(sectionKey) as ContactInfoContent;
+  const catalogById: Record<string, { label: string; value: string }> = {
+    contact_email: { label: t.contact.email, value: "info@mccoy.nl" },
+    contact_phone: { label: t.contact.phone, value: "0541 534 982" },
+    contact_address: { label: t.contact.address, value: t.contact.addressValue },
+    contact_hours: { label: t.contact.hours, value: t.contact.hoursValue },
+    offerte_email: { label: t.contact.email, value: "info@mccoy.nl" },
+    offerte_phone: { label: t.contact.phone, value: "0541 534 982" },
+    offerte_address: { label: t.contact.address, value: t.contact.addressValue },
+    offerte_hours: { label: t.contact.hours, value: t.contact.hoursValue },
+  };
+
+  return {
+    ...content,
+    items: content.items.map((item) => {
+      const factory = def.items.find((d) => d.id === item.id);
+      const cat = catalogById[item.id];
+      if (!cat) return item;
+      return {
+        ...item,
+        label: cmsTextOrFallback(item.label, cat.label, factory?.label),
+        value: cmsTextOrFallback(item.value, cat.value, factory?.value),
+      };
+    }),
   };
 }

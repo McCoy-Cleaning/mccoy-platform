@@ -4,13 +4,15 @@ import logoUrl from "@/assets/logo-mccoy.png";
 import logoWebpUrl from "@/assets/logo-mccoy.webp";
 import { useI18n } from "@/lib/i18n";
 import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 export function Footer() {
   const { t } = useI18n();
   const jobsHref = "/vacatures";
   return (
     <footer className="relative border-t border-white/10 bg-card/50">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className={cn(SECTION_PAGE_RAIL, "py-16")}>
         <div className="grid gap-12 lg:grid-cols-4">
           <div>
             <picture>

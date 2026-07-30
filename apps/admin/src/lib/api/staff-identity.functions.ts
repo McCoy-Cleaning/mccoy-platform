@@ -7,12 +7,13 @@ import {
   createSupabaseServiceClient,
   decideStaffInviteForExistingEmail,
   deleteAuthTotpFactors,
+  ensureStaffProfileForInvite,
   expireStaffInvitationIfNeeded,
+  findAuthUserIdByEmail,
   getActiveStaffInvitationByEmail,
   getStaffInvitationForAuthUser,
   getStaffUserByEmail,
   getStaffUserById,
-  insertStaffProfile,
   isStaffInvitationAcceptable,
   listStaffUsers,
   markStaffInvitationFailed,
@@ -29,6 +30,7 @@ import { normalizeEmail } from "@mccoy/domain";
 import {
   isStaffInviteEmailConfigured,
   sendStaffInviteEmail,
+  shouldPreferBrandedStaffInviteFirst,
 } from "@mccoy/email/server";
 import {
   AdminAuthError,
@@ -87,6 +89,52 @@ function invitationAcceptErrorMessage(
     default:
       return "Deze uitnodiging is niet meer geldig.";
   }
+}
+
+function isAuthUserAlreadyExistsError(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return /already (been )?registered|already exists|user already|email.*exists/i.test(message);
+}
+
+function isAuthEmailRateLimitError(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return /rate.?limit|email.*limit|too many.*(email|request)/i.test(message);
+}
+
+/**
+ * Build an invite/recovery action link without sending Auth mail (avoids email rate limits).
+ * Prefer invite for brand-new users; fall back to recovery for existing Auth orphans.
+ */
+async function generateStaffInviteActionLink(input: {
+  supabase: ReturnType<typeof createSupabaseServiceClient>;
+  email: string;
+  redirectTo: string;
+  userMeta: Record<string, unknown>;
+}): Promise<{ authUserId: string | null; actionLink: string | null; errorMessage: string | null }> {
+  const inviteLink = await input.supabase.auth.admin.generateLink({
+    type: "invite",
+    email: input.email,
+    options: {
+      redirectTo: input.redirectTo,
+      data: input.userMeta,
+    },
+  });
+  let authUserId = inviteLink.data?.user?.id ?? null;
+  let actionLink = inviteLink.data?.properties?.action_link ?? null;
+  if (authUserId && actionLink) {
+    return { authUserId, actionLink, errorMessage: null };
+  }
+
+  const recoveryLink = await input.supabase.auth.admin.generateLink({
+    type: "recovery",
+    email: input.email,
+    options: { redirectTo: input.redirectTo },
+  });
+  authUserId = recoveryLink.data?.user?.id ?? authUserId;
+  actionLink = recoveryLink.data?.properties?.action_link ?? actionLink;
+  const errorMessage =
+    recoveryLink.error?.message || inviteLink.error?.message || null;
+  return { authUserId, actionLink, errorMessage };
 }
 
 export const listStaffUsersFn = createServerFn({ method: "POST" }).handler(async () => {
@@ -152,9 +200,26 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
           requestId: data.requestId ?? null,
         });
       } else {
-        let activeInvite = null;
+        // Open invites live in private.staff_invitations — not public.users.
+        // Manual deletes in Auth/Users leave stale pending/sent rows; revoke so
+        // re-invite (and intentional resend) can create a fresh invitation.
         try {
-          activeInvite = await getActiveStaffInvitationByEmail(emailNormalized);
+          const activeInvite = await getActiveStaffInvitationByEmail(emailNormalized);
+          if (activeInvite) {
+            await revokeActiveStaffInvitationsForEmail(emailNormalized);
+            await writeStaffAudit({
+              actorUserId: actor.id,
+              action: "staff.invitation_revoked",
+              targetType: "staff_invitation",
+              targetId: activeInvite.id,
+              before: {
+                email: emailNormalized,
+                status: activeInvite.status,
+              },
+              after: { status: "revoked", reason: "replaced_by_new_invite" },
+              requestId: data.requestId ?? null,
+            });
+          }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           const privateHint = messageIfPrivateSchemaMissing(message);
@@ -163,12 +228,6 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
             error:
               privateHint ??
               "Openstaande uitnodigingen konden niet worden gecontroleerd. Probeer het later opnieuw.",
-          };
-        }
-        if (activeInvite) {
-          return {
-            ok: false as const,
-            error: "Er staat al een openstaande uitnodiging voor dit e-mailadres.",
           };
         }
       }
@@ -206,121 +265,198 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
       });
 
       const supabase = createSupabaseServiceClient();
-      const useCustomEmail = isStaffInviteEmailConfigured();
       let authUserId: string | null = isReinstate ? existingStaff.id : null;
-      let delivery: "smtp" | "supabase_auth" = "supabase_auth";
+      let delivery: "smtp" | "graph" | "supabase_auth" | "manual_link" = "supabase_auth";
+      let emailDelivered = true;
+      let emailRateLimited = false;
+      let manualInviteUrl: string | null = null;
       const userMeta = {
         full_name: fullName,
         invited_by: actor.id,
         mccoy_staff_role: "admin",
       };
 
-      if (useCustomEmail) {
-        // Prefer invite link; for reinstated Auth users fall back to recovery.
-        let actionLink: string | null = null;
-        let linkUserId: string | null = isReinstate ? existingStaff.id : null;
-
-        const inviteLink = await supabase.auth.admin.generateLink({
-          type: "invite",
-          email,
-          options: { redirectTo, data: userMeta },
-        });
-        actionLink = inviteLink.data?.properties?.action_link ?? null;
-        linkUserId = inviteLink.data?.user?.id ?? linkUserId;
-
-        if ((!actionLink || inviteLink.error) && isReinstate) {
-          const recoveryLink = await supabase.auth.admin.generateLink({
-            type: "recovery",
-            email,
-            options: { redirectTo },
-          });
-          actionLink = recoveryLink.data?.properties?.action_link ?? null;
-          linkUserId = recoveryLink.data?.user?.id ?? linkUserId;
-        }
-
-        authUserId = linkUserId;
-        if (!authUserId || !actionLink) {
-          await markStaffInvitationFailed({
-            invitationId: invitation.id,
-            attemptCount: invitation.attempt_count + 1,
-            errorCode: "auth_generate_link_failed",
-          });
-          return {
-            ok: false as const,
-            error: "Uitnodiging kon niet worden aangemaakt. Probeer het later opnieuw.",
-          };
-        }
-
-        const sent = await sendStaffInviteEmail({
-          to: email,
-          inviteUrl: actionLink,
-          invitedByName: actor.fullName,
-          invitedByEmail: actor.email,
-          inviteeFullName: fullName,
-          expiresAt,
-        });
-        if (!sent.ok) {
-          await markStaffInvitationFailed({
-            invitationId: invitation.id,
-            authUserId,
-            attemptCount: invitation.attempt_count + 1,
-            errorCode: "invite_email_send_failed",
-          });
-          return {
-            ok: false as const,
-            error: "Uitnodiging kon niet worden verzonden. Probeer het later opnieuw.",
-            authUserId,
-          };
-        }
-        delivery = "smtp";
-      } else if (isReinstate) {
-        // inviteUserByEmail fails for existing users; Auth recovery mail + /admin/invite redirect.
+      if (isReinstate) {
+        // Existing Auth user: recovery mail via Supabase (primary), optional branded Graph/SMTP.
         authUserId = existingStaff.id;
-        await supabase.auth.admin.generateLink({
+        const recoveryLink = await supabase.auth.admin.generateLink({
           type: "recovery",
           email,
           options: { redirectTo },
         });
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo,
-        });
-        if (resetError) {
-          await markStaffInvitationFailed({
-            invitationId: invitation.id,
-            authUserId,
-            attemptCount: invitation.attempt_count + 1,
-            errorCode: "auth_recovery_email_failed",
-          });
-          return {
-            ok: false as const,
-            error:
-              "Heruitnodiging vereist e-mailverzending. Configureer SMTP (FORM_INBOX of SMTP_*) of controleer Supabase Auth mail.",
-            authUserId,
-          };
-        }
-        delivery = "supabase_auth";
-      } else {
-        const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-          email,
-          {
-            redirectTo,
-            data: userMeta,
-          },
-        );
+        const actionLink = recoveryLink.data?.properties?.action_link ?? null;
+        manualInviteUrl = actionLink;
 
-        if (inviteError || !invited.user) {
+        let brandedOk = false;
+        if (actionLink && isStaffInviteEmailConfigured()) {
+          const sent = await sendStaffInviteEmail({
+            to: email,
+            inviteUrl: actionLink,
+            invitedByName: actor.fullName,
+            invitedByEmail: actor.email,
+            inviteeFullName: fullName,
+            expiresAt,
+          });
+          if (sent.ok) {
+            brandedOk = true;
+            delivery = sent.delivery;
+            emailDelivered = true;
+          } else {
+            console.error("[inviteAdmin] branded reinstate email failed; falling back to Auth", {
+              email: emailNormalized,
+              authUserId,
+              error: sent.error,
+            });
+          }
+        }
+
+        if (!brandedOk) {
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo,
+          });
+          if (resetError) {
+            emailDelivered = false;
+            emailRateLimited = isAuthEmailRateLimitError(resetError.message);
+            delivery = manualInviteUrl ? "manual_link" : "supabase_auth";
+            console.error("[inviteAdmin] recovery email failed after reinstate", {
+              email: emailNormalized,
+              authUserId,
+              error: resetError.message,
+            });
+          } else {
+            emailDelivered = true;
+            delivery = "supabase_auth";
+          }
+        }
+      } else {
+        // Resolve Auth user first. Orphans from prior generateLink attempts must not call
+        // inviteUserByEmail again (already registered + burns Supabase email rate limit).
+        authUserId = await findAuthUserIdByEmail(email);
+
+        if (authUserId) {
+          // Auth orphan / prior invite — do not call inviteUserByEmail or
+          // resetPasswordForEmail (both send Auth mail and hit rate limits).
+          // generateLink builds a usable CTA without sending email.
+          emailDelivered = false;
+          const linked = await generateStaffInviteActionLink({
+            supabase,
+            email,
+            redirectTo,
+            userMeta,
+          });
+          authUserId = linked.authUserId ?? authUserId;
+          manualInviteUrl = linked.actionLink;
+          delivery = "manual_link";
+
+          if (manualInviteUrl && isStaffInviteEmailConfigured()) {
+            const branded = await sendStaffInviteEmail({
+              to: email,
+              inviteUrl: manualInviteUrl,
+              invitedByName: actor.fullName,
+              invitedByEmail: actor.email,
+              inviteeFullName: fullName,
+              expiresAt,
+            });
+            if (branded.ok) {
+              delivery = branded.delivery;
+              emailDelivered = true;
+            } else {
+              console.warn("[inviteAdmin] branded send failed for existing Auth user; manual link ready", {
+                email: emailNormalized,
+                authUserId,
+                error: branded.error,
+              });
+            }
+          }
+        } else if (shouldPreferBrandedStaffInviteFirst()) {
+          const linked = await generateStaffInviteActionLink({
+            supabase,
+            email,
+            redirectTo,
+            userMeta,
+          });
+          authUserId = linked.authUserId;
+          manualInviteUrl = linked.actionLink;
+
+          if (authUserId && manualInviteUrl) {
+            const branded = await sendStaffInviteEmail({
+              to: email,
+              inviteUrl: manualInviteUrl,
+              invitedByName: actor.fullName,
+              invitedByEmail: actor.email,
+              inviteeFullName: fullName,
+              expiresAt,
+            });
+            if (branded.ok) {
+              delivery = branded.delivery;
+              emailDelivered = true;
+            } else {
+              emailDelivered = false;
+              delivery = "manual_link";
+              console.error("[inviteAdmin] branded invite failed; using manual link", {
+                email: emailNormalized,
+                error: branded.error,
+              });
+            }
+          } else {
+            // generateLink failed — fall through to inviteUserByEmail below
+            emailDelivered = false;
+          }
+        }
+
+        if (!authUserId) {
+          const { data: invited, error: inviteError } =
+            await supabase.auth.admin.inviteUserByEmail(email, {
+              redirectTo,
+              data: userMeta,
+            });
+
+          authUserId = invited?.user?.id ?? (await findAuthUserIdByEmail(email));
+
+          if (inviteError) {
+            emailDelivered = false;
+            emailRateLimited = isAuthEmailRateLimitError(inviteError.message);
+            console.error("[inviteAdmin] inviteUserByEmail failed", {
+              email: emailNormalized,
+              authUserId,
+              error: inviteError.message,
+              alreadyExists: isAuthUserAlreadyExistsError(inviteError.message),
+              rateLimited: emailRateLimited,
+            });
+
+            if (authUserId && !manualInviteUrl) {
+              const linked = await generateStaffInviteActionLink({
+                supabase,
+                email,
+                redirectTo,
+                userMeta,
+              });
+              manualInviteUrl = linked.actionLink;
+              authUserId = linked.authUserId ?? authUserId;
+            }
+          } else if (authUserId) {
+            emailDelivered = true;
+            delivery = "supabase_auth";
+          }
+        }
+
+        if (!authUserId) {
           await markStaffInvitationFailed({
             invitationId: invitation.id,
             attemptCount: invitation.attempt_count + 1,
-            errorCode: "auth_invite_failed",
+            errorCode: emailRateLimited ? "auth_email_rate_limited" : "auth_invite_failed",
           });
           return {
             ok: false as const,
-            error: "Uitnodiging kon niet worden verzonden. Probeer het later opnieuw.",
+            error: emailRateLimited
+              ? "Supabase Auth e-maillimiet bereikt. Wacht ongeveer een uur en probeer opnieuw, of nodig een ander e-mailadres uit."
+              : "Uitnodiging kon niet worden verzonden. Probeer het later opnieuw.",
           };
         }
-        authUserId = invited.user.id;
-        delivery = "supabase_auth";
+
+        if (!emailDelivered && manualInviteUrl) {
+          delivery = "manual_link";
+        }
       }
 
       if (!authUserId) {
@@ -337,7 +473,7 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
 
       if (!isReinstate) {
         try {
-          await insertStaffProfile({
+          await ensureStaffProfileForInvite({
             id: authUserId,
             email,
             staffRole: "admin",
@@ -345,7 +481,12 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
             fullName,
             createdBy: actor.id,
           });
-        } catch {
+        } catch (profileError) {
+          console.error("[inviteAdmin] profile provision failed", {
+            email: emailNormalized,
+            authUserId,
+            error: profileError instanceof Error ? profileError.message : String(profileError),
+          });
           await markStaffInvitationFailed({
             invitationId: invitation.id,
             authUserId,
@@ -376,6 +517,8 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
           staff_role: "admin",
           status: "invited",
           delivery,
+          email_delivered: emailDelivered,
+          email_rate_limited: emailRateLimited,
           reinstate: Boolean(isReinstate),
         },
         requestId: data.requestId ?? null,
@@ -386,6 +529,9 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
         userId: authUserId,
         invitationId: invitation.id,
         delivery,
+        emailDelivered,
+        emailRateLimited,
+        inviteUrl: emailDelivered ? null : manualInviteUrl,
         reinstated: Boolean(isReinstate),
       };
     } catch (error) {

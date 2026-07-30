@@ -8,52 +8,13 @@ import {
   linkTarget,
   type CmsButton,
 } from "@mccoy/cms-schema";
-import {
-  SECTION_PAGE_RAIL,
-  SECTION_SHELL_Y,
-  SECTION_TITLE,
-  sectionInnerAlignRowClass,
-  sectionInnerColumnClass,
-} from "../sectionLayout";
-import { useContentAlign } from "../contentAlign";
+import { SectionShell } from "../SectionShell";
+import { SectionEyebrow, SectionHeader, SectionSurface } from "../sectionChromeUi";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
 import { CmsButtonView, type LinkResolverPages } from "./primitives";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
-}
-
-function SectionShell({
-  blockType,
-  children,
-  tone = "default",
-}: {
-  blockType: string;
-  children: React.ReactNode;
-  tone?: "default" | "muted" | "cta";
-}) {
-  const contentAlign = useContentAlign();
-  const framed =
-    tone === "muted"
-      ? "rounded-3xl border border-white/10 bg-white/[0.02] px-6 py-12 sm:px-10 sm:py-16"
-      : tone === "cta"
-        ? "my-4 overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent px-6 py-16 sm:px-12 sm:py-24"
-        : null;
-  return (
-    <section
-      data-cms-block-type={blockType}
-      data-cms-content-align={contentAlign}
-      className={SECTION_SHELL_Y}
-    >
-      <div className={SECTION_PAGE_RAIL} data-cms-section-rail="">
-        <div className={sectionInnerAlignRowClass(contentAlign)} data-cms-section-align="">
-          <div className={sectionInnerColumnClass()} data-cms-section-inner="">
-            {framed ? <div className={framed}>{children}</div> : children}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 export type ConversionRenderMode = "preview" | "storefront";
@@ -137,15 +98,14 @@ export function NewsletterSectionView({
   };
 
   return (
-    <SectionShell blockType="newsletter" tone="muted">
-      <h2 className={SECTION_TITLE}>{d.title}</h2>
-      {d.body ? <p className="mt-2 max-w-2xl text-white/70">{d.body}</p> : null}
+    <SectionShell blockType="newsletter">
+      <SectionHeader title={d.title} body={d.body || undefined} className="mb-6 sm:mb-8" />
       {status === "success" ? (
-        <p className="mt-6 text-sm text-emerald-300" role="status">
+        <p className="text-sm text-emerald-300" role="status">
           Bedankt — je aanmelding is ontvangen.
         </p>
       ) : (
-        <form className="mt-6 max-w-lg space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
+        <form className="max-w-lg space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
           <div className="sr-only" aria-hidden="true">
             <label>
               Website
@@ -158,7 +118,7 @@ export function NewsletterSectionView({
             </label>
           </div>
           <div>
-            <label htmlFor={`newsletter-email-${blockId}`} className="text-xs font-medium text-white/60">
+            <label htmlFor={`newsletter-email-${blockId}`} className="text-xs font-medium text-muted-foreground">
               E-mail
             </label>
             <input
@@ -170,11 +130,11 @@ export function NewsletterSectionView({
               disabled={preview || status === "loading"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="mt-1 w-full rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
           {requiresConsent ? (
-            <label className="flex items-start gap-2 text-sm text-white/75">
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 className="mt-1"
@@ -198,7 +158,7 @@ export function NewsletterSectionView({
             {status === "loading" ? "Bezig…" : d.buttonLabel || "Aanmelden"}
           </button>
           {preview ? (
-            <p className="text-xs text-white/45">Preview — verzenden is uitgeschakeld.</p>
+            <p className="text-xs text-muted-foreground">Preview — verzenden is uitgeschakeld.</p>
           ) : null}
         </form>
       )}
@@ -276,9 +236,9 @@ export function ContactFormSectionView({
 
   if (fields.length === 0) {
     return (
-      <SectionShell blockType="contactForm" tone="muted">
-        <h2 className={SECTION_TITLE}>{d.title}</h2>
-        <p className="mt-2 text-sm text-white/55">Nog geen velden geconfigureerd.</p>
+      <SectionShell blockType="contactForm">
+        <SectionHeader title={d.title} />
+        <p className="mt-2 text-sm text-muted-foreground">Nog geen velden geconfigureerd.</p>
       </SectionShell>
     );
   }
@@ -287,25 +247,24 @@ export function ContactFormSectionView({
     <SectionShell blockType="contactForm">
       <div className="mx-auto grid max-w-5xl items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Contact</p>
-          <h2 className="font-display mt-3 text-3xl text-white md:text-4xl">{d.title}</h2>
-          <p className="mt-4 text-sm leading-relaxed text-white/60 md:text-base">
+          <SectionEyebrow>Contact</SectionEyebrow>
+          <h2 className="font-display mt-3 text-3xl text-foreground md:text-4xl">{d.title}</h2>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
             Vul het formulier in. Uw aanvraag wordt opgeslagen en per e-mail doorgestuurd naar
             info@mccoy.nl.
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-white/[0.06] via-white/[0.03] to-transparent p-6 sm:p-8">
-          <div className="pointer-events-none absolute -right-12 top-0 h-40 w-40 rounded-full bg-primary/15 blur-3xl" aria-hidden />
+        <SectionSurface variant="form">
           {status === "success" ? (
-            <div className="relative py-10 text-center" role="status">
-              <p className="font-display text-2xl text-white">
+            <div className="py-10 text-center" role="status">
+              <p className="font-display text-2xl text-foreground">
                 {d.confirmation?.trim() || "Bedankt voor uw bericht."}
               </p>
-              <p className="mt-2 text-sm text-white/55">We nemen zo snel mogelijk contact op.</p>
+              <p className="mt-2 text-sm text-muted-foreground">We nemen zo snel mogelijk contact op.</p>
             </div>
           ) : (
-            <form className="relative space-y-5" onSubmit={(e) => void onSubmit(e)} noValidate>
+            <form className="space-y-5" onSubmit={(e) => void onSubmit(e)} noValidate>
               <div className="sr-only" aria-hidden="true">
                 <label>
                   Website
@@ -324,7 +283,7 @@ export function ContactFormSectionView({
                   <div key={item.id}>
                     <label
                       htmlFor={fieldId}
-                      className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/55"
+                      className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
                     >
                       {item.text}
                       {required ? <span className="ml-1 text-primary">*</span> : null}
@@ -338,7 +297,7 @@ export function ContactFormSectionView({
                         disabled={preview || status === "loading"}
                         value={values[key] ?? ""}
                         onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                        className="w-full resize-y rounded-2xl border border-white/12 bg-black/35 px-4 py-3.5 text-sm text-white outline-none transition hover:border-white/20 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                        className="w-full resize-y rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
                       />
                     ) : (
                       <input
@@ -349,7 +308,7 @@ export function ContactFormSectionView({
                         disabled={preview || status === "loading"}
                         value={values[key] ?? ""}
                         onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                        className="w-full rounded-2xl border border-white/12 bg-black/35 px-4 py-3.5 text-sm text-white outline-none transition hover:border-white/20 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+                        className="w-full rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
                       />
                     )}
                   </div>
@@ -366,16 +325,16 @@ export function ContactFormSectionView({
               <button
                 type="submit"
                 disabled={preview || status === "loading"}
-                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60 sm:w-auto"
+                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60 sm:w-auto"
               >
                 {status === "loading" ? "Bezig…" : "Versturen"}
               </button>
               {preview ? (
-                <p className="text-xs text-white/45">Preview — verzenden is uitgeschakeld.</p>
+                <p className="text-xs text-muted-foreground">Preview — verzenden is uitgeschakeld.</p>
               ) : null}
             </form>
           )}
-        </div>
+        </SectionSurface>
       </div>
     </SectionShell>
   );
@@ -485,8 +444,8 @@ export function PopupSectionView({
 
   if (preview) {
     return (
-      <SectionShell blockType="popup" tone="muted">
-        <p className="mb-3 text-xs uppercase tracking-wider text-white/45">Popup-preview</p>
+      <SectionShell blockType="popup">
+        <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Popup-preview</p>
         {panel}
       </SectionShell>
     );

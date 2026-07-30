@@ -29,6 +29,7 @@ import { ensurePageLocaleFields } from "./migrate-locale";
 import { validatePageSectionContent } from "./content";
 import { validatePageBlocksForPublish } from "./blocks/validate";
 import { ensureVacaturesJobsBlock } from "./blocks/jobs";
+import { validatePageBlockPolicies } from "./page-block-policies";
 
 export type ValidateIssue = {
   code: string;
@@ -161,19 +162,41 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
     }
   }
 
+  const productsMigration = next.productsBlocksMigration;
+  const productsMigrated =
+    pageKey === "products" &&
+    (productsMigration?.status === "migrated" || productsMigration?.status === "verified");
+
   if (!layout.length) {
-    // Default fixed sections only; CMS block refs come from migrated extras / existing layout.
-    const extras = next.extraBlocks ?? [];
-    const blockItems = extras.length
-      ? extras.map((b) => newBlockLayoutItem(b.id))
-      : [];
-    // If blocks already hold CMS content without extras (post-clear), keep orphans out of default layout.
-    layout = buildDefaultLayout(pageKey, blockItems);
-    layoutVersion = CURRENT_LAYOUT_VERSION;
+    if (productsMigrated) {
+      // Migrated Producten: intentionally empty layouts must stay empty (no fixed reseed).
+      layout = [];
+      layoutVersion = CURRENT_LAYOUT_VERSION;
+    } else {
+      // Default fixed sections only; CMS block refs come from migrated extras / existing layout.
+      const extras = next.extraBlocks ?? [];
+      const blockItems = extras.length
+        ? extras.map((b) => newBlockLayoutItem(b.id))
+        : [];
+      // If blocks already hold CMS content without extras (post-clear), keep orphans out of default layout.
+      layout = buildDefaultLayout(pageKey, blockItems);
+      layoutVersion = CURRENT_LAYOUT_VERSION;
+    }
   } else {
     const reconciled = reconcileLayoutVersion(pageKey, layout, layoutVersion);
     layout = reconciled.layout;
     layoutVersion = reconciled.layoutVersion;
+    // layoutVersion bumps used to re-insert products.main/info — that fights the blocks pilot
+    // and makes admin Secties diverge from the storefront (which suppresses those fixed keys).
+    if (productsMigrated) {
+      layout = layout.filter(
+        (i) =>
+          !(
+            i.kind === "fixed" &&
+            (i.key === "products.main" || i.key === "products.info")
+          ),
+      );
+    }
   }
 
   // Stabilize fixed IDs and hide flags for sections present in the layout.
@@ -403,6 +426,14 @@ export function validatePublishableCmsPage(page: CmsPage): ValidateResult {
         blockType: e.blockType,
       });
     }
+  }
+
+  for (const policyIssue of validatePageBlockPolicies(page)) {
+    issues.push({
+      code: policyIssue.code,
+      message: policyIssue.message,
+      blockType: policyIssue.blockType,
+    });
   }
 
   if (issues.length) return { ok: false, issues };

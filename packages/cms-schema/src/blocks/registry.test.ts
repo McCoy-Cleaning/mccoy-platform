@@ -45,6 +45,11 @@ const EXPECTED_BLOCK_TYPES = [
   "portfolio",
   "jobs",
   "latestPosts",
+  "partnersMarquee",
+  "statsCounters",
+  "contactInfoCards",
+  "quoteRequestForm",
+  "legalArticles",
 ] as const satisfies readonly BlockType[];
 
 type MissingFromExpected = Exclude<BlockType, (typeof EXPECTED_BLOCK_TYPES)[number]>;

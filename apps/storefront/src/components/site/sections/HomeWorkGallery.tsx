@@ -32,6 +32,7 @@ export function WorkGallery() {
       id: item.id,
       title: item.title || "McCoy work",
       caption: item.caption?.trim() || "",
+      shape: item.shape,
       image: {
         ...item.image,
         src,
@@ -51,8 +52,8 @@ export function WorkGallery() {
           variant="gallery"
           src={item.image.src}
           alt={item.caption ? `${item.title} — ${item.caption}` : item.title}
-          width={800}
-          height={1000}
+          width={1200}
+          height={900}
           loading="lazy"
           decoding="async"
           sizes={GALLERY_IMAGE_SIZES}

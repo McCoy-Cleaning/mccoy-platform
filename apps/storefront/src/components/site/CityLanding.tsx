@@ -24,7 +24,7 @@ export function CityLanding({ city, intro, services, reasons }: CityLandingProps
       <main className="pt-32">
         <section className={`${SECTION_SHELL_Y} px-4 sm:px-6 lg:px-8`}>
           <div className="pointer-events-none absolute -top-20 right-0 h-96 w-96 rounded-full bg-primary/15 blur-3xl" />
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto max-w-[96rem]">
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}

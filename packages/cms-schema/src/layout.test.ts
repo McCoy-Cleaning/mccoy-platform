@@ -293,9 +293,12 @@ describe("layout operations", () => {
       ok: false,
       code: "NOT_REMOVABLE",
     });
+    expect(removeFixedLayoutItem(page, "contact.info")).toEqual({
+      ok: false,
+      code: "NOT_REMOVABLE",
+    });
     expect(toggleLayoutItemHidden(page, "fixed:contact:form").ok).toBe(true);
     expect(removeFixedLayoutItem(page, "contact.main").ok).toBe(true);
-    expect(removeFixedLayoutItem(page, "contact.info").ok).toBe(true);
   });
 
   it("offerte page has intro, info, and required form sections", () => {
@@ -316,9 +319,12 @@ describe("layout operations", () => {
       ok: false,
       code: "NOT_REMOVABLE",
     });
+    expect(removeFixedLayoutItem(page, "offerte.info")).toEqual({
+      ok: false,
+      code: "NOT_REMOVABLE",
+    });
     expect(toggleLayoutItemHidden(page, "fixed:offerte:form").ok).toBe(true);
     expect(removeFixedLayoutItem(page, "offerte.main").ok).toBe(true);
-    expect(removeFixedLayoutItem(page, "offerte.info").ok).toBe(true);
   });
 
   it("vacatures jobs listing hide migration is one-shot (admin unhide sticks)", () => {

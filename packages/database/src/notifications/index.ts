@@ -14,6 +14,8 @@ export type {
 } from "./types";
 
 export {
+  NotificationOutboxUnavailableError,
+  isNotificationOutboxUnavailableMessage,
   enqueueNotificationOutbox,
   listUnprocessedNotificationOutbox,
   markNotificationOutboxProcessed,

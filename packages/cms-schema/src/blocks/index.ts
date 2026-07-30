@@ -6,6 +6,7 @@ export * from "./timeline";
 export * from "./plans";
 export * from "./jobs";
 export * from "./vacancy-application";
+export * from "./new-sections";
 export * from "./catalog";
 export * from "./registry";
 export * from "./validation-codes";

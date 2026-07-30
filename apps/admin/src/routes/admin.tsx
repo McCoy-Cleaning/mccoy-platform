@@ -124,9 +124,9 @@ function AdminLayout() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:32px_32px] opacity-40" />
       </div>
 
-      <div className="mx-auto flex min-h-screen w-full max-w-[1600px] gap-6 px-4 py-4 lg:px-6 lg:py-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-[2400px] gap-4 px-2 py-3 lg:gap-5 lg:px-4 lg:py-5">
         {/* Desktop sidebar */}
-        <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-72 shrink-0 flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_32px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:flex">
+        <aside className="sticky top-5 hidden h-[calc(100vh-2.5rem)] w-60 shrink-0 flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_32px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:flex">
           <SidebarBrand />
           <NavList pathname={pathname} onNavigate={() => {}} requestsUnread={requestsUnread} />
           <div className="mt-auto pt-4">

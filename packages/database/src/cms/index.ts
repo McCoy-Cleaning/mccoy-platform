@@ -18,7 +18,12 @@ export {
 } from "./types";
 
 export { createFileCmsStore, getFileCmsStore } from "./file-store";
-export { createSupabaseCmsStore, getCmsStore } from "./supabase-store";
+export {
+  createSupabaseCmsStore,
+  getCmsStore,
+  isSupabaseConnectivityError,
+  markSupabaseCmsUnreachable,
+} from "./supabase-store";
 export {
   cmsPageRecordId,
   cmsPageStableKey,

@@ -23,66 +23,14 @@ import {
 } from "./ConversionSectionViews";
 import {
   SECTION_GRID,
-  SECTION_PAGE_RAIL,
-  SECTION_SHELL_Y,
-  SECTION_SHELL_Y_HERO,
   SECTION_TITLE,
   SECTION_TITLE_TIGHT,
-  sectionInnerAlignRowClass,
-  sectionInnerColumnClass,
-  type SectionInnerMaxWidth,
 } from "../sectionLayout";
-import { useContentAlign } from "../contentAlign";
+import { SectionShell } from "../SectionShell";
+import { SectionEyebrow, SectionHeader, SectionIndex, SectionSurface } from "../sectionChromeUi";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
-}
-
-function SectionShell({
-  children,
-  className,
-  tone = "default",
-  blockType,
-  innerMaxWidth = "7xl",
-  innerClassName,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  tone?: "default" | "muted" | "hero" | "cta";
-  blockType: string;
-  /** Narrow columns (richText / centered) must live on the inner, not the section. */
-  innerMaxWidth?: SectionInnerMaxWidth;
-  innerClassName?: string;
-}) {
-  const contentAlign = useContentAlign();
-  const framed =
-    tone === "muted"
-      ? "rounded-3xl border border-white/10 bg-white/[0.02] px-6 py-12 sm:px-10 sm:py-16"
-      : tone === "cta"
-        ? "my-4 overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent px-6 py-16 sm:px-12 sm:py-24"
-        : null;
-
-  return (
-    <section
-      data-cms-block-type={blockType}
-      data-cms-content-align={contentAlign}
-      className={cn(
-        tone === "hero" ? SECTION_SHELL_Y_HERO : SECTION_SHELL_Y,
-        className,
-      )}
-    >
-      <div className={SECTION_PAGE_RAIL} data-cms-section-rail="">
-        <div className={sectionInnerAlignRowClass(contentAlign)} data-cms-section-align="">
-          <div
-            className={cn(sectionInnerColumnClass(innerMaxWidth), innerClassName)}
-            data-cms-section-inner=""
-          >
-            {framed ? <div className={framed}>{children}</div> : children}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 function SectionTitle({
@@ -198,20 +146,20 @@ export function RegisteredBlockView({
           >
             <div className={cn("space-y-5", alignCenter && "flex w-full max-w-3xl flex-col items-center")}>
               {typeof d.eyebrow === "string" && d.eyebrow ? (
-                <span className="inline-flex rounded-full border border-primary/35 bg-primary/10 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                <SectionEyebrow className="inline-flex rounded-full border border-primary/35 bg-primary/10 px-3.5 py-1 tracking-[0.16em]">
                   {d.eyebrow}
-                </span>
+                </SectionEyebrow>
               ) : null}
               <h1
                 data-testid="hero-heading"
-                className="font-display text-4xl font-semibold tracking-tight text-white sm:text-5xl"
+                className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl"
               >
                 {String(d.title ?? "")}
               </h1>
               {typeof d.subtitle === "string" && d.subtitle ? (
                 <p
                   className={cn(
-                    "max-w-xl text-base leading-relaxed text-white/70 sm:text-lg",
+                    "max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg",
                     alignCenter && "mx-auto",
                   )}
                 >
@@ -244,11 +192,13 @@ export function RegisteredBlockView({
           innerMaxWidth={centered ? "2xl" : type === "richText" ? "3xl" : "7xl"}
           innerClassName={centered ? "text-center" : undefined}
         >
-          <h2 className="font-display text-3xl font-semibold text-white sm:text-4xl">{String(d.title ?? "")}</h2>
-          {typeof d.body === "string" && d.body ? (
-            <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-white/70">{d.body}</p>
-          ) : null}
-          <div className="mt-8">
+          <SectionHeader
+            title={String(d.title ?? "")}
+            body={typeof d.body === "string" ? d.body : undefined}
+            align={centered ? "center" : undefined}
+            className={type === "cta" ? "mb-8 sm:mb-10" : undefined}
+          />
+          <div className={cn(type === "cta" ? "mt-2" : "mt-2", centered && "flex justify-center")}>
             <OptionalCta
               cta={d.cta as CmsButton | undefined}
               pages={pages}
@@ -269,24 +219,22 @@ export function RegisteredBlockView({
             )}
           >
             <div className="min-w-0">
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-white break-words sm:text-4xl">
+              <h2 className="font-display text-3xl font-semibold tracking-tight text-foreground break-words sm:text-4xl">
                 {String(d.title ?? "")}
               </h2>
               {typeof d.body === "string" && d.body ? (
-                <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-white/70 break-words">
+                <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground break-words">
                   {d.body}
                 </p>
               ) : null}
             </div>
             {image ? (
-              <FitImage
-                image={image}
-                aspectClass="aspect-[4/3]"
-                className="w-full rounded-3xl ring-1 ring-white/10"
-              />
+              <SectionSurface variant="media" className="w-full">
+                <FitImage image={image} aspectClass="aspect-[4/3]" className="w-full" />
+              </SectionSurface>
             ) : (
               <div
-                className="flex aspect-[4/3] items-center justify-center rounded-3xl border border-dashed border-white/15 bg-white/[0.02] text-sm text-white/40"
+                className="flex aspect-[4/3] items-center justify-center rounded-3xl border border-dashed border-border bg-card/30 text-sm text-muted-foreground"
                 aria-hidden
               >
                 Geen afbeelding
@@ -303,10 +251,10 @@ export function RegisteredBlockView({
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
           <div className={cn(SECTION_GRID, "md:grid-cols-2 lg:grid-cols-3")}>
             {columns.map((c) => (
-              <div key={c.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                <h3 className="text-lg font-semibold text-white">{c.title}</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-white/70">{c.body}</p>
-              </div>
+              <SectionSurface key={c.id} variant="outlined" className="p-5 sm:p-6">
+                <h3 className="text-lg font-semibold text-foreground">{c.title}</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{c.body}</p>
+              </SectionSurface>
             ))}
           </div>
         </SectionShell>
@@ -315,15 +263,15 @@ export function RegisteredBlockView({
     case "benefits": {
       const items = (d.items as Array<{ id: string; text: string }>) ?? [];
       return (
-        <SectionShell blockType={type} tone="muted">
+        <SectionShell blockType={type}>
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-          <ul className="space-y-4">
-            {items.map((item) => (
-              <li key={item.id} className="flex gap-3 text-white/80">
-                <span className="text-primary" aria-hidden>
-                  ✓
-                </span>
-                <span>{item.text}</span>
+          <ul className={cn(SECTION_GRID, "sm:grid-cols-2")}>
+            {items.map((item, index) => (
+              <li key={item.id}>
+                <SectionSurface variant="outlined" className="flex h-full gap-3 p-5">
+                  <SectionIndex value={String(index + 1).padStart(2, "0")} />
+                  <span className="text-foreground/90">{item.text}</span>
+                </SectionSurface>
               </li>
             ))}
           </ul>
@@ -343,27 +291,28 @@ export function RegisteredBlockView({
       return (
         <SectionShell blockType={type}>
           <SectionTitle>{data.title}</SectionTitle>
-          <ol className="relative space-y-8 border-l-2 border-primary/35 pl-6 sm:pl-8">
-            {data.milestones.map((m) => (
+          <ol className="relative space-y-6 border-l border-border pl-6 sm:pl-8">
+            {data.milestones.map((m, i) => (
               <li key={m.id} className="relative">
-                <span
-                  className="absolute -left-[1.7rem] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-primary bg-[#0b0d12] sm:-left-[2.05rem]"
-                  aria-hidden
-                />
-                {m.year ? (
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">{m.year}</p>
-                ) : null}
-                <h3 className="text-xl font-semibold text-white break-words">{m.title}</h3>
-                {m.body ? <p className="mt-1 text-white/70 break-words">{m.body}</p> : null}
-                {m.bullets.length ? (
-                  <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-white/75">
-                    {m.bullets.map((b) => (
-                      <li key={b.id} className="break-words">
-                        {b.text}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
+                <SectionSurface variant="outlined" className="p-5 sm:p-6">
+                  <div className="mb-2 flex items-center gap-3">
+                    <SectionIndex value={String(i + 1).padStart(2, "0")} />
+                    {m.year ? (
+                      <SectionEyebrow className="tracking-wider">{m.year}</SectionEyebrow>
+                    ) : null}
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground break-words">{m.title}</h3>
+                  {m.body ? <p className="mt-1 text-muted-foreground break-words">{m.body}</p> : null}
+                  {m.bullets.length ? (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {m.bullets.map((b) => (
+                        <li key={b.id} className="break-words">
+                          {b.text}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </SectionSurface>
               </li>
             ))}
           </ol>
@@ -375,12 +324,17 @@ export function RegisteredBlockView({
       return (
         <SectionShell blockType={type}>
           <SectionTitle>{data.title}</SectionTitle>
-          <ol className="space-y-6 border-l border-white/15 pl-6">
-            {data.milestones.map((m) => (
+          <ol className="space-y-4 border-l border-border pl-6">
+            {data.milestones.map((m, i) => (
               <li key={m.id}>
-                {m.year ? <p className="text-xs text-primary">{m.year}</p> : null}
-                <h3 className="text-lg font-semibold text-white">{m.title}</h3>
-                {m.body ? <p className="text-white/70">{m.body}</p> : null}
+                <SectionSurface variant="outlined" className="p-4 sm:p-5">
+                  <div className="mb-2 flex items-center gap-3">
+                    <SectionIndex value={i + 1} />
+                    {m.year ? <SectionEyebrow>{m.year}</SectionEyebrow> : null}
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">{m.title}</h3>
+                  {m.body ? <p className="mt-1 text-muted-foreground">{m.body}</p> : null}
+                </SectionSurface>
               </li>
             ))}
           </ol>
@@ -501,15 +455,15 @@ export function RegisteredBlockView({
           ) : (
             <div className={cn(SECTION_GRID, "sm:grid-cols-2")}>
               {features.map((f) => (
-                <div key={f.id} className="rounded-2xl border border-white/10 p-5">
+                <SectionSurface key={f.id} variant="outlined" className="p-5 sm:p-6">
                   {f.icon ? (
                     <span className="mb-2 block text-xs uppercase tracking-wider text-primary/80" aria-hidden>
                       {f.icon}
                     </span>
                   ) : null}
-                  <h3 className="font-semibold text-white break-words">{f.title}</h3>
-                  <p className="mt-2 text-sm text-white/70 break-words">{f.body}</p>
-                </div>
+                  <h3 className="font-semibold text-foreground break-words">{f.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground break-words">{f.body}</p>
+                </SectionSurface>
               ))}
             </div>
           )}
@@ -521,16 +475,16 @@ export function RegisteredBlockView({
       return (
         <SectionShell blockType={type}>
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-          <ol className="space-y-5">
+          <ol className="relative space-y-4 border-l border-border pl-6 sm:pl-8">
             {steps.map((s, i) => (
-              <li key={s.id} className="flex gap-4 rounded-2xl border border-white/10 p-4">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/20 text-sm font-bold text-primary">
-                  {i + 1}
-                </span>
-                <div>
-                  <h3 className="font-semibold text-white">{s.title}</h3>
-                  <p className="text-sm text-white/70">{s.body}</p>
-                </div>
+              <li key={s.id}>
+                <SectionSurface variant="outlined" className="flex gap-4 p-4 sm:p-5">
+                  <SectionIndex value={i + 1} />
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-foreground">{s.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
+                  </div>
+                </SectionSurface>
               </li>
             ))}
           </ol>
@@ -541,32 +495,34 @@ export function RegisteredBlockView({
       const columns = (d.columns as string[]) ?? [];
       const rows = (d.rows as Array<{ id: string; feature: string; values: boolean[] }>) ?? [];
       return (
-        <SectionShell blockType={type} className="overflow-x-auto">
+        <SectionShell blockType={type}>
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-          <table className="w-full min-w-[32rem] border-collapse text-left text-sm text-white/80">
-            <thead>
-              <tr>
-                <th className="border-b border-white/10 p-3" />
-                {columns.map((c) => (
-                  <th key={c} className="border-b border-white/10 p-3 font-semibold text-white">
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="border-b border-white/5 p-3">{r.feature}</td>
-                  {columns.map((_, i) => (
-                    <td key={`${r.id}-${i}`} className="border-b border-white/5 p-3">
-                      {r.values[i] ? "✓" : "✗"}
-                    </td>
+          <div className="-mx-1 overflow-x-auto px-1 pb-2">
+            <table className="w-full min-w-[32rem] border-collapse text-left text-sm text-muted-foreground">
+              <thead>
+                <tr>
+                  <th className="border-b border-border p-3" />
+                  {columns.map((c) => (
+                    <th key={c} className="border-b border-border p-3 font-semibold text-foreground">
+                      {c}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="border-b border-border/60 p-3 text-foreground">{r.feature}</td>
+                    {columns.map((_, i) => (
+                      <td key={`${r.id}-${i}`} className="border-b border-border/60 p-3">
+                        {r.values[i] ? "✓" : "✗"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </SectionShell>
       );
     }
@@ -577,6 +533,7 @@ export function RegisteredBlockView({
           image: CmsImage;
           title?: string;
           caption?: string;
+          shape?: "wide" | "square" | "tall";
         }>) ?? [];
       const layout = d.layout === "masonry" || d.layout === "featured" ? d.layout : "grid";
 
@@ -591,6 +548,7 @@ export function RegisteredBlockView({
               title: img.title?.trim() || img.image.alt || "McCoy work",
               caption: img.caption,
               image: img.image,
+              shape: img.shape,
             }))}
           />
         );
@@ -646,7 +604,7 @@ export function RegisteredBlockView({
         <SectionShell blockType={type}>
           {typeof d.title === "string" && d.title ? <SectionTitle>{d.title}</SectionTitle> : null}
           {embed.ok ? (
-            <div className="aspect-video overflow-hidden rounded-3xl border border-white/10">
+            <SectionSurface variant="media" className="aspect-video">
               <iframe
                 title={typeof d.title === "string" && d.title ? d.title : "Video"}
                 src={embed.embedUrl}
@@ -657,7 +615,7 @@ export function RegisteredBlockView({
                 allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
               />
-            </div>
+            </SectionSurface>
           ) : (
             <p className="text-sm text-amber-200">{embed.reason}</p>
           )}
@@ -669,16 +627,20 @@ export function RegisteredBlockView({
         <SectionShell blockType={type}>
           {typeof d.title === "string" && d.title ? <SectionTitle>{d.title}</SectionTitle> : null}
           <div className={cn(SECTION_GRID, "md:grid-cols-2")}>
-            <FitImage
-              image={d.before as CmsImage | undefined}
-              aspectClass="aspect-[4/3]"
-              className="w-full rounded-3xl ring-1 ring-white/10"
-            />
-            <FitImage
-              image={d.after as CmsImage | undefined}
-              aspectClass="aspect-[4/3]"
-              className="w-full rounded-3xl ring-1 ring-white/10"
-            />
+            <SectionSurface variant="media">
+              <FitImage
+                image={d.before as CmsImage | undefined}
+                aspectClass="aspect-[4/3]"
+                className="w-full"
+              />
+            </SectionSurface>
+            <SectionSurface variant="media">
+              <FitImage
+                image={d.after as CmsImage | undefined}
+                aspectClass="aspect-[4/3]"
+                className="w-full"
+              />
+            </SectionSurface>
           </div>
         </SectionShell>
       );
@@ -688,7 +650,7 @@ export function RegisteredBlockView({
       return (
         <SectionShell blockType={type}>
           {slides.length === 0 ? (
-            <p className="text-sm text-white/55">Nog geen slides in deze carousel.</p>
+            <p className="text-sm text-muted-foreground">Nog geen slides in deze carousel.</p>
           ) : (
             <div
               className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:-mx-6 sm:gap-8 sm:px-6 lg:-mx-8 lg:gap-10 lg:px-8"
@@ -697,18 +659,23 @@ export function RegisteredBlockView({
               tabIndex={0}
             >
               {slides.map((s) => (
-                <article
+                <SectionSurface
                   key={s.id}
-                  className="w-[min(100%,20rem)] shrink-0 snap-start rounded-3xl border border-white/10 bg-white/[0.02] p-5 transition hover:border-white/20 focus-within:border-white/25 sm:w-[22rem] sm:p-6"
+                  variant="elevated"
+                  className="w-[min(100%,20rem)] shrink-0 snap-start p-5 transition hover:border-primary/35 focus-within:border-primary/40 sm:w-[22rem] sm:p-6"
                 >
-                  <FitImage
-                    image={s.image}
-                    aspectClass="aspect-video"
-                    className="mb-4 w-full rounded-2xl ring-1 ring-white/10"
-                  />
-                  <h3 className="font-display text-lg font-semibold text-white">{s.title}</h3>
-                  {s.body ? <p className="mt-2 text-sm leading-relaxed text-white/70">{s.body}</p> : null}
-                </article>
+                  <article>
+                    <FitImage
+                      image={s.image}
+                      aspectClass="aspect-video"
+                      className="mb-4 w-full rounded-2xl"
+                    />
+                    <h3 className="font-display text-lg font-semibold text-foreground">{s.title}</h3>
+                    {s.body ? (
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                    ) : null}
+                  </article>
+                </SectionSurface>
               ))}
             </div>
           )}
@@ -765,7 +732,7 @@ export function RegisteredBlockView({
         const byline = [role, company].filter(Boolean).join(" · ");
         const body = (
           <div className="space-y-6 text-center">
-            <blockquote className="font-display text-2xl text-white md:text-3xl">
+            <blockquote className="font-display text-2xl text-foreground md:text-3xl">
               &ldquo;{String(item.quote ?? "")}&rdquo;
             </blockquote>
             <div className="flex items-center justify-center gap-3">
@@ -774,28 +741,25 @@ export function RegisteredBlockView({
                 className="h-14 w-14 shrink-0 rounded-full object-cover"
               />
               <div className="min-w-0 text-left">
-                {author ? <p className="text-sm font-semibold text-white">{author}</p> : null}
-                {byline ? <p className="text-xs text-white/50">{byline}</p> : null}
+                {author ? <p className="text-sm font-semibold text-foreground">{author}</p> : null}
+                {byline ? <p className="text-xs text-muted-foreground">{byline}</p> : null}
               </div>
             </div>
           </div>
         );
         if (!opts.framed) return body;
         return (
-          <div
-            key={item.id}
-            className="rounded-3xl border border-white/10 bg-white/[0.02] px-6 py-10 sm:px-8"
-          >
+          <SectionSurface key={item.id} variant="elevated" className="px-6 py-10 sm:px-8">
             {body}
-          </div>
+          </SectionSurface>
         );
       };
 
       if (items.length <= 1) {
         return (
-          <SectionShell blockType={type} tone="muted" innerMaxWidth="3xl" className="text-center">
+          <SectionShell blockType={type} innerMaxWidth="3xl" className="text-center">
             <div className="mx-auto w-full max-w-3xl">
-              {renderCard(items[0]!, { framed: false })}
+              {renderCard(items[0]!, { framed: true })}
             </div>
           </SectionShell>
         );
@@ -837,10 +801,12 @@ export function RegisteredBlockView({
             )}
           >
             {members.map((m) => (
-              <article
+              <SectionSurface
                 key={m.id}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] transition duration-300 hover:border-white/20 hover:bg-white/[0.045]"
+                variant="elevated"
+                className="group flex flex-col overflow-hidden transition duration-300 hover:border-primary/35"
               >
+              <article className="flex h-full flex-col">
                 <div className="relative overflow-hidden bg-black/30">
                   <FitImage
                     image={m.photo}
@@ -853,7 +819,7 @@ export function RegisteredBlockView({
                   />
                 </div>
                 <div className="flex flex-1 flex-col items-center px-5 pb-6 pt-5 text-center">
-                  <h3 className="font-display text-xl font-semibold tracking-tight text-white sm:text-[1.35rem]">
+                  <h3 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-[1.35rem]">
                     {m.name}
                   </h3>
                   {m.role ? (
@@ -862,10 +828,11 @@ export function RegisteredBlockView({
                     </p>
                   ) : null}
                   {m.bio ? (
-                    <p className="mt-3 max-w-[18rem] text-sm leading-relaxed text-white/60">{m.bio}</p>
+                    <p className="mt-3 max-w-[18rem] text-sm leading-relaxed text-muted-foreground">{m.bio}</p>
                   ) : null}
                 </div>
               </article>
+              </SectionSurface>
             ))}
           </div>
         </SectionShell>
@@ -961,11 +928,14 @@ export function RegisteredBlockView({
         <SectionShell blockType={type}>
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
           <div className={cn(SECTION_GRID, "md:grid-cols-2")}>
-            {values.map((v) => (
-              <div key={v.id} className="rounded-2xl border border-white/10 p-5">
-                <h3 className="font-semibold text-white">{v.title}</h3>
-                <p className="mt-2 text-sm text-white/70">{v.body}</p>
-              </div>
+            {values.map((v, i) => (
+              <SectionSurface key={v.id} variant="outlined" className="p-5 sm:p-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <SectionIndex value={String(i + 1).padStart(2, "0")} />
+                  <h3 className="font-semibold text-foreground">{v.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">{v.body}</p>
+              </SectionSurface>
             ))}
           </div>
         </SectionShell>
@@ -997,13 +967,13 @@ export function RegisteredBlockView({
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
           <div className={cn(SECTION_GRID, "sm:grid-cols-2 lg:grid-cols-3")}>
             {projects.map((p) => (
-              <div key={p.id} className="overflow-hidden rounded-2xl border border-white/10">
+              <SectionSurface key={p.id} variant="media" className="overflow-hidden">
                 <FitImage image={p.image} aspectClass="aspect-video" className="w-full" />
                 <div className="p-4">
-                  <h3 className="font-semibold text-white">{p.title}</h3>
-                  {p.category ? <p className="text-xs text-white/50">{p.category}</p> : null}
+                  <h3 className="font-semibold text-foreground">{p.title}</h3>
+                  {p.category ? <p className="text-xs text-muted-foreground">{p.category}</p> : null}
                 </div>
-              </div>
+              </SectionSurface>
             ))}
           </div>
         </SectionShell>
@@ -1030,12 +1000,14 @@ export function RegisteredBlockView({
           <SectionTitle>{String(d.title ?? "")}</SectionTitle>
           <div className={cn(SECTION_GRID, "md:grid-cols-2")}>
             {posts.map((p) => (
-              <article key={p.id} className="rounded-2xl border border-white/10 p-4">
-                <FitImage image={p.image} aspectClass="aspect-video" className="mb-3 w-full rounded-xl" />
-                {p.date ? <p className="text-xs text-white/45">{p.date}</p> : null}
-                <h3 className="font-semibold text-white">{p.title}</h3>
-                {p.excerpt ? <p className="mt-1 text-sm text-white/70">{p.excerpt}</p> : null}
-              </article>
+              <SectionSurface key={p.id} variant="outlined" className="p-4">
+                <article>
+                  <FitImage image={p.image} aspectClass="aspect-video" className="mb-3 w-full rounded-xl" />
+                  {p.date ? <p className="text-xs text-muted-foreground">{p.date}</p> : null}
+                  <h3 className="font-semibold text-foreground">{p.title}</h3>
+                  {p.excerpt ? <p className="mt-1 text-sm text-muted-foreground">{p.excerpt}</p> : null}
+                </article>
+              </SectionSurface>
             ))}
           </div>
         </SectionShell>
@@ -1067,6 +1039,197 @@ export function RegisteredBlockView({
           mode={adminMode ? "preview" : "storefront"}
           pages={pages}
         />
+      );
+    }
+    case "partnersMarquee": {
+      const items =
+        (d.items as Array<{
+          id: string;
+          name: string;
+          logo?: CmsImage;
+          href?: string;
+        }>) ?? [];
+      const animate = d.animate !== false && items.length >= 4;
+      return (
+        <SectionShell blockType={type} tone="default">
+          <SectionHeader
+            eyebrow={typeof d.eyebrow === "string" ? d.eyebrow : undefined}
+            title={typeof d.heading === "string" ? d.heading : undefined}
+            className="mb-10 sm:mb-12"
+          />
+          <div
+            className={cn(
+              "grid gap-6",
+              items.length <= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4",
+            )}
+          >
+            {items.map((item) => (
+              <SectionSurface
+                key={item.id}
+                variant="outlined"
+                className="flex min-h-[5rem] items-center justify-center p-4"
+              >
+                {item.logo ? (
+                  <OptionalImage image={item.logo} className="max-h-12 w-auto object-contain" />
+                ) : (
+                  <span className="text-sm text-muted-foreground">{item.name}</span>
+                )}
+                <span className="sr-only">{item.name}</span>
+              </SectionSurface>
+            ))}
+          </div>
+          {animate ? (
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Animatie uitgeschakeld in preview — storefront respecteert reduced-motion.
+            </p>
+          ) : null}
+        </SectionShell>
+      );
+    }
+    case "statsCounters": {
+      const items =
+        (d.items as Array<{
+          id: string;
+          prefix?: string;
+          value: string;
+          suffix?: string;
+          label: string;
+          supportingText?: string;
+        }>) ?? [];
+      return (
+        <SectionShell blockType={type}>
+          <SectionHeader
+            title={typeof d.heading === "string" ? d.heading : undefined}
+            body={typeof d.body === "string" ? d.body : undefined}
+            className="mb-10 sm:mb-12"
+          />
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {items.map((item) => (
+              <SectionSurface key={item.id} variant="outlined" className="p-5 sm:p-6">
+                <p className="font-display text-4xl font-semibold text-foreground">
+                  <span>{item.prefix ?? ""}</span>
+                  <span>{item.value}</span>
+                  <span>{item.suffix ?? ""}</span>
+                </p>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">{item.label}</p>
+                {item.supportingText ? (
+                  <p className="mt-1 text-xs text-muted-foreground/80">{item.supportingText}</p>
+                ) : null}
+              </SectionSurface>
+            ))}
+          </div>
+        </SectionShell>
+      );
+    }
+    case "contactInfoCards": {
+      const items =
+        (d.items as Array<{
+          id: string;
+          label: string;
+          value: string;
+          secondaryValue?: string;
+          action?: { kind: string; href: string; label?: string };
+        }>) ?? [];
+      return (
+        <SectionShell blockType={type}>
+          <SectionHeader
+            title={typeof d.heading === "string" ? d.heading : undefined}
+            className="mb-10 sm:mb-12"
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((item) => {
+              const href = item.action?.href;
+              const safe =
+                href &&
+                (href.startsWith("/") ||
+                  href.startsWith("https://") ||
+                  href.startsWith("http://") ||
+                  href.startsWith("mailto:") ||
+                  href.startsWith("tel:"))
+                  ? href
+                  : null;
+              const inner = (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-lg font-medium text-foreground">{item.value}</p>
+                  {item.secondaryValue ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{item.secondaryValue}</p>
+                  ) : null}
+                </>
+              );
+              return safe ? (
+                <a key={item.id} href={safe} className="block transition hover:opacity-95">
+                  <SectionSurface variant="outlined" className="h-full p-5 hover:border-primary/35">
+                    {inner}
+                  </SectionSurface>
+                </a>
+              ) : (
+                <SectionSurface key={item.id} variant="outlined" className="p-5">
+                  {inner}
+                </SectionSurface>
+              );
+            })}
+          </div>
+        </SectionShell>
+      );
+    }
+    case "quoteRequestForm": {
+      return (
+        <SectionShell blockType={type}>
+          <SectionHeader
+            title={String(d.heading ?? "Offerte")}
+            body={typeof d.description === "string" ? d.description : undefined}
+            className="mb-8 sm:mb-10"
+          />
+          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-sm text-muted-foreground">
+            Offerteformulier (presentatie) — server bepaalt bron en scope. Knop:{" "}
+            {String(d.submitLabel ?? "Verstuur")}
+          </p>
+        </SectionShell>
+      );
+    }
+    case "legalArticles": {
+      const articles =
+        (d.articles as Array<{ id: string; heading: string; anchor: string; content: string }>) ??
+        [];
+      return (
+        <SectionShell blockType={type} innerMaxWidth="3xl">
+          <h1 className="font-display text-4xl text-foreground">{String(d.heading ?? "")}</h1>
+          {typeof d.updatedLabel === "string" && d.updatedAt ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {d.updatedLabel}: {String(d.updatedAt)}
+            </p>
+          ) : null}
+          {articles.length > 1 ? (
+            <SectionSurface variant="outlined" className="mt-8 p-4">
+              <nav aria-label="Inhoudsopgave">
+                <ol className="space-y-2 text-sm">
+                  {articles.map((a) => (
+                    <li key={a.id}>
+                      <a className="text-primary hover:underline" href={`#${a.anchor}`}>
+                        {a.heading}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            </SectionSurface>
+          ) : null}
+          <div className="mt-10 space-y-10">
+            {articles.map((a) => (
+              <SectionSurface key={a.id} variant="outlined" className="p-5 sm:p-6">
+                <article id={a.anchor}>
+                  <h2 className="font-display text-2xl text-foreground">{a.heading}</h2>
+                  <p className="mt-4 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground">
+                    {a.content}
+                  </p>
+                </article>
+              </SectionSurface>
+            ))}
+          </div>
+        </SectionShell>
       );
     }
     default: {

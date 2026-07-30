@@ -11,7 +11,7 @@ import {
  * Publish lifecycle is covered by fixed-section / plans / gallery specs.
  */
 const ADD_CASES: Array<{ template: string; title: string }> = [
-  { template: "Tekst + afbeelding", title: "E2E TextImage Title" },
+  { template: "Tekst met afbeelding", title: "E2E TextImage Title" },
   { template: "Nieuwsbrief", title: "E2E Newsletter Title" },
   { template: "Contactformulier", title: "E2E ContactForm Title" },
   { template: "Popup CTA", title: "E2E Popup Title" },

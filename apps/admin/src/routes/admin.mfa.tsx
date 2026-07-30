@@ -30,6 +30,7 @@ function AdminMfaPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [mode, setMode] = React.useState<"enroll" | "verify">("enroll");
+  const codeInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (!ready) return;
@@ -41,6 +42,15 @@ function AdminMfaPage() {
       navigate({ to: "/admin", replace: true });
     }
   }, [ready, session, navigate]);
+
+  // autoFocus alone can miss when the field mounts after the loading shell.
+  React.useEffect(() => {
+    if (!ready || !session) return;
+    const frame = window.requestAnimationFrame(() => {
+      codeInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [ready, session, mode]);
 
   React.useEffect(() => {
     if (!ready || !session) return;
@@ -190,15 +200,18 @@ function AdminMfaPage() {
             </div>
           )}
 
-          <label className="mb-4 block">
+          <label className="mb-4 block" htmlFor="mfa-code">
             <span className="mb-1.5 block text-xs font-medium text-white/70">Authenticatiecode</span>
             <div className="relative">
               <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
               <input
+                ref={codeInputRef}
+                id="mfa-code"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 autoComplete="one-time-code"
+                autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 required

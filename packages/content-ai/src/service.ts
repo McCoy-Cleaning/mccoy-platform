@@ -98,7 +98,7 @@ export function createContentAiService(
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        temperature: regenerate ? 0.9 : 0.55,
+        temperature: regenerate ? 0.85 : 0.4,
         maxTokens: 500,
       });
       try {
@@ -288,7 +288,7 @@ export function createContentAiService(
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        temperature: regenerate ? 0.9 : 0.55,
+        temperature: regenerate ? 0.85 : 0.4,
         maxTokens: 1600,
       });
 

@@ -25,6 +25,9 @@ import {
   updateLayoutBlockData,
   validatePublishableCmsPage,
   createDefaultBlock,
+  parseBlockData,
+  resolveProductsBlocksLayout,
+  forceProductsIntroAssortmentPair,
   cloneJobsDataWithNewIds,
   normalizeJobs,
   createItemId,
@@ -66,7 +69,7 @@ import { pushPublishedChromeToStorefront } from "./publish-sync";
 import { deleteSavedPageFromServer, publishSavedPageToServer, saveConceptPageToServer } from "./server-publish";
 import { adminGetPublishedCmsPages, adminListPublishedCustomPageIds } from "@/lib/api/cms-publish.functions";
 import { translateNlToEn } from "@/lib/api/content-ai.functions";
-import { getTemplate } from "./templates";
+import { getTemplate, getTemplateById } from "./templates";
 
 const KEY = "mccoy_cms_v1";
 const EVENT = "mccoy-cms-change";
@@ -753,18 +756,100 @@ export const cms = {
     return run();
   },
 
+  /**
+   * Producten fixed→blocks: resolve once and persist draft when changed.
+   * Storefront must never call this (admin is the persistence authority).
+   */
+  ensureProductsBlocksMigration(pageId: string): {
+    changed: boolean;
+    report: ReturnType<typeof resolveProductsBlocksLayout>["report"] | null;
+  } {
+    const page = editablePage(read(), pageId);
+    if (!page || page.kind !== "builtin" || page.pageKey !== "products") {
+      return { changed: false, report: null };
+    }
+    const summarize = (p: typeof page) =>
+      p.layout.map((item) => {
+        if (item.kind === "fixed") return `fixed:${item.key}`;
+        const block = p.blocks.find((b) => b.id === item.blockId);
+        const data =
+          block?.data && typeof block.data === "object"
+            ? (block.data as Record<string, unknown>)
+            : {};
+        return `${block?.type ?? "missing"}:${String(data.presentation ?? "none")}`;
+      });
+    const resolved = resolveProductsBlocksLayout(page);
+    // Nuclear guarantee: resolve alone was observed returning unchanged layouts while
+    // claiming restore. Force exact Intro + Assortiment pair for non-empty Producten.
+    const forced = forceProductsIntroAssortmentPair(resolved.page);
+    const nextPage = forced.page;
+    const beforePresentations = summarize(page);
+    const afterPresentations = summarize(nextPage);
+    const beforeHasIntro = beforePresentations.some((p) => p.includes(":productsIntro"));
+    const beforeHasAssortment = beforePresentations.some((p) =>
+      p.includes(":productsAssortment"),
+    );
+    const afterHasIntro = afterPresentations.some((p) => p.includes(":productsIntro"));
+    const afterHasAssortment = afterPresentations.some((p) =>
+      p.includes(":productsAssortment"),
+    );
+    const pairComplete = afterHasIntro && afterHasAssortment;
+    const pairWasIncomplete = !(beforeHasIntro && beforeHasAssortment);
+    const willPersist =
+      forced.changed ||
+      (resolved.changed &&
+        JSON.stringify({
+          layout: page.layout,
+          blocks: page.blocks,
+          migration: page.productsBlocksMigration ?? null,
+        }) !==
+          JSON.stringify({
+            layout: nextPage.layout,
+            blocks: nextPage.blocks,
+            migration: nextPage.productsBlocksMigration ?? null,
+          })) ||
+      (pairWasIncomplete && pairComplete);
+    if (!willPersist) {
+      return {
+        changed: false,
+        report: {
+          ...resolved.report,
+          warnings: [...resolved.report.warnings, ...forced.warnings],
+        },
+      };
+    }
+    commitDraftPage(read(), pageId, nextPage);
+    return {
+      changed: true,
+      report: {
+        ...resolved.report,
+        warnings: [...resolved.report.warnings, ...forced.warnings],
+      },
+    };
+  },
+
   /* ============ Layout ops (draft only) ============ */
   moveLayoutItem(pageId: string, itemId: string, direction: "up" | "down") {
     const page = editablePage(read(), pageId);
     if (!page) return { ok: false as const, code: "UNKNOWN_SECTION" as const };
     return applyLayoutResult(pageId, moveLayoutItem(page, itemId, direction));
   },
-  addLayoutBlock(pageId: string, type: BlockType, atIndex: number) {
+  addLayoutBlock(
+    pageId: string,
+    type: BlockType,
+    atIndex: number,
+    opts?: { templateId?: string },
+  ) {
     const page = editablePage(read(), pageId);
     if (!page) return { ok: false as const, code: "UNKNOWN_SECTION" as const };
-    const tpl = getTemplate(type);
-    if (!tpl) return { ok: false as const, code: "UNKNOWN_SECTION" as const };
+    const tpl = opts?.templateId ? getTemplateById(opts.templateId) : getTemplate(type);
+    if (!tpl || tpl.type !== type) return { ok: false as const, code: "UNKNOWN_SECTION" as const };
     const block = createDefaultBlock(type);
+    const parsed = parseBlockData(type, tpl.defaultData);
+    if (parsed.ok) {
+      block.data = parsed.data as Block["data"];
+      block.dataVersion = parsed.dataVersion;
+    }
     block.id = uid("b");
     return applyLayoutResult(pageId, addLayoutBlock(page, block, atIndex));
   },
@@ -895,13 +980,24 @@ export const cms = {
    * Custom-page block list helpers — draft-gated.
    * @deprecated Prefer layout APIs for builtins; kept for custom PageEditor.
    */
-  addBlock(pageId: string, type: BlockType, index?: number, _target: "blocks" | "extraBlocks" = "blocks") {
+  addBlock(
+    pageId: string,
+    type: BlockType,
+    index?: number,
+    _target: "blocks" | "extraBlocks" = "blocks",
+    opts?: { templateId?: string },
+  ) {
     const s = read();
     const page = editablePage(s, pageId);
     if (!page) return;
-    const tpl = getTemplate(type);
-    if (!tpl) return;
+    const tpl = opts?.templateId ? getTemplateById(opts.templateId) : getTemplate(type);
+    if (!tpl || tpl.type !== type) return;
     const block = createDefaultBlock(type);
+    const parsed = parseBlockData(type, tpl.defaultData);
+    if (parsed.ok) {
+      block.data = parsed.data as Block["data"];
+      block.dataVersion = parsed.dataVersion;
+    }
     block.id = uid("b");
     if (page.kind === "builtin" && page.pageKey) {
       const at = index ?? page.layout.length;
@@ -1168,11 +1264,29 @@ export const cms = {
     }
 
     // Durable publish first — never clear the local draft until the live store accepts it.
+    // Always include EN when the page is marked EN-published, and ensure localeContent.en
+    // exists so public /en resolve does not fail after NL-only SEO bags.
     const publishedLocales: Array<"nl" | "en"> = ["nl"];
-    if (
-      nextPage.localeStates?.en?.publicationState === "published" &&
-      nextPage.localeContent?.en
-    ) {
+    if (nextPage.localeStates?.en?.publicationState === "published") {
+      const nlBag = nextPage.localeContent?.nl ?? {
+        navigationLabel: nextPage.title,
+        pageTitle: nextPage.title,
+        seo: { title: nextPage.title, description: nextPage.description },
+      };
+      if (!nextPage.localeContent?.en) {
+        const enTitle = synced.enFieldDrafts["page:meta:title"]?.trim() || nextPage.title;
+        const enDesc =
+          synced.enFieldDrafts["page:meta:description"]?.trim() || nextPage.description;
+        nextPage.localeContent = {
+          ...(nextPage.localeContent ?? { nl: nlBag }),
+          nl: nlBag,
+          en: {
+            navigationLabel: enTitle,
+            pageTitle: enTitle,
+            seo: { title: enTitle, description: enDesc },
+          },
+        };
+      }
       publishedLocales.push("en");
     }
     const pub = await publishSavedPageToServer(nextPage, publishedLocales);
@@ -1194,6 +1308,13 @@ export const cms = {
     markPreviewStale(pageId);
     if (nextPage.isCustom) {
       syncCustomPageIntoNavigation(s, nextPage, { push: true });
+    } else {
+      // Builtin publish: push full page into open storefront tabs so live content
+      // updates without waiting for a hard refresh / snapshot TTL.
+      pushPublishedChromeToStorefront({
+        navigation: s.navigation ?? defaultSiteNavigation(),
+        pages: [nextPage],
+      });
     }
     if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
     if (translateWarning) {

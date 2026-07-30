@@ -31,7 +31,10 @@ function FormPageChromeSection({
   const copy = localizedFormChromeCopy(sectionKey, content, t, lang);
 
   return (
-    <section className="relative" data-cms-section={sectionKey}>
+    <section
+      className="relative py-10 sm:py-14 md:py-16"
+      data-cms-section={sectionKey}
+    >
       <SectionInner>
         {badge ? (
           <motion.div

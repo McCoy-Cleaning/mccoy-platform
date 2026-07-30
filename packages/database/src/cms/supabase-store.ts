@@ -795,7 +795,47 @@ export function createSupabaseCmsStore(): CmsStore {
   };
 }
 
+/** Soft-fail window after DNS/network errors so local file CMS can serve without hammering a dead host. */
+let supabaseCmsUnreachableUntil = 0;
+const SUPABASE_CMS_UNREACHABLE_TTL_MS = 60_000;
+
+export function isSupabaseConnectivityError(error: unknown): boolean {
+  const parts: string[] = [];
+  if (error instanceof Error) {
+    parts.push(error.message);
+    if (error.cause instanceof Error) parts.push(error.cause.message);
+    else if (error.cause != null) parts.push(String(error.cause));
+  } else if (error != null) {
+    parts.push(String(error));
+  }
+  const haystack = parts.join(" ").toLowerCase();
+  return (
+    haystack.includes("fetch failed") ||
+    haystack.includes("enotfound") ||
+    haystack.includes("econnrefused") ||
+    haystack.includes("econnreset") ||
+    haystack.includes("etimedout") ||
+    haystack.includes("eai_again") ||
+    haystack.includes("connecttimeout") ||
+    haystack.includes("socket hang up") ||
+    haystack.includes("networkerror") ||
+    haystack.includes("getaddrinfo")
+  );
+}
+
+export function markSupabaseCmsUnreachable(reason: string): void {
+  supabaseCmsUnreachableUntil = Date.now() + SUPABASE_CMS_UNREACHABLE_TTL_MS;
+  console.warn(
+    `[cms] Supabase CMS unreachable for ${SUPABASE_CMS_UNREACHABLE_TTL_MS / 1000}s — using file store. ` +
+      `Check SUPABASE_URL (DNS/network) or clear SUPABASE_SECRET_KEY for local file-only CMS. ` +
+      `(${reason.slice(0, 240)})`,
+  );
+}
+
 export function getCmsStore(): CmsStore {
+  if (Date.now() < supabaseCmsUnreachableUntil) {
+    return getFileCmsStore();
+  }
   if (hasSupabaseServiceConfig()) {
     try {
       return createSupabaseCmsStore();

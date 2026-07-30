@@ -47,6 +47,57 @@ function samplePage(enPublished: boolean): BuiltinCmsPage {
 }
 
 describe("resolvePublishedCmsPage", () => {
+  it("restores required contact.info and contact.form when omitted from published layout", () => {
+    const incomplete = ensurePageLocaleFields({
+      id: "page_contact",
+      kind: "builtin",
+      isCustom: false,
+      pageKey: "contact",
+      slug: "/contact",
+      title: "Contact",
+      description: "Contact",
+      inNav: true,
+      blocks: [],
+      layout: [{ id: "fixed:contact:main", kind: "fixed", key: "contact.main", hidden: false }],
+      layoutVersion: 1,
+      sectionContent: {
+        "contact.main": {
+          eyebrow: "Contact",
+          heading: "Let's talk",
+          body: "Hello",
+        },
+      },
+      updatedAt: 1,
+      version: 1,
+      paths: { nl: "/contact", en: "/contact" },
+      localeContent: {
+        nl: {
+          navigationLabel: "Contact",
+          pageTitle: "Contact",
+          seo: { title: "Contact", description: "Contact" },
+        },
+      },
+      localeStates: {
+        nl: { publicationState: "published", freshness: "current" },
+      },
+    }) as BuiltinCmsPage;
+
+    const ok = resolvePublishedCmsPage({
+      page: incomplete,
+      revisionId: "rev_contact",
+      publishedAt: "2026-07-19T12:00:00Z",
+      locale: "nl",
+      site: { origin: "https://www.mccoy.nl" },
+    });
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    const keys = ok.snapshot.page.layout.flatMap((i) =>
+      i.kind === "fixed" ? [i.key] : [],
+    );
+    expect(keys).toEqual(["contact.main", "contact.info", "contact.form"]);
+    expect(ok.snapshot.page.kind === "builtin" && ok.snapshot.page.sectionContent?.["contact.info"]).toBeTruthy();
+  });
+
   it("builds EN snapshot only when EN is published", () => {
     const ok = resolvePublishedCmsPage({
       page: samplePage(true),

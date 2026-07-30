@@ -6,18 +6,18 @@ import {
 } from "@/lib/cms/store";
 import type { CmsPage } from "@mccoy/cms-schema";
 
-async function loadPublishedBundle(): Promise<boolean> {
+async function loadPublishedBundle(): Promise<CmsPage[] | null> {
   try {
     const bundle = await getPublishedCmsBundle();
-    if (!bundle.ok) return false;
+    if (!bundle.ok) return null;
     const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
     // Durable nav = published pages with inNav (+ orphan filter in resolveStorefrontNavLinks).
     // Admin chrome sync may update memory sooner; focus/visibility refresh re-reads the file store.
     hydratePublishedCmsState({ pages });
-    return true;
+    return pages;
   } catch (error) {
     console.error("[cms] failed to load published bundle", error);
-    return false;
+    return null;
   }
 }
 
@@ -27,6 +27,9 @@ async function loadPublishedBundle(): Promise<boolean> {
  *
  * Also re-fetches when the tab becomes visible so Opslaan → shared `.data` shows up even
  * when the cross-origin chrome iframe / BroadcastChannel bridge was missed.
+ *
+ * Route bodies prefer a newer hydrated page over a stale loader snapshot via
+ * `useCmsPageForView` (SSR snapshot cache is also keyed by site configVersion).
  */
 export function PublishedCmsProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
@@ -36,7 +39,8 @@ export function PublishedCmsProvider({ children }: { children: React.ReactNode }
     let cancelled = false;
     void (async () => {
       await loadPublishedBundle();
-      if (!cancelled) setReady(true);
+      if (cancelled) return;
+      setReady(true);
     })();
 
     const refresh = () => {

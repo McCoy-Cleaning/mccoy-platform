@@ -92,8 +92,8 @@ export function ExtraBlocksEditor({ page }: { page: Page }) {
         <TemplatePicker
           open
           onClose={() => setPickerAt(null)}
-          onPick={(type) => {
-            cms.addBlock(page.id, type, pickerAt, "extraBlocks");
+          onPick={(type, templateId) => {
+            cms.addBlock(page.id, type, pickerAt, "extraBlocks", { templateId });
             setPickerAt(null);
           }}
         />

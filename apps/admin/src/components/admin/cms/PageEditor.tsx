@@ -132,7 +132,9 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
       <TemplatePicker
         open={pickerAt !== null}
         onClose={() => setPickerAt(null)}
-        onPick={(type) => { if (pickerAt !== null) cms.addBlock(page.id, type, pickerAt); }}
+        onPick={(type, templateId) => {
+          if (pickerAt !== null) cms.addBlock(page.id, type, pickerAt, "blocks", { templateId });
+        }}
       />
 
       {settingsOpen && <PageSettings page={page} onClose={() => setSettingsOpen(false)} />}

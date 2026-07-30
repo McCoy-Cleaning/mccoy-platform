@@ -98,7 +98,7 @@ If the seed exits with `Invalid schema: private`, expose the schema and re-run �
 
 **Option A — SQL (preferred; also in the migration above)**
 
-1. Open [SQL Editor](https://supabase.com/dashboard/project/bwrktdwnnlgxdpefecmv/sql/new) for project `bwrktdwnnlgxdpefecmv` (must be signed in as the project owner/org member).
+1. Open the [SQL Editor](https://supabase.com/dashboard) for your McCoy project (must be signed in as the project owner/org member).
 2. Run:
 
 ```sql
@@ -111,7 +111,7 @@ notify pgrst, 'reload config';
 
 **Option B — Dashboard**
 
-1. Open [Project Settings → Data API](https://supabase.com/dashboard/project/bwrktdwnnlgxdpefecmv/settings/api).
+1. Open [Project Settings → Data API](https://supabase.com/dashboard/project/_/settings/api) for your McCoy project.
 2. Under **Exposed schemas**, add `private` alongside `public`, `storage`, and `graphql_public` (keep those).
 3. Save.
 4. Retry `npx tsx scripts/seed-cms-media.ts`.

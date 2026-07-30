@@ -6,7 +6,7 @@ import {
   UNPUBLISHABLE_BLOCK_WARNING_NL,
   type CmsPage,
 } from "@mccoy/cms-schema";
-import { TEMPLATES, CATEGORY_ORDER, PAGE_PARITY_BLOCK_TYPES } from "@/lib/cms/templates";
+import { TEMPLATES, CATEGORY_ORDER, PAGE_PARITY_BLOCK_TYPES, templateId } from "@/lib/cms/templates";
 import type { BlockType } from "@/lib/cms/types";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function TemplatePicker({
 }: {
   open: boolean;
   onClose: () => void;
-  onPick: (type: BlockType) => void;
+  onPick: (type: BlockType, templateId: string) => void;
   /** When set, page-level block instance policies hide saturated types. */
   page?: CmsPage | null;
 }) {
@@ -67,14 +67,15 @@ export function TemplatePicker({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => {
               const Icon = t.icon;
+              const tid = templateId(t);
               const publishable = getBlockDataDefinition(t.type).capabilities.publishable;
               return (
                 <button
-                  key={t.type}
+                  key={tid}
                   type="button"
-                  data-cms-template={t.type}
+                  data-cms-template={tid}
                   aria-label={t.name}
-                  onClick={() => { onPick(t.type); onClose(); }}
+                  onClick={() => { onPick(t.type, tid); onClose(); }}
                   className="group text-left rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-0.5 hover:border-[#1e88e5]/50 hover:bg-white/[0.07]"
                 >
                   <div className="flex items-center gap-2.5 mb-3">
@@ -99,7 +100,6 @@ export function TemplatePicker({
               );
             })}
           </div>
-          {filtered.length === 0 && <div className="text-center text-base text-white/45 py-12">Geen resultaten.</div>}
         </div>
       </div>
     </div>

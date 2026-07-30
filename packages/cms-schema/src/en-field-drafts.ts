@@ -44,7 +44,11 @@ export function mergeEnFieldDrafts(
 }
 
 /**
- * Set a dotted path on a plain object tree (`primaryCta.label`, `cards.0.title`).
+ * Set a dotted (or colon-separated id) path on a plain object tree.
+ * Supports:
+ * - `primaryCta.label` (objects)
+ * - `features.0.title` (array indexes)
+ * - `features:prod_hygiene:title` / `features.prod_hygiene.title` (array item by id)
  * Creates missing object parents; grows arrays when a numeric segment appears.
  */
 export function setValueAtDotPath(
@@ -52,7 +56,10 @@ export function setValueAtDotPath(
   fieldPath: string,
   value: string,
 ): void {
-  const segments = fieldPath.split(".").filter(Boolean);
+  const segments =
+    fieldPath.includes(":") && !fieldPath.includes(".")
+      ? fieldPath.split(":").filter(Boolean)
+      : fieldPath.split(".").filter(Boolean);
   if (segments.length === 0) return;
 
   let cursor: unknown = root;
@@ -62,18 +69,28 @@ export function setValueAtDotPath(
     const asIndex = Number.parseInt(key, 10);
     const keyIsIndex = String(asIndex) === key;
 
-    if (keyIsIndex) {
-      if (!Array.isArray(cursor)) return;
+    if (Array.isArray(cursor)) {
       const arr = cursor as unknown[];
-      while (arr.length <= asIndex) arr.push({});
-      if (arr[asIndex] == null || typeof arr[asIndex] !== "object") {
-        arr[asIndex] = Number.isInteger(Number(nextKey)) ? [] : {};
+      let index = keyIsIndex ? asIndex : -1;
+      if (index < 0) {
+        index = arr.findIndex(
+          (item) =>
+            item != null &&
+            typeof item === "object" &&
+            !Array.isArray(item) &&
+            (item as Record<string, unknown>).id === key,
+        );
       }
-      cursor = arr[asIndex];
+      if (index < 0) return;
+      while (arr.length <= index) arr.push({});
+      if (arr[index] == null || typeof arr[index] !== "object") {
+        arr[index] = Number.isInteger(Number(nextKey)) ? [] : {};
+      }
+      cursor = arr[index];
       continue;
     }
 
-    if (cursor == null || typeof cursor !== "object" || Array.isArray(cursor)) return;
+    if (cursor == null || typeof cursor !== "object") return;
     const obj = cursor as Record<string, unknown>;
     const existing = obj[key];
     if (existing == null || typeof existing !== "object") {
@@ -84,13 +101,25 @@ export function setValueAtDotPath(
 
   const leaf = segments[segments.length - 1]!;
   const leafIndex = Number.parseInt(leaf, 10);
-  if (String(leafIndex) === leaf && Array.isArray(cursor)) {
+  if (Array.isArray(cursor)) {
     const arr = cursor as unknown[];
-    while (arr.length <= leafIndex) arr.push("");
-    arr[leafIndex] = value;
+    if (String(leafIndex) === leaf) {
+      while (arr.length <= leafIndex) arr.push("");
+      arr[leafIndex] = value;
+      return;
+    }
+    const byId = arr.findIndex(
+      (item) =>
+        item != null &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        (item as Record<string, unknown>).id === leaf,
+    );
+    if (byId < 0) return;
+    arr[byId] = value;
     return;
   }
-  if (cursor == null || typeof cursor !== "object" || Array.isArray(cursor)) return;
+  if (cursor == null || typeof cursor !== "object") return;
   (cursor as Record<string, unknown>)[leaf] = value;
 }
 

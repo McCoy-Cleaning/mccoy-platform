@@ -6,6 +6,25 @@ import type {
 } from "./types";
 import { createSupabaseServiceClient } from "../supabase";
 
+/** Thrown when notification_outbox (or related) is missing from the live schema. */
+export class NotificationOutboxUnavailableError extends Error {
+  readonly code = "NOTIFICATION_OUTBOX_UNAVAILABLE" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "NotificationOutboxUnavailableError";
+  }
+}
+
+export function isNotificationOutboxUnavailableMessage(message: string): boolean {
+  return (
+    /notification_outbox/i.test(message) &&
+    /schema cache|does not exist|could not find the table|relation .* does not exist/i.test(
+      message,
+    )
+  );
+}
+
 function mapOutboxRow(row: Record<string, unknown>): NotificationOutboxRow {
   return {
     id: String(row.id),
@@ -19,6 +38,15 @@ function mapOutboxRow(row: Record<string, unknown>): NotificationOutboxRow {
     attempts: Number(row.attempts ?? 0),
     last_error: (row.last_error as string | null) ?? null,
   };
+}
+
+function throwOutboxError(operation: string, message: string): never {
+  if (isNotificationOutboxUnavailableMessage(message)) {
+    throw new NotificationOutboxUnavailableError(
+      `${operation}: public.notification_outbox ontbreekt. Pas migratie supabase/migrations/20260725120000_platform_notifications.sql toe op dit Supabase-project.`,
+    );
+  }
+  throw new Error(`${operation}: ${message}`);
 }
 
 /**
@@ -52,7 +80,7 @@ export async function enqueueNotificationOutbox(
       .eq("dedupe_key", input.dedupeKey)
       .maybeSingle();
     if (existingError) {
-      throw new Error(`enqueueNotificationOutbox lookup failed: ${existingError.message}`);
+      throwOutboxError("enqueueNotificationOutbox lookup failed", existingError.message);
     }
     if (existing?.id) {
       return { id: String(existing.id), inserted: false };
@@ -74,11 +102,11 @@ export async function enqueueNotificationOutbox(
         .eq("dedupe_key", input.dedupeKey)
         .maybeSingle();
       if (raceError || !raced?.id) {
-        throw new Error(`enqueueNotificationOutbox race resolve failed: ${error.message}`);
+        throwOutboxError("enqueueNotificationOutbox race resolve failed", error.message);
       }
       return { id: String(raced.id), inserted: false };
     }
-    throw new Error(`enqueueNotificationOutbox failed: ${error.message}`);
+    throwOutboxError("enqueueNotificationOutbox failed", error.message);
   }
 
   return { id: String(data.id), inserted: true };
@@ -96,7 +124,7 @@ export async function listUnprocessedNotificationOutbox(
     .limit(Math.max(1, Math.min(limit, 200)));
 
   if (error) {
-    throw new Error(`listUnprocessedNotificationOutbox failed: ${error.message}`);
+    throwOutboxError("listUnprocessedNotificationOutbox failed", error.message);
   }
 
   return (data ?? []).map((row) => mapOutboxRow(row as Record<string, unknown>));
@@ -115,7 +143,7 @@ export async function markNotificationOutboxProcessed(
     .eq("id", outboxId);
 
   if (error) {
-    throw new Error(`markNotificationOutboxProcessed failed: ${error.message}`);
+    throwOutboxError("markNotificationOutboxProcessed failed", error.message);
   }
 }
 
@@ -131,7 +159,7 @@ export async function markNotificationOutboxFailed(
     .maybeSingle();
 
   if (readError) {
-    throw new Error(`markNotificationOutboxFailed read failed: ${readError.message}`);
+    throwOutboxError("markNotificationOutboxFailed read failed", readError.message);
   }
 
   const attempts = Number(current?.attempts ?? 0) + 1;
@@ -147,6 +175,6 @@ export async function markNotificationOutboxFailed(
     .eq("id", outboxId);
 
   if (error) {
-    throw new Error(`markNotificationOutboxFailed failed: ${error.message}`);
+    throwOutboxError("markNotificationOutboxFailed failed", error.message);
   }
 }

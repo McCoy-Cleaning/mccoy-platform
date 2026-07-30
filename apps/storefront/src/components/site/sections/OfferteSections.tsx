@@ -14,6 +14,12 @@ import { useI18n } from "@/lib/i18n";
 import { submitSiteForm } from "@/lib/forms/submit-client";
 import { useClientReady } from "@/lib/use-client-ready";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
+import {
+  SECTION_PAGE_RAIL,
+  SectionEyebrow,
+  SectionSurface,
+} from "@mccoy/cms-renderer";
+import { cn } from "@/lib/utils";
 
 export function OfferteFormSection() {
   const content = useTypedSectionContent("page_offerte", "offerte.form") as ContactFormContent;
@@ -50,12 +56,12 @@ export function OfferteFormSection() {
   return (
     <div data-cms-section="offerte.form">
       {content.heading ? (
-        <h2 className="mx-auto mt-16 max-w-7xl px-4 font-display text-3xl text-white sm:px-6 md:text-4xl lg:px-8">
+        <h2 className={cn(SECTION_PAGE_RAIL, "mt-16 font-display text-3xl text-foreground md:text-4xl")}>
           {content.heading}
         </h2>
       ) : null}
 
-      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className={cn(SECTION_PAGE_RAIL, "mt-20")}>
         <div className="grid gap-4 md:grid-cols-2">
           {tabs.map((tb, i) => {
             const Icon = tb.icon;
@@ -70,19 +76,13 @@ export function OfferteFormSection() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: i * 0.06 }}
                 whileHover={{ y: -3 }}
-                className={`group relative overflow-hidden rounded-3xl border p-5 text-left transition ${
+                className={cn(
+                  "group relative overflow-hidden rounded-3xl border p-5 text-left transition",
                   active
                     ? "border-primary/60 bg-primary/10"
-                    : "border-white/10 bg-card/60 hover:border-primary/40"
-                }`}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="contact-tab-glow"
-                    className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-primary/30 blur-3xl"
-                    transition={{ type: "spring", stiffness: 220, damping: 30 }}
-                  />
+                    : "border-border bg-card/60 hover:border-primary/40",
                 )}
+              >
                 <div className="relative flex items-start gap-4">
                   <div
                     className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition ${
@@ -92,10 +92,8 @@ export function OfferteFormSection() {
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-                      {tb.tag}
-                    </p>
-                    <p className="mt-1 truncate font-display text-lg text-white">{tb.title}</p>
+                    <SectionEyebrow className="text-[10px] tracking-[0.2em]">{tb.tag}</SectionEyebrow>
+                    <p className="mt-1 truncate font-display text-lg text-foreground">{tb.title}</p>
                   </div>
                 </div>
               </motion.button>
@@ -104,7 +102,7 @@ export function OfferteFormSection() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-28 pt-10 sm:px-6 lg:px-8">
+      <section className={cn(SECTION_PAGE_RAIL, "pb-28 pt-10")}>
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
@@ -142,14 +140,14 @@ function FormShell({
         <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
           <Icon className="h-5 w-5" />
         </div>
-        <p className="mt-6 text-xs font-semibold uppercase tracking-[0.25em] text-primary">{tag}</p>
-        <h2 className="font-display mt-3 text-4xl text-white md:text-5xl">{title}</h2>
-        <p className="mt-5 max-w-md leading-relaxed text-white/65">{desc}</p>
+        <SectionEyebrow className="mt-6 tracking-[0.25em]">{tag}</SectionEyebrow>
+        <h2 className="font-display mt-3 text-4xl text-foreground md:text-5xl">{title}</h2>
+        <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">{desc}</p>
       </aside>
 
-      <div className="rounded-[2rem] border border-white/10 bg-card/60 p-7 lg:col-span-7 md:p-9">
+      <SectionSurface variant="form" className="lg:col-span-7">
         {children}
-      </div>
+      </SectionSurface>
     </div>
   );
 }

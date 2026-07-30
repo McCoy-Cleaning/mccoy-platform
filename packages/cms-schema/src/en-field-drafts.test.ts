@@ -40,6 +40,20 @@ describe("setValueAtDotPath", () => {
     setValueAtDotPath(root, "cards.1.title", "EN B");
     expect((root.cards as Array<{ title: string }>)[1]?.title).toBe("EN B");
   });
+
+  it("sets assortment feature paths by item id (colon and dotted)", () => {
+    const root: Record<string, unknown> = {
+      features: [
+        { id: "prod_hygiene", title: "NL", body: "NL body" },
+        { id: "prod_soaps", title: "NL2", body: "NL2 body" },
+      ],
+    };
+    setValueAtDotPath(root, "features:prod_hygiene:title", "Hygiene paper");
+    setValueAtDotPath(root, "features.prod_soaps.body", "Soaps EN");
+    const features = root.features as Array<{ id: string; title: string; body: string }>;
+    expect(features[0]).toMatchObject({ title: "Hygiene paper", body: "NL body" });
+    expect(features[1]).toMatchObject({ title: "NL2", body: "Soaps EN" });
+  });
 });
 
 describe("localizeCmsPageForLocale", () => {
@@ -59,6 +73,17 @@ describe("localizeCmsPageForLocale", () => {
           type: "richText",
           data: { heading: "NL heading", body: "NL body" },
         },
+        {
+          id: "blk_assort",
+          type: "featureGrid",
+          data: {
+            presentation: "productsAssortment",
+            title: "McCoy Cleaning Products",
+            features: [
+              { id: "prod_hygiene", icon: "sparkles", title: "Hygiëne papier", body: "NL desc" },
+            ],
+          },
+        },
       ],
       layout: [],
       layoutVersion: 1,
@@ -73,6 +98,8 @@ describe("localizeCmsPageForLocale", () => {
         "section:home.hero:heading": "EN hero",
         "section:home.hero:primaryCta.label": "Request a quote",
         "block:blk_1:heading": "EN heading",
+        "block:blk_assort:features:prod_hygiene:title": "Hygiene paper",
+        "block:blk_assort:features:prod_hygiene:body": "EN desc",
         "page:meta:title": "Home EN",
       },
       updatedAt: 1,
@@ -100,6 +127,14 @@ describe("localizeCmsPageForLocale", () => {
       body: "NL body",
     });
     expect(localized.localeContent?.en?.seo.title).toBe("Home EN");
+  });
+
+  it("overlays remapped assortment feature drafts by card id", () => {
+    const localized = localizeCmsPageForLocale(builtin(), "en");
+    const assort = localized.blocks.find((b) => b.id === "blk_assort");
+    expect(assort?.data).toMatchObject({
+      features: [{ id: "prod_hygiene", title: "Hygiene paper", body: "EN desc" }],
+    });
   });
 
   it("does not invent EN when drafts are missing", () => {

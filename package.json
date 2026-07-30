@@ -28,6 +28,7 @@
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:ui": "playwright test --project=chromium --ui",
     "test:e2e:update-snapshots": "playwright test --project=chromium --update-snapshots",
+    "apply:auth-invite-template": "node scripts/apply-auth-invite-email-template.mjs",
     "test:e2e:brave": "playwright test --project=brave-smoke",
     "test:e2e:smoke": "playwright test --project=chromium e2e/smoke.p0.spec.ts",
     "test:e2e:forms": "playwright test --project=chromium e2e/forms-aanvragen.spec.ts",
