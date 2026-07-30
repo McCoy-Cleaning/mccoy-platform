@@ -5,6 +5,7 @@ import { PasswordInput } from "@/components/admin/PasswordInput";
 import {
   adminEstablishSession,
   fetchAdminSession,
+  refreshAdminSessionClient,
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
@@ -13,6 +14,7 @@ import {
   getStaffInviteContextFn,
 } from "@/lib/api/staff-identity.functions";
 import { getAdminBrowserSupabase, hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
+import { clearStaffInviteAuthCallbackFromUrl } from "@/lib/staff-invite-callback";
 import logoUrl from "@/assets/logo-mccoy.png";
 import { staffPasswordStrengthError } from "@mccoy/domain";
 
@@ -160,6 +162,9 @@ function AdminInvitePage() {
         },
       });
 
+      // Prevent /admin/mfa ↔ /admin/invite loops when #access_token&type=invite lingers.
+      clearStaffInviteAuthCallbackFromUrl();
+
       if (!established.ok) {
         if (!cancelled) {
           setPhase("error");
@@ -230,6 +235,18 @@ function AdminInvitePage() {
         return;
       }
 
+      // Keep HttpOnly cookies aligned with the post-password browser session.
+      const { data: refreshed } = await supabase.auth.getSession();
+      if (refreshed.session) {
+        await adminEstablishSession({
+          data: {
+            accessToken: refreshed.session.access_token,
+            refreshToken: refreshed.session.refresh_token,
+            clientKey: refreshed.session.user.email ?? undefined,
+          },
+        });
+      }
+
       const completed = await completeStaffInviteRegistrationFn({
         data: {
           fullName: fullName.trim() || undefined,
@@ -242,6 +259,8 @@ function AdminInvitePage() {
         return;
       }
 
+      refreshAdminSessionClient();
+      clearStaffInviteAuthCallbackFromUrl();
       navigate({ to: "/admin/mfa", replace: true });
     } catch {
       setPhase("ready");

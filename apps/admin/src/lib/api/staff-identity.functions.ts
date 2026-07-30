@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import {
   acceptStaffInvitation,
   assertActiveSuperAdminActor,
+  activateStaffUser,
   createStaffInvitation,
   createSupabaseServiceClient,
   decideStaffInviteForExistingEmail,
@@ -609,6 +610,25 @@ export const getStaffInviteContextFn = createServerFn({ method: "POST" }).handle
       return { ok: false as const, error: "Dit account is geblokkeerd." };
     }
     if (profile.status === "active" && session.aal === "aal2") {
+      return {
+        ok: true as const,
+        alreadyComplete: true as const,
+        registrationComplete: true as const,
+        email: profile.email,
+        fullName: profile.fullName,
+        needsFullName: false,
+        expiresAt: null,
+      };
+    }
+
+    // Password was set outside the invite form (e.g. Admin API reset) but MFA is done:
+    // activate and leave the invite shell so login is not a redirect loop.
+    if (profile.status === "invited" && session.aal === "aal2") {
+      try {
+        await activateStaffUser(session.userId);
+      } catch {
+        /* non-fatal — client still proceeds to admin */
+      }
       return {
         ok: true as const,
         alreadyComplete: true as const,

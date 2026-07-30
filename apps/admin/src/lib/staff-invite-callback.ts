@@ -3,6 +3,11 @@
  * (e.g. Site URL origin without /admin/invite → login shell).
  */
 
+const AUTH_SHELL_PATHS = new Set([
+  "/admin/invite",
+  "/admin/mfa",
+]);
+
 function readAuthCallbackType(url: URL): string | null {
   const fromQuery = url.searchParams.get("type");
   if (fromQuery) return fromQuery.toLowerCase();
@@ -14,6 +19,26 @@ function readAuthCallbackType(url: URL): string | null {
   return fromHash ? fromHash.toLowerCase() : null;
 }
 
+/** Strip Auth hash/query tokens after the browser session is established. */
+export function clearStaffInviteAuthCallbackFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  let changed = false;
+  if (url.hash) {
+    url.hash = "";
+    changed = true;
+  }
+  for (const key of ["code", "type", "token", "token_hash", "error", "error_description"]) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) {
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  }
+}
+
 /** True when the current URL carries an invite or recovery Auth callback. */
 export function isStaffInviteAuthCallback(locationLike: {
   pathname: string;
@@ -21,7 +46,8 @@ export function isStaffInviteAuthCallback(locationLike: {
   hash: string;
   href?: string;
 }): boolean {
-  if (locationLike.pathname === "/admin/invite") return false;
+  // Never yank the user off MFA / invite / login mid-flow when tokens linger in the hash.
+  if (AUTH_SHELL_PATHS.has(locationLike.pathname)) return false;
 
   let url: URL;
   try {
@@ -38,9 +64,6 @@ export function isStaffInviteAuthCallback(locationLike: {
     return true;
   }
 
-  // PKCE invite sometimes only has ?code= after verify when type was dropped.
-  // Only treat as invite callback when not already on login with a normal flow —
-  // require access_token in hash or explicit type above. code alone is too broad.
   const hash = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
   if (hash && new URLSearchParams(hash).has("access_token")) {
     return true;
@@ -50,7 +73,7 @@ export function isStaffInviteAuthCallback(locationLike: {
 }
 
 /**
- * If Auth dumped the user on `/` or `/admin/login` with invite tokens,
+ * If Auth dumped the user on `/` or a non-auth path with invite tokens,
  * hard-navigate to `/admin/invite` preserving query + hash (one-shot).
  */
 export function redirectStaffInviteAuthCallbackIfNeeded(): boolean {
@@ -64,7 +87,7 @@ export function redirectStaffInviteAuthCallbackIfNeeded(): boolean {
   return true;
 }
 
-// Run as early as this module loads so Auth hash tokens are not eaten on /admin/login first.
+// Run as early as this module loads so Auth hash tokens are not eaten on `/` first.
 if (typeof window !== "undefined") {
   redirectStaffInviteAuthCallbackIfNeeded();
 }

@@ -82,8 +82,22 @@ function AdminLayout() {
       navigate({ to: "/admin/login", replace: true });
       return;
     }
-    if (session && !isInviteRoute && session.status === "invited") {
+    // Do not trap aal2 (or MFA-in-progress) users on /admin/invite after a password reset.
+    if (
+      session &&
+      !isInviteRoute &&
+      !isMfaRoute &&
+      session.status === "invited" &&
+      session.aal !== "aal2" &&
+      !session.mfaRequired &&
+      session.nextStep !== "mfa_enroll" &&
+      session.nextStep !== "mfa_verify"
+    ) {
       navigate({ to: "/admin/invite", replace: true });
+      return;
+    }
+    if (session && session.status === "invited" && session.aal === "aal2" && !isInviteRoute) {
+      navigate({ to: "/admin", replace: true });
       return;
     }
     if (

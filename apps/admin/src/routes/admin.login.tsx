@@ -62,7 +62,12 @@ function AdminLoginPage() {
       navigate({ to: "/admin/mfa", replace: true });
       return;
     }
-    // Invited staff must finish /admin/invite before the main shell.
+    // Invited + aal2 should already be activated; never trap on /admin/invite.
+    if (session.status === "invited" && session.aal === "aal2") {
+      navigate({ to: "/admin", replace: true });
+      return;
+    }
+    // Invited staff who still need password/name onboarding (invite link / incomplete accept).
     if (session.status === "invited") {
       navigate({ to: "/admin/invite", replace: true });
       return;

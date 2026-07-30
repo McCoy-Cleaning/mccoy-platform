@@ -4,6 +4,7 @@ import { ShieldCheck } from "lucide-react";
 import {
   adminEstablishSession,
   completeAdminMfa,
+  refreshAdminSessionClient,
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
@@ -29,21 +30,50 @@ function AdminMfaPage() {
   const [code, setCode] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [enrollBusy, setEnrollBusy] = React.useState(false);
   const [mode, setMode] = React.useState<"enroll" | "verify">("enroll");
   const codeInputRef = React.useRef<HTMLInputElement>(null);
+  const enrollAttemptedForUser = React.useRef<string | null>(null);
+
+  const nextStep = session?.nextStep;
+  const userId = session?.userId ?? session?.username ?? null;
 
   React.useEffect(() => {
     if (!ready) return;
     if (!session) {
-      navigate({ to: "/admin/login", replace: true });
-      return;
+      let cancelled = false;
+      const recover = async () => {
+        const supabase = getAdminBrowserSupabase();
+        const browserSession = supabase
+          ? (await supabase.auth.getSession()).data.session
+          : null;
+        if (cancelled) return;
+        if (browserSession) {
+          const established = await adminEstablishSession({
+            data: {
+              accessToken: browserSession.access_token,
+              refreshToken: browserSession.refresh_token,
+              clientKey: browserSession.user.email ?? undefined,
+            },
+          });
+          if (cancelled) return;
+          if (established.ok) {
+            refreshAdminSessionClient();
+            return;
+          }
+        }
+        navigate({ to: "/admin/login", replace: true });
+      };
+      void recover();
+      return () => {
+        cancelled = true;
+      };
     }
     if (!session.mfaRequired && session.nextStep === "none" && session.aal === "aal2") {
       navigate({ to: "/admin", replace: true });
     }
   }, [ready, session, navigate]);
 
-  // autoFocus alone can miss when the field mounts after the loading shell.
   React.useEffect(() => {
     if (!ready || !session) return;
     const frame = window.requestAnimationFrame(() => {
@@ -53,37 +83,83 @@ function AdminMfaPage() {
   }, [ready, session, mode]);
 
   React.useEffect(() => {
-    if (!ready || !session) return;
-    const next = session.nextStep === "mfa_verify" ? "verify" : "enroll";
-    setMode(next);
+    if (!ready || !userId) return;
 
+    const next = nextStep === "mfa_verify" ? "verify" : "enroll";
+    setMode(next);
     if (next !== "enroll") return;
 
+    // Only one enroll attempt per user on this page — re-running cancels in-flight
+    // enroll and leaves orphan unverified factors (infinite spinner / disabled button).
+    if (enrollAttemptedForUser.current === userId) return;
+    enrollAttemptedForUser.current = userId;
+
     let cancelled = false;
+
     const startEnroll = async () => {
+      setEnrollBusy(true);
+      setError(null);
       const supabase = getAdminBrowserSupabase();
       if (!supabase) {
         setError("Supabase browserconfig ontbreekt.");
+        setEnrollBusy(false);
         return;
       }
+
+      // Invite registration may have cookies only — MFA APIs need the browser session.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setError(
+          "Sessie verlopen voor MFA. Log opnieuw in of open de uitnodigingslink opnieuw.",
+        );
+        setEnrollBusy(false);
+        return;
+      }
+
+      // Remove incomplete enrollments so a fresh QR can be issued.
+      const listed = await supabase.auth.mfa.listFactors();
+      const pending = [
+        ...(listed.data?.all ?? []),
+        ...(listed.data?.totp ?? []),
+      ].filter((factor, index, arr) => {
+        const first = arr.findIndex((f) => f.id === factor.id);
+        return first === index && factor.status !== "verified";
+      });
+      for (const factor of pending) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id }).catch(() => undefined);
+      }
+
+      const friendlyName = `McCoy Admin ${Date.now().toString(36)}`;
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "McCoy Admin",
+        friendlyName,
       });
       if (cancelled) return;
       if (enrollError || !data) {
-        setError(enrollError?.message || "MFA-aanmelding mislukt.");
+        enrollAttemptedForUser.current = null;
+        setError(
+          enrollError?.message ||
+            "MFA-aanmelding mislukt. Vernieuw de pagina of log opnieuw in.",
+        );
+        setEnrollBusy(false);
         return;
       }
       setFactorId(data.id);
       setQrCode(data.totp.qr_code);
       setSecret(data.totp.secret);
+      setEnrollBusy(false);
     };
+
     void startEnroll();
     return () => {
       cancelled = true;
+      // React Strict Mode runs effect → cleanup → effect. Reset so the second
+      // run can enroll; otherwise the first attempt is cancelled and never retried.
+      if (enrollAttemptedForUser.current === userId) {
+        enrollAttemptedForUser.current = null;
+      }
     };
-  }, [ready, session]);
+  }, [ready, userId, nextStep]);
 
   const syncCookiesFromBrowserSession = async () => {
     const supabase = getAdminBrowserSupabase();
@@ -153,6 +229,7 @@ function AdminMfaPage() {
         await completeAdminMfa().catch(() => undefined);
       }
 
+      refreshAdminSessionClient();
       navigate({ to: "/admin", replace: true });
     } catch {
       setError("MFA verifiëren mislukt.");
@@ -163,7 +240,10 @@ function AdminMfaPage() {
   if (!ready || !session) {
     return (
       <div className="admin-shell flex min-h-screen items-center justify-center text-white/60">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          <p className="text-sm">Sessie laden…</p>
+        </div>
       </div>
     );
   }
@@ -185,6 +265,13 @@ function AdminMfaPage() {
           onSubmit={onVerify}
           className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur-xl"
         >
+          {mode === "enroll" && enrollBusy && !qrCode && (
+            <div className="mb-4 flex flex-col items-center gap-3 py-6 text-sm text-white/60">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+              <p>QR-code voorbereiden…</p>
+            </div>
+          )}
+
           {mode === "enroll" && qrCode && (
             <div className="mb-4 flex flex-col items-center gap-3">
               <img
@@ -236,7 +323,7 @@ function AdminMfaPage() {
             disabled={busy || (mode === "enroll" && !factorId)}
             className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#1e88e5] to-[#7c3aed] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {busy ? "Bezig..." : "Bevestigen"}
+            {busy ? "Bezig..." : mode === "enroll" && !factorId ? "Even geduld…" : "Bevestigen"}
           </button>
 
           <button
