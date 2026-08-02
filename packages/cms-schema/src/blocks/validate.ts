@@ -243,13 +243,15 @@ function collectContentPublishErrors(block: Block): PublishValidationError[] {
           }),
         );
       }
-      const labeled = data.fields.filter((f) => f.text.trim().length > 0);
-      if (labeled.length === 0) {
-        errors.push(
-          err(PUBLISH_VALIDATION_CODES.CONTACT_FORM_FIELDS_REQUIRED, [...base, "fields"], {
-            blockType: block.type,
-          }),
-        );
+      const labeled = data.fields.filter((f) => f.label.trim().length > 0);
+      for (const field of labeled) {
+        if (field.type === "select" && !(field.options?.length ?? 0)) {
+          errors.push(
+            err(PUBLISH_VALIDATION_CODES.CONTACT_FORM_SELECT_OPTIONS_REQUIRED, [...base, "fields"], {
+              blockType: block.type,
+            }),
+          );
+        }
       }
     }
   }

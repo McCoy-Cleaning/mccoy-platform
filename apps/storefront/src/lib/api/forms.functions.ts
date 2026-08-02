@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { resolvePublishedFormScope, resolveVacancyApplication, type CmsPage } from "@mccoy/cms-schema";
+import {
+  resolvePublishedContactFormFields,
+  resolvePublishedFormScope,
+  resolveVacancyApplication,
+  validateContactFormSubmission,
+} from "@mccoy/cms-schema";
 import { websiteFormPayloadSchema } from "@mccoy/validation";
 
 /**
@@ -12,10 +17,8 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
   .validator(websiteFormPayloadSchema)
   .handler(async ({ data }) => {
     try {
-      const { getCmsStore } = await import("@mccoy/database/server");
-      const store = getCmsStore();
-      const revision = await store.getActivePublishedRevision(data.pageId);
-      const page = (revision?.payload ?? null) as CmsPage | null;
+      const { loadCmsPageForWebsiteForm } = await import("@mccoy/database/server");
+      const page = await loadCmsPageForWebsiteForm(data.pageId);
 
       const resolvedForm = resolvePublishedFormScope(page, {
         pageId: data.pageId,
@@ -36,30 +39,53 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
         scope: resolvedForm.form.scope ?? undefined,
       };
 
+      if (data.kind === "inquiry") {
+        const resolvedFields = resolvePublishedContactFormFields(page, data.sourceId);
+        if (resolvedFields.ok) {
+          const validated = validateContactFormSubmission(resolvedFields.fields, data.fields ?? {});
+          if (!validated.ok) {
+            return { ok: false as const, error: validated.reason, code: "validation" as const };
+          }
+          payload = { ...payload, fields: validated.sanitized };
+        }
+      }
+
       if (data.kind === "job_application") {
-        const resolved = resolveVacancyApplication(page, data.fields?.vacancyId);
+        const resolved = resolveVacancyApplication(page, data.fields?.vacancyId, new Date(), {
+          vacancySlug: data.fields?.vacancySlug,
+        });
 
         const hasJobsBlock = Boolean(page?.blocks?.some((b) => b.type === "jobs"));
         if (hasJobsBlock) {
           if (!resolved.ok) {
             return { ok: false as const, error: resolved.reason, code: "validation" as const };
           }
+          const {
+            vacancySlug: _vacancySlug,
+            vacancyTitleSnapshot: _vacancyTitleSnapshot,
+            role: _clientRole,
+            ...restFields
+          } = data.fields ?? {};
           payload = {
             ...payload,
             fields: {
-              ...data.fields,
+              ...restFields,
               vacancyId: resolved.fields.vacancyId,
-              vacancyTitleSnapshot: resolved.fields.vacancyTitleSnapshot,
               role: resolved.fields.vacancyTitleSnapshot,
             },
           };
         } else if (resolved.ok) {
+          const {
+            vacancySlug: _vacancySlug,
+            vacancyTitleSnapshot: _vacancyTitleSnapshot,
+            role: _clientRole,
+            ...restFields
+          } = data.fields ?? {};
           payload = {
             ...payload,
             fields: {
-              ...data.fields,
+              ...restFields,
               vacancyId: resolved.fields.vacancyId,
-              vacancyTitleSnapshot: resolved.fields.vacancyTitleSnapshot,
               role: resolved.fields.vacancyTitleSnapshot,
             },
           };

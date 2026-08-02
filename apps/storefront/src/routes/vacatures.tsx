@@ -6,6 +6,8 @@ import {
   normalizeJobs,
   allowLegacyVacancyFallback,
   warnLegacyVacancyFallback,
+  resolveVacancyPublicSlug,
+  slugifyVacancyTitle,
 } from "@mccoy/cms-schema";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
@@ -181,6 +183,7 @@ function VacaturesPageBody() {
           .filter((v) => v.visible)
           .map((v) => ({
             id: v.id,
+            slug: v.slug?.trim() || resolveVacancyPublicSlug(v),
             title: v.title,
             desc: v.shortDescription || v.department || v.location || "",
           }));
@@ -191,6 +194,7 @@ function VacaturesPageBody() {
         warnLegacyVacancyFallback("page_vacatures");
         return t.jobs.roles.map((r, i) => ({
           id: `legacy_${i}`,
+          slug: slugifyVacancyTitle(r.title),
           title: r.title,
           desc: r.desc,
         }));
@@ -200,6 +204,7 @@ function VacaturesPageBody() {
     if (allowLegacyVacancyFallback()) {
       return t.jobs.roles.map((r, i) => ({
         id: `legacy_${i}`,
+        slug: slugifyVacancyTitle(r.title),
         title: r.title,
         desc: r.desc,
       }));
@@ -210,6 +215,7 @@ function VacaturesPageBody() {
   const safeRoleIndex = Math.min(activeRoleIndex, Math.max(0, applicationRoles.length - 1));
   const selectedRole = applicationRoles[safeRoleIndex];
   const activeVacancyId = selectedRole?.id ?? "";
+  const activeVacancySlug = selectedRole?.slug ?? "";
   const activeRoleTitle = selectedRole?.title ?? "";
 
   return (
@@ -275,6 +281,7 @@ function VacaturesPageBody() {
                         form: e.currentTarget,
                         extras: {
                           vacancyId: activeVacancyId,
+                          vacancySlug: activeVacancySlug,
                           vacancyTitleSnapshot: activeRoleTitle,
                           // Legacy display field for email templates; server prefers vacancyId.
                           role: activeRoleTitle,

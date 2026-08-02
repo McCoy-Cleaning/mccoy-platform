@@ -43,15 +43,39 @@ export type EmailBrandLogoInput = {
   fallbackToProduction?: boolean;
 };
 
+function isPublicHttpOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    const host = url.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host.endsWith(".local") ||
+      host.endsWith(".localhost")
+    ) {
+      return false;
+    }
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Absolute logo URL for Graph/SMTP HTML.
- * Prefer EMAIL_BRAND_LOGO_URL, else storefront/CMS origin + path, else production.
+ * Prefer EMAIL_BRAND_LOGO_URL, else public storefront/CMS origin + path, else production.
+ * Localhost/private VITE_* origins are skipped — they break in email clients.
  */
 export function resolveEmailBrandLogoUrl(input: EmailBrandLogoInput = {}): string {
   const explicit = input.explicit?.trim();
   if (explicit) return explicit;
 
-  const origin = (input.storefrontOrigin || input.siteOrigin || "").trim().replace(/\/$/, "");
+  const storefrontOrigin = (input.storefrontOrigin || "").trim().replace(/\/$/, "");
+  const siteOrigin = (input.siteOrigin || "").trim().replace(/\/$/, "");
+  const origin = [storefrontOrigin, siteOrigin].find(isPublicHttpOrigin);
   if (origin) return `${origin}${EMAIL_BRAND_LOGO_PATH}`;
 
   if (input.fallbackToProduction !== false) {

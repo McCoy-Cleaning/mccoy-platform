@@ -14,6 +14,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminRecoverMfaRouteImport } from './routes/admin.recover-mfa'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminMfaRouteImport } from './routes/admin.mfa'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
@@ -47,6 +48,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRecoverMfaRoute = AdminRecoverMfaRouteImport.update({
+  id: '/recover-mfa',
+  path: '/recover-mfa',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/mfa': typeof AdminMfaRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/admin/mfa': typeof AdminMfaRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin': typeof AdminIndexRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/admin/mfa': typeof AdminMfaRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/mfa'
     | '/admin/products'
+    | '/admin/recover-mfa'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/mfa'
     | '/admin/products'
+    | '/admin/recover-mfa'
     | '/admin/settings'
     | '/admin/users'
     | '/admin'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/mfa'
     | '/admin/products'
+    | '/admin/recover-mfa'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/'
@@ -234,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/recover-mfa': {
+      id: '/admin/recover-mfa'
+      path: '/recover-mfa'
+      fullPath: '/admin/recover-mfa'
+      preLoaderRoute: typeof AdminRecoverMfaRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/products': {
@@ -308,6 +327,7 @@ interface AdminRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AdminMfaRoute: typeof AdminMfaRoute
   AdminProductsRoute: typeof AdminProductsRoute
+  AdminRecoverMfaRoute: typeof AdminRecoverMfaRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -323,6 +343,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AdminMfaRoute: AdminMfaRoute,
   AdminProductsRoute: AdminProductsRoute,
+  AdminRecoverMfaRoute: AdminRecoverMfaRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,

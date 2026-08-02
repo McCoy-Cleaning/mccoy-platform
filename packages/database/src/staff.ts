@@ -1,7 +1,7 @@
 import type { StaffAuditAction, StaffRole, StaffUserProfile, UserStatus } from "@mccoy/domain";
 import { normalizeEmail } from "@mccoy/domain";
 import { createSupabaseServiceClient } from "./supabase";
-import { messageIfPrivateSchemaMissing } from "./staff-policy";
+import { staffInvitationDbErrorMessage } from "./staff-policy";
 
 type UsersRow = {
   id: string;
@@ -219,6 +219,41 @@ export async function reinstateBlockedStaffUser(input: {
   return mapUser(data as UsersRow);
 }
 
+/**
+ * Access recovery for an active staff member who lost MFA: keep the same user id,
+ * role, and profile data; set status back to invited so they can re-enroll TOTP
+ * via /admin/recover-mfa (password unchanged). Caller must clear TOTP factors + sign out Auth.
+ */
+export async function prepareStaffAccessRecovery(input: {
+  userId: string;
+  fullName?: string | null;
+}): Promise<StaffUserProfile> {
+  return reinstateBlockedStaffUser(input);
+}
+
+export async function changeStaffRole(input: {
+  userId: string;
+  staffRole: StaffRole;
+}): Promise<StaffUserProfile> {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from("users")
+    .update({ staff_role: input.staffRole })
+    .eq("id", input.userId)
+    .eq("account_kind", "staff")
+    .select("*")
+    .single();
+  if (error) throw new Error(`changeStaffRole failed: ${error.message}`);
+  return mapUser(data as UsersRow);
+}
+
+/** Hard-delete an Auth user (public.users cascades via FK). Used for incomplete invites. */
+export async function deleteAuthStaffUser(userId: string): Promise<void> {
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+  if (error) throw new Error(`deleteAuthStaffUser failed: ${error.message}`);
+}
+
 /** Clear Auth ban so the reinstated user can sign in via invite/recovery again. */
 export async function unbanAuthUser(userId: string): Promise<void> {
   const supabase = createSupabaseServiceClient();
@@ -233,26 +268,35 @@ export async function unbanAuthUser(userId: string): Promise<void> {
  * Soft-fails when Admin MFA API is unavailable.
  */
 export async function deleteAuthTotpFactors(userId: string): Promise<number> {
+  return deleteAuthTotpFactorsExcept(userId);
+}
+
+/** Remove TOTP factors for a user, optionally keeping one verified factor (e.g. after self-service replace). */
+export async function deleteAuthTotpFactorsExcept(
+  userId: string,
+  keepFactorId?: string,
+): Promise<number> {
   try {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId });
     if (error || !data?.factors?.length) {
-      if (error) console.warn("deleteAuthTotpFactors list failed:", error.message);
+      if (error) console.warn("deleteAuthTotpFactorsExcept list failed:", error.message);
       return 0;
     }
     let deleted = 0;
     for (const factor of data.factors) {
+      if (keepFactorId && factor.id === keepFactorId) continue;
       const result = await supabase.auth.admin.mfa.deleteFactor({
         id: factor.id,
         userId,
       });
       if (!result.error) deleted += 1;
-      else console.warn("deleteAuthTotpFactors delete failed:", result.error.message);
+      else console.warn("deleteAuthTotpFactorsExcept delete failed:", result.error.message);
     }
     return deleted;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn("deleteAuthTotpFactors failed:", message);
+    console.warn("deleteAuthTotpFactorsExcept failed:", message);
     return 0;
   }
 }
@@ -267,6 +311,20 @@ export async function countActiveSuperAdmins(): Promise<number> {
     .eq("status", "active")
     .is("blocked_at", null);
   if (error) throw new Error(`countActiveSuperAdmins failed: ${error.message}`);
+  return count ?? 0;
+}
+
+/** Active + invited super_admins (for the max-2 promote cap). */
+export async function countRosterSuperAdmins(): Promise<number> {
+  const supabase = createSupabaseServiceClient();
+  const { count, error } = await supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("account_kind", "staff")
+    .eq("staff_role", "super_admin")
+    .in("status", ["active", "invited"])
+    .is("blocked_at", null);
+  if (error) throw new Error(`countRosterSuperAdmins failed: ${error.message}`);
   return count ?? 0;
 }
 
@@ -324,11 +382,14 @@ export async function writeStaffAudit(params: {
   }
 }
 
+export type StaffInvitationPurpose = "onboard" | "mfa_recovery";
+
 export type CreateStaffInvitationInput = {
   email: string;
   invitedBy: string;
   intendedRole?: StaffRole;
   expiresAt?: string | null;
+  purpose?: StaffInvitationPurpose;
 };
 
 export type StaffInvitationRow = {
@@ -336,6 +397,7 @@ export type StaffInvitationRow = {
   email: string;
   email_normalized: string;
   intended_role: StaffRole;
+  purpose: StaffInvitationPurpose;
   status: string;
   auth_user_id: string | null;
   invited_by: string;
@@ -347,36 +409,66 @@ export type StaffInvitationRow = {
   updated_at: string;
 };
 
+export function isStaffMfaRecoveryInvitation(invitation: StaffInvitationRow): boolean {
+  return invitation.purpose === "mfa_recovery";
+}
+
+/** Pending MFA recovery must finish via completeStaffMfaRecovery (accept invite + audit). */
+export function shouldDeferStaffActivationForMfaRecovery(
+  invitation: StaffInvitationRow | null | undefined,
+): boolean {
+  return Boolean(
+    invitation &&
+      isStaffMfaRecoveryInvitation(invitation) &&
+      invitation.status !== "accepted",
+  );
+}
+
+/** Profile + invitation state allowed for MFA recovery enrollment or completion. */
+export function isStaffMfaRecoveryProfileEligible(
+  profile: Pick<StaffUserProfile, "status">,
+  invitation: StaffInvitationRow,
+): boolean {
+  if (!isStaffMfaRecoveryInvitation(invitation)) return false;
+  if (profile.status === "invited") return true;
+  // Cookie sync can activate invited users at aal2 before completeStaffMfaRecovery runs.
+  if (profile.status === "active" && invitation.status !== "accepted") return true;
+  return false;
+}
+
 export async function createStaffInvitation(input: CreateStaffInvitationInput) {
   const supabase = createSupabaseServiceClient();
   const email = input.email.trim();
   const emailNormalized = normalizeEmail(email);
   const intendedRole = input.intendedRole ?? "admin";
+  const purpose = input.purpose ?? "onboard";
   if (intendedRole !== "admin") {
     throw new Error("Only admin invitations are allowed via invite flow.");
+  }
+
+  const insertRow: Record<string, unknown> = {
+    email,
+    email_normalized: emailNormalized,
+    intended_role: intendedRole,
+    status: "pending",
+    invited_by: input.invitedBy,
+    expires_at: input.expiresAt ?? null,
+  };
+  // onboard relies on DB default when the purpose column exists; omit the field so
+  // environments that have not yet applied 20260802170000_staff_invitation_purpose still work.
+  if (purpose !== "onboard") {
+    insertRow.purpose = purpose;
   }
 
   const { data, error } = await supabase
     .schema("private")
     .from("staff_invitations")
-    .insert({
-      email,
-      email_normalized: emailNormalized,
-      intended_role: intendedRole,
-      status: "pending",
-      invited_by: input.invitedBy,
-      expires_at: input.expiresAt ?? null,
-    })
+    .insert(insertRow)
     .select("*")
     .single();
 
   if (error) {
-    const privateHint = messageIfPrivateSchemaMissing(error.message);
-    throw new Error(
-      privateHint
-        ? `createStaffInvitation failed: ${privateHint}`
-        : `createStaffInvitation failed: ${error.message}`,
-    );
+    throw new Error(`createStaffInvitation failed: ${error.message}`);
   }
   return data as StaffInvitationRow;
 }
@@ -478,8 +570,9 @@ export async function revokeActiveStaffInvitationsForEmail(email: string): Promi
     .in("status", ["pending", "sent"])
     .select("id");
   if (error) {
-    console.warn("revokeActiveStaffInvitationsForEmail failed:", error.message);
-    return 0;
+    throw new Error(
+      `revokeActiveStaffInvitationsForEmail failed: ${staffInvitationDbErrorMessage(error.message)}`,
+    );
   }
   return data?.length ?? 0;
 }

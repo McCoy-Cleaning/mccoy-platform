@@ -7,6 +7,7 @@ import type {
   ContactFormContent,
   FixedSectionKey,
 } from "@mccoy/cms-schema";
+import { cmsTextOrFallback } from "@mccoy/cms-schema";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { localizedContactInfoContent } from "@/lib/cms-i18n";
 import { useI18n } from "@/lib/i18n";
@@ -108,6 +109,7 @@ export function ContactFormSection() {
   const [error, setError] = useState<string | null>(null);
 
   const heading = content.heading?.trim() || t.contact.title;
+  const intro = cmsTextOrFallback(content.body, t.contact.sub);
 
   return (
     <section
@@ -127,7 +129,7 @@ export function ContactFormSection() {
           <h2 className="font-display mt-4 text-3xl leading-tight text-foreground md:text-4xl lg:text-[2.75rem]">
             {heading}
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">{t.contact.sub}</p>
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">{intro}</p>
           <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
             <li className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">

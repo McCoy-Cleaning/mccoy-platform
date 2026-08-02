@@ -8,6 +8,10 @@
 
 import type { Locale } from "./locale";
 import type { PageSectionContent } from "./content";
+import {
+  shouldSyncParagraphStructure,
+  syncParagraphStructure,
+} from "./paragraph-structure";
 import type { Block, CmsPage } from "./types";
 
 export function enFieldDraftPath(
@@ -123,6 +127,42 @@ export function setValueAtDotPath(
   (cursor as Record<string, unknown>)[leaf] = value;
 }
 
+/** Read a dotted path previously written by {@link setValueAtDotPath}. */
+export function getValueAtDotPath(root: Record<string, unknown>, fieldPath: string): unknown {
+  const segments =
+    fieldPath.includes(":") && !fieldPath.includes(".")
+      ? fieldPath.split(":").filter(Boolean)
+      : fieldPath.split(".").filter(Boolean);
+  let cursor: unknown = root;
+  for (const key of segments) {
+    if (cursor == null || typeof cursor !== "object") return undefined;
+    if (Array.isArray(cursor)) {
+      const asIndex = Number.parseInt(key, 10);
+      if (String(asIndex) === key) {
+        cursor = cursor[asIndex];
+        continue;
+      }
+      cursor = cursor.find(
+        (item) =>
+          item != null &&
+          typeof item === "object" &&
+          !Array.isArray(item) &&
+          (item as Record<string, unknown>).id === key,
+      );
+      continue;
+    }
+    cursor = (cursor as Record<string, unknown>)[key];
+  }
+  return cursor;
+}
+
+function withSyncedParagraphStructure(nlValue: unknown, enValue: string): string {
+  if (typeof nlValue !== "string" || !shouldSyncParagraphStructure(nlValue, enValue)) {
+    return enValue;
+  }
+  return syncParagraphStructure(nlValue, enValue);
+}
+
 function applyDraftToSectionContent(
   sectionContent: PageSectionContent,
   sectionKey: string,
@@ -136,7 +176,8 @@ function applyDraftToSectionContent(
       ? (existing as Record<string, unknown>)
       : {};
   if (existing !== section) bag[sectionKey] = section;
-  setValueAtDotPath(section, field, value);
+  const nlValue = getValueAtDotPath(section, field);
+  setValueAtDotPath(section, field, withSyncedParagraphStructure(nlValue, value));
 }
 
 function applyDraftToBlocks(blocks: Block[], blockId: string, field: string, value: string): void {
@@ -146,7 +187,8 @@ function applyDraftToBlocks(blocks: Block[], blockId: string, field: string, val
     block.data != null && typeof block.data === "object" && !Array.isArray(block.data)
       ? ({ ...block.data } as Record<string, unknown>)
       : {};
-  setValueAtDotPath(data, field, value);
+  const nlValue = getValueAtDotPath(data, field);
+  setValueAtDotPath(data, field, withSyncedParagraphStructure(nlValue, value));
   block.data = data;
 }
 

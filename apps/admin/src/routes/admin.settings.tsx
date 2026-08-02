@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import * as React from "react";
 import {
   Settings,
@@ -17,17 +17,20 @@ import {
   Trash2,
   Bell,
   Monitor,
+  LifeBuoy,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/AdminBits";
 import { PasswordInput } from "@/components/admin/PasswordInput";
+import { StaffAuthenticatorReplacePanel } from "@/components/admin/StaffAuthenticatorReplacePanel";
 import { Switch } from "@/components/ui/switch";
 import { useAdminSession } from "@/lib/admin-auth";
 import { cn } from "@/lib/utils";
-import { inviteAdminFn } from "@/lib/api/staff-identity.functions";
+import { inviteAdminFn, recoverStaffAccountFn } from "@/lib/api/staff-identity.functions";
 import {
   changeStaffEmailFn,
   changeStaffPasswordFn,
+  changeStaffRoleFn,
   getStaffSettingsProfileFn,
   getSuperAdminSettingsOverviewFn,
   removeStaffMemberFn,
@@ -106,6 +109,7 @@ function formatWhen(iso: string): string {
 }
 
 function SettingsPage() {
+  const navigate = useNavigate();
   const { session } = useAdminSession();
   const isSuperAdmin = session?.staffRole === "super_admin";
 
@@ -140,6 +144,8 @@ function SettingsPage() {
   const [inviteMessage, setInviteMessage] = React.useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = React.useState<string | null>(null);
   const [removeMessage, setRemoveMessage] = React.useState<string | null>(null);
+  const [roleChangingUserId, setRoleChangingUserId] = React.useState<string | null>(null);
+  const [recoveringUserId, setRecoveringUserId] = React.useState<string | null>(null);
 
   const [preferences, setPreferences] = React.useState<AdminNotificationPreference[]>([]);
   const [prefState, setPrefState] = React.useState<"loading" | "ready" | "error">("loading");
@@ -355,26 +361,26 @@ function SettingsPage() {
       }
       setInviteEmail("");
       setInviteName("");
-      setInviteState("success");
       const reinstateHint = "reinstated" in result && result.reinstated
-        ? " Geblokkeerd account hersteld; 2FA moet opnieuw worden ingesteld."
+        ? " Geblokkeerd account hersteld; 2FA moet opnieuw worden ingesteld. Profiel en rol blijven behouden."
         : "";
       if ("emailDelivered" in result && result.emailDelivered === false) {
-        const rateHint =
-          "emailRateLimited" in result && result.emailRateLimited
-            ? " Supabase Auth e-maillimiet is bereikt — automatische mail werkt weer over ~1 uur."
-            : "";
+        setInviteState("error");
         const link =
           "inviteUrl" in result && typeof result.inviteUrl === "string" && result.inviteUrl
             ? result.inviteUrl
             : null;
+        const providerDetail =
+          "emailError" in result && typeof result.emailError === "string" && result.emailError
+            ? `\n\nTechnische details: ${result.emailError}`
+            : "";
         setInviteMessage(
           [
-            "Gebruiker toegevoegd. De automatische uitnodigingsmail is niet verzonden.",
-            rateHint.trim(),
+            "Gebruiker aangemaakt, maar de uitnodigingsmail is niet verzonden. Controleer Graph Mail.Send / SMTP en de map Verzonden items van GRAPH_MAILBOX.",
+            providerDetail.trim(),
             link
-              ? "Open deze eenmalige link in de browser (niet doorsturen via chat die de URL inkort). De link moet naar https://…/admin/invite gaan — niet naar supabase.co:"
-              : "Probeer later opnieuw voor een mail, of gebruik een ander e-mailadres.",
+              ? "Gebruik deze eenmalige link (niet doorsturen via chat die de URL inkort). De link moet naar https://…/admin/invite gaan — niet naar supabase.co:"
+              : "Probeer later opnieuw, of controleer de e-mailconfiguratie op de server.",
             link,
             reinstateHint.trim(),
           ]
@@ -382,14 +388,13 @@ function SettingsPage() {
             .join("\n\n"),
         );
       } else {
+        setInviteState("success");
         const deliveryHint =
           result.delivery === "graph"
-            ? "Uitnodiging verzonden via Microsoft Graph."
+            ? "Uitnodiging verzonden via Microsoft Graph. Controleer de inbox van de uitgenodigde (en spam). In GRAPH_MAILBOX staat een kopie onder Verzonden items."
             : result.delivery === "smtp"
-              ? "Uitnodiging verzonden (McCoy e-mail via SMTP)."
-              : result.delivery === "manual_link"
-                ? "Gebruiker toegevoegd. Deel de uitnodigingslink handmatig."
-                : "Uitnodiging verzonden via Supabase Auth. Controleer de inbox (en spam) van de uitgenodigde.";
+              ? "Uitnodiging verzonden via SMTP."
+              : "Gebruiker toegevoegd. Deel de uitnodigingslink handmatig.";
         setInviteMessage(deliveryHint + reinstateHint);
       }
       void loadOverview();
@@ -422,6 +427,93 @@ function SettingsPage() {
       setRemoveMessage("Verwijderen mislukt. Probeer het opnieuw.");
     } finally {
       setRemovingUserId(null);
+    }
+  }
+
+  async function onChangeStaffRole(
+    userId: string,
+    label: string,
+    nextRole: "admin" | "super_admin",
+  ) {
+    const promote = nextRole === "super_admin";
+    const confirmed = await appConfirm({
+      title: promote ? "Super admin-rechten geven?" : "Degraderen naar admin?",
+      description: promote
+        ? `${label}\n\nDeze medewerker krijgt dezelfde super_admin-rechten als jij (uitnodigen, verwijderen, rollen wijzigen).`
+        : `${label}\n\nDeze medewerker wordt een gewone admin en verliest super_admin-rechten.`,
+      confirmLabel: promote ? "Maak super admin" : "Degradeer",
+      tone: promote ? "warning" : "destructive",
+    });
+    if (!confirmed) return;
+
+    setRoleChangingUserId(userId);
+    setRemoveMessage(null);
+    try {
+      const result = await changeStaffRoleFn({
+        data: { targetUserId: userId, staffRole: nextRole },
+      });
+      if (!result.ok) {
+        setRemoveMessage(result.error);
+        return;
+      }
+      setRemoveMessage(
+        promote
+          ? "Medewerker is nu super admin."
+          : "Medewerker is gedegradeerd naar admin.",
+      );
+      void loadOverview();
+    } catch {
+      setRemoveMessage("Rol wijzigen mislukt. Probeer het opnieuw.");
+    } finally {
+      setRoleChangingUserId(null);
+    }
+  }
+
+  async function onRecoverStaffAccount(userId: string, label: string) {
+    const confirmed = await appConfirm({
+      title: "Account herstellen?",
+      description: `${label}\n\nMFA wordt gereset en alle sessies worden uitgelogd. De medewerker ontvangt een e-mail met een activatielink om wachtwoord te bevestigen en een nieuwe authenticator QR-code in te stellen. Profiel, rol en geschiedenis blijven behouden.`,
+      confirmLabel: "Herstel account",
+      tone: "warning",
+    });
+    if (!confirmed) return;
+
+    setRecoveringUserId(userId);
+    setRemoveMessage(null);
+    try {
+      const result = await recoverStaffAccountFn({
+        data: {
+          targetUserId: userId,
+          acceptOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (!result.ok) {
+        setRemoveMessage(result.error);
+        return;
+      }
+      if (result.emailDelivered) {
+        setRemoveMessage(
+          "Accountherstel gestart. De medewerker ontvangt een e-mail met een herstellink.",
+        );
+      } else {
+        const link =
+          "recoveryUrl" in result && typeof result.recoveryUrl === "string" && result.recoveryUrl
+            ? result.recoveryUrl
+            : null;
+        setRemoveMessage(
+          [
+            "MFA is gereset, maar de herstellink kon niet per e-mail worden verzonden.",
+            link ? `Deel deze eenmalige link veilig:\n${link}` : "Controleer de e-mailconfiguratie.",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+        );
+      }
+      void loadOverview();
+    } catch {
+      setRemoveMessage("Accountherstel mislukt. Probeer het opnieuw.");
+    } finally {
+      setRecoveringUserId(null);
     }
   }
 
@@ -621,6 +713,20 @@ function SettingsPage() {
                 </div>
               </form>
             </SettingsCard>
+
+            {profile.mfaActive && (
+              <SettingsCard
+                icon={Shield}
+                title="Tweestapsverificatie"
+                description="Koppel je authenticator opnieuw wanneer je de app opnieuw installeert."
+                className="lg:col-span-2"
+              >
+                <StaffAuthenticatorReplacePanel
+                  aal={session?.aal}
+                  onRequireMfa={() => navigate({ to: "/admin/mfa", replace: true })}
+                />
+              </SettingsCard>
+            )}
           </div>
 
           <SettingsCard
@@ -789,19 +895,28 @@ function SettingsPage() {
               <SettingsCard
                 icon={Users}
                 title="Medewerkers & login"
-                description="Rol, status en laatste update van actieve staff-accounts. Verwijderen blokkeert toegang (geen harde delete)."
+                description={`Maximaal ${overview.maxSuperAdmins ?? 2} super admins (jij + één backup). Nieuwe uitnodigingen starten als admin; promoveer hoogstens één andere persoon. Verwijderen blokkeert toegang (geen harde delete).`}
               >
                 {removeMessage && (
                   <p
                     className={cn(
                       "mb-3 text-xs",
-                      removeMessage.includes("verwijderd") ? "text-emerald-300" : "text-red-300",
+                      /verwijderd|super admin|gedegradeerd/i.test(removeMessage)
+                        ? "text-emerald-300"
+                        : "text-red-300",
                     )}
                     role="status"
                   >
                     {removeMessage}
                   </p>
                 )}
+                {(overview.rosterSuperAdminCount ?? 0) >= (overview.maxSuperAdmins ?? 2) ? (
+                  <p className="mb-3 text-xs text-amber-100/80" role="status">
+                    Super admin-limiet bereikt ({overview.rosterSuperAdminCount}/
+                    {overview.maxSuperAdmins}). Gebruik “Naar admin” om iemand te degraderen
+                    voordat je een andere super admin aanwijst.
+                  </p>
+                ) : null}
                 {overview.staffUsers.length === 0 ? (
                   <p className="text-sm text-white/50">Nog geen medewerkers gevonden.</p>
                 ) : (
@@ -821,6 +936,9 @@ function SettingsPage() {
                         {overview.staffUsers.map((u) => {
                           const isSelf = u.id === session?.userId || u.id === profile?.id;
                           const label = `${u.fullName || "—"} <${u.email}>`;
+                          const atSuperAdminCap =
+                            (overview.rosterSuperAdminCount ?? 0) >=
+                            (overview.maxSuperAdmins ?? 2);
                           return (
                             <tr key={u.id} className="border-b border-white/5 last:border-0">
                               <td className="py-2.5 pr-3 font-medium text-white/90">
@@ -852,19 +970,80 @@ function SettingsPage() {
                                 {isSelf ? (
                                   <span className="text-xs text-white/35">—</span>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    disabled={removingUserId === u.id}
-                                    onClick={() => void onRemoveStaff(u.id, label)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
-                                  >
-                                    {removingUserId === u.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    )}
-                                    Verwijderen
-                                  </button>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {u.staffRole === "admin" &&
+                                    u.status !== "blocked" &&
+                                    !atSuperAdminCap ? (
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          roleChangingUserId === u.id || removingUserId === u.id
+                                        }
+                                        onClick={() =>
+                                          void onChangeStaffRole(u.id, label, "super_admin")
+                                        }
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#1e88e5]/35 bg-[#1e88e5]/10 px-2.5 py-1 text-xs font-medium text-[#90caf9] transition hover:bg-[#1e88e5]/20 disabled:opacity-50"
+                                      >
+                                        {roleChangingUserId === u.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Shield className="h-3.5 w-3.5" />
+                                        )}
+                                        Super admin
+                                      </button>
+                                    ) : null}
+                                    {u.staffRole === "super_admin" && u.status !== "blocked" ? (
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          roleChangingUserId === u.id || removingUserId === u.id
+                                        }
+                                        onClick={() =>
+                                          void onChangeStaffRole(u.id, label, "admin")
+                                        }
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/75 transition hover:bg-white/10 disabled:opacity-50"
+                                      >
+                                        {roleChangingUserId === u.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Shield className="h-3.5 w-3.5" />
+                                        )}
+                                        Naar admin
+                                      </button>
+                                    ) : null}
+                                    {u.status === "active" ? (
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          recoveringUserId === u.id ||
+                                          removingUserId === u.id ||
+                                          roleChangingUserId === u.id
+                                        }
+                                        onClick={() => void onRecoverStaffAccount(u.id, label)}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-100 transition hover:bg-amber-500/20 disabled:opacity-50"
+                                      >
+                                        {recoveringUserId === u.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <LifeBuoy className="h-3.5 w-3.5" />
+                                        )}
+                                        Herstel account
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={removingUserId === u.id || roleChangingUserId === u.id}
+                                      onClick={() => void onRemoveStaff(u.id, label)}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+                                    >
+                                      {removingUserId === u.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      )}
+                                      Verwijderen
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -879,7 +1058,7 @@ function SettingsPage() {
               <SettingsCard
                 icon={UserPlus}
                 title="Beheerder uitnodigen"
-                description="Stuurt een Supabase Auth-uitnodiging met rol admin (geen privilege-escalatie naar super_admin)."
+                description="Nieuwe admins starten als admin; promoveer hoogstens één andere persoon tot super admin. Voor actieve medewerkers die MFA kwijt zijn: gebruik “Herstel account” in de tabel — niet dit formulier."
               >
                 <form onSubmit={onInvite} className="grid gap-3 sm:grid-cols-2">
                   <Field label="E-mail" htmlFor="inviteEmail">

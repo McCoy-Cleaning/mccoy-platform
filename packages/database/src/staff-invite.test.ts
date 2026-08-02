@@ -8,6 +8,7 @@ function invitation(overrides: Partial<StaffInvitationRow> = {}): StaffInvitatio
     email: "admin@example.com",
     email_normalized: "admin@example.com",
     intended_role: "admin",
+    purpose: "onboard",
     status: "sent",
     auth_user_id: "22222222-2222-2222-2222-222222222222",
     invited_by: "33333333-3333-3333-3333-333333333333",

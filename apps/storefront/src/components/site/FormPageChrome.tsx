@@ -66,7 +66,7 @@ function FormPageChromeSection({
         >
           {copy.heading}
         </motion.h1>
-        {copy.body ? <p className="mt-5 max-w-2xl font-bold text-white/65">{copy.body}</p> : null}
+        {copy.body ? <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">{copy.body}</p> : null}
         {content.image ? (
           <motion.div
             initial={{ opacity: 0, y: 16 }}

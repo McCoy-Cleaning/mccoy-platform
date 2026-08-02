@@ -18,6 +18,8 @@ import {
   FormInboxConfigError,
   FormInboxError,
   formInboxConfigHelpMessage,
+  deleteFormInboxMessage,
+  bulkDeleteFailureMessage,
   getFormInboxAttachment,
   getFormInboxMessage,
   getFormInboxThread,
@@ -30,6 +32,7 @@ import { AdminAuthError, assertInboxFetchRateLimit, assertReplyRateLimit } from 
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
   adminInboxAttachmentSchema,
+  adminInboxBulkDeleteSchema,
   adminInboxListSchema,
   adminInboxMessageIdSchema,
   adminInboxReplySchema,
@@ -41,6 +44,51 @@ import {
 
 function ensureInboxEnv(): void {
   ensureMonorepoEnvLoaded();
+}
+
+async function mergePersistedRepliesIntoThread(
+  thread: Awaited<ReturnType<typeof getFormInboxThread>>,
+  requestNumber: string | null | undefined,
+): Promise<Awaited<ReturnType<typeof getFormInboxThread>>> {
+  if (!requestNumber) return thread;
+
+  try {
+    const matches = await listWebsiteRequests({ q: requestNumber });
+    const summary = matches.find((item) => item.number === requestNumber);
+    if (!summary) return thread;
+
+    const request = await getWebsiteRequest(summary.id);
+    if (!request?.replies.length) return thread;
+
+    const existingBodies = new Set(
+      thread
+        .filter((item) => item.direction === "admin")
+        .map((item) => item.textBody.trim().toLowerCase()),
+    );
+
+    const extras = request.replies
+      .filter((reply) => !existingBodies.has(reply.body.trim().toLowerCase()))
+      .map((reply, index) => ({
+        id: `persisted-reply:${request.id}:${reply.id}`,
+        uid: 900_000 + index,
+        direction: "admin" as const,
+        from: reply.sentBy || "McCoy",
+        to: reply.toEmail,
+        date: reply.sentAt,
+        subject: `Re: ${request.subject}`,
+        textBody: reply.body,
+        messageId: reply.resendId ?? null,
+        attachments: [],
+      }));
+
+    if (extras.length === 0) return thread;
+
+    return [...thread, ...extras].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+  } catch {
+    return thread;
+  }
 }
 function authErrorResult(error: unknown) {
   if (error instanceof AdminAuthError) {
@@ -323,6 +371,8 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
         };
       }
 
+      // listFormInboxMessages merges mailbox + website_requests (by WR- number).
+      // Requests remain visible when the CMS form or mailbox copy is gone.
       let result: Awaited<ReturnType<typeof listFormInboxMessages>>;
       try {
         result = await listFormInboxMessages({
@@ -331,41 +381,35 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
           q: data.q,
           limit: data.limit,
         });
+        await reportMailboxConnectionOk();
       } catch (inboxError) {
         await reportMailboxConnectionFailed(inboxError);
         throw inboxError;
       }
-      await reportMailboxConnectionOk();
 
-      // Facets: mailbox window ∪ persisted website-request scopes (not limited to result page).
-      let storeScopes: Array<{ key: string; label: string; count: number }> = [];
+      const { buildAanvragenScopeFacets } = await import("@mccoy/email/contracts");
+      const { showAllGraphInboxMessages } = await import("@mccoy/email/server");
+      let publishedScopes: Array<{ key: string; label: string; count: number }> = [];
       try {
-        const requests = await listWebsiteRequests({ kind: "all", status: "all" });
-        const map = new Map<string, { label: string; count: number }>();
-        for (const r of requests) {
-          if (!r.scopeKey) continue;
-          const prev = map.get(r.scopeKey);
-          map.set(r.scopeKey, {
-            label: r.scopeLabel?.trim() || prev?.label || r.scopeKey,
-            count: (prev?.count ?? 0) + 1,
-          });
-        }
-        storeScopes = [...map.entries()].map(([key, v]) => ({
-          key,
-          label: v.label,
-          count: v.count,
-        }));
+        const { loadPublishedCmsPagesForFormScopes } = await import("@mccoy/database/server");
+        const { collectPublishedFormScopes } = await import("@mccoy/cms-schema");
+        const pages = await loadPublishedCmsPagesForFormScopes();
+        publishedScopes = collectPublishedFormScopes(pages);
       } catch {
-        storeScopes = [];
+        publishedScopes = [];
       }
 
-      const { mergeScopeFacets } = await import("@mccoy/email/contracts");
-      const scopes = mergeScopeFacets(storeScopes, result.facets.scopes);
+      const scopes = buildAanvragenScopeFacets({
+        published: publishedScopes,
+        mailbox: result.facets.scopes,
+        storeLabels: result.facets.scopes,
+      });
 
       return {
         ok: true as const,
         items: result.items,
         facets: { kinds: result.facets.kinds, scopes },
+        showAll: showAllGraphInboxMessages(),
       };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
@@ -422,8 +466,12 @@ export const getAdminFormInboxThread = createServerFn({ method: "POST" })
         };
       }
 
-      const thread = await getFormInboxThread(data.id);
-      return { ok: true as const, thread };
+      const [thread, message] = await Promise.all([
+        getFormInboxThread(data.id),
+        getFormInboxMessage(data.id),
+      ]);
+      const merged = await mergePersistedRepliesIntoThread(thread, message?.requestNumber ?? null);
+      return { ok: true as const, thread: merged };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
         return { ok: false as const, error: error.message, code: "rate_limit" as const };
@@ -514,6 +562,36 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         return { ok: false as const, error: sent.error, code: "provider" as const };
       }
 
+      // Persist so Gesprek shows the reply even when mailbox threading lags
+      // (Graph sendMail often starts a new conversationId).
+      if (message.requestNumber) {
+        try {
+          const matches = await listWebsiteRequests({ q: message.requestNumber });
+          const match = matches.find((item) => item.number === message.requestNumber);
+          if (match) {
+            await appendWebsiteRequestReply(
+              match.id,
+              {
+                body: data.body,
+                sentAt: new Date().toISOString(),
+                sentBy: session.username,
+                toEmail: message.submitterEmail,
+                resendId: sent.resendId ?? sent.messageId,
+              },
+              "replied",
+            );
+          }
+        } catch (persistError) {
+          console.error("[admin-requests] failed to persist inbox reply", {
+            requestNumber: message.requestNumber,
+            message:
+              persistError instanceof Error
+                ? persistError.message.slice(0, 160)
+                : "unknown",
+          });
+        }
+      }
+
       return {
         ok: true as const,
         toEmail: message.submitterEmail,
@@ -524,5 +602,120 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         return { ok: false as const, error: error.message, code: "rate_limit" as const };
       }
       return inboxErrorResult(error);
+    }
+  });
+
+export const deleteAdminFormInboxMessage = createServerFn({ method: "POST" })
+  .validator(adminInboxMessageIdSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureInboxEnv();
+      const session = await requireAdminSession();
+      assertReplyRateLimit(session.username);
+
+      if (!isFormInboxConfigured()) {
+        return {
+          ok: false as const,
+          error: formInboxConfigHelpMessage(),
+          code: "config" as const,
+        };
+      }
+
+      await deleteFormInboxMessage(data.id);
+      return { ok: true as const };
+    } catch (error) {
+      if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
+        return { ok: false as const, error: error.message, code: "rate_limit" as const };
+      }
+      return inboxErrorResult(error);
+    }
+  });
+
+export const bulkDeleteAdminFormInboxMessages = createServerFn({ method: "POST" })
+  .validator(adminInboxBulkDeleteSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureInboxEnv();
+      const session = await requireAdminSession();
+      assertReplyRateLimit(session.username);
+
+      if (!isFormInboxConfigured()) {
+        return {
+          ok: false as const,
+          error: formInboxConfigHelpMessage(),
+          code: "config" as const,
+          deletedCount: 0,
+          deletedIds: [] as string[],
+          failures: [] as { id: string; error: string }[],
+        };
+      }
+
+      const deletedIds: string[] = [];
+      const failures: { id: string; error: string }[] = [];
+
+      for (const id of data.ids) {
+        try {
+          await deleteFormInboxMessage(id);
+          deletedIds.push(id);
+        } catch (error) {
+          if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
+            failures.push({ id, error: error.message });
+            break;
+          }
+          try {
+            const mapped = inboxErrorResult(error);
+            failures.push({ id, error: mapped.error });
+          } catch {
+            failures.push({ id, error: "Verwijderen mislukt." });
+          }
+        }
+      }
+
+      const deletedCount = deletedIds.length;
+      if (deletedCount === 0) {
+        return {
+          ok: false as const,
+          error: bulkDeleteFailureMessage(0, failures),
+          code: failures.some((f) => f.error.includes("Te veel"))
+            ? ("rate_limit" as const)
+            : ("provider" as const),
+          deletedCount: 0,
+          deletedIds,
+          failures,
+        };
+      }
+
+      return {
+        ok: true as const,
+        deletedCount,
+        deletedIds,
+        failures,
+        ...(failures.length > 0
+          ? { partial: true as const, error: bulkDeleteFailureMessage(deletedCount, failures) }
+          : {}),
+      };
+    } catch (error) {
+      if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
+        return {
+          ok: false as const,
+          error: error.message,
+          code: "rate_limit" as const,
+          deletedCount: 0,
+          deletedIds: [] as string[],
+          failures: [] as { id: string; error: string }[],
+        };
+      }
+      const mapped = inboxErrorResult(error);
+      if (mapped && typeof mapped === "object" && "error" in mapped) {
+        return {
+          ok: false as const,
+          error: mapped.error,
+          code: "code" in mapped ? mapped.code : ("provider" as const),
+          deletedCount: 0,
+          deletedIds: [] as string[],
+          failures: [] as { id: string; error: string }[],
+        };
+      }
+      throw error;
     }
   });

@@ -15,6 +15,9 @@ import {
 } from "@mccoy/security";
 
 import { FormSubmitError } from "./form-submit-error";
+import { shouldAttemptGraphMail } from "./form-inbox-provider";
+import { isGraphMailConfigured } from "./graph-config";
+import { sendGraphAdminReply } from "./graph-mail";
 import { defaultTransactionalFrom, isSmtpConfigured, sendSmtpMail } from "./smtp";
 import { buildFormEmail } from "./templates";
 
@@ -65,9 +68,23 @@ function filterAttachments(attachments: FormAttachment[] | undefined): FormAttac
   return accepted;
 }
 
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 /**
  * Persist a structured admin request, then queue/send the staff notification.
- * Persistence succeeds even when email delivery fails.
+ * Prefer Microsoft Graph Mail.Send (as GRAPH_MAILBOX) over SMTP — avoids M365
+ * SMTP AUTH / MFA issues. Persistence succeeds even when email delivery fails.
  */
 export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise<{ ok: true }> {
   if (isHoneypotTriggered(payload.website)) {
@@ -155,40 +172,88 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   );
 
   const config = getFormEmailConfig();
-  if (process.env.MCCOY_E2E === "1" || !isSmtpConfigured()) {
+  const subject = `${email.subject} (${request.number})`;
+  const text = htmlToPlainText(email.html);
+  const headers: Record<string, string> = {
+    "X-McCoy-Form-Kind": kind,
+    "X-McCoy-Form-Id": formId,
+    "X-McCoy-Form-Submission-Id": request.number,
+    "X-McCoy-Submitter-Email": fields.email.trim().toLowerCase(),
+  };
+  if (scope?.key) {
+    headers["X-McCoy-Form-Scope-Key"] = scope.key;
+  }
+  if (scope?.label) {
+    headers["X-McCoy-Form-Scope-Label"] = sanitizeScopeForSubject(scope.label);
+  }
+
+  if (process.env.MCCOY_E2E === "1") {
     await updateRequestNotification(
       request.id,
-      process.env.MCCOY_E2E === "1" ? "skipped" : "failed",
-      process.env.MCCOY_E2E === "1"
-        ? "E2E: SMTP notification skipped (deterministic inbox)"
-        : "SMTP is not configured (SMTP_* or FORM_INBOX_USER/PASS)",
+      "skipped",
+      "E2E: email notification skipped (deterministic inbox)",
     );
-    if (process.env.MCCOY_E2E !== "1") {
-      console.warn("[forms] request persisted without email notification", {
-        id: request.id,
-        number: request.number,
-      });
-    }
+    return { ok: true };
+  }
+
+  const canGraph = shouldAttemptGraphMail() && isGraphMailConfigured();
+  const canSmtp = isSmtpConfigured();
+
+  if (!canGraph && !canSmtp) {
+    await updateRequestNotification(
+      request.id,
+      "failed",
+      "Geen e-mailkanaal: configureer Microsoft Graph (Mail.Send) of SMTP_*.",
+    );
+    console.warn("[forms] request persisted without email notification", {
+      id: request.id,
+      number: request.number,
+    });
     return { ok: true };
   }
 
   try {
-    const headers: Record<string, string> = {
-      "X-McCoy-Form-Kind": kind,
-      "X-McCoy-Form-Id": formId,
-      "X-McCoy-Form-Submission-Id": request.number,
-    };
-    if (scope?.key) {
-      headers["X-McCoy-Form-Scope-Key"] = scope.key;
-    }
-    if (scope?.label) {
-      headers["X-McCoy-Form-Scope-Label"] = sanitizeScopeForSubject(scope.label);
+    if (canGraph) {
+      const sent = await sendGraphAdminReply({
+        to: config.to,
+        subject,
+        html: email.html,
+        text,
+        replyTo: fields.email,
+        headers,
+        // Form notifications to the shared mailbox must not also land in Sent Items
+        // (saveToSentItems would duplicate the same submission in Aanvragen).
+        saveToSentItems: false,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          contentBase64: a.contentBase64,
+          contentType: a.contentType,
+        })),
+      });
+
+      if (sent.ok) {
+        await updateRequestNotification(request.id, "sent");
+        return { ok: true };
+      }
+
+      console.error("[forms] Graph send failed", {
+        detail: sent.error.slice(0, 300),
+        kind,
+        to: config.to,
+        requestId: request.id,
+      });
+
+      if (!canSmtp) {
+        await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
+        return { ok: true };
+      }
+      console.error("[forms] falling back to SMTP after Graph failure");
     }
 
     const sent = await sendSmtpMail({
       from: config.from,
       to: config.to,
-      subject: `${email.subject} (${request.number})`,
+      subject,
       html: email.html,
       replyTo: fields.email,
       headers,

@@ -15,13 +15,28 @@ export { sendAdminReplyEmail } from "./send-reply";
 export {
   buildStaffInviteEmail,
   buildStaffInviteSupabaseAuthTemplate,
+  buildStaffPasswordResetEmail,
+  buildStaffAccountRecoveryEmail,
   sendStaffInviteEmail,
+  sendStaffPasswordResetEmail,
+  sendStaffAccountRecoveryEmail,
   isStaffInviteEmailConfigured,
+  staffAuthEmailConfigErrorMessage,
   shouldPreferBrandedStaffInviteFirst,
   type StaffInviteEmailInput,
+  type StaffPasswordResetEmailInput,
+  type StaffAccountRecoveryEmailInput,
   type StaffInviteDelivery,
   type SendStaffInviteEmailResult,
 } from "./staff-invite";
+export {
+  buildStaffAuthAppLink,
+  normalizeStaffAuthAppLinkType,
+  resolveStaffAuthEmailLink,
+  withInviteRedirectTo,
+  type StaffAuthAppLinkType,
+  type StaffAuthGenerateLinkProperties,
+} from "./staff-auth-app-link";
 export {
   EMAIL_BRAND,
   EMAIL_BRAND_LOGO_PATH,
@@ -35,12 +50,24 @@ export {
   type TransactionalEmailLayoutInput,
 } from "./transactional-layout";
 export {
+  EMAIL_BRAND_LOGO_CID,
+  embedBrandLogoCidInHtml,
+  loadEmailBrandLogoAttachment,
+  prepareStaffEmailHtmlForDelivery,
+  resolveStaffEmailRecipientName,
+  staffEmailBrandLogoUrl,
+  staffEmailGreeting,
+  type EmailBrandLogoAttachment,
+  type PreparedStaffEmailDelivery,
+} from "./email-brand-logo";
+export {
   FormInboxConfigError,
   FormInboxError,
   decodeInboxMessageId,
   encodeInboxMessageId,
   encodeGraphMessageId,
   encodeImapMessageId,
+  deleteFormInboxMessage,
   getFormInboxAttachment,
   getFormInboxMessage,
   getFormInboxThread,
@@ -55,6 +82,15 @@ export {
 } from "./form-inbox";
 export { isGraphMailConfigured, getGraphMailConfig } from "./graph-config";
 export {
+  classifyGraphThreadDirection,
+  formKindFromInternetHeaders,
+  hasMcCoyFormMarkerHeaders,
+  isMcCoyWebsiteFormNotificationGraph,
+  isReplyOrForwardSubject,
+  looksLikeFormCandidate,
+  showAllGraphInboxMessages,
+} from "./graph-mail";
+export {
   formInboxConfigHelpMessage,
   getFormInboxProviderMode,
   shouldAllowImapInbox,
@@ -64,6 +100,7 @@ export {
 } from "./form-inbox-provider";
 export { clearGraphAccessTokenCache } from "./graph-auth";
 export { INBOX_MESSAGE_ID_PATTERN } from "./inbox-message-id";
+export { bulkDeleteFailureMessage, type InboxBulkDeleteFailure } from "./inbox-delete-errors";
 /** Re-export pure helpers so server consumers can import one entry when needed. */
 export { buildFormEmail, escapeHtml } from "./templates";
 export {

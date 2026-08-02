@@ -1,9 +1,14 @@
-import { normalizeJobs, type VacancyItem } from "./jobs";
+import { normalizeJobs, resolveVacancyPublicSlug, type VacancyItem } from "./jobs";
 import type { CmsPage } from "../types";
 
 export type VacancyApplicationFields = {
   vacancyId: string;
   vacancyTitleSnapshot: string;
+};
+
+export type ResolveVacancyApplicationOptions = {
+  /** Public slug when the client id is stale (seed vs published mismatch). */
+  vacancySlug?: string;
 };
 
 export type ResolveVacancyApplicationResult =
@@ -19,6 +24,34 @@ export function findVacaturesJobsBlock(page: CmsPage | null | undefined) {
   return page.blocks.find((b) => b.type === "jobs") ?? null;
 }
 
+function findVacancyInJobs(
+  vacancies: VacancyItem[],
+  vacancyId: string,
+  options?: ResolveVacancyApplicationOptions,
+): VacancyItem | undefined {
+  const byId = vacancies.find((v) => v.id === vacancyId);
+  if (byId) return byId;
+
+  const slugHint = options?.vacancySlug?.trim();
+  if (slugHint) {
+    const bySlug = vacancies.find(
+      (v) => v.slug === slugHint || resolveVacancyPublicSlug(v) === slugHint,
+    );
+    if (bySlug) return bySlug;
+  }
+
+  // Legacy i18n role cards (`legacy_0`, …) when the storefront still renders static roles.
+  if (vacancyId.startsWith("legacy_")) {
+    const index = Number.parseInt(vacancyId.slice("legacy_".length), 10);
+    if (Number.isFinite(index) && index >= 0) {
+      const visible = vacancies.filter((v) => v.visible);
+      if (index < visible.length) return visible[index];
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Validate a job application against the published vacatures jobs block.
  * Does not trust client-supplied titles; snapshot is taken from the published vacancy.
@@ -27,6 +60,7 @@ export function resolveVacancyApplication(
   page: CmsPage | null | undefined,
   vacancyId: string | undefined,
   now = new Date(),
+  options?: ResolveVacancyApplicationOptions,
 ): ResolveVacancyApplicationResult {
   const id = typeof vacancyId === "string" ? vacancyId.trim() : "";
   if (!id) {
@@ -39,7 +73,7 @@ export function resolveVacancyApplication(
   }
 
   const jobs = normalizeJobs(block.data);
-  const vacancy = jobs.vacancies.find((v) => v.id === id);
+  const vacancy = findVacancyInJobs(jobs.vacancies, id, options);
   if (!vacancy) {
     return { ok: false, reason: "De geselecteerde vacature bestaat niet meer." };
   }

@@ -104,3 +104,46 @@ export function mergeScopeFacets(
   }
   return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "nl"));
 }
+
+/**
+ * Scope tabs for Aanvragen (mailbox UI).
+ *
+ * - Count = listable mailbox messages only (never inflate from orphan DB rows).
+ * - Keep tabs for published form scopes (even at 0) so operators see active routing.
+ * - Keep tabs for scopes that still have mailbox hits after a form was deleted.
+ * - Drop store-only scopes with 0 mailbox hits (deleted form + mail gone → no ghost tab).
+ */
+export function buildAanvragenScopeFacets(input: {
+  published: InboxScopeFacet[];
+  mailbox: InboxScopeFacet[];
+  /** Labels only — request-store counts are not shown on the mailbox list. */
+  storeLabels?: InboxScopeFacet[];
+}): InboxScopeFacet[] {
+  const labels = new Map<string, string>();
+  for (const facet of [
+    ...(input.storeLabels ?? []),
+    ...input.published,
+    ...input.mailbox,
+  ]) {
+    const label = facet.label.trim() || facet.key;
+    if (!labels.has(facet.key) || label !== facet.key) {
+      labels.set(facet.key, label);
+    }
+  }
+
+  const mailboxCount = new Map(
+    input.mailbox.map((facet) => [facet.key, facet.count] as const),
+  );
+  const keys = new Set<string>([
+    ...input.published.map((facet) => facet.key),
+    ...mailboxCount.keys(),
+  ]);
+
+  return [...keys]
+    .map((key) => ({
+      key,
+      label: labels.get(key) || key,
+      count: mailboxCount.get(key) ?? 0,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "nl"));
+}

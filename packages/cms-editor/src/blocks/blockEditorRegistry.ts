@@ -256,7 +256,18 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
   contactForm: def(
     ContactFormBlockEditor as ComponentType<BlockEditorProps<ContactFormBlockData>>,
     "dedicated",
-    ["title", "fields", "fields.id", "fields.text", "confirmation"],
+    [
+      "title",
+      "body",
+      "fields",
+      "fields.id",
+      "fields.label",
+      "fields.type",
+      "fields.required",
+      "fields.options",
+      "fields.options.id",
+      "fields.options.label",
+    ],
     {
       recipient:
         "Ontvanger is server-config (FORM_TO_EMAIL); browser mag geen willekeurig adres kiezen.",

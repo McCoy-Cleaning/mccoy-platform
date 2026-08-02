@@ -356,6 +356,23 @@ export function assertStaffInviteRateLimit(actorKey: string, limit = 8, windowMs
   }
 }
 
+/** Super-admin MFA account recovery for staff who lost their authenticator. */
+export function assertStaffRecoveryRateLimit(actorKey: string, limit = 5, windowMs = 60 * 60_000): void {
+  try {
+    assertRateLimit(
+      `admin-staff-recovery:${actorKey}`,
+      limit,
+      windowMs,
+      "Te veel accountherstel-pogingen. Wacht even en probeer opnieuw.",
+    );
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      throw new AdminAuthError(error.message);
+    }
+    throw error;
+  }
+}
+
 /** Invitee completing registration (password / name) after Auth invite. */
 export function assertStaffInviteAcceptRateLimit(userKey: string, limit = 10, windowMs = 15 * 60_000): void {
   try {
@@ -364,6 +381,23 @@ export function assertStaffInviteAcceptRateLimit(userKey: string, limit = 10, wi
       limit,
       windowMs,
       "Te veel pogingen. Wacht even en probeer opnieuw.",
+    );
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      throw new AdminAuthError(error.message);
+    }
+    throw error;
+  }
+}
+
+/** Self-service staff password reset (login page). */
+export function assertStaffPasswordResetRateLimit(emailKey: string, limit = 5, windowMs = 60 * 60_000): void {
+  try {
+    assertRateLimit(
+      `admin-staff-password-reset:${emailKey}`,
+      limit,
+      windowMs,
+      "Te veel wachtwoordreset-verzoeken. Wacht even en probeer opnieuw.",
     );
   } catch (error) {
     if (error instanceof RateLimitError) {

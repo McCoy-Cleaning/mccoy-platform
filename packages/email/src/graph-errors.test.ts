@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatGraphApiError, formatGraphTokenError } from "./graph-errors";
+import {
+  formatGraphApiError,
+  formatGraphMailWriteError,
+  formatGraphTokenError,
+} from "./graph-errors";
 
 describe("formatGraphTokenError", () => {
   it("guides on invalid client secret", () => {
@@ -43,6 +47,7 @@ describe("formatGraphApiError", () => {
       mailbox: "sander@mccoy.nl",
     });
     expect(msg).toMatch(/Mail\.Read/);
+    expect(msg).toMatch(/Mail\.ReadWrite/);
     expect(msg).toMatch(/Application Access Policy/);
     expect(msg).toMatch(/sander@mccoy\.nl/);
   });
@@ -67,5 +72,18 @@ describe("formatGraphApiError", () => {
     });
     expect(msg).toMatch(/GRAPH_MAILBOX/);
     expect(msg).toMatch(/missing@mccoy\.nl/);
+  });
+});
+
+describe("formatGraphMailWriteError", () => {
+  it("calls out Mail.ReadWrite for delete/move 403", () => {
+    const msg = formatGraphMailWriteError({
+      status: 403,
+      code: "ErrorAccessDenied",
+      detail: "Access is denied.",
+      mailbox: "info@mccoy.nl",
+    });
+    expect(msg).toMatch(/Mail\.ReadWrite/);
+    expect(msg).toMatch(/Verwijderen uit Aanvragen/i);
   });
 });

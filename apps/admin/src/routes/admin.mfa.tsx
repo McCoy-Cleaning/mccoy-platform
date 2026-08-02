@@ -8,10 +8,20 @@ import {
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
+import { adminHydrateBrowserAuthFromCookies } from "@/lib/api/admin-auth.functions";
+import { completeStaffMfaRecoveryFn } from "@/lib/api/staff-identity.functions";
+import { hydrateBrowserSupabaseSession } from "@/lib/hydrate-browser-supabase-session";
 import { getAdminBrowserSupabase } from "@/lib/supabase-browser";
 import logoUrl from "@/assets/logo-mccoy.png";
 
+type MfaSearch = {
+  recovery?: string;
+};
+
 export const Route = createFileRoute("/admin/mfa")({
+  validateSearch: (search: Record<string, unknown>): MfaSearch => ({
+    recovery: typeof search.recovery === "string" ? search.recovery : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "MFA — McCoy Admin" },
@@ -23,6 +33,8 @@ export const Route = createFileRoute("/admin/mfa")({
 
 function AdminMfaPage() {
   const navigate = useNavigate();
+  const { recovery } = Route.useSearch();
+  const isRecoveryFlow = recovery === "1";
   const { session, ready } = useAdminSession();
   const [factorId, setFactorId] = React.useState<string | null>(null);
   const [qrCode, setQrCode] = React.useState<string | null>(null);
@@ -43,6 +55,18 @@ function AdminMfaPage() {
     if (!session) {
       let cancelled = false;
       const recover = async () => {
+        // Prefer HttpOnly cookies from server-side invite exchange (mobile-safe).
+        const fromCookies = await adminHydrateBrowserAuthFromCookies();
+        if (cancelled) return;
+        if (fromCookies.ok) {
+          await hydrateBrowserSupabaseSession({
+            accessToken: fromCookies.accessToken,
+            refreshToken: fromCookies.refreshToken,
+          });
+          refreshAdminSessionClient();
+          return;
+        }
+
         const supabase = getAdminBrowserSupabase();
         const browserSession = supabase
           ? (await supabase.auth.getSession()).data.session
@@ -106,8 +130,18 @@ function AdminMfaPage() {
         return;
       }
 
-      // Invite registration may have cookies only — MFA APIs need the browser session.
-      const { data: sessionData } = await supabase.auth.getSession();
+      // Invite exchange sets HttpOnly cookies; hydrate supabase-js for MFA enroll APIs.
+      let { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        const fromCookies = await adminHydrateBrowserAuthFromCookies();
+        if (fromCookies.ok) {
+          await hydrateBrowserSupabaseSession({
+            accessToken: fromCookies.accessToken,
+            refreshToken: fromCookies.refreshToken,
+          });
+          sessionData = (await supabase.auth.getSession()).data;
+        }
+      }
       if (!sessionData.session) {
         setError(
           "Sessie verlopen voor MFA. Log opnieuw in of open de uitnodigingslink opnieuw.",
@@ -217,6 +251,20 @@ function AdminMfaPage() {
         return;
       }
 
+      if (isRecoveryFlow) {
+        const completed = await completeStaffMfaRecoveryFn();
+        if (!completed.ok) {
+          setError(completed.error);
+          setBusy(false);
+          return;
+        }
+
+        await signOutAdmin();
+        refreshAdminSessionClient();
+        navigate({ to: "/admin/login", search: { recovered: "1" }, replace: true });
+        return;
+      }
+
       const cookiesOk = await syncCookiesFromBrowserSession();
       if (!cookiesOk) {
         const completed = await completeAdminMfa();
@@ -252,11 +300,15 @@ function AdminMfaPage() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div className="w-full max-w-md animate-fade-in">
         <div className="mb-8 flex flex-col items-center text-center">
-          <img src={logoUrl} alt="McCoy Cleaning" className="mb-5 h-14 w-auto object-contain sm:h-16" />
-          <h1 className="text-2xl font-bold tracking-tight text-white">Tweestapsverificatie</h1>
+          <img src={logoUrl} alt="McCoy Cleaning" className="mb-5 h-20 w-auto object-contain sm:h-24" />
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {isRecoveryFlow ? "Nieuwe authenticator koppelen" : "Tweestapsverificatie"}
+          </h1>
           <p className="mt-1 text-sm text-white/60">
             {mode === "enroll"
-              ? "Scan de QR-code met je authenticator-app en voer de code in."
+              ? isRecoveryFlow
+                ? "Scan de QR-code met je authenticator-app en voer de code in. Daarna log je opnieuw in met je bestaande wachtwoord."
+                : "Scan de QR-code met je authenticator-app en voer de code in."
               : "Voer de code uit je authenticator-app in."}
           </p>
         </div>
@@ -272,7 +324,7 @@ function AdminMfaPage() {
             </div>
           )}
 
-          {mode === "enroll" && qrCode && (
+          {mode === "enroll" && qrCode ? (
             <div className="mb-4 flex flex-col items-center gap-3">
               <img
                 src={qrCode}
@@ -284,30 +336,53 @@ function AdminMfaPage() {
                   Handmatige sleutel: <code className="text-white/80">{secret}</code>
                 </p>
               )}
+              <label className="block w-full max-w-xs" htmlFor="mfa-code">
+                <span className="mb-1.5 block text-xs font-medium text-white/70">
+                  Authenticatiecode
+                </span>
+                <div className="relative">
+                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                  <input
+                    ref={codeInputRef}
+                    id="mfa-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                    maxLength={12}
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-10 py-2.5 text-sm tracking-widest text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+                    placeholder="000000"
+                  />
+                </div>
+              </label>
             </div>
+          ) : (
+            <label className="mb-4 block" htmlFor="mfa-code">
+              <span className="mb-1.5 block text-xs font-medium text-white/70">Authenticatiecode</span>
+              <div className="relative">
+                <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                <input
+                  ref={codeInputRef}
+                  id="mfa-code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  maxLength={12}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-10 py-2.5 text-sm tracking-widest text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+                  placeholder="000000"
+                />
+              </div>
+            </label>
           )}
-
-          <label className="mb-4 block" htmlFor="mfa-code">
-            <span className="mb-1.5 block text-xs font-medium text-white/70">Authenticatiecode</span>
-            <div className="relative">
-              <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-              <input
-                ref={codeInputRef}
-                id="mfa-code"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                autoComplete="one-time-code"
-                autoFocus
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-                maxLength={12}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-10 py-2.5 text-sm tracking-widest text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
-                placeholder="000000"
-              />
-            </div>
-          </label>
 
           {error && (
             <div
@@ -325,6 +400,14 @@ function AdminMfaPage() {
           >
             {busy ? "Bezig..." : mode === "enroll" && !factorId ? "Even geduld…" : "Bevestigen"}
           </button>
+
+          {mode === "verify" && (
+            <p className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-100/90">
+              Authenticator kwijt? Je kunt je 2FA niet zelf resetten zonder de huidige code.
+              Vraag een super admin om <strong className="font-semibold">Herstel account</strong>{" "}
+              via Instellingen → Medewerkers.
+            </p>
+          )}
 
           <button
             type="button"

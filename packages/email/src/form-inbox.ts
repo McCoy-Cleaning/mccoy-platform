@@ -26,9 +26,11 @@ import {
   shouldFallbackFromGraph,
 } from "./form-inbox-provider";
 import {
+  deleteGraphFormInboxMessage,
   getGraphFormInboxAttachment,
   getGraphFormInboxMessage,
   getGraphFormInboxThread,
+  isReplyOrForwardSubject,
   listGraphFormInboxMessages,
 } from "./graph-mail";
 import {
@@ -45,6 +47,7 @@ import {
   parseFormFieldsFromHtml,
   parseFormFieldsFromText,
   normalizeFormFieldLabel,
+  toDisplayParsedFields,
   type ParsedFormField,
 } from "./parse-form-fields";
 import { escapeHtml } from "./templates";
@@ -169,7 +172,9 @@ export function isFormInboxConfigured(): boolean {
   if (process.env.MCCOY_E2E === "1") return true;
   if (shouldAttemptGraphMail()) return true;
   if (shouldAllowImapInbox() && getInboxConfig() !== null) return true;
-  return false;
+  // website_requests (Supabase or JSON fallback) are first-class Aanvragen rows
+  // even when mailbox sync is unavailable.
+  return true;
 }
 
 /** @deprecated Prefer encodeImapMessageId — kept for existing IMAP call sites. */
@@ -209,18 +214,29 @@ function firstName(value: AddressObject | AddressObject[] | undefined): string {
   return "";
 }
 
-function configuredFromAddress(): string {
+function configuredSenderAddresses(): string[] {
   const candidates = [
     readServerEnv("FORM_FROM_EMAIL"),
     readServerEnv("SMTP_FROM_EMAIL"),
     readServerEnv("SMTP_USER"),
     readServerEnv("FORM_INBOX_USER"),
+    readServerEnv("GRAPH_MAILBOX"),
+    readServerEnv("FORM_TO_EMAIL"),
+    readServerEnv("SMTP_REPLY_TO"),
   ];
+  const out: string[] = [];
+  const seen = new Set<string>();
   for (const raw of candidates) {
     const email = extractEmailAddress(raw);
-    if (email && EMAIL_RE.test(email)) return email;
+    if (!email || !EMAIL_RE.test(email) || seen.has(email)) continue;
+    seen.add(email);
+    out.push(email);
   }
-  return "";
+  return out;
+}
+
+function configuredFromAddress(): string {
+  return configuredSenderAddresses()[0] || "";
 }
 
 function configuredFromDisplayName(): string {
@@ -235,12 +251,12 @@ function configuredFromDisplayName(): string {
 export function isMcCoyWebsiteFormNotification(parsed: ParsedMail): boolean {
   const fromName = firstName(parsed.from).toLowerCase();
   const fromAddr = firstAddress(parsed.from) || "";
-  const configured = configuredFromAddress();
+  const senders = configuredSenderAddresses();
   const configuredName = configuredFromDisplayName().toLowerCase();
 
   if (fromName.includes("mccoy website")) return true;
   if (configuredName && fromName.includes(configuredName)) return true;
-  if (configured && fromAddr === configured) return true;
+  if (fromAddr && senders.includes(fromAddr)) return true;
   if (fromAddr.endsWith("@resend.dev") && fromName.includes("mccoy")) return true;
 
   const html = typeof parsed.html === "string" ? parsed.html : "";
@@ -387,7 +403,7 @@ function sanitizeParsedFields(fields: ParsedFormField[]): ParsedFormField[] {
     if (out.some((f) => f.key === key)) continue;
     out.push({ key, label, value });
   }
-  return out;
+  return toDisplayParsedFields(out);
 }
 
 function parseFields(parsed: ParsedMail): ParsedFormField[] {
@@ -405,26 +421,32 @@ function parseFieldsFromParts(text: string, html: string): ParsedFormField[] {
 
 /**
  * Prefer Reply-To (notifications set this to the form submitter), then labeled body email,
- * then From when it is not our notification mailbox.
+ * then From when it is not our notification mailbox / configured sender.
  */
 export function resolveSubmitterEmail(
   parsed: ParsedMail,
   inboxUser: string,
 ): string | null {
+  const inbox = inboxUser.trim().toLowerCase();
+  const ourAddresses = new Set(
+    [...configuredSenderAddresses(), inbox].filter(Boolean),
+  );
+  const isExternal = (addr: string | null | undefined): addr is string =>
+    Boolean(addr && EMAIL_RE.test(addr) && !ourAddresses.has(addr.toLowerCase()));
+
   const replyTo = firstAddress(parsed.replyTo);
-  if (replyTo) return replyTo;
+  if (isExternal(replyTo)) return replyTo;
 
   const fields = parseFields(parsed);
   const emailField = fields.find((f) => f.key === "email");
-  if (emailField && EMAIL_RE.test(emailField.value)) {
-    return emailField.value.trim().toLowerCase();
-  }
+  const fieldEmail = emailField?.value.trim().toLowerCase() || null;
+  if (isExternal(fieldEmail)) return fieldEmail;
 
   const fromBody = extractEmailFromText(bodyPlain(parsed));
-  if (fromBody && fromBody !== inboxUser.toLowerCase()) return fromBody;
+  if (isExternal(fromBody)) return fromBody;
 
   const from = firstAddress(parsed.from);
-  if (from && from !== inboxUser.toLowerCase()) return from;
+  if (isExternal(from)) return from;
 
   return null;
 }
@@ -801,12 +823,12 @@ function messageFromTextParts(
 
   const fromName = envelopeFirstName(envelope?.from).toLowerCase();
   const fromAddr = envelopeFirstAddress(envelope?.from) || "";
-  const configured = configuredFromAddress();
+  const senders = configuredSenderAddresses();
   const configuredName = configuredFromDisplayName().toLowerCase();
   const isMcCoy =
     fromName.includes("mccoy website") ||
     (configuredName.length > 0 && fromName.includes(configuredName)) ||
-    (configured && fromAddr === configured) ||
+    (fromAddr.length > 0 && senders.includes(fromAddr)) ||
     (fromAddr.endsWith("@resend.dev") && fromName.includes("mccoy")) ||
     /verstuurd via het mccoy websiteformulier|sent from the mccoy website form/i.test(
       `${text}\n${html}`,
@@ -929,12 +951,13 @@ function isMcCoyEnvelope(envelope: MessageEnvelopeObject | undefined | null): bo
   if (!envelope) return false;
   const name = envelopeFirstName(envelope.from).toLowerCase();
   const addr = envelopeFirstAddress(envelope.from) || "";
-  const configured = configuredFromAddress();
+  const senders = configuredSenderAddresses();
   const configuredName = configuredFromDisplayName().toLowerCase();
   if (name.includes("mccoy website")) return true;
   if (configuredName && name.includes(configuredName)) return true;
-  if (configured && addr === configured) return true;
+  if (addr && senders.includes(addr)) return true;
   if (addr.endsWith("@resend.dev") && name.includes("mccoy")) return true;
+  // Do not treat arbitrary @mccoy.nl mail as a website form notification.
   return false;
 }
 
@@ -947,6 +970,7 @@ function summaryFromEnvelope(
 ): FormInboxMessageSummary | null {
   if (!isMcCoyEnvelope(envelope)) return null;
   const subject = (envelope.subject || "").trim() || "(geen onderwerp)";
+  if (isReplyOrForwardSubject(subject)) return null;
   const kind = classifyFormEmailSubject(subject);
   if (!kind) return null;
 
@@ -982,7 +1006,7 @@ function classifyDirection(
   }
   const from = firstAddress(parsed.from);
   if (submitterEmail && from === submitterEmail) return "customer";
-  if (from === configuredFromAddress()) return "admin";
+  if (from && configuredSenderAddresses().includes(from)) return "admin";
   if (from === inboxUser.toLowerCase()) return "admin";
   if (isMcCoyWebsiteFormNotification(parsed)) return "admin";
   return "customer";
@@ -1174,17 +1198,12 @@ async function buildThread(
   return thread;
 }
 
-export async function listFormInboxMessages(options?: {
+async function listMailboxFormInboxMessages(options?: {
   kind?: FormKind | "all";
   scopeKey?: string | "all";
   q?: string;
   limit?: number;
 }): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
-  if (process.env.MCCOY_E2E === "1") {
-    const { listE2eFormInboxMessages } = await import("./e2e-form-inbox");
-    return listE2eFormInboxMessages(options);
-  }
-
   if (shouldAttemptGraphMail()) {
     try {
       return await listGraphFormInboxMessages(options);
@@ -1197,6 +1216,10 @@ export async function listFormInboxMessages(options?: {
       const message = error instanceof Error ? error.message.slice(0, 160) : "unknown";
       console.error("[form-inbox] Graph list failed; falling back to IMAP", { message });
     }
+  }
+
+  if (!(shouldAllowImapInbox() && getInboxConfig() !== null)) {
+    return { items: [], facets: { kinds: [], scopes: [] } };
   }
 
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
@@ -1244,11 +1267,68 @@ export async function listFormInboxMessages(options?: {
   });
 }
 
+export async function listFormInboxMessages(options?: {
+  kind?: FormKind | "all";
+  scopeKey?: string | "all";
+  q?: string;
+  limit?: number;
+}): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
+  if (process.env.MCCOY_E2E === "1") {
+    const { listE2eFormInboxMessages } = await import("./e2e-form-inbox");
+    return listE2eFormInboxMessages(options);
+  }
+
+  const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
+
+  // Mailbox + website_requests, merged by WR- number. Requests without a mailbox
+  // copy still appear — that is the Aanvragen product contract.
+  let mailboxItems: FormInboxMessageSummary[] = [];
+  try {
+    const mailbox = await listMailboxFormInboxMessages({
+      ...options,
+      // Defer scope/kind filtering until after merge so request-only rows apply.
+      kind: "all",
+      scopeKey: "all",
+      limit: MAX_LIMIT,
+    });
+    mailboxItems = mailbox.items;
+  } catch (error) {
+    console.error("[form-inbox] mailbox list failed; continuing with website requests", {
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
+  const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
+  const { mergeMailboxAndWebsiteRequestSummaries } = await import("./enrich-inbox-scopes");
+
+  let requestItems: FormInboxMessageSummary[] = [];
+  try {
+    requestItems = await listWebsiteRequestInboxSummaries({
+      kind: "all",
+      scopeKey: "all",
+      limit: 200,
+    });
+  } catch (error) {
+    console.error("[form-inbox] website request list failed", {
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
+  const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems);
+  const facets = buildInboxFacets(merged);
+  const filtered = filterInboxMessages(merged, {
+    kind: options?.kind,
+    scopeKey: options?.scopeKey,
+    q: options?.q,
+  });
+  return { items: filtered.slice(0, limit), facets };
+}
+
 export async function getFormInboxMessage(id: string): Promise<FormInboxMessage | null> {
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
-  if (decoded.provider === "e2e") {
-    const { getE2eFormInboxMessage } = await import("./e2e-form-inbox");
-    return getE2eFormInboxMessage(id);
+  if (decoded.provider === "e2e" || decoded.provider === "request") {
+    const { getWebsiteRequestFormInboxMessage } = await import("./website-request-inbox");
+    return getWebsiteRequestFormInboxMessage(id);
   }
   if (decoded.provider === "graph") {
     if (!shouldAttemptGraphMail()) {
@@ -1299,9 +1379,9 @@ export async function getFormInboxMessage(id: string): Promise<FormInboxMessage 
 /** Load conversation replies (separate call so opening a mail stays fast). */
 export async function getFormInboxThread(id: string): Promise<FormInboxThreadItem[]> {
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
-  if (decoded.provider === "e2e") {
-    const { getE2eFormInboxThread } = await import("./e2e-form-inbox");
-    return getE2eFormInboxThread(id);
+  if (decoded.provider === "e2e" || decoded.provider === "request") {
+    const { getWebsiteRequestFormInboxThread } = await import("./website-request-inbox");
+    return getWebsiteRequestFormInboxThread(id);
   }
   if (decoded.provider === "graph") {
     if (!shouldAttemptGraphMail()) {
@@ -1408,9 +1488,9 @@ export async function getFormInboxAttachment(
   filename: string,
 ): Promise<FormInboxAttachment | null> {
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
-  if (decoded.provider === "e2e") {
-    const { getE2eFormInboxAttachment } = await import("./e2e-form-inbox");
-    return getE2eFormInboxAttachment(id, filename);
+  if (decoded.provider === "e2e" || decoded.provider === "request") {
+    const { getWebsiteRequestFormInboxAttachment } = await import("./website-request-inbox");
+    return getWebsiteRequestFormInboxAttachment();
   }
   if (decoded.provider === "graph") {
     if (!shouldAttemptGraphMail()) {
@@ -1490,6 +1570,64 @@ export async function getFormInboxAttachment(
       }
 
       return meta ? { ...meta, omitted: true } : null;
+    } finally {
+      lock.release();
+    }
+  });
+}
+
+/**
+ * Delete a website-form notification from Aanvragen.
+ * Graph: move to Deleted Items (fallback hard-delete). IMAP: flag+expunge.
+ * E2E: marks the website request closed so it leaves the inbox list.
+ */
+export async function deleteFormInboxMessage(id: string): Promise<void> {
+  const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
+
+  if (decoded.provider === "e2e" || decoded.provider === "request") {
+    const { deleteWebsiteRequestFormInboxMessage } = await import("./website-request-inbox");
+    await deleteWebsiteRequestFormInboxMessage(id);
+    return;
+  }
+
+  if (decoded.provider === "graph") {
+    if (!shouldAttemptGraphMail()) {
+      throw new FormInboxError(
+        "Dit bericht komt van Microsoft Graph, maar Graph is uitgeschakeld (FORM_INBOX_PROVIDER=imap). Vernieuw de Aanvragen-lijst.",
+      );
+    }
+    // Confirm it is a form notification before deleting from the mailbox.
+    const message = await getGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
+    if (!message) {
+      throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+    }
+    await deleteGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
+    return;
+  }
+
+  const { mailbox, uid } = decoded;
+  await withImapClient(async (client, config) => {
+    const box = mailbox || config.mailbox;
+    const lock = await client.getMailboxLock(box);
+    try {
+      let envelope: MessageEnvelopeObject | undefined;
+      let flags: Set<string> | string[] | undefined;
+      for await (const msg of client.fetch(
+        String(uid),
+        { uid: true, envelope: true, flags: true },
+        { uid: true },
+      )) {
+        envelope = msg.envelope;
+        flags = msg.flags;
+      }
+      if (!envelope) {
+        throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+      }
+      const summary = summaryFromEnvelope(uid, box, envelope, flags, config.user);
+      if (!summary) {
+        throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+      }
+      await client.messageDelete(String(uid), { uid: true });
     } finally {
       lock.release();
     }

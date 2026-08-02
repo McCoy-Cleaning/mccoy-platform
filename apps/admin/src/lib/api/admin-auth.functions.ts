@@ -3,8 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import {
   completeStaffMfaOnboarding,
   establishLegacyAdminSession,
+  establishStaffSessionFromEmailAuthCallback,
   establishStaffSessionFromTokens,
   establishStaffSessionWithPassword,
+  hydrateBrowserStaffAuthFromCookies,
   isStaffSupabaseAuthEnabled,
   readAdminSession,
   signOutAdminSessions,
@@ -12,6 +14,7 @@ import {
 import { getSupabaseAdminEnvDiagnostics } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
+  adminAuthCallbackExchangeSchema,
   adminEmailLoginSchema,
   adminEstablishSessionSchema,
   adminLoginSchema,
@@ -57,6 +60,45 @@ export const adminEstablishSession = createServerFn({ method: "POST" })
       };
     }
   });
+
+/** Verify invite/recovery link server-side → HttpOnly cookies (+ one-shot browser hydration). */
+export const adminExchangeAuthCallback = createServerFn({ method: "POST" })
+  .validator(adminAuthCallbackExchangeSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      return await establishStaffSessionFromEmailAuthCallback({
+        tokenHash: data.tokenHash,
+        type: data.type,
+        code: data.code,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        clientKey: data.clientKey,
+      });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Uitnodigingssessie mislukt.",
+        code: "unknown" as const,
+      };
+    }
+  });
+
+/** Reload-safe: read HttpOnly cookies and hydrate supabase-js for MFA (no sessionStorage). */
+export const adminHydrateBrowserAuthFromCookies = createServerFn({ method: "POST" }).handler(
+  async () => {
+    try {
+      ensureMonorepoEnvLoaded();
+      return await hydrateBrowserStaffAuthFromCookies();
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Sessie kon niet worden hersteld.",
+        code: "unknown" as const,
+      };
+    }
+  },
+);
 
 export const adminSignInWithEmail = createServerFn({ method: "POST" })
   .validator(adminEmailLoginSchema)

@@ -146,6 +146,27 @@ describe("localizeCmsPageForLocale", () => {
     });
   });
 
+  it("mirrors NL blank-line paragraph structure onto EN drafts", () => {
+    const page = builtin();
+    page.sectionContent = {
+      ...page.sectionContent,
+      "products.main": {
+        eyebrow: "Ons assortiment",
+        heading: "McCoy Cleaning Products",
+        intro: "Eerste alinea.\n\n\nTweede alinea.\n\nDerde alinea.",
+        body: "",
+      },
+    };
+    page.enFieldDrafts = {
+      ...(page.enFieldDrafts ?? {}),
+      "section:products.main:intro": "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.",
+    };
+    const localized = localizeCmsPageForLocale(page, "en");
+    expect(localized.kind === "builtin" && localized.sectionContent?.["products.main"]).toMatchObject({
+      intro: "First paragraph.\n\n\nSecond paragraph.\n\nThird paragraph.",
+    });
+  });
+
   it("localizes custom page blocks", () => {
     const page = {
       id: "page_custom",

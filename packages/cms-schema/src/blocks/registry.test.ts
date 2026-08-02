@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BlockType } from "../types";
 import { catalogDefinitions } from "./catalog";
+import { DEFAULT_CONTACT_FORM_FIELDS } from "./form-fields";
 import {
   ALL_BLOCK_TYPES,
   assertPickerTypesMatchRegistry,
@@ -111,6 +112,22 @@ describe("block data registry", () => {
       expect(blockDataRegistry[type].capabilities.publishable).toBe(true);
       expect(blockDataRegistry[type].capabilities.duplicable).toBe(true);
     }
+  });
+
+  it("contactForm normalize strips legacy name/email rows and keeps custom fields", () => {
+    const def = blockDataRegistry.contactForm;
+    const normalized = def.normalize({
+      title: "Contact",
+      body: "  Custom intro  ",
+      fields: [{ id: "f1", text: "Naam" }, { id: "f2", text: "E-mail" }, { id: "f3", text: "Bericht" }],
+    });
+    expect((normalized as { body?: string }).body).toBe("  Custom intro  ");
+    expect((normalized as { fields: Array<{ type: string; label: string }> }).fields).toEqual([
+      expect.objectContaining({ type: "textarea", label: "Bericht" }),
+    ]);
+    expect(def.normalize({ title: "Contact", fields: [{ id: "f1", text: "Naam" }] })).toEqual(
+      expect.objectContaining({ body: undefined, fields: DEFAULT_CONTACT_FORM_FIELDS }),
+    );
   });
 
   it("assertPickerTypesMatchRegistry accepts PUBLISHABLE_BLOCK_TYPES and rejects gaps", () => {

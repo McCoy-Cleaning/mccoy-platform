@@ -16,11 +16,17 @@ export {
   filterInboxMessages,
   buildInboxFacets,
   mergeScopeFacets,
+  buildAanvragenScopeFacets,
   type InboxListFilters,
   type InboxFacets,
   type InboxScopeFacet,
   type InboxKindFacet,
 } from "./filter-inbox-messages";
+export {
+  enrichInboxSummariesWithRequestScopes,
+  mergeMailboxAndWebsiteRequestSummaries,
+  type InboxScopeEnrichmentSource,
+} from "./enrich-inbox-scopes";
 export {
   parseFormFieldsFromHtml,
   parseFormFieldsFromText,

@@ -43,6 +43,13 @@ export {
 export { KIND_LABELS, STATUS_LABELS, FIELD_LABELS_NL } from "./labels";
 
 export {
+  INTERNAL_VACANCY_FIELD_KEYS,
+  type InternalVacancyFieldKey,
+  isInternalVacancyFieldKey,
+  displayFormFields,
+} from "./form-display-fields";
+
+export {
   ACCOUNT_KINDS,
   STAFF_ROLES,
   USER_STATUSES,

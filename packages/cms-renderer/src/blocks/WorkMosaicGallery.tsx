@@ -73,7 +73,7 @@ export function WorkMosaicGallery({
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
             ) : null}
             <h2 className="font-display mt-4 text-4xl text-white md:text-5xl">{heading}</h2>
-            {body ? <p className="mt-4 text-white/65">{body}</p> : null}
+            {body ? <p className="mt-4 whitespace-pre-line text-white/65">{body}</p> : null}
           </div>
         </div>
 

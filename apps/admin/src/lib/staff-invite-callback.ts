@@ -5,6 +5,7 @@
 
 const AUTH_SHELL_PATHS = new Set([
   "/admin/invite",
+  "/admin/recover-mfa",
   "/admin/mfa",
 ]);
 
@@ -17,6 +18,21 @@ function readAuthCallbackType(url: URL): string | null {
   const params = new URLSearchParams(hash);
   const fromHash = params.get("type");
   return fromHash ? fromHash.toLowerCase() : null;
+}
+
+/** Read invite/recovery type from the current browser URL (query or hash). */
+export function readStaffAuthCallbackTypeFromLocation(
+  locationLike: Pick<Location, "search" | "hash"> & { href?: string },
+): string | null {
+  try {
+    const url = new URL(
+      locationLike.href ??
+        `${typeof window !== "undefined" ? window.location.origin : "http://localhost"}${typeof window !== "undefined" ? window.location.pathname : ""}${locationLike.search}${locationLike.hash}`,
+    );
+    return readAuthCallbackType(url);
+  } catch {
+    return null;
+  }
 }
 
 /** Strip Auth hash/query tokens after the browser session is established. */

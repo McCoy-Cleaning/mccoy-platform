@@ -10,7 +10,8 @@ export function FormScopeField({
   label = "Aanvragen-scope",
   value,
   onChange,
-  hint = "Optioneel. Verschijnt als filter/tab in Aanvragen. De sleutel blijft stabiel bij hernoemen van het label.",
+  hint =
+    "Optioneel. Extra filter-tab in Aanvragen (naast type zoals Algemeen). Alleen inzendingen via dit gepubliceerde formulier verschijnen onder die tab. De sleutel blijft stabiel bij hernoemen.",
 }: {
   label?: string;
   value?: FormScopeSnapshot;

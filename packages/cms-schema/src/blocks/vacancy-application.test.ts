@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultJobs, createDefaultVacancy } from "./jobs";
+import {
+  createDefaultJobs,
+  createDefaultVacancy,
+  createVacaturesSeedJobs,
+  VACATURES_SEED_VACANCY_IDS,
+} from "./jobs";
 import { resolveVacancyApplication } from "./vacancy-application";
 import { newBlockLayoutItem } from "../layout";
 import type { BuiltinCmsPage } from "../types";
@@ -46,6 +51,43 @@ describe("resolveVacancyApplication", () => {
     const page = publishedVacatures();
     const result = resolveVacancyApplication(page, "job_missing");
     expect(result.ok).toBe(false);
+  });
+
+  it("resolves by slug when the client vacancy id is stale", () => {
+    const vacancy = createDefaultVacancy({
+      title: "Reguliere schoonmaak",
+      slug: "reguliere-schoonmaak",
+      visible: true,
+    });
+    const page = publishedVacatures([vacancy]);
+    const result = resolveVacancyApplication(page, "job_stale_from_seed", undefined, {
+      vacancySlug: "reguliere-schoonmaak",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fields.vacancyId).toBe(vacancy.id);
+    expect(result.fields.vacancyTitleSnapshot).toBe("Reguliere schoonmaak");
+  });
+
+  it("resolves legacy role index ids against visible vacancies", () => {
+    const vacancies = [
+      createDefaultVacancy({ title: "Reguliere schoonmaak", visible: true }),
+      createDefaultVacancy({ title: "Glazenwasser", visible: true }),
+    ];
+    const page = publishedVacatures(vacancies);
+    const result = resolveVacancyApplication(page, "legacy_1");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fields.vacancyTitleSnapshot).toBe("Glazenwasser");
+  });
+
+  it("uses stable ids in vacatures seed jobs", () => {
+    const jobs = createVacaturesSeedJobs();
+    expect(jobs.vacancies.map((v) => v.id)).toEqual([
+      VACATURES_SEED_VACANCY_IDS.reguliereSchoonmaak,
+      VACATURES_SEED_VACANCY_IDS.glazenwasser,
+      VACATURES_SEED_VACANCY_IDS.oproepkracht,
+    ]);
   });
 
   it("rejects hidden vacancies", () => {

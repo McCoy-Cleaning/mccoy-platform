@@ -1,7 +1,6 @@
 import { readServerEnv } from "@mccoy/security";
 
 import { shouldAttemptGraphMail } from "./form-inbox-provider";
-import { decodeInboxMessageId } from "./inbox-message-id";
 import { sendGraphAdminReply } from "./graph-mail";
 import { defaultTransactionalFrom, isSmtpConfigured, sendSmtpMail } from "./smtp";
 import { escapeHtml } from "./templates";
@@ -104,17 +103,10 @@ export async function sendAdminReplyEmail(options: {
     intendedTo,
   });
 
-  let graphReplyId: string | undefined;
-  if (options.inboxMessageId) {
-    try {
-      const decoded = decodeInboxMessageId(options.inboxMessageId);
-      if (decoded.provider === "graph") {
-        graphReplyId = decoded.graphId;
-      }
-    } catch {
-      // ignore invalid ids — fall through to compose send
-    }
-  }
+  // Never use Graph /messages/{id}/reply for Aanvragen. Form notifications are
+  // From GRAPH_MAILBOX, so native reply would deliver to our own mailbox — not
+  // the website visitor. Compose sendMail with an explicit `to` instead.
+  // inboxMessageId is retained for API compatibility / future threading helpers.
 
   if (shouldAttemptGraphMail()) {
     const sent = await sendGraphAdminReply({
@@ -123,8 +115,19 @@ export async function sendAdminReplyEmail(options: {
       html,
       text,
       replyTo,
-      inReplyToGraphId: graphReplyId,
+      // Mirror SMTP BCC so the outbound reply appears in Aanvragen → Gesprek.
+      ...(bccInbox && bccInbox.toLowerCase() !== deliverTo.toLowerCase()
+        ? { bcc: bccInbox }
+        : {}),
       inReplyToInternetMessageId: options.inReplyTo,
+      headers: {
+        ...(options.requestNumber
+          ? { "x-mccoy-request-number": options.requestNumber }
+          : {}),
+        ...(options.inReplyTo
+          ? { "x-mccoy-in-reply-to": options.inReplyTo.replace(/[<>\s]/g, "").slice(0, 200) }
+          : {}),
+      },
     });
     if (!sent.ok) {
       // Fall back to SMTP when Graph send fails but SMTP is available

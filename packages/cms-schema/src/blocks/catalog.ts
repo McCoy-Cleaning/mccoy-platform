@@ -9,6 +9,14 @@ import { plansDefinition } from "./plans";
 import { roadmapDefinition } from "./roadmap";
 import { jobsDefinition } from "./jobs";
 import {
+  createFormFieldItem,
+  DEFAULT_CONTACT_FORM_FIELDS,
+  formFieldItemSchema,
+  formFieldPayloadKey,
+  normalizeFormFields,
+  type FormFieldItem,
+} from "./form-fields";
+import {
   createTextListItem,
   normalizeTextList,
   textListItemSchema,
@@ -462,9 +470,12 @@ export type NewsletterBlockData = {
 };
 export type ContactFormBlockData = {
   title: string;
+  /** Plain-text intro beside the form (left column). */
+  body?: string;
   /** Ignored at runtime — delivery uses server FORM_TO_EMAIL. Kept for legacy JSON. */
   recipient?: string;
-  fields: TextListItem[];
+  fields: FormFieldItem[];
+  /** Legacy success copy — no longer edited in CMS; storefront uses a fixed default. */
   confirmation?: string;
   scope?: FormScopeSnapshot;
 };
@@ -1088,26 +1099,37 @@ export const catalogDefinitions = {
     category: "Conversion",
     description:
       "Configureerbaar contactformulier; verzending via dezelfde Aanvragen-pijplijn (FORM_TO_EMAIL, geen willekeurige ontvanger).",
-    dataVersion: 1,
+    dataVersion: 2,
     schema: z.object({
       title: z.string(),
+      body: z.string().optional(),
       recipient: z.string().optional(),
-      fields: z.array(textListItemSchema),
+      fields: z.array(formFieldItemSchema),
       confirmation: z.string().optional(),
       scope: formScopeSnapshotSchema.optional(),
     }),
     createDefault: (): ContactFormBlockData => ({
       title: "Contact",
-      fields: [createTextListItem("Naam"), createTextListItem("E-mail"), createTextListItem("Bericht")],
-      confirmation: "Bedankt voor uw bericht.",
+      fields: DEFAULT_CONTACT_FORM_FIELDS.map((field) =>
+        createFormFieldItem(field.label, field.type, {
+          required: field.required,
+          options: field.options,
+        }),
+      ),
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const fields = normalizeFormFields(rec.fields).filter((field) => {
+        if (field.type === "name" || field.type === "email") return false;
+        const key = formFieldPayloadKey(field);
+        return key !== "name" && key !== "email";
+      });
       return {
         title: str(rec, "title", "Contact"),
+        body: str(rec, "body") || undefined,
         // Legacy field retained but never trusted for delivery.
         recipient: str(rec, "recipient") || undefined,
-        fields: normalizeTextList(rec.fields),
+        fields: fields.length > 0 ? fields : DEFAULT_CONTACT_FORM_FIELDS,
         confirmation: str(rec, "confirmation") || undefined,
         scope: normalizeFormScopeSnapshot(rec.scope),
       };

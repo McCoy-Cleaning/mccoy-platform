@@ -1,11 +1,16 @@
 import * as React from "react";
 import {
-  createTextListItem,
+  CONTACT_FORM_CUSTOM_FIELD_TYPES,
+  createFormFieldItem,
+  createFormFieldOption,
+  FORM_FIELD_TYPE_LABELS_NL,
   type BlockEditorPresentation,
   type ContactFormBlockData,
+  type FormFieldItem,
+  type FormFieldOption,
+  type FormFieldType,
   type NewsletterBlockData,
   type PopupBlockData,
-  type TextListItem,
 } from "@mccoy/cms-schema";
 import { blockEnPath, EnDraftFor, NlEnField } from "./en-draft-fields";
 import { ObjectListEditor } from "./ObjectListEditor";
@@ -69,6 +74,67 @@ export function NewsletterBlockEditor({
   );
 }
 
+function FormFieldOptionsEditor({
+  options,
+  onChange,
+  blockId,
+  fieldIndex,
+}: {
+  options: FormFieldOption[];
+  onChange: (next: FormFieldOption[]) => void;
+  blockId?: string;
+  fieldIndex: number;
+}) {
+  return (
+    <ObjectListEditor<FormFieldOption>
+      items={options}
+      onChange={onChange}
+      createItem={() => createFormFieldOption("Optie")}
+      cloneItem={(item) => ({ ...item, id: createFormFieldOption(item.label).id })}
+      addLabel="Optie toevoegen"
+      renderItem={(option, actions, optionIndex) => (
+        <div className="rounded-lg border border-white/10 bg-black/10 p-2">
+          <Field label="Label">
+            <input
+              className={inputClass}
+              value={option.label}
+              onChange={(e) => actions.update({ ...option, label: e.target.value })}
+            />
+          </Field>
+          <EnDraftFor
+            fieldPath={blockEnPath(blockId, `fields.${fieldIndex}.options.${optionIndex}.label`)}
+            label="Label"
+          />
+          <Field label="Waarde (optioneel)" hint="Stabiele sleutel; leeg = afgeleid uit label.">
+            <input
+              className={inputClass}
+              value={option.value ?? ""}
+              onChange={(e) =>
+                actions.update({ ...option, value: e.target.value.trim() || undefined })
+              }
+            />
+          </Field>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveUp}>
+              Omhoog
+            </button>
+            <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveDown}>
+              Omlaag
+            </button>
+            <button
+              type="button"
+              className="text-xs text-rose-300/80 hover:text-rose-200"
+              onClick={actions.remove}
+            >
+              Verwijderen
+            </button>
+          </div>
+        </div>
+      )}
+    />
+  );
+}
+
 export function ContactFormBlockEditor({
   value,
   onChange,
@@ -91,11 +157,12 @@ export function ContactFormBlockEditor({
             onChange={(e) => onChange({ ...value, title: e.target.value })}
           />
         </NlEnField>
-        <NlEnField label="Bevestigingstekst" enPath={blockEnPath(blockId, "confirmation")} multiline>
+        <NlEnField label="Introductietekst" enPath={blockEnPath(blockId, "body")} multiline>
           <textarea
-            className={`${inputClass} min-h-[3rem]`}
-            value={value.confirmation ?? ""}
-            onChange={(e) => onChange({ ...value, confirmation: e.target.value || undefined })}
+            className={`${inputClass} min-h-[4rem]`}
+            value={value.body ?? ""}
+            onChange={(e) => onChange({ ...value, body: e.target.value || undefined })}
+            placeholder="Tekst naast het formulier (links)."
           />
         </NlEnField>
         <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/55">
@@ -108,50 +175,103 @@ export function ContactFormBlockEditor({
         />
       </Section>
       <Section title="Velden">
-        <ObjectListEditor<TextListItem>
+        <p className="text-[11px] text-white/50">
+          <span className="text-white/70">Naam</span> en{" "}
+          <span className="text-white/70">E-mail</span> staan standaard op het formulier (verplicht
+          voor verzending). Voeg hier extra velden toe — telefoon, bedrijf, tekst, tekstvak of
+          keuzelijst. Het <span className="text-white/70">label</span> is wat de bezoeker ziet; het
+          veldtype bepaalt invoercontrole.
+        </p>
+        <ObjectListEditor<FormFieldItem>
           items={value.fields}
           onChange={(fields) => onChange({ ...value, fields })}
-          createItem={() => createTextListItem("Nieuw veld")}
-          cloneItem={(item) => ({ ...item, id: createTextListItem(item.text).id })}
+          createItem={() => createFormFieldItem("Nieuw veld", "text")}
+          cloneItem={(item) => ({
+            ...item,
+            id: createFormFieldItem(item.label, item.type).id,
+            options: item.options?.map((option) => ({
+              ...option,
+              id: createFormFieldOption(option.label, option.value).id,
+            })),
+          })}
           addLabel="Veld toevoegen"
-          renderItem={(item, actions, index) => (
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <Field label="Label">
-                <input
-                  className={inputClass}
-                  value={item.text}
-                  onChange={(e) => actions.update({ ...item, text: e.target.value })}
-                />
-              </Field>
-              <EnDraftFor
-                fieldPath={blockEnPath(blockId, `fields.${index}.text`)}
-                label="Label"
-              />
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  className="text-xs text-white/50 hover:text-white"
-                  onClick={actions.moveUp}
+          renderItem={(item, actions, index) => {
+            return (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <Field label="Label">
+                  <input
+                    className={inputClass}
+                    value={item.label}
+                    onChange={(e) => actions.update({ ...item, label: e.target.value })}
+                  />
+                </Field>
+                <EnDraftFor fieldPath={blockEnPath(blockId, `fields.${index}.label`)} label="Label" />
+                <Field
+                  label="Veldtype"
+                  hint="Bepaalt opslag en invoercontrole — niet hetzelfde als het zichtbare label."
                 >
-                  Omhoog
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-white/50 hover:text-white"
-                  onClick={actions.moveDown}
-                >
-                  Omlaag
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-rose-300/80 hover:text-rose-200"
-                  onClick={actions.remove}
-                >
-                  Verwijderen
-                </button>
+                  <select
+                    className={inputClass}
+                    value={item.type}
+                    onChange={(e) => {
+                      const type = e.target.value as FormFieldType;
+                      const next: FormFieldItem = {
+                        ...item,
+                        type,
+                        options:
+                          type === "select"
+                            ? item.options?.length
+                              ? item.options
+                              : [createFormFieldOption("Optie 1"), createFormFieldOption("Optie 2")]
+                            : undefined,
+                      };
+                      actions.update(next);
+                    }}
+                  >
+                    {CONTACT_FORM_CUSTOM_FIELD_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {FORM_FIELD_TYPE_LABELS_NL[type]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <label className="mt-2 flex items-center gap-2 text-xs text-white/70">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.required)}
+                    onChange={(e) => actions.update({ ...item, required: e.target.checked })}
+                  />
+                  Verplicht
+                </label>
+                {item.type === "select" ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] font-medium text-white/55">Keuzeopties</p>
+                    <FormFieldOptionsEditor
+                      options={item.options ?? []}
+                      onChange={(options) => actions.update({ ...item, options })}
+                      blockId={blockId}
+                      fieldIndex={index}
+                    />
+                  </div>
+                ) : null}
+                <div className="mt-2 flex gap-2">
+                  <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveUp}>
+                    Omhoog
+                  </button>
+                  <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveDown}>
+                    Omlaag
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-rose-300/80 hover:text-rose-200"
+                    onClick={actions.remove}
+                  >
+                    Verwijderen
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          }}
         />
       </Section>
     </div>

@@ -94,7 +94,8 @@ export function formatGraphApiError(input: {
     }
     return (
       `Microsoft Graph toegang geweigerd (${code}). Checklist: ` +
-      "(1) Application permission Mail.Read (+ Mail.Send voor Graph-antwoorden) met admin consent, " +
+      "(1) Application permissions Mail.Read (lezen), Mail.Send (antwoorden/verzenden) en " +
+      "Mail.ReadWrite (verwijderen + markeren als gelezen) met admin consent, " +
       `(2) app mag mailbox ${mailbox} openen (Application Access Policy), ` +
       "(3) juiste TENANT_ID / CLIENT_ID / CLIENT_SECRET."
     );
@@ -115,4 +116,26 @@ export function formatGraphApiError(input: {
 
   const clipped = detail.trim().slice(0, 180);
   return `Microsoft Graph-fout (${code}).${clipped ? ` ${clipped}` : ""}`;
+}
+
+/** Graph REST failures for move/delete/mark-read (needs Mail.ReadWrite, not Mail.Read alone). */
+export function formatGraphMailWriteError(input: {
+  status: number;
+  code: string;
+  detail: string;
+  mailbox: string;
+}): string {
+  const base = formatGraphApiError(input);
+  const blob = `${input.code} ${input.detail}`.toLowerCase();
+  if (
+    input.status === 403 ||
+    input.code === "ErrorAccessDenied" ||
+    /accessdenied|forbidden|authorization_requestdenied/i.test(blob)
+  ) {
+    return (
+      `${base} Verwijderen uit Aanvragen vereist Application permission Mail.ReadWrite ` +
+      "(naast Mail.Read) met admin consent in Entra."
+    );
+  }
+  return base;
 }

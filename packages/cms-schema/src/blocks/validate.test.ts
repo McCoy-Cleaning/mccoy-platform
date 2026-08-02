@@ -98,17 +98,39 @@ describe("validatePageBlocksForPublish", () => {
     }
   });
 
-  it("rejects contactForm without labeled fields", () => {
+  it("allows contactForm without custom labeled fields", () => {
     const block = createDefaultBlock("contactForm");
     const result = validatePageBlocksForPublish([
-      { ...block, data: { ...block.data, fields: [{ id: "f1", text: "  " }] } },
+      {
+        ...block,
+        data: {
+          ...block.data,
+          fields: [
+            { id: "f1", label: "   ", type: "text" },
+            { id: "f2", label: "  ", type: "textarea" },
+          ],
+        },
+      },
     ]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(
-        result.errors.some((e) => e.code === PUBLISH_VALIDATION_CODES.CONTACT_FORM_FIELDS_REQUIRED),
-      ).toBe(true);
-    }
+    expect(result.ok).toBe(true);
+  });
+
+  it("allows contactForm without name/email field types in CMS fields", () => {
+    const block = createDefaultBlock("contactForm");
+    const result = validatePageBlocksForPublish([
+      {
+        ...block,
+        data: {
+          ...block.data,
+          fields: [
+            { id: "f1", label: "Label 1", type: "text" },
+            { id: "f2", label: "Label 2", type: "textarea" },
+            { id: "f3", label: "Label 3", type: "phone" },
+          ],
+        },
+      },
+    ]);
+    expect(result.ok).toBe(true);
   });
 
   it("rejects a page that mixes publishable and invalid newsletter", () => {

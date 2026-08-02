@@ -1,4 +1,4 @@
-import { FIELD_LABELS_NL } from "@mccoy/domain";
+import { displayFormFields, FIELD_LABELS_NL } from "@mccoy/domain";
 
 export type ParsedFormField = {
   key: string;
@@ -194,6 +194,16 @@ export function parseFormFieldsFromText(text: string | undefined | null): Parsed
     pushField(fields, current.label, value);
   }
   return fields;
+}
+
+/** Parsed fields filtered for Aanvragen detail (no redundant vacancy rows). */
+export function toDisplayParsedFields(fields: ParsedFormField[]): ParsedFormField[] {
+  const display = displayFormFields(Object.fromEntries(fields.map((f) => [f.key, f.value])));
+  return Object.entries(display).map(([key, value]) => ({
+    key,
+    label: FIELD_LABELS_NL[key] ?? key,
+    value,
+  }));
 }
 
 export function parseAttachmentNamesFromBody(text: string | undefined | null): string[] {

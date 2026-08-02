@@ -1,6 +1,11 @@
 import * as React from "react";
 import {
   type ContactFormBlockData,
+  DEFAULT_CONTACT_FORM_INTRO_NL,
+  formFieldPayloadKey,
+  optionPayloadValue,
+  resolveContactFormFields,
+  type FormFieldItem,
   type NewsletterBlockData,
   type PopupBlockData,
   resolveCmsLinkHref,
@@ -19,20 +24,16 @@ function cn(...parts: Array<string | false | null | undefined>) {
 
 export type ConversionRenderMode = "preview" | "storefront";
 
-function fieldKeyFromLabel(label: string, id: string): string {
-  const lower = label.trim().toLowerCase();
-  if (/^(e-?mail|email)$/i.test(lower)) return "email";
-  if (/^(naam|name)$/i.test(lower)) return "name";
-  if (/^(bericht|message|opmerking)$/i.test(lower)) return "message";
-  if (/^(telefoon|phone|tel)$/i.test(lower)) return "phone";
-  if (/^(bedrijf|company)$/i.test(lower)) return "company";
-  const slug = lower
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 40);
-  return slug || `field_${id.slice(0, 12)}`;
+const CONTACT_FORM_SUCCESS_NL = "Bedankt voor uw bericht.";
+
+const FIELD_INPUT_CLASS =
+  "w-full rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60";
+
+const FIELD_LABEL_CLASS =
+  "mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+
+function isFieldRequired(field: FormFieldItem): boolean {
+  return field.required ?? (field.type === "name" || field.type === "email");
 }
 
 export function NewsletterSectionView({
@@ -166,6 +167,88 @@ export function NewsletterSectionView({
   );
 }
 
+function ContactFormFieldInput({
+  field,
+  blockId,
+  value,
+  onChange,
+  disabled,
+}: {
+  field: FormFieldItem;
+  blockId: string;
+  value: string;
+  onChange: (next: string) => void;
+  disabled: boolean;
+}) {
+  const fieldId = `cf-${blockId}-${field.id}`;
+  const key = formFieldPayloadKey(field);
+  const required = isFieldRequired(field);
+
+  if (field.type === "textarea") {
+    return (
+      <textarea
+        id={fieldId}
+        name={key}
+        rows={5}
+        required={required}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${FIELD_INPUT_CLASS} resize-y`}
+      />
+    );
+  }
+
+  if (field.type === "select") {
+    const options = field.options ?? [];
+    return (
+      <select
+        id={fieldId}
+        name={key}
+        required={required}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={FIELD_INPUT_CLASS}
+      >
+        <option value="">{required ? "Maak een keuze…" : "—"}</option>
+        {options.map((option) => (
+          <option key={option.id} value={optionPayloadValue(option)}>
+            {option.label.trim() || optionPayloadValue(option)}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  const inputType =
+    field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text";
+  const autoComplete =
+    field.type === "email"
+      ? "email"
+      : field.type === "name"
+        ? "name"
+        : field.type === "phone"
+          ? "tel"
+          : field.type === "company"
+            ? "organization"
+            : undefined;
+
+  return (
+    <input
+      id={fieldId}
+      type={inputType}
+      name={key}
+      required={required}
+      autoComplete={autoComplete}
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={FIELD_INPUT_CLASS}
+    />
+  );
+}
+
 export function ContactFormSectionView({
   data,
   blockId,
@@ -178,32 +261,23 @@ export function ContactFormSectionView({
   const d = data as ContactFormBlockData;
   const adapters = useCmsFormAdapters();
   const pageId = useCmsPageId();
-  const fields = (d.fields ?? []).filter((f) => f.text.trim());
+  const fields = React.useMemo(() => resolveContactFormFields(d.fields), [d.fields]);
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [honeypot, setHoneypot] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
   const preview = mode === "preview";
 
-  const keys = React.useMemo(
-    () =>
-      fields.map((f) => ({
-        item: f,
-        key: fieldKeyFromLabel(f.text, f.id),
-        inputType: /e-?mail/i.test(f.text) ? "email" : /bericht|message/i.test(f.text) ? "textarea" : "text",
-      })),
-    [fields],
-  );
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (preview) return;
     setError(null);
     const payload: Record<string, string> = {};
-    for (const row of keys) {
-      payload[row.key] = (values[row.key] ?? "").trim();
+    for (const field of fields) {
+      const key = formFieldPayloadKey(field);
+      payload[key] = (values[key] ?? "").trim();
     }
-    if (!payload.email || !payload.name) {
+    if (!payload.name || !payload.email) {
       setError("Naam en e-mail zijn verplicht.");
       setStatus("error");
       return;
@@ -234,15 +308,6 @@ export function ContactFormSectionView({
     setValues({});
   };
 
-  if (fields.length === 0) {
-    return (
-      <SectionShell blockType="contactForm">
-        <SectionHeader title={d.title} />
-        <p className="mt-2 text-sm text-muted-foreground">Nog geen velden geconfigureerd.</p>
-      </SectionShell>
-    );
-  }
-
   return (
     <SectionShell blockType="contactForm">
       <div className="mx-auto grid max-w-5xl items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
@@ -250,17 +315,14 @@ export function ContactFormSectionView({
           <SectionEyebrow>Contact</SectionEyebrow>
           <h2 className="font-display mt-3 text-3xl text-foreground md:text-4xl">{d.title}</h2>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
-            Vul het formulier in. Uw aanvraag wordt opgeslagen en per e-mail doorgestuurd naar
-            info@mccoy.nl.
+            {d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
           </p>
         </div>
 
         <SectionSurface variant="form">
           {status === "success" ? (
             <div className="py-10 text-center" role="status">
-              <p className="font-display text-2xl text-foreground">
-                {d.confirmation?.trim() || "Bedankt voor uw bericht."}
-              </p>
+              <p className="font-display text-2xl text-foreground">{CONTACT_FORM_SUCCESS_NL}</p>
               <p className="mt-2 text-sm text-muted-foreground">We nemen zo snel mogelijk contact op.</p>
             </div>
           ) : (
@@ -276,41 +338,22 @@ export function ContactFormSectionView({
                   />
                 </label>
               </div>
-              {keys.map(({ item, key, inputType }) => {
-                const fieldId = `cf-${blockId}-${item.id}`;
-                const required = key === "name" || key === "email";
+              {fields.map((field) => {
+                const key = formFieldPayloadKey(field);
+                const required = isFieldRequired(field);
                 return (
-                  <div key={item.id}>
-                    <label
-                      htmlFor={fieldId}
-                      className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-                    >
-                      {item.text}
+                  <div key={field.id}>
+                    <label htmlFor={`cf-${blockId}-${field.id}`} className={FIELD_LABEL_CLASS}>
+                      {field.label}
                       {required ? <span className="ml-1 text-primary">*</span> : null}
                     </label>
-                    {inputType === "textarea" ? (
-                      <textarea
-                        id={fieldId}
-                        name={key}
-                        rows={5}
-                        required={required}
-                        disabled={preview || status === "loading"}
-                        value={values[key] ?? ""}
-                        onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                        className="w-full resize-y rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
-                      />
-                    ) : (
-                      <input
-                        id={fieldId}
-                        type={inputType}
-                        name={key}
-                        required={required}
-                        disabled={preview || status === "loading"}
-                        value={values[key] ?? ""}
-                        onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                        className="w-full rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
-                      />
-                    )}
+                    <ContactFormFieldInput
+                      field={field}
+                      blockId={blockId}
+                      value={values[key] ?? ""}
+                      onChange={(next) => setValues((current) => ({ ...current, [key]: next }))}
+                      disabled={preview || status === "loading"}
+                    />
                   </div>
                 );
               })}

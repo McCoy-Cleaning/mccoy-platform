@@ -1,21 +1,33 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as React from "react";
-import { ArrowRight, UserRound } from "lucide-react";
+import { ArrowRight, ShieldCheck, UserRound } from "lucide-react";
 import { PasswordInput } from "@/components/admin/PasswordInput";
 import {
-  adminEstablishSession,
   fetchAdminSession,
   refreshAdminSessionClient,
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
 import {
+  adminExchangeAuthCallback,
+  adminHydrateBrowserAuthFromCookies,
+} from "@/lib/api/admin-auth.functions";
+import {
   completeStaffInviteRegistrationFn,
+  completeStaffPasswordRecoveryFn,
   getStaffInviteContextFn,
+  getStaffMfaRecoveryContextFn,
+  getStaffPasswordRecoveryContextFn,
 } from "@/lib/api/staff-identity.functions";
-import { getAdminBrowserSupabase, hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
-import { clearStaffInviteAuthCallbackFromUrl } from "@/lib/staff-invite-callback";
-import { establishBrowserSessionFromAuthCallback } from "@/lib/auth-callback-session";
+import { hydrateBrowserSupabaseSession } from "@/lib/hydrate-browser-supabase-session";
+import {
+  clearStaffInviteAuthCallbackFromUrl,
+  readStaffAuthCallbackTypeFromLocation,
+} from "@/lib/staff-invite-callback";
+import {
+  hasStaffAuthCallbackParams,
+  parseStaffAuthCallbackParams,
+} from "@/lib/staff-auth-callback-params";
 import logoUrl from "@/assets/logo-mccoy.png";
 import { staffPasswordStrengthError } from "@mccoy/domain";
 
@@ -34,6 +46,7 @@ type InviteContext = {
   fullName: string | null;
   needsFullName: boolean;
   expiresAt: string | null;
+  requiresMfaCode?: boolean;
 };
 
 type PagePhase =
@@ -42,43 +55,80 @@ type PagePhase =
   | "submitting"
   | "missing_session"
   | "error"
-  | "already_complete";
+  | "already_complete"
+  | "recovery_complete";
+
+type FlowMode = "invite" | "recovery";
 
 function AdminInvitePage() {
   const navigate = useNavigate();
   const { session, ready: sessionReady } = useAdminSession();
   const [phase, setPhase] = React.useState<PagePhase>("booting");
+  const [flowMode, setFlowMode] = React.useState<FlowMode>("invite");
   const [error, setError] = React.useState<string | null>(null);
   const [context, setContext] = React.useState<InviteContext | null>(null);
   const [fullName, setFullName] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [totpCode, setTotpCode] = React.useState("");
   const bootAttempted = React.useRef(false);
 
   const loadContext = React.useCallback(async () => {
+    const callbackType = readStaffAuthCallbackTypeFromLocation(window.location);
+    const inviteLinkTypes = new Set(["invite", "signup", "magiclink"]);
+
     const result = await getStaffInviteContextFn();
-    if (!result.ok) {
-      setPhase("error");
-      setError(result.error);
+    if (result.ok) {
+      if (result.alreadyComplete) {
+        setPhase("already_complete");
+        navigate({ to: "/admin", replace: true });
+        return;
+      }
+      if (result.registrationComplete) {
+        navigate({ to: "/admin/mfa", replace: true });
+        return;
+      }
+      setFlowMode("invite");
+      setContext({
+        email: result.email,
+        fullName: result.fullName,
+        needsFullName: result.needsFullName,
+        expiresAt: result.expiresAt,
+      });
+      if (result.fullName) setFullName(result.fullName);
+      setPhase("ready");
       return;
     }
-    if (result.alreadyComplete) {
-      setPhase("already_complete");
-      navigate({ to: "/admin", replace: true });
+
+    const mfaRecovery = await getStaffMfaRecoveryContextFn();
+    if (mfaRecovery.ok) {
+      navigate({ to: "/admin/recover-mfa", replace: true });
       return;
     }
-    if (result.registrationComplete) {
-      navigate({ to: "/admin/mfa", replace: true });
+
+    const recovery = await getStaffPasswordRecoveryContextFn();
+    if (recovery.ok) {
+      // Never show password-reset UI for invitation links (recovery token fallback is OK).
+      if (inviteLinkTypes.has(callbackType ?? "")) {
+        setPhase("error");
+        setError(result.error);
+        return;
+      }
+      setFlowMode("recovery");
+      setContext({
+        email: recovery.email,
+        fullName: recovery.fullName,
+        needsFullName: false,
+        expiresAt: null,
+        requiresMfaCode: recovery.requiresMfaCode,
+      });
+      if (recovery.fullName) setFullName(recovery.fullName);
+      setPhase("ready");
       return;
     }
-    setContext({
-      email: result.email,
-      fullName: result.fullName,
-      needsFullName: result.needsFullName,
-      expiresAt: result.expiresAt,
-    });
-    if (result.fullName) setFullName(result.fullName);
-    setPhase("ready");
+
+    setPhase("error");
+    setError(result.error);
   }, [navigate]);
 
   React.useEffect(() => {
@@ -91,96 +141,71 @@ function AdminInvitePage() {
       setPhase("booting");
       setError(null);
 
-      if (!hasBrowserSupabaseConfig()) {
-        if (!cancelled) {
-          setPhase("error");
-          setError("Supabase browserconfig ontbreekt. Neem contact op met McCoy.");
-        }
-        return;
-      }
+      // Read callback params into memory only — never sessionStorage.
+      const callbackParams = parseStaffAuthCallbackParams();
 
-      const supabase = getAdminBrowserSupabase();
-      if (!supabase) {
-        if (!cancelled) {
-          setPhase("error");
-          setError("Supabase browserconfig ontbreekt. Neem contact op met McCoy.");
-        }
-        return;
-      }
-
-      // Invite emails redirect with hash tokens (implicit) or ?code= / ?token_hash=.
-      // PKCE-default clients often miss the hash — parse explicitly.
-      const fromLink = await establishBrowserSessionFromAuthCallback(supabase);
-      if (fromLink.error && !fromLink.session) {
-        if (!cancelled) {
-          setPhase("missing_session");
-          setError(fromLink.error);
-        }
-        return;
-      }
-
-      let session = fromLink.session;
-      if (!session) {
-        // Brief wait for detectSessionInUrl race on slow mobiles.
-        await new Promise((resolve) => {
-          const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-            if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
-              sub.subscription.unsubscribe();
-              resolve(undefined);
-            }
-          });
-          window.setTimeout(() => {
-            sub.subscription.unsubscribe();
-            resolve(undefined);
-          }, 1500);
+      if (hasStaffAuthCallbackParams(callbackParams) && callbackParams) {
+        const exchanged = await adminExchangeAuthCallback({
+          data: {
+            tokenHash: callbackParams.tokenHash,
+            type: callbackParams.type,
+            code: callbackParams.code,
+            accessToken: callbackParams.accessToken,
+            refreshToken: callbackParams.refreshToken,
+            clientKey: callbackParams.tokenHash?.slice(0, 32) || callbackParams.code?.slice(0, 32),
+          },
         });
-        session = (await supabase.auth.getSession()).data.session;
-      }
 
-      if (!session) {
-        const existing = await fetchAdminSession().catch(() => null);
-        if (existing?.userId) {
-          if (!cancelled) await loadContext();
+        // Strip secrets from the URL as soon as the server has them (or failed).
+        clearStaffInviteAuthCallbackFromUrl();
+
+        if (!exchanged.ok) {
+          if (!cancelled) {
+            setPhase("missing_session");
+            setError(exchanged.error);
+          }
           return;
         }
-        if (!cancelled) {
-          setPhase("missing_session");
-          setError(
-            "Geen geldige uitnodigingssessie gevonden. Open de link opnieuw via de knop in je e-mail (bij voorkeur in Safari of Chrome, niet in de e-mail-app). Oude links werken niet meer — vraag zo nodig een nieuwe uitnodiging.",
-          );
+
+        if (exchanged.browserHydration) {
+          await hydrateBrowserSupabaseSession(exchanged.browserHydration);
         }
-        return;
-      }
+        refreshAdminSessionClient();
 
-      const established = await adminEstablishSession({
-        data: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          clientKey: session.user.email ?? undefined,
-        },
-      });
-
-      // Prevent /admin/mfa ↔ /admin/invite loops when #access_token&type=invite lingers.
-      clearStaffInviteAuthCallbackFromUrl();
-
-      if (!established.ok) {
-        if (!cancelled) {
-          setPhase("error");
-          setError(established.error);
+        if (
+          exchanged.nextStep === "none" &&
+          exchanged.session.status === "active" &&
+          exchanged.session.aal === "aal2"
+        ) {
+          if (!cancelled) navigate({ to: "/admin", replace: true });
+          return;
         }
+
+        if (!cancelled) await loadContext();
         return;
       }
 
-      if (
-        established.nextStep === "none" &&
-        established.session.status === "active" &&
-        established.session.aal === "aal2"
-      ) {
-        if (!cancelled) navigate({ to: "/admin", replace: true });
+      // Clean URL / reload: recover from HttpOnly cookies (mobile-safe).
+      const existing = await fetchAdminSession().catch(() => null);
+      if (existing?.userId) {
+        const hydrated = await adminHydrateBrowserAuthFromCookies();
+        if (hydrated.ok) {
+          await hydrateBrowserSupabaseSession({
+            accessToken: hydrated.accessToken,
+            refreshToken: hydrated.refreshToken,
+          });
+        }
+        refreshAdminSessionClient();
+        if (!cancelled) await loadContext();
         return;
       }
 
-      if (!cancelled) await loadContext();
+      if (!cancelled) {
+        setPhase("missing_session");
+        setError(
+          "Geen geldige uitnodigingssessie gevonden. Open de knop in je e-mail opnieuw (op de telefoon: kies “Open in Safari/Chrome”). De link is eenmalig; vraag zo nodig een nieuwe uitnodiging.",
+        );
+      }
     };
 
     void boot();
@@ -206,47 +231,56 @@ function AdminInvitePage() {
       setError("Vul je volledige naam in.");
       return;
     }
+    if (flowMode === "recovery" && context?.requiresMfaCode && !/^\d{6}$/.test(totpCode.trim())) {
+      setError("Voer de 6-cijferige MFA-code in.");
+      return;
+    }
 
     setPhase("submitting");
 
     try {
-      const supabase = getAdminBrowserSupabase();
-      if (!supabase) {
-        setPhase("error");
-        setError("Supabase browserconfig ontbreekt.");
-        return;
-      }
-
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
-        data: {
-          full_name: fullName.trim() || context?.fullName || null,
-        },
-      });
-      if (updateError) {
-        setPhase("ready");
-        setError(
-          updateError.message?.toLowerCase().includes("password")
-            ? "Wachtwoord kon niet worden ingesteld. Kies een sterker wachtwoord."
-            : "Account bijwerken mislukt. Probeer het opnieuw.",
-        );
-        return;
-      }
-
-      // Keep HttpOnly cookies aligned with the post-password browser session.
-      const { data: refreshed } = await supabase.auth.getSession();
-      if (refreshed.session) {
-        await adminEstablishSession({
+      if (flowMode === "recovery") {
+        const completed = await completeStaffPasswordRecoveryFn({
           data: {
-            accessToken: refreshed.session.access_token,
-            refreshToken: refreshed.session.refresh_token,
-            clientKey: refreshed.session.user.email ?? undefined,
+            newPassword: password,
+            totpCode: context?.requiresMfaCode ? totpCode.trim() : undefined,
           },
         });
+
+        if (!completed.ok) {
+          setPhase("ready");
+          setError(completed.error);
+          return;
+        }
+
+        if (completed.nextStep === "mfa_enroll") {
+          if (completed.browserHydration) {
+            await hydrateBrowserSupabaseSession(completed.browserHydration);
+          } else {
+            const hydrated = await adminHydrateBrowserAuthFromCookies();
+            if (hydrated.ok) {
+              await hydrateBrowserSupabaseSession({
+                accessToken: hydrated.accessToken,
+                refreshToken: hydrated.refreshToken,
+              });
+            }
+          }
+          refreshAdminSessionClient();
+          clearStaffInviteAuthCallbackFromUrl();
+          navigate({ to: "/admin/mfa", replace: true });
+          return;
+        }
+
+        await signOutAdmin();
+        setPhase("recovery_complete");
+        setError(null);
+        navigate({ to: "/admin/login", replace: true });
+        return;
       }
 
       const completed = await completeStaffInviteRegistrationFn({
         data: {
+          newPassword: password,
           fullName: fullName.trim() || undefined,
         },
       });
@@ -257,6 +291,17 @@ function AdminInvitePage() {
         return;
       }
 
+      if (completed.browserHydration) {
+        await hydrateBrowserSupabaseSession(completed.browserHydration);
+      } else {
+        const hydrated = await adminHydrateBrowserAuthFromCookies();
+        if (hydrated.ok) {
+          await hydrateBrowserSupabaseSession({
+            accessToken: hydrated.accessToken,
+            refreshToken: hydrated.refreshToken,
+          });
+        }
+      }
       refreshAdminSessionClient();
       clearStaffInviteAuthCallbackFromUrl();
       navigate({ to: "/admin/mfa", replace: true });
@@ -290,12 +335,16 @@ function AdminInvitePage() {
           <img
             src={logoUrl}
             alt="McCoy Cleaning"
-            className="mb-5 h-14 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-16"
+            className="mb-5 h-20 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-24"
             draggable={false}
           />
-          <h1 className="text-2xl font-bold tracking-tight text-white">Account activeren</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {flowMode === "recovery" ? "Nieuw wachtwoord" : "Account activeren"}
+          </h1>
           <p className="mt-1 text-sm text-white/60">
-            Stel je wachtwoord in en rond daarna tweestapsverificatie af.
+            {flowMode === "recovery"
+              ? "Stel een nieuw wachtwoord in voor je McCoy Admin-account."
+              : "Stel je wachtwoord in en rond daarna tweestapsverificatie af."}
           </p>
         </div>
 
@@ -323,12 +372,12 @@ function AdminInvitePage() {
             className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur-xl"
           >
             <div className="mb-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
-              Uitnodiging voor{" "}
+              {flowMode === "recovery" ? "Reset voor" : "Uitnodiging voor"}{" "}
               <span className="font-medium text-white/85">{context.email}</span>
-              {session?.staffRole === "admin" ? " · rol: beheerder" : null}
+              {flowMode === "invite" && session?.staffRole === "admin" ? " · rol: beheerder" : null}
             </div>
 
-            {(context.needsFullName || !context.fullName) && (
+            {flowMode === "invite" && (context.needsFullName || !context.fullName) && (
               <label className="mb-4 block">
                 <span className="mb-1.5 block text-xs font-medium text-white/70">Volledige naam</span>
                 <div className="relative">
@@ -377,9 +426,36 @@ function AdminInvitePage() {
               />
             </label>
 
+            {flowMode === "recovery" && context.requiresMfaCode && (
+              <label className="mb-4 block" htmlFor="recovery-mfa-code">
+                <span className="mb-1.5 block text-xs font-medium text-white/70">
+                  Authenticatiecode
+                </span>
+                <div className="relative">
+                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                  <input
+                    id="recovery-mfa-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value)}
+                    required
+                    maxLength={12}
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-10 py-2.5 text-sm tracking-widest text-white outline-none transition focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30"
+                    placeholder="000000"
+                  />
+                </div>
+              </label>
+            )}
+
             <p className="mb-4 text-[11px] leading-relaxed text-white/45">
-              Na deze stap stel je tweestapsverificatie (TOTP) in. Pas daarna heb je volledige
-              toegang tot McCoy Admin.
+              {flowMode === "recovery"
+                ? context.requiresMfaCode
+                  ? "Voer de code uit je authenticator-app in om je identiteit te bevestigen. Daarna kun je opnieuw inloggen met je nieuwe wachtwoord."
+                  : "Na het opslaan stel je tweestapsverificatie in. Daarna kun je inloggen met je nieuwe wachtwoord."
+                : "Na deze stap stel je tweestapsverificatie (TOTP) in. Pas daarna heb je volledige toegang tot McCoy Admin."}
             </p>
 
             {error && (
@@ -396,7 +472,11 @@ function AdminInvitePage() {
               disabled={phase === "submitting"}
               className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1e88e5] to-[#7c3aed] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#1e88e5]/30 transition hover:shadow-[#1e88e5]/50 disabled:opacity-60"
             >
-              {phase === "submitting" ? "Bezig…" : "Doorgaan naar MFA"}
+              {phase === "submitting"
+                ? "Bezig…"
+                : flowMode === "recovery"
+                  ? "Wachtwoord opslaan"
+                  : "Doorgaan naar MFA"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
           </form>

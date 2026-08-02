@@ -107,9 +107,20 @@ export function ProductsIntroView({
 }: ProductsIntroViewProps) {
   const reduced = useReducedMotion();
   const introParagraphs = intro
-    .split(/\n\s*\n/)
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter(Boolean);
+  const introGaps = (() => {
+    const normalized = intro.replace(/\r\n/g, "\n").replace(/^\n+|\n+$/g, "");
+    const tokens = normalized.split(/(\n{2,})/);
+    const gaps: number[] = [];
+    for (let i = 1; i < tokens.length; i += 2) {
+      const newlineCount = (tokens[i]?.match(/\n/g) ?? []).length;
+      gaps.push(Math.max(1, newlineCount - 1));
+    }
+    return gaps;
+  })();
 
   const metrics = localizedProductsIntroMetrics(metricsProp, isEn);
 
@@ -135,18 +146,20 @@ export function ProductsIntroView({
             </h1>
             <div className="mt-5 h-0.5 w-14 rounded-full bg-primary" aria-hidden />
 
-            {introParagraphs.map((paragraph, index) => (
-              <p
-                key={`products-intro-${index}`}
-                className={
-                  index === 0
-                    ? "mt-6 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
-                    : "mt-4 max-w-xl text-base leading-relaxed text-white/70 md:text-[17px]"
-                }
-              >
-                {paragraph}
-              </p>
-            ))}
+            {introParagraphs.map((paragraph, index) => {
+              const gap = index === 0 ? 0 : (introGaps[index - 1] ?? 1);
+              const marginTop =
+                index === 0 ? "1.5rem" : gap >= 2 ? `${1 + gap * 0.75}rem` : "1rem";
+              return (
+                <p
+                  key={`products-intro-${index}`}
+                  className="max-w-xl whitespace-pre-line text-base leading-relaxed text-white/70 md:text-[17px]"
+                  style={{ marginTop }}
+                >
+                  {paragraph}
+                </p>
+              );
+            })}
 
             <div className="mt-10 flex flex-wrap items-center gap-3 sm:gap-4">
               <Link
@@ -171,7 +184,7 @@ export function ProductsIntroView({
                 aria-label={isEn ? "Webshop notice" : "Webshop melding"}
               >
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                <p className="text-sm leading-relaxed text-white/80">{notice}</p>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-white/80">{notice}</p>
               </aside>
             ) : null}
           </motion.div>
@@ -259,7 +272,7 @@ export function ProductsAssortmentView({
               <h2 className="font-display mt-4 text-3xl text-white md:text-4xl">{heading}</h2>
             ) : null}
             {intro ? (
-              <p className="mt-4 text-base leading-relaxed text-white/65">{intro}</p>
+              <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-white/65">{intro}</p>
             ) : null}
           </div>
 

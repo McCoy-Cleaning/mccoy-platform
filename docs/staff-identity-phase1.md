@@ -102,9 +102,10 @@ Only an **active** `super_admin` session at **aal2** may invite. Invites create 
 2. Rate-limit invites per actor
 3. Normalize email; reject if active invite or existing staff
 4. Insert `private.staff_invitations` (`intended_role = admin` only, 7-day expiry)
-5. Prefer branded delivery when SMTP is configured (`SMTP_*` or `FORM_INBOX_USER`/`PASS`):
+5. Prefer branded delivery when Graph/SMTP is configured:
    - Auth Admin `generateLink({ type: "invite", redirectTo })`
-   - Send McCoy HTML via `@mccoy/email` → Nodemailer (`STAFF_INVITE_FROM_EMAIL` or `FORM_FROM_EMAIL`)
+   - Email CTA uses a **direct McCoy app link** (`/admin/invite?token_hash=&type=`) built from `hashed_token` — not the Supabase `action_link` host (avoids hosted verify/recovery UI and bad Site URL redirects)
+   - Send McCoy HTML via `@mccoy/email` → Graph/SMTP
 6. Fallback (no SMTP): Auth Admin `inviteUserByEmail` (Supabase sends the Invite template)
 7. Insert `public.users` staff profile (`status = invited`, role `admin`)
 8. Mark invitation `sent` + audit (`staff.invitation_created`, `staff.invitation_sent`)
@@ -147,9 +148,11 @@ Add redirect URLs for each environment, for example:
 
 - `http://localhost:5174/admin/invite`
 - `https://admin.mccoy.nl/admin/invite` (production)
-- Matching staging/preview origins
+- Matching staging/preview origins (`https://*.vercel.app/admin/invite`)
 
-Site URL may remain the admin origin; invite `redirectTo` must match an allow-listed URL.
+Site URL may remain the admin origin (e.g. `https://admin.mccoy.nl`); invite emails land directly on `/admin/invite` but keep redirect URLs allow-listed for legacy `action_link` fallbacks and password reset.
+
+**Do not** set Site URL to `*.supabase.co` or a bare Vercel URL without `/admin/invite` in the allow-list — misconfiguration still breaks legacy links and password reset.
 
 **Authentication → Providers**
 

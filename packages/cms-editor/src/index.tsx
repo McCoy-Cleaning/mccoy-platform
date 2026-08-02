@@ -1294,6 +1294,19 @@ export function ContactFormInspector({
           onChange={(e) => onPatch({ heading: e.target.value || undefined })}
         />
       </Field>
+      {!isOfferte ? (
+        <InspectTextField
+          label="Introductietekst"
+          value={content.body ?? ""}
+          onChange={(v) => onPatch({ body: v || undefined })}
+          fieldPath={`section:${sectionKey}:body`}
+          fieldHint="body"
+          multiline
+          maxChars={600}
+          placeholder="Tekst naast het formulier (links)."
+          enableAi={false}
+        />
+      ) : null}
       {isOfferte ? (
         <>
           <FormScopeField

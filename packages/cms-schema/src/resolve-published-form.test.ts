@@ -3,6 +3,7 @@ import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
 import type { BuiltinCmsPage } from "./types";
 import { normalizeFormScopeSnapshot } from "./form-scope";
 import { resolvePublishedFormScope } from "./resolve-published-form";
+import { normalizeCmsPage } from "./pipeline";
 
 function pageWithContactForm(scope?: { key: string; label: string }): BuiltinCmsPage {
   return {
@@ -33,6 +34,25 @@ function pageWithContactForm(scope?: { key: string; label: string }): BuiltinCms
     },
     updatedAt: Date.now(),
   };
+}
+
+function emptyBuiltinSeed(pageId: string, pageKey: "contact" | "offerte" | "vacatures"): BuiltinCmsPage {
+  return normalizeCmsPage({
+    id: pageId,
+    kind: "builtin",
+    isCustom: false,
+    pageKey,
+    title: pageKey,
+    slug: `/${pageKey}`,
+    description: "",
+    inNav: true,
+    version: 1,
+    layoutVersion: 0,
+    blocks: [],
+    layout: [],
+    sectionContent: {},
+    updatedAt: Date.now(),
+  }) as BuiltinCmsPage;
 }
 
 describe("resolvePublishedFormScope", () => {
@@ -66,6 +86,36 @@ describe("resolvePublishedFormScope", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("hidden");
+  });
+
+  it("resolves builtin contact/offerte/vacatures forms from empty seed layouts", () => {
+    const contact = emptyBuiltinSeed("page_contact", "contact");
+    const offerte = emptyBuiltinSeed("page_offerte", "offerte");
+    const vacatures = emptyBuiltinSeed("page_vacatures", "vacatures");
+
+    expect(
+      resolvePublishedFormScope(contact, {
+        pageId: "page_contact",
+        sourceId: FIXED_FORM_SOURCE_IDS.contactForm,
+        kind: "inquiry",
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      resolvePublishedFormScope(offerte, {
+        pageId: "page_offerte",
+        sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
+        kind: "glass_washing",
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      resolvePublishedFormScope(vacatures, {
+        pageId: "page_vacatures",
+        sourceId: FIXED_FORM_SOURCE_IDS.vacaturesApplication,
+        kind: "job_application",
+      }).ok,
+    ).toBe(true);
   });
 
   it("normalizes scope snapshots from CMS JSON", () => {

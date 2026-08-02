@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin-auth";
 import { hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
 import { redirectStaffInviteAuthCallbackIfNeeded } from "@/lib/staff-invite-callback";
+import { requestStaffPasswordResetFn } from "@/lib/api/staff-identity.functions";
 import logoUrl from "@/assets/logo-mccoy.png";
 
 export const Route = createFileRoute("/admin/login")({
@@ -28,6 +29,9 @@ function AdminLoginPage() {
   const [identifier, setIdentifier] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [resetMessage, setResetMessage] = React.useState<string | null>(null);
+  const [recoverySuccess, setRecoverySuccess] = React.useState(false);
+  const [showForgotPassword, setShowForgotPassword] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [authMode, setAuthMode] = React.useState<{
     supabaseEnabled: boolean;
@@ -36,6 +40,21 @@ function AdminLoginPage() {
     hasPublishable: boolean;
     hasSecret: boolean;
   } | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("recovered") === "1") {
+      setRecoverySuccess(true);
+      params.delete("recovered");
+      const nextSearch = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`,
+      );
+    }
+  }, []);
 
   React.useEffect(() => {
     if (redirectStaffInviteAuthCallbackIfNeeded()) return;
@@ -81,6 +100,7 @@ function AdminLoginPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setResetMessage(null);
     try {
       const result = await signInAdmin(identifier, password);
       if (!result.ok) {
@@ -103,6 +123,31 @@ function AdminLoginPage() {
     }
   };
 
+  const onRequestPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResetMessage(null);
+    try {
+      const result = await requestStaffPasswordResetFn({
+        data: {
+          email: identifier.trim(),
+          acceptOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setResetMessage(result.message);
+      setShowForgotPassword(false);
+    } catch {
+      setError("Resetverzoek mislukt. Probeer het later opnieuw.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -116,19 +161,21 @@ function AdminLoginPage() {
           <img
             src={logoUrl}
             alt="McCoy Cleaning"
-            className="mb-6 h-16 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-20"
+            className="mb-6 h-24 w-auto object-contain drop-shadow-[0_0_24px_rgba(30,136,229,0.35)] sm:h-28"
             draggable={false}
           />
           <h1 className="font-display text-3xl font-bold tracking-tight text-white">McCoy Beheer</h1>
           <p className="mt-2 text-base text-white/60">
-            {useSupabaseUi
-              ? "Log in met je staff e-mailadres en wachtwoord"
-              : "Log in om het beheer te openen"}
+            {showForgotPassword
+              ? "Vul je e-mailadres in — we sturen een resetlink via McCoy-mail"
+              : useSupabaseUi
+                ? "Log in met je staff e-mailadres en wachtwoord"
+                : "Log in om het beheer te openen"}
           </p>
         </div>
 
         <form
-          onSubmit={onSubmit}
+          onSubmit={showForgotPassword ? onRequestPasswordReset : onSubmit}
           className="rounded-3xl border border-white/10 bg-white/[0.05] p-7 shadow-2xl backdrop-blur-xl"
         >
           <label className="mb-5 block">
@@ -150,6 +197,7 @@ function AdminLoginPage() {
             </div>
           </label>
 
+          {!showForgotPassword && (
           <label className="mb-5 block">
             <span className="a-label">Wachtwoord</span>
             <PasswordInput
@@ -162,6 +210,26 @@ function AdminLoginPage() {
               placeholder="••••••••"
             />
           </label>
+          )}
+
+          {recoverySuccess && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+            >
+              Je nieuwe authenticator is gekoppeld. Log in met je bestaande wachtwoord en de
+              6-cijferige code uit je authenticator-app.
+            </div>
+          )}
+
+          {resetMessage && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+            >
+              {resetMessage}
+            </div>
+          )}
 
           {error && (
             <div
@@ -177,9 +245,29 @@ function AdminLoginPage() {
             disabled={busy}
             className="group flex min-h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#2f9ff0] to-[#1e88e5] px-5 text-lg font-semibold text-white shadow-lg shadow-[#1e88e5]/30 transition hover:shadow-[#1e88e5]/50 hover:brightness-110 disabled:opacity-60"
           >
-            {busy ? "Bezig..." : "Inloggen"}
+            {busy
+              ? "Bezig..."
+              : showForgotPassword
+                ? "Resetlink versturen"
+                : "Inloggen"}
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
           </button>
+
+          {authMode?.supabaseEnabled && (
+            <div className="mt-5 text-center">
+              <button
+                type="button"
+                className="text-sm text-white/60 underline-offset-2 hover:text-white hover:underline"
+                onClick={() => {
+                  setShowForgotPassword((prev) => !prev);
+                  setError(null);
+                  setResetMessage(null);
+                }}
+              >
+                {showForgotPassword ? "Terug naar inloggen" : "Wachtwoord vergeten?"}
+              </button>
+            </div>
+          )}
 
           {authMode && !authMode.supabaseEnabled && authMode.legacyEnabled && (
             <div className="mt-6 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm leading-relaxed text-white/55">

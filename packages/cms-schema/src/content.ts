@@ -163,12 +163,18 @@ export type ContactInfoContent = {
   items: ContactInfoItem[];
 };
 
+/** Default intro beside the contact form (NL) when CMS `body` is unset. */
+export const DEFAULT_CONTACT_FORM_INTRO_NL =
+  "Vul het formulier in. Uw aanvraag wordt opgeslagen en per e-mail doorgestuurd naar info@mccoy.nl.";
+
 /**
  * App-controlled inquiry / offerte forms; section exists so it can be hidden (not deleted).
  * Contact uses `scope`; offerte uses `glassScope` / `furnitureScope`.
  */
 export type ContactFormContent = {
   heading?: string;
+  /** Plain-text intro beside the form (left column). */
+  body?: string;
   scope?: FormScopeSnapshot;
   glassScope?: FormScopeSnapshot;
   furnitureScope?: FormScopeSnapshot;
@@ -404,6 +410,7 @@ export const contactInfoContentSchema: z.ZodType<ContactInfoContent> = z.object(
 
 export const contactFormContentSchema: z.ZodType<ContactFormContent> = z.object({
   heading: z.string().optional(),
+  body: z.string().optional(),
   scope: formScopeSnapshotSchema.optional(),
   glassScope: formScopeSnapshotSchema.optional(),
   furnitureScope: formScopeSnapshotSchema.optional(),

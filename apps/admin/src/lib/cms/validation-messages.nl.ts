@@ -47,6 +47,10 @@ export const PUBLISH_VALIDATION_MESSAGES_NL: Record<string, string> = {
   [PUBLISH_VALIDATION_CODES.CONTACT_FORM_TITLE_REQUIRED]: "Contactformulier: titel is verplicht.",
   [PUBLISH_VALIDATION_CODES.CONTACT_FORM_FIELDS_REQUIRED]:
     "Contactformulier: voeg minstens één veld met een label toe.",
+  [PUBLISH_VALIDATION_CODES.CONTACT_FORM_NAME_EMAIL_REQUIRED]:
+    "Contactformulier: stel bij één veld het type op Naam en bij één veld op E-mail (het label mag afwijken).",
+  [PUBLISH_VALIDATION_CODES.CONTACT_FORM_SELECT_OPTIONS_REQUIRED]:
+    "Contactformulier: een keuzelijst heeft minstens één optie met een label nodig.",
   [PUBLISH_VALIDATION_CODES.POPUP_TITLE_REQUIRED]: "Popup: titel is verplicht.",
 };
 

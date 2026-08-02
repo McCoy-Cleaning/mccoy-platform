@@ -1,4 +1,5 @@
 import * as React from "react";
+import { shouldSyncParagraphStructure, syncParagraphStructure } from "@mccoy/cms-schema";
 import { cn } from "@mccoy/ui";
 
 export type CmsAiTone = "professional" | "catchy" | "warm" | "concise";
@@ -253,7 +254,10 @@ export function InspectTextField({
       );
       if (!ok) return;
     }
-    ai.setEnDraft(fieldPath, preview.text);
+    const enText = shouldSyncParagraphStructure(value, preview.text)
+      ? syncParagraphStructure(value, preview.text)
+      : preview.text;
+    ai.setEnDraft(fieldPath, enText);
     setPreview({ kind: "idle" });
   };
 
@@ -301,7 +305,19 @@ export function InspectTextField({
           value={value}
           placeholder={placeholder}
           aria-label={label}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            onChange(next);
+            // Mirror NL blank-line structure onto the EN draft so both locales
+            // keep the same paragraph spacing after NL edits.
+            if (fieldPath && ai) {
+              const en = ai.getEnDraft(fieldPath);
+              if (en.trim() && shouldSyncParagraphStructure(next, en)) {
+                const synced = syncParagraphStructure(next, en);
+                if (synced !== en) ai.setEnDraft(fieldPath, synced);
+              }
+            }
+          }}
         />
       ) : (
         <input

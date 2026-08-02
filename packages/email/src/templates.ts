@@ -1,4 +1,5 @@
 import {
+  displayFormFields,
   FIELD_LABELS_NL,
   FORM_SUBJECTS,
   encodeFormScopeSubjectMarker,
@@ -17,7 +18,7 @@ function escapeHtml(value: string): string {
 }
 
 function rowsHtml(fields: Record<string, string>): string {
-  return Object.entries(fields)
+  return Object.entries(displayFormFields(fields))
     .filter(([, value]) => value.trim().length > 0)
     .map(([key, value]) => {
       const label = FIELD_LABELS_NL[key] ?? key;

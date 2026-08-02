@@ -43,7 +43,7 @@ export function Stats() {
               </>
             )}
           </h2>
-          <p className="mt-6 max-w-lg text-muted-foreground">{body}</p>
+          <p className="mt-6 max-w-lg whitespace-pre-line text-muted-foreground">{body}</p>
         </motion.div>
 
         <div className="grid grid-cols-1 gap-4 self-center sm:grid-cols-3">

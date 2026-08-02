@@ -43,6 +43,8 @@ export {
   assertContentAiRateLimit,
   assertStaffAccountChangeRateLimit,
   assertStaffInviteRateLimit,
+  assertStaffRecoveryRateLimit,
   assertStaffInviteAcceptRateLimit,
+  assertStaffPasswordResetRateLimit,
   AdminAuthError,
 } from "./session";

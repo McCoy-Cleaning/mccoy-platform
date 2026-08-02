@@ -3,7 +3,7 @@
  * Application permissions (client credentials) against a shared mailbox.
  */
 import type { FormKind } from "@mccoy/domain";
-import { FIELD_LABELS_NL } from "@mccoy/domain";
+import { FIELD_LABELS_NL, FORM_KINDS, FORM_SCOPE_KEY_PATTERN } from "@mccoy/domain";
 import { readServerEnv } from "@mccoy/security";
 
 import {
@@ -22,7 +22,7 @@ import {
 } from "./form-inbox-contracts";
 import { getGraphAccessToken } from "./graph-auth";
 import { getGraphMailConfig, type GraphMailConfig } from "./graph-config";
-import { formatGraphApiError } from "./graph-errors";
+import { formatGraphApiError, formatGraphMailWriteError } from "./graph-errors";
 import {
   encodeGraphMessageId,
   graphIdToSyntheticUid,
@@ -31,6 +31,7 @@ import {
   normalizeFormFieldLabel,
   parseFormFieldsFromHtml,
   parseFormFieldsFromText,
+  toDisplayParsedFields,
   type ParsedFormField,
 } from "./parse-form-fields";
 import { escapeHtml } from "./templates";
@@ -54,6 +55,11 @@ type GraphRecipient = {
   emailAddress?: GraphEmailAddress | null;
 };
 
+type GraphInternetMessageHeader = {
+  name?: string | null;
+  value?: string | null;
+};
+
 type GraphMessage = {
   id?: string;
   subject?: string | null;
@@ -66,6 +72,7 @@ type GraphMessage = {
   from?: GraphRecipient | null;
   replyTo?: GraphRecipient[] | null;
   toRecipients?: GraphRecipient[] | null;
+  internetMessageHeaders?: GraphInternetMessageHeader[] | null;
   body?: { contentType?: string | null; content?: string | null } | null;
 };
 
@@ -89,23 +96,104 @@ function extractEmail(raw: string): string {
   return (match?.[1] || raw).trim().toLowerCase();
 }
 
-function configuredFromAddress(): string {
+/**
+ * All addresses that may appear as From when our servers send form mail.
+ * SMTP auth user (e.g. sander@) often differs from SMTP_FROM_EMAIL / GRAPH_MAILBOX
+ * (e.g. info@ shared mailbox) — Exchange may deliver with either address.
+ */
+function configuredSenderAddresses(): string[] {
   const candidates = [
     readServerEnv("FORM_FROM_EMAIL"),
     readServerEnv("SMTP_FROM_EMAIL"),
     readServerEnv("SMTP_USER"),
     readServerEnv("FORM_INBOX_USER"),
     readServerEnv("GRAPH_MAILBOX"),
+    readServerEnv("FORM_TO_EMAIL"),
+    readServerEnv("SMTP_REPLY_TO"),
   ];
+  const out: string[] = [];
+  const seen = new Set<string>();
   for (const raw of candidates) {
     const email = extractEmail(raw);
-    if (email && EMAIL_RE.test(email)) return email;
+    if (!email || !EMAIL_RE.test(email) || seen.has(email)) continue;
+    seen.add(email);
+    out.push(email);
   }
-  return "";
+  return out;
+}
+
+function configuredFromAddress(): string {
+  return configuredSenderAddresses()[0] || "";
 }
 
 function configuredFromDisplayName(): string {
   return (readServerEnv("SMTP_FROM_NAME") || "McCoy Website").trim();
+}
+
+/** Dev/debug: list every Graph mailbox message, not only McCoy form notifications. */
+export function showAllGraphInboxMessages(): boolean {
+  const raw = readServerEnv("FORM_INBOX_SHOW_ALL").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
+function readInternetHeader(
+  headers: GraphInternetMessageHeader[] | null | undefined,
+  name: string,
+): string | null {
+  if (!headers?.length) return null;
+  const wanted = name.trim().toLowerCase();
+  for (const header of headers) {
+    if ((header.name?.trim() || "").toLowerCase() !== wanted) continue;
+    const value = header.value?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+/** True for reply/forward subjects — those are conversation mail, not form submissions. */
+export function isReplyOrForwardSubject(subject: string | null | undefined): boolean {
+  return /^(re|fw|fwd)\s*:/i.test((subject ?? "").trim());
+}
+
+/**
+ * Website form notifications set X-McCoy-Form-* headers (incl. future custom forms).
+ * Exported for unit tests.
+ */
+export function hasMcCoyFormMarkerHeaders(
+  headers: GraphInternetMessageHeader[] | null | undefined,
+): boolean {
+  if (!headers?.length) return false;
+  return headers.some((header) => {
+    const name = header.name?.trim() || "";
+    if (!/^x-mccoy-form-(kind|id|submission-id)$/i.test(name)) return false;
+    return Boolean(header.value?.trim());
+  });
+}
+
+/**
+ * Prefer X-McCoy-Form-Kind for category tabs. Unknown/custom kinds fall back to
+ * `inquiry` (Algemeen) when other form marker headers are present.
+ */
+export function formKindFromInternetHeaders(
+  headers: GraphInternetMessageHeader[] | null | undefined,
+): FormKind | null {
+  const raw = readInternetHeader(headers, "x-mccoy-form-kind")?.toLowerCase() || "";
+  if (raw && (FORM_KINDS as readonly string[]).includes(raw)) {
+    return raw as FormKind;
+  }
+  if (hasMcCoyFormMarkerHeaders(headers)) {
+    return "inquiry";
+  }
+  return null;
+}
+
+function formScopeFromInternetHeaders(
+  headers: GraphInternetMessageHeader[] | null | undefined,
+): { key: string | null; label: string | null } {
+  const keyRaw = readInternetHeader(headers, "x-mccoy-form-scope-key")?.toLowerCase() || "";
+  const key = keyRaw && FORM_SCOPE_KEY_PATTERN.test(keyRaw) ? keyRaw : null;
+  const label = readInternetHeader(headers, "x-mccoy-form-scope-label");
+  return { key, label };
 }
 
 function recipientAddress(r: GraphRecipient | null | undefined): string | null {
@@ -184,7 +272,7 @@ function sanitizeParsedFields(fields: ParsedFormField[]): ParsedFormField[] {
     if (out.some((f) => f.key === key)) continue;
     out.push({ key, label, value });
   }
-  return out;
+  return toDisplayParsedFields(out);
 }
 
 function parseFieldsFromParts(text: string, html: string): ParsedFormField[] {
@@ -193,8 +281,18 @@ function parseFieldsFromParts(text: string, html: string): ParsedFormField[] {
   return sanitizeParsedFields(parseFormFieldsFromText(text || stripHtmlToText(html)));
 }
 
+function hasMcCoyFormFooter(text: string, html: string): boolean {
+  return (
+    /verstuurd via het mccoy websiteformulier/i.test(html) ||
+    /verstuurd via het mccoy websiteformulier/i.test(text) ||
+    /sent from the mccoy website form/i.test(html) ||
+    /sent from the mccoy website form/i.test(text)
+  );
+}
+
 /**
- * Detect McCoy website form notification messages (same rules as IMAP path).
+ * Detect McCoy website form notification From/footer markers.
+ * Does not treat arbitrary @mccoy.nl mail as a form submission.
  * Exported for unit tests.
  */
 export function isMcCoyWebsiteFormNotificationGraph(input: {
@@ -205,22 +303,14 @@ export function isMcCoyWebsiteFormNotificationGraph(input: {
 }): boolean {
   const fromName = input.fromName.toLowerCase();
   const fromAddr = input.fromAddress.toLowerCase();
-  const configured = configuredFromAddress();
+  const senders = configuredSenderAddresses();
   const configuredName = configuredFromDisplayName().toLowerCase();
 
   if (fromName.includes("mccoy website")) return true;
   if (configuredName && fromName.includes(configuredName)) return true;
-  if (configured && fromAddr === configured) return true;
+  if (fromAddr && senders.includes(fromAddr)) return true;
   if (fromAddr.endsWith("@resend.dev") && fromName.includes("mccoy")) return true;
-
-  if (
-    /verstuurd via het mccoy websiteformulier/i.test(input.html) ||
-    /verstuurd via het mccoy websiteformulier/i.test(input.text) ||
-    /sent from the mccoy website form/i.test(input.html) ||
-    /sent from the mccoy website form/i.test(input.text)
-  ) {
-    return true;
-  }
+  if (hasMcCoyFormFooter(input.text, input.html)) return true;
 
   return false;
 }
@@ -243,20 +333,34 @@ export function resolveSubmitterEmailGraph(
   fields: ParsedFormField[],
   textBody: string,
   inboxUser: string,
+  extraHeaders?: GraphInternetMessageHeader[] | null,
 ): string | null {
-  const replyTo = recipientAddress(msg.replyTo?.[0]);
-  if (replyTo) return replyTo;
+  const inbox = inboxUser.trim().toLowerCase();
+  const ourAddresses = new Set(
+    [...configuredSenderAddresses(), inbox].filter(Boolean),
+  );
 
-  const emailField = fields.find((f) => f.key === "email");
-  if (emailField && EMAIL_RE.test(emailField.value)) {
-    return emailField.value.trim().toLowerCase();
+  const isExternal = (addr: string | null | undefined): addr is string =>
+    Boolean(addr && EMAIL_RE.test(addr) && !ourAddresses.has(addr.toLowerCase()));
+
+  for (const header of extraHeaders ?? []) {
+    if (!/^x-mccoy-submitter-email$/i.test(header.name?.trim() || "")) continue;
+    const value = header.value?.trim().toLowerCase() || "";
+    if (isExternal(value)) return value;
   }
 
+  const replyTo = recipientAddress(msg.replyTo?.[0]);
+  if (isExternal(replyTo)) return replyTo;
+
+  const emailField = fields.find((f) => f.key === "email");
+  const fieldEmail = emailField?.value.trim().toLowerCase() || null;
+  if (isExternal(fieldEmail)) return fieldEmail;
+
   const fromBody = extractEmailFromText(textBody);
-  if (fromBody && fromBody !== inboxUser.toLowerCase()) return fromBody;
+  if (isExternal(fromBody)) return fromBody;
 
   const from = recipientAddress(msg.from);
-  if (from && from !== inboxUser.toLowerCase()) return from;
+  if (isExternal(from)) return from;
 
   return null;
 }
@@ -285,6 +389,38 @@ function formMessageSnippet(
     .join(" · ");
   if (useful) return makeSnippet(useful);
   return makeSnippet(textBody || subject);
+}
+
+/**
+ * One form submit can appear twice in Graph when saveToSentItems duplicated a
+ * self-addressed notification (Inbox + Sent Items). Keep a single list row per
+ * McCoy request number when present.
+ */
+export function dedupeFormInboxSummaries(
+  items: FormInboxMessageSummary[],
+): FormInboxMessageSummary[] {
+  const withoutNumber: FormInboxMessageSummary[] = [];
+  const byNumber = new Map<string, FormInboxMessageSummary>();
+
+  for (const item of items) {
+    const number = item.requestNumber?.trim();
+    if (!number) {
+      withoutNumber.push(item);
+      continue;
+    }
+    const existing = byNumber.get(number);
+    if (!existing) {
+      byNumber.set(number, item);
+      continue;
+    }
+    const keepExisting =
+      new Date(existing.date).getTime() >= new Date(item.date).getTime();
+    byNumber.set(number, keepExisting ? existing : item);
+  }
+
+  return [...byNumber.values(), ...withoutNumber].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
 }
 
 async function graphFetch<T>(
@@ -393,9 +529,21 @@ function mapAttachments(list: GraphAttachment[] | undefined): FormInboxAttachmen
   return out;
 }
 
-function looksLikeFormCandidate(msg: GraphMessage): boolean {
+/**
+ * List-path filter: keep only website form notifications (headers, or
+ * form subject + sender/footer). Replies/forwards are excluded.
+ * Exported for unit tests.
+ */
+export function looksLikeFormCandidate(msg: {
+  subject?: string | null;
+  bodyPreview?: string | null;
+  from?: GraphRecipient | null;
+  internetMessageHeaders?: GraphInternetMessageHeader[] | null;
+}): boolean {
+  if (hasMcCoyFormMarkerHeaders(msg.internetMessageHeaders)) return true;
   const subject = msg.subject || "";
-  if (classifyFormEmailSubject(subject)) return true;
+  if (isReplyOrForwardSubject(subject)) return false;
+  if (!classifyFormEmailSubject(subject)) return false;
   const fromName = recipientName(msg.from);
   const fromAddr = recipientAddress(msg.from) || "";
   return isMcCoyWebsiteFormNotificationGraph({
@@ -406,6 +554,20 @@ function looksLikeFormCandidate(msg: GraphMessage): boolean {
   });
 }
 
+function resolveFormKind(
+  subject: string,
+  headers: GraphInternetMessageHeader[] | null | undefined,
+  showAll: boolean,
+): FormKind | null {
+  const headerKind = formKindFromInternetHeaders(headers);
+  if (headerKind) return headerKind;
+  if (!isReplyOrForwardSubject(subject)) {
+    const subjectKind = classifyFormEmailSubject(subject);
+    if (subjectKind) return subjectKind;
+  }
+  return showAll ? ("inquiry" as FormKind) : null;
+}
+
 function toSummary(
   msg: GraphMessage,
   mailbox: string,
@@ -414,7 +576,8 @@ function toSummary(
 ): FormInboxMessageSummary | null {
   if (!msg.id) return null;
   const subject = (msg.subject || "").trim() || "(geen onderwerp)";
-  const kind = classifyFormEmailSubject(subject);
+  const showAll = showAllGraphInboxMessages();
+  const kind = resolveFormKind(subject, msg.internetMessageHeaders, showAll);
   if (!kind) return null;
 
   const fromName = recipientName(msg.from);
@@ -423,32 +586,18 @@ function toSummary(
     ? { text: textBody, html: "" }
     : bodyPlainFromGraph(msg);
 
-  const isForm = isMcCoyWebsiteFormNotificationGraph({
-    fromName,
-    fromAddress: fromAddr,
-    text: text || msg.bodyPreview || "",
-    html,
-  });
-  // List path may only have preview — still require kind match; body check when available
-  if (textBody != null || html || msg.body?.content) {
-    if (!isForm) return null;
-  } else if (
-    !isForm &&
-    !isMcCoyWebsiteFormNotificationGraph({
+  if (!showAll) {
+    const headerMarksForm = hasMcCoyFormMarkerHeaders(msg.internetMessageHeaders);
+    if (isReplyOrForwardSubject(subject) && !headerMarksForm) return null;
+
+    const senderOrFooter = isMcCoyWebsiteFormNotificationGraph({
       fromName,
       fromAddress: fromAddr,
-      text: msg.bodyPreview || "",
-      html: "",
-    })
-  ) {
-    // Keep subject-classified candidates from our From address / name for list speed
-    const configured = configuredFromAddress();
-    const configuredName = configuredFromDisplayName().toLowerCase();
-    const fromOk =
-      (configured && fromAddr === configured) ||
-      (configuredName && fromName.toLowerCase().includes(configuredName)) ||
-      fromName.toLowerCase().includes("mccoy");
-    if (!fromOk) return null;
+      text: text || msg.bodyPreview || "",
+      html,
+    });
+    const isForm = headerMarksForm || senderOrFooter;
+    if (!isForm) return null;
   }
 
   const parsedFields = fields ?? [];
@@ -457,7 +606,11 @@ function toSummary(
     parsedFields,
     text || msg.bodyPreview || "",
     mailbox,
+    msg.internetMessageHeaders,
   );
+  const headerScope = formScopeFromInternetHeaders(msg.internetMessageHeaders);
+  const scopeFromField =
+    parsedFields.find((f) => f.label.toLowerCase() === "scope")?.value?.trim() || null;
 
   return {
     id: encodeGraphMessageId(msg.id, mailbox),
@@ -472,23 +625,47 @@ function toSummary(
     submitterName: resolveSubmitterName(subject, parsedFields),
     submitterEmail,
     requestNumber: extractRequestNumber(subject, text || msg.bodyPreview || ""),
-    scopeKey: extractFormScopeKeyFromSubject(subject),
-    scopeLabel:
-      parsedFields.find((f) => f.label.toLowerCase() === "scope")?.value?.trim() || null,
+    scopeKey: headerScope.key ?? extractFormScopeKeyFromSubject(subject),
+    scopeLabel: headerScope.label ?? scopeFromField,
   };
 }
 
-function threadDirection(
-  from: string | null,
-  inboxUser: string,
-  submitter: string | null,
-): FormInboxThreadItem["direction"] {
-  const f = (from || "").toLowerCase();
-  if (submitter && f === submitter.toLowerCase()) return "customer";
-  if (f === inboxUser.toLowerCase()) return "admin";
-  const configured = configuredFromAddress();
-  if (configured && f === configured) return "form";
-  return "admin";
+/**
+ * Classify a Graph conversation item. Form notifications are From our mailbox
+ * (info@…), so mailbox/from checks alone would mis-label them as admin and
+ * duplicate the structured fields in the UI. Outbound `Re:` replies must stay
+ * "admin" even though From is the same mailbox.
+ */
+export function classifyGraphThreadDirection(input: {
+  fromAddress: string | null;
+  fromName: string;
+  subject: string;
+  text: string;
+  inboxUser: string;
+  submitter: string | null;
+}): FormInboxThreadItem["direction"] {
+  const from = (input.fromAddress || "").toLowerCase();
+  const subject = input.subject.trim();
+  const isReplySubject = /^(re|fw|fwd)\s*:/i.test(subject);
+  const hasFormFooter =
+    /verstuurd via het mccoy websiteformulier/i.test(input.text) ||
+    /sent from the mccoy website form/i.test(input.text);
+  const isFormNotification =
+    !isReplySubject &&
+    Boolean(classifyFormEmailSubject(subject)) &&
+    (hasFormFooter ||
+      isMcCoyWebsiteFormNotificationGraph({
+        fromName: input.fromName,
+        fromAddress: from,
+        text: input.text,
+        html: "",
+      }));
+
+  if (isFormNotification) return "form";
+  if (input.submitter && from === input.submitter.toLowerCase()) return "customer";
+  if (from && from === input.inboxUser.trim().toLowerCase()) return "admin";
+  if (from && configuredSenderAddresses().includes(from)) return "admin";
+  return "customer";
 }
 
 function toThreadItem(
@@ -499,14 +676,23 @@ function toThreadItem(
   if (!msg.id) return null;
   const { text } = bodyPlainFromGraph(msg);
   const fromAddr = recipientAddress(msg.from);
+  const fromName = msg.from?.emailAddress?.name?.trim() || "";
+  const subject = (msg.subject || "").trim() || "(geen onderwerp)";
   return {
     id: encodeGraphMessageId(msg.id, mailbox),
     uid: graphIdToSyntheticUid(msg.id),
-    direction: threadDirection(fromAddr, mailbox, submitter),
+    direction: classifyGraphThreadDirection({
+      fromAddress: fromAddr,
+      fromName,
+      subject,
+      text,
+      inboxUser: mailbox,
+      submitter,
+    }),
     from: formatRecipient(msg.from) || "(onbekend)",
     to: formatRecipients(msg.toRecipients) || mailbox,
     date: msg.receivedDateTime || new Date().toISOString(),
-    subject: (msg.subject || "").trim() || "(geen onderwerp)",
+    subject,
     textBody: text,
     messageId: msg.internetMessageId ?? null,
     attachments: [],
@@ -566,16 +752,18 @@ export async function listGraphFormInboxMessages(options?: {
   const recent = await listRecentMessages(config, accessToken);
 
   const windowMessages: FormInboxMessageSummary[] = [];
+  const showAll = showAllGraphInboxMessages();
   for (const msg of recent) {
-    if (!looksLikeFormCandidate(msg)) continue;
+    if (!showAll && !looksLikeFormCandidate(msg)) continue;
     const summary = toSummary(msg, config.mailbox);
     if (!summary) continue;
     windowMessages.push(summary);
   }
 
   windowMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const facets = buildInboxFacets(windowMessages);
-  const filtered = filterInboxMessages(windowMessages, {
+  const deduped = dedupeFormInboxSummaries(windowMessages);
+  const facets = buildInboxFacets(deduped);
+  const filtered = filterInboxMessages(deduped, {
     kind: options?.kind,
     scopeKey: options?.scopeKey,
     q: options?.q,
@@ -613,6 +801,22 @@ export async function getGraphFormInboxMessage(
     usersPath(box, `/messages/${encodeURIComponent(graphId)}?$select=${encodeURIComponent(select)}`),
     { accessToken },
   );
+
+  // Graph requires internetMessageHeaders as the sole $select property.
+  let headers: GraphInternetMessageHeader[] = [];
+  try {
+    const headerMsg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=internetMessageHeaders`,
+      ),
+      { accessToken },
+    );
+    headers = headerMsg.internetMessageHeaders ?? [];
+  } catch {
+    headers = [];
+  }
+  msg.internetMessageHeaders = headers;
 
   const { text, html } = bodyPlainFromGraph(msg);
   const fields = parseFieldsFromParts(text, html);
@@ -688,7 +892,28 @@ export async function getGraphFormInboxThread(
 
   const { text: rootText, html: rootHtml } = bodyPlainFromGraph(root);
   const fields = parseFieldsFromParts(rootText, rootHtml);
-  const submitter = resolveSubmitterEmailGraph(root, fields, rootText, box);
+
+  let rootHeaders: GraphInternetMessageHeader[] = [];
+  try {
+    const headerMsg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=internetMessageHeaders`,
+      ),
+      { accessToken },
+    );
+    rootHeaders = headerMsg.internetMessageHeaders ?? [];
+  } catch {
+    rootHeaders = [];
+  }
+
+  const submitter = resolveSubmitterEmailGraph(
+    root,
+    fields,
+    rootText,
+    box,
+    rootHeaders,
+  );
   const conversationId = root.conversationId;
 
   if (!conversationId) {
@@ -696,22 +921,43 @@ export async function getGraphFormInboxThread(
     return single ? [single] : [];
   }
 
-  const filter = `conversationId eq '${conversationId.replace(/'/g, "''")}'`;
-  const data = await graphFetch<GraphListResponse<GraphMessage>>(
-    usersPath(
-      box,
-      `/messages?$filter=${encodeURIComponent(filter)}` +
-        `&$select=${encodeURIComponent(
-          "id,subject,from,toRecipients,replyTo,receivedDateTime,internetMessageId,body,bodyPreview",
-        )}` +
-        `&$orderby=${encodeURIComponent("receivedDateTime asc")}` +
-        `&$top=${MAX_THREAD_MESSAGES}`,
-    ),
-    { accessToken },
-  );
+  // Graph rejects bare conversationId filters with InefficientFilter (400).
+  // A receivedDateTime lower bound makes the filter usable; on failure fall back
+  // to the single root message so reply UI still works.
+  const filter =
+    `conversationId eq '${conversationId.replace(/'/g, "''")}'` +
+    ` and receivedDateTime ge 1970-01-01T00:00:00Z`;
+
+  let messages: GraphMessage[] = [];
+  try {
+    const data = await graphFetch<GraphListResponse<GraphMessage>>(
+      usersPath(
+        box,
+        `/messages?$filter=${encodeURIComponent(filter)}` +
+          `&$select=${encodeURIComponent(
+            "id,subject,from,toRecipients,replyTo,receivedDateTime,internetMessageId,body,bodyPreview",
+          )}` +
+          `&$orderby=${encodeURIComponent("receivedDateTime asc")}` +
+          `&$top=${MAX_THREAD_MESSAGES}`,
+      ),
+      { accessToken },
+    );
+    messages = data.value ?? [];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/InefficientFilter|ErrorInvalidArgument/i.test(message)) {
+      console.warn(
+        "[graph-mail] conversation filter rejected; using single-message thread",
+        message.slice(0, 160),
+      );
+      const single = toThreadItem(root, box, submitter);
+      return single ? [single] : [];
+    }
+    throw error;
+  }
 
   const thread: FormInboxThreadItem[] = [];
-  for (const msg of data.value ?? []) {
+  for (const msg of messages) {
     const item = toThreadItem(msg, box, submitter);
     if (item) thread.push(item);
   }
@@ -768,14 +1014,98 @@ export async function getGraphFormInboxAttachment(
   return { ...hit, omitted: true };
 }
 
+/**
+ * Move a form notification to Deleted Items (soft-delete).
+ * Requires Mail.ReadWrite on the Graph application.
+ */
+async function deleteGraphFormInboxMessageWithToken(
+  graphId: string,
+  box: string,
+  accessToken: string,
+  mailboxForErrors: string,
+): Promise<void> {
+  const movePath = usersPath(box, `/messages/${encodeURIComponent(graphId)}/move`);
+  const deletePath = usersPath(box, `/messages/${encodeURIComponent(graphId)}`);
+
+  try {
+    await graphFetch(movePath, {
+      method: "POST",
+      accessToken,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destinationId: "deleteditems" }),
+    });
+    return;
+  } catch (error) {
+    if (!(error instanceof FormInboxError)) throw error;
+  }
+
+  try {
+    await graphFetch(deletePath, {
+      method: "DELETE",
+      accessToken,
+    });
+  } catch (error) {
+    if (!(error instanceof FormInboxError)) throw error;
+    throw new FormInboxError(
+      rewriteGraphMailWriteErrorMessage(error.message, mailboxForErrors),
+    );
+  }
+}
+
+function rewriteGraphMailWriteErrorMessage(message: string, mailbox: string): string {
+  const lower = message.toLowerCase();
+  if (
+    /toegang geweigerd|accessdenied|forbidden|authorization_requestdenied|http_403/i.test(
+      lower,
+    )
+  ) {
+    return formatGraphMailWriteError({
+      status: 403,
+      code: "ErrorAccessDenied",
+      detail: message,
+      mailbox,
+    });
+  }
+  return message;
+}
+
+export async function deleteGraphFormInboxMessage(
+  graphId: string,
+  mailbox?: string,
+): Promise<void> {
+  const config = getGraphMailConfig();
+  if (!config) {
+    throw new FormInboxError("Microsoft Graph is niet geconfigureerd.");
+  }
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  await deleteGraphFormInboxMessageWithToken(graphId, box, accessToken, config.mailbox);
+}
+
+export type GraphSendAttachment = {
+  filename: string;
+  contentBase64: string;
+  contentType?: string;
+  /** When set with isInline, embeds as cid: in HTML (staff brand logo). */
+  contentId?: string;
+  isInline?: boolean;
+};
+
 export async function sendGraphAdminReply(options: {
   to: string;
   subject: string;
   html: string;
   text: string;
   replyTo?: string;
+  /** BCC so Aanvragen can show the outbound reply in the conversation list. */
+  bcc?: string | string[];
   inReplyToGraphId?: string;
   inReplyToInternetMessageId?: string;
+  /** Custom x-* internet headers (Graph only allows extension headers). */
+  headers?: Record<string, string>;
+  attachments?: GraphSendAttachment[];
+  /** Default true — staff replies. Form notifications pass false to avoid Sent Items dupes. */
+  saveToSentItems?: boolean;
 }): Promise<{ ok: true; messageId?: string } | { ok: false; error: string }> {
   const config = getGraphMailConfig();
   if (!config) {
@@ -784,6 +1114,63 @@ export async function sendGraphAdminReply(options: {
 
   try {
     const accessToken = await getGraphAccessToken(config);
+
+    const internetMessageHeaders = Object.entries(options.headers ?? {})
+      .filter(([name, value]) => name.trim() && value.trim())
+      .map(([name, value]) => {
+        const headerName = name.trim();
+        // Graph only accepts extension headers (must start with x- / X-).
+        const safeName = /^x-/i.test(headerName) ? headerName : `x-${headerName}`;
+        return { name: safeName, value: value.trim().slice(0, 500) };
+      });
+
+    const fileAttachments = (options.attachments ?? [])
+      .filter((a) => a.filename && a.contentBase64)
+      .slice(0, 8)
+      .map((a) => ({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: a.filename.slice(0, 180),
+        contentType: a.contentType || "application/octet-stream",
+        contentBytes: a.contentBase64,
+        ...(a.isInline && a.contentId
+          ? { isInline: true, contentId: a.contentId.slice(0, 180) }
+          : {}),
+      }));
+
+    const bccList = (Array.isArray(options.bcc) ? options.bcc : options.bcc ? [options.bcc] : [])
+      .map((addr) => addr.trim().toLowerCase())
+      .filter((addr) => addr.length > 0 && addr !== options.to.trim().toLowerCase());
+
+    const messageBase = {
+      subject: options.subject,
+      body: {
+        contentType: "HTML" as const,
+        content: options.html,
+      },
+      toRecipients: [
+        {
+          emailAddress: { address: options.to },
+        },
+      ],
+      ...(bccList.length > 0
+        ? {
+            bccRecipients: bccList.map((address) => ({
+              emailAddress: { address },
+            })),
+          }
+        : {}),
+      ...(options.replyTo
+        ? {
+            replyTo: [
+              {
+                emailAddress: { address: options.replyTo },
+              },
+            ],
+          }
+        : {}),
+      ...(internetMessageHeaders.length > 0 ? { internetMessageHeaders } : {}),
+      ...(fileAttachments.length > 0 ? { attachments: fileAttachments } : {}),
+    };
 
     if (options.inReplyToGraphId) {
       await graphFetch(
@@ -796,27 +1183,7 @@ export async function sendGraphAdminReply(options: {
           accessToken,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: {
-              subject: options.subject,
-              body: {
-                contentType: "HTML",
-                content: options.html,
-              },
-              toRecipients: [
-                {
-                  emailAddress: { address: options.to },
-                },
-              ],
-              ...(options.replyTo
-                ? {
-                    replyTo: [
-                      {
-                        emailAddress: { address: options.replyTo },
-                      },
-                    ],
-                  }
-                : {}),
-            },
+            message: messageBase,
           }),
         },
       );
@@ -828,28 +1195,8 @@ export async function sendGraphAdminReply(options: {
       accessToken,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: {
-          subject: options.subject,
-          body: {
-            contentType: "HTML",
-            content: options.html,
-          },
-          toRecipients: [
-            {
-              emailAddress: { address: options.to },
-            },
-          ],
-          ...(options.replyTo
-            ? {
-                replyTo: [
-                  {
-                    emailAddress: { address: options.replyTo },
-                  },
-                ],
-              }
-            : {}),
-        },
-        saveToSentItems: true,
+        message: messageBase,
+        saveToSentItems: options.saveToSentItems !== false,
       }),
     });
 

@@ -11,6 +11,8 @@ export type SmtpAttachment = {
   content: Buffer | string;
   contentType?: string;
   encoding?: "base64";
+  /** Inline image Content-ID (Nodemailer cid: reference). */
+  cid?: string;
 };
 
 export type SendSmtpMailInput = {
@@ -166,6 +168,7 @@ export async function sendSmtpMail(
         content: a.content,
         contentType: a.contentType,
         encoding: a.encoding,
+        cid: a.cid,
       })),
     };
     const info = await transport.sendMail(mail);

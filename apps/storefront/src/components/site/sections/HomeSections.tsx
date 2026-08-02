@@ -195,7 +195,7 @@ export function Hero() {
             </span>
           </h1>
 
-          <p className="mt-8 max-w-xl text-lg text-white/75 md:text-xl">
+          <p className="mt-8 max-w-xl whitespace-pre-line text-lg text-white/75 md:text-xl">
             <HeroEditableText
               as="span"
               multiline

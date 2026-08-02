@@ -18,7 +18,13 @@ import {
   type AdminPrincipal,
 } from "@mccoy/security";
 
-import { activateStaffUser, getStaffUserById, writeStaffAudit } from "./staff";
+import {
+  activateStaffUser,
+  getStaffInvitationForAuthUser,
+  getStaffUserById,
+  shouldDeferStaffActivationForMfaRecovery,
+  writeStaffAudit,
+} from "./staff";
 import { assertStaffProfileAllowsAdminSession } from "./staff-policy";
 import {
   createSupabaseServiceClient,
@@ -99,12 +105,19 @@ function createUserScopedClient(accessToken: string) {
   });
 }
 
-async function listVerifiedTotpFactorCount(accessToken: string): Promise<number> {
+/** Verified TOTP factor count for the given access token (0 when unavailable). */
+export async function countVerifiedTotpFactorsForAccessToken(
+  accessToken: string,
+): Promise<number> {
   const client = createUserScopedClient(accessToken);
   const { data, error } = await client.auth.mfa.listFactors();
   if (error) return 0;
   const totp = data?.totp ?? [];
   return totp.filter((f) => f.status === "verified").length;
+}
+
+async function listVerifiedTotpFactorCount(accessToken: string): Promise<number> {
+  return countVerifiedTotpFactorsForAccessToken(accessToken);
 }
 
 async function resolveNextStep(
@@ -186,25 +199,28 @@ async function resolveSupabasePrincipal(
   const mfaRequired = nextStep !== "none";
 
   if (aal === "aal2" && profile.status === "invited") {
-    try {
-      const activated = await activateStaffUser(profile.id);
-      if (activated) {
-        try {
-          await writeStaffAudit({
-            actorUserId: profile.id,
-            action: "staff.mfa_onboarding_completed",
-            targetType: "user",
-            targetId: profile.id,
-            before: { status: "invited" },
-            after: { status: "active" },
-          });
-        } catch {
-          // Private schema exposure must not block login.
+    const invitation = await getStaffInvitationForAuthUser(profile.id);
+    if (!shouldDeferStaffActivationForMfaRecovery(invitation)) {
+      try {
+        const activated = await activateStaffUser(profile.id);
+        if (activated) {
+          try {
+            await writeStaffAudit({
+              actorUserId: profile.id,
+              action: "staff.mfa_onboarding_completed",
+              targetType: "user",
+              targetId: profile.id,
+              before: { status: "invited" },
+              after: { status: "active" },
+            });
+          } catch {
+            // Private schema exposure must not block login.
+          }
+          profile.status = "active";
         }
-        profile.status = "active";
+      } catch {
+        // Do not block aal2 access solely on activation write failure.
       }
-    } catch {
-      // Do not block aal2 access solely on activation write failure.
     }
   }
 
@@ -334,6 +350,229 @@ export async function establishStaffSessionWithPassword(input: {
     // Password path already rate-limited above.
     skipRateLimit: true,
   });
+}
+
+export type StaffSessionBrowserHydration = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+/**
+ * After Admin API password set invalidates invite/recovery link tokens, sign in with the
+ * new password and re-issue HttpOnly cookies so MFA enrollment continues in the same flow.
+ */
+export async function reestablishStaffSessionAfterPasswordSet(input: {
+  email: string;
+  password: string;
+  clientKey?: string;
+}): Promise<
+  EstablishStaffSessionResult & { browserHydration?: StaffSessionBrowserHydration }
+> {
+  if (!isSupabaseStaffAuthReady()) {
+    return { ok: false, error: "Supabase is niet geconfigureerd.", code: "config" };
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const { url, publishableKey } = getSupabasePublicConfig();
+  const client = createClient(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password: input.password,
+  });
+  if (error || !data.session) {
+    return {
+      ok: false,
+      error:
+        "Sessie kon niet worden vernieuwd na het instellen van je wachtwoord. Probeer opnieuw in te loggen.",
+      code: "unknown",
+    };
+  }
+
+  const established = await establishStaffSessionFromTokens({
+    accessToken: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    clientKey: input.clientKey ?? email,
+    skipRateLimit: true,
+  });
+  if (!established.ok) return established;
+
+  return {
+    ...established,
+    browserHydration: {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+    },
+  };
+}
+
+export type EstablishStaffSessionFromCallbackResult =
+  | {
+      ok: true;
+      session: AdminSessionView;
+      nextStep: StaffAuthNextStep;
+      /**
+       * One-shot tokens so supabase-js can run MFA enroll in the browser.
+       * McCoy does not store these in sessionStorage; client hydrates then discards.
+       * Durable mobile recovery is the HttpOnly cookies set by this call.
+       */
+      browserHydration: { accessToken: string; refreshToken: string };
+    }
+  | {
+      ok: false;
+      error: string;
+      code?:
+        | "invalid_credentials"
+        | "not_staff"
+        | "blocked"
+        | "rate_limited"
+        | "config"
+        | "unknown";
+    };
+
+/**
+ * Verify invite/recovery Auth callback on the server and set HttpOnly cookies.
+ * Preferred over browser verifyOtp + sessionStorage handoff (XSS / WebView safe).
+ */
+export async function establishStaffSessionFromEmailAuthCallback(input: {
+  tokenHash?: string;
+  type?: "invite" | "recovery" | "signup" | "magiclink" | "email";
+  code?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  clientKey?: string;
+}): Promise<EstablishStaffSessionFromCallbackResult> {
+  if (!isSupabaseStaffAuthReady()) {
+    return {
+      ok: false,
+      error:
+        "Supabase is niet geconfigureerd op de server (controleer SUPABASE_URL, publishable key en SUPABASE_SECRET_KEY).",
+      code: "config",
+    };
+  }
+
+  const rateKey = (input.clientKey || input.tokenHash || input.code || "auth-callback").slice(0, 80);
+  try {
+    assertAdminLoginRateLimit(rateKey);
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "rate_limited" };
+    }
+    throw error;
+  }
+
+  try {
+    let accessToken = input.accessToken?.trim() || "";
+    let refreshToken = input.refreshToken?.trim() || "";
+
+    if ((!accessToken || !refreshToken) && (input.code || input.tokenHash)) {
+      const { url, publishableKey } = getSupabasePublicConfig();
+      const authClient = createClient(url, publishableKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+
+      if (input.code) {
+        const exchanged = await authClient.auth.exchangeCodeForSession(input.code);
+        if (exchanged.error || !exchanged.data.session) {
+          return {
+            ok: false,
+            error:
+              exchanged.error?.message ||
+              "Uitnodigingslink is ongeldig of verlopen. Vraag een nieuwe uitnodiging aan.",
+            code: "invalid_credentials",
+          };
+        }
+        accessToken = exchanged.data.session.access_token;
+        refreshToken = exchanged.data.session.refresh_token;
+      } else if (input.tokenHash && input.type) {
+        const verified = await authClient.auth.verifyOtp({
+          token_hash: input.tokenHash,
+          type: input.type,
+        });
+        if (verified.error || !verified.data.session) {
+          return {
+            ok: false,
+            error:
+              verified.error?.message ||
+              "Uitnodigingslink is ongeldig of verlopen. Vraag een nieuwe uitnodiging aan.",
+            code: "invalid_credentials",
+          };
+        }
+        accessToken = verified.data.session.access_token;
+        refreshToken = verified.data.session.refresh_token;
+      }
+    }
+
+    if (!accessToken || !refreshToken) {
+      return {
+        ok: false,
+        error: "Ongeldige of incomplete uitnodigingslink.",
+        code: "invalid_credentials",
+      };
+    }
+
+    const established = await establishStaffSessionFromTokens({
+      accessToken,
+      refreshToken,
+      clientKey: input.clientKey,
+      skipRateLimit: true,
+    });
+    if (!established.ok) return established;
+
+    return {
+      ok: true,
+      session: established.session,
+      nextStep: established.nextStep,
+      browserHydration: { accessToken, refreshToken },
+    };
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "unknown" };
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Uitnodigingssessie mislukt.",
+      code: "unknown",
+    };
+  }
+}
+
+/**
+ * Re-hydrate supabase-js from HttpOnly cookies after a clean reload (no URL tokens).
+ * Used for MFA enroll when the invite page already exchanged the link server-side.
+ */
+export async function hydrateBrowserStaffAuthFromCookies(): Promise<
+  | { ok: true; accessToken: string; refreshToken: string }
+  | { ok: false; error: string; code?: "missing_session" | "unauthorized" | "unknown" }
+> {
+  try {
+    const accessToken = readSupabaseAccessToken();
+    const refreshToken = readSupabaseRefreshToken();
+    if (!accessToken || !refreshToken) {
+      return {
+        ok: false,
+        error: "Geen geldige sessie. Open de uitnodigingslink opnieuw.",
+        code: "missing_session",
+      };
+    }
+    // Ensure cookies belong to a staff invite/MFA-capable principal.
+    await resolveSupabasePrincipal(accessToken, { allowMfaEnrollment: true });
+    return { ok: true, accessToken, refreshToken };
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "unauthorized" };
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Sessie kon niet worden hersteld.",
+      code: "unknown",
+    };
+  }
 }
 
 export async function establishStaffSessionFromTokens(input: {

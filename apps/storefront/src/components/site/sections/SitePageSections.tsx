@@ -127,7 +127,7 @@ export function Services() {
         <div className="max-w-2xl">
           <SectionEyebrow>{eyebrow}</SectionEyebrow>
           <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">{heading}</h1>
-          {intro ? <p className="mt-4 text-muted-foreground">{intro}</p> : null}
+          {intro ? <p className="mt-4 whitespace-pre-line text-muted-foreground">{intro}</p> : null}
         </div>
         </CompositePartSelectChrome>
 
@@ -393,7 +393,7 @@ function PillarRow({
           <h3 className="font-display mt-5 text-4xl text-white md:text-5xl lg:text-6xl">{title}</h3>
           <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/75">
             {body.split("\n\n").map((p, idx) => (
-              <p key={idx}>{p}</p>
+              <p key={idx} className="whitespace-pre-line">{p}</p>
             ))}
           </div>
         </motion.div>

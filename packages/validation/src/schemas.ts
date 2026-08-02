@@ -67,6 +67,27 @@ export const adminEstablishSessionSchema = z.object({
   clientKey: z.string().trim().max(80).optional(),
 });
 
+/**
+ * Server-side invite/recovery exchange: verify Auth callback on the server,
+ * set HttpOnly cookies, never persist token_hash in browser storage.
+ */
+export const adminAuthCallbackExchangeSchema = z
+  .object({
+    tokenHash: z.string().trim().min(10).max(2_048).optional(),
+    type: z.enum(["invite", "recovery", "signup", "magiclink", "email"]).optional(),
+    code: z.string().trim().min(10).max(2_048).optional(),
+    accessToken: z.string().min(20).max(32_000).optional(),
+    refreshToken: z.string().min(10).max(32_000).optional(),
+    clientKey: z.string().trim().max(80).optional(),
+  })
+  .refine(
+    (value) =>
+      Boolean(value.code) ||
+      Boolean(value.tokenHash && value.type) ||
+      Boolean(value.accessToken && value.refreshToken),
+    { message: "Ongeldige of incomplete uitnodigingslink." },
+  );
+
 export const adminRequestListSchema = z.object({
   kind: z.enum([...FORM_KINDS, "all"]).default("all"),
   status: z.enum([...REQUEST_STATUSES, "all"]).default("all"),
@@ -104,10 +125,19 @@ const inboxMessageId = z
   .string()
   .min(1)
   .max(800)
-  .regex(/^(imap:[^:]+:\d+|graph:[^:]+:.+|e2e:[^:]+:.+)$/);
+  .regex(/^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/);
 
 export const adminInboxMessageIdSchema = z.object({
   id: inboxMessageId,
+});
+
+/** Bulk delete for Admin → Aanvragen (deduped server-side). */
+export const adminInboxBulkDeleteSchema = z.object({
+  ids: z
+    .array(inboxMessageId)
+    .min(1, "Selecteer minimaal één bericht.")
+    .max(50, "Maximaal 50 berichten tegelijk verwijderen.")
+    .transform((ids) => [...new Set(ids)]),
 });
 
 export const adminInboxReplySchema = z.object({
@@ -215,17 +245,49 @@ export const staffInviteAdminSchema = z.object({
   requestId: z.string().uuid().optional(),
 });
 
+/** Self-service staff password reset from /admin/login (no auth). */
+export const staffRequestPasswordResetSchema = z.object({
+  email: z.string().trim().email().max(320),
+  acceptOrigin: z.string().url().max(500).optional(),
+});
+
 export const staffRemoveMemberSchema = z.object({
   targetUserId: z.string().uuid(),
 });
 
-/** Server complete-invite step after the invitee set their own password via Auth updateUser. */
-export const staffCompleteInviteRegistrationSchema = z.object({
-  fullName: z.string().trim().min(1).max(200).optional(),
+/** Super-admin promotes/demotes another staff member (admin ↔ super_admin). */
+export const staffChangeRoleSchema = z.object({
+  targetUserId: z.string().uuid(),
+  staffRole: z.enum(["admin", "super_admin"]),
+});
+
+/** Super-admin MFA account recovery for an active staff member. */
+export const staffRecoverAccountSchema = z.object({
+  targetUserId: z.string().uuid(),
+  acceptOrigin: z.string().url().max(500).optional(),
   requestId: z.string().uuid().optional(),
 });
 
-/** Client-side invite registration form (password never sent to McCoy server). */
+/** Self-service authenticator replacement while fully signed in (AAL2). */
+export const staffFinalizeAuthenticatorReplaceSchema = z.object({
+  keepFactorId: z.string().uuid("Geen geldige MFA-factor opgegeven."),
+});
+
+/** Server complete recovery after reset e-mail link (password + optional TOTP). */
+export const staffCompletePasswordRecoverySchema = z.object({
+  newPassword: staffPasswordSchema,
+  /** Required when the user has a verified TOTP factor; validated server-side. */
+  totpCode: z.string().trim().max(12).optional(),
+});
+
+/** Server complete-invite: set password via Admin API (cookie session), then accept invite. */
+export const staffCompleteInviteRegistrationSchema = z.object({
+  fullName: z.string().trim().min(1).max(200).optional(),
+  newPassword: staffPasswordSchema,
+  requestId: z.string().uuid().optional(),
+});
+
+/** Client-side invite registration form validation. */
 export const staffInviteRegistrationFormSchema = z
   .object({
     fullName: z.string().trim().max(200).optional(),

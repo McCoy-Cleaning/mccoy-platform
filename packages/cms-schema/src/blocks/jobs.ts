@@ -263,6 +263,13 @@ export function createDefaultJobs(): JobsBlockData {
   };
 }
 
+/** Stable ids for default vacatures seed — must not use random createItemId. */
+export const VACATURES_SEED_VACANCY_IDS = {
+  reguliereSchoonmaak: "job_seed_reguliere-schoonmaak",
+  glazenwasser: "job_seed_glazenwasser",
+  oproepkracht: "job_seed_oproepkracht",
+} as const;
+
 /** Seed vacancies matching historical i18n roles on /vacatures. */
 export function createVacaturesSeedJobs(): JobsBlockData {
   return {
@@ -273,6 +280,7 @@ export function createVacaturesSeedJobs(): JobsBlockData {
     emptyStateText: "Er zijn momenteel geen openstaande vacatures.",
     vacancies: [
       createDefaultVacancy({
+        id: VACATURES_SEED_VACANCY_IDS.reguliereSchoonmaak,
         title: "Reguliere schoonmaak",
         slug: "reguliere-schoonmaak",
         department: "Operations",
@@ -284,6 +292,7 @@ export function createVacaturesSeedJobs(): JobsBlockData {
         buttonLabel: "Solliciteer",
       }),
       createDefaultVacancy({
+        id: VACATURES_SEED_VACANCY_IDS.glazenwasser,
         title: "Glazenwasser",
         slug: "glazenwasser",
         department: "Operations",
@@ -294,6 +303,7 @@ export function createVacaturesSeedJobs(): JobsBlockData {
         applicationLink: { type: "none" },
       }),
       createDefaultVacancy({
+        id: VACATURES_SEED_VACANCY_IDS.oproepkracht,
         title: "Oproepkracht",
         slug: "oproepkracht",
         department: "Operations",

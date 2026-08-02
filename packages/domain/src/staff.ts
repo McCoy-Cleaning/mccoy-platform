@@ -32,6 +32,7 @@ export const STAFF_AUDIT_ACTIONS = [
   "staff.blocked",
   "staff.unblocked",
   "staff.role_changed",
+  "staff.mfa_reset",
   "staff.profile_changed",
   "staff.email_changed",
   "staff.password_changed",
