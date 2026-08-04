@@ -4,6 +4,7 @@ import {
   HERO_IMAGE_SIZES,
   heroWebpSrcSet,
   supabasePhotoSrcSets,
+  localCmsPhotoWebpSrcSet,
 } from "@/lib/image-delivery";
 
 type DeliveryImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
@@ -16,9 +17,9 @@ type DeliveryImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
 };
 
 /**
- * Serves explicit WebP srcsets (e.g. hero variants) and Supabase Image
- * Transformation for cms-media URLs. Local `/images/cms` JPEGs/PNGs are served
- * as-is — do not invent sibling `.webp` paths (many were never generated and 404).
+ * Serves explicit WebP srcsets (e.g. hero variants), allowlisted local CMS
+ * WebP siblings from the optimize script, and Supabase Image Transformation
+ * for cms-media URLs. Unknown local paths stay as-is (no invented 404 WebPs).
  */
 export function DeliveryImage({
   src,
@@ -37,7 +38,11 @@ export function DeliveryImage({
   // Width-only + `cover` can still over-crop some CDN variants; deliver the full
   // frame and let CSS (`object-cover` / `object-contain`) decide the tile crop.
   const remote = supabasePhotoSrcSets(src, widths, { resize: "contain" });
-  const webpSrcSet = webpSrcSetProp ?? localHero ?? remote?.webpSrcSet;
+  const localCms =
+    !localHero && !remote && (variant === "gallery" || variant === "photo")
+      ? localCmsPhotoWebpSrcSet(src)
+      : undefined;
+  const webpSrcSet = webpSrcSetProp ?? localHero ?? remote?.webpSrcSet ?? localCms;
 
   // Prefer a WebP URL as <img src> so Chromium doesn’t paint the heavy JPEG
   // fallback first (Lighthouse “Improve image delivery”).

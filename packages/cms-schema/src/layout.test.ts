@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CURRENT_LAYOUT_VERSION,
+  FIXED_SECTION_DEFS,
   addFixedLayoutItem,
   addLayoutBlock,
   moveLayoutItem,
@@ -244,6 +245,29 @@ describe("layout operations", () => {
     expect(b2 && b2.kind === "block" && b2.hidden).toBe(true);
   });
 
+  it("re-attaches required vacatures.application even at current layoutVersion", () => {
+    const page = parseMigrateNormalizePage({
+      id: "page_vacatures",
+      slug: "/vacatures",
+      title: "Vacatures",
+      description: "",
+      isCustom: false,
+      inNav: true,
+      blocks: [],
+      updatedAt: 1,
+      version: 1,
+      layoutVersion: CURRENT_LAYOUT_VERSION,
+      layout: [
+        { id: "fixed:vacatures:main", kind: "fixed", key: "vacatures.main", hidden: false },
+      ],
+    })!;
+    const keys = page.layout.flatMap((i) => (i.kind === "fixed" ? [i.key] : []));
+    expect(keys).toContain("vacatures.application");
+    const last = page.layout[page.layout.length - 1];
+    expect(last && last.kind === "fixed" && last.key).toBe("vacatures.application");
+    expect(FIXED_SECTION_DEFS["vacatures.application"].label).toBe("Sollicitatie + video");
+  });
+
   it("vacatures page policy blocks a second jobs block and removal", () => {
     const page = parseMigrateNormalizePage({
       id: "page_vacatures",
@@ -263,6 +287,12 @@ describe("layout operations", () => {
       (i) => i.kind === "block" && i.blockId === jobsBlock.id,
     );
     expect(jobsLayout && jobsLayout.kind === "block" && jobsLayout.hidden).toBe(true);
+    const application = page.layout.find(
+      (i) => i.kind === "fixed" && i.key === "vacatures.application",
+    );
+    expect(application).toBeTruthy();
+    const last = page.layout[page.layout.length - 1];
+    expect(last && last.kind === "fixed" && last.key).toBe("vacatures.application");
     expect(addLayoutBlock(page, block("jobs2", "jobs"), page.layout.length)).toEqual({
       ok: false,
       code: "POLICY_BLOCKED",
@@ -273,6 +303,11 @@ describe("layout operations", () => {
     });
     // Fixed chrome can still be removed; jobs block policy is independent.
     expect(removeFixedLayoutItem(page, "vacatures.main").ok).toBe(true);
+    // Application section is required — cannot delete.
+    expect(removeFixedLayoutItem(page, "vacatures.application")).toEqual({
+      ok: false,
+      code: "NOT_REMOVABLE",
+    });
   });
 
   it("contact page has intro, info, and required form sections", () => {

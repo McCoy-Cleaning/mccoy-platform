@@ -2,6 +2,7 @@ import {
   cmsTextOrFallback,
   defaultSectionContent,
   defaultSiteNavigation,
+  resolveHeroHeadingParts,
   type CmsLink,
   type ContactInfoContent,
   type FormPageChromeContent,
@@ -61,10 +62,17 @@ export function localizedNavLabel(cmsLabel: string, link: CmsLink, t: I18nDict):
 
 export function localizedHeroCopy(content: HomeHeroContent, t: I18nDict) {
   const def = defaultSectionContent("home.hero") as HomeHeroContent;
+  const heading = cmsTextOrFallback(content.heading, t.hero.title, def.heading);
+  const headingAccent = cmsTextOrFallback(
+    content.headingAccent,
+    t.hero.titleAccent,
+    def.headingAccent,
+  );
+  const parts = resolveHeroHeadingParts(heading, headingAccent);
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, t.hero.kicker, def.eyebrow),
-    heading: cmsTextOrFallback(content.heading, t.hero.title, def.heading),
-    headingAccent: cmsTextOrFallback(content.headingAccent, t.hero.titleAccent, def.headingAccent),
+    heading: parts.heading,
+    headingAccent: parts.headingAccent,
     body: cmsTextOrFallback(content.body, t.hero.sub, def.body),
     primaryCtaLabel: content.primaryCta
       ? cmsTextOrFallback(content.primaryCta.label, t.hero.ctaPrimary, undefined)

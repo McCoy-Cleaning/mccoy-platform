@@ -1,10 +1,10 @@
-import wRegular from "@/assets/work-regular.jpg";
-import wHoreca from "@/assets/work-horeca-new.jpg";
-import wOpl from "@/assets/work-oplevering.jpg";
-import wFloor from "@/assets/work-floor.jpg";
-import wGlass from "@/assets/work-glass.jpg";
-/** Prefer JPEG (~140KB) over the 1.8MB PNG sibling — same frame, far less mobile payload. */
-import aboutVision from "@/assets/mccoy-about-vision.jpg";
+import wRegular from "@/assets/work-regular.webp";
+import wHoreca from "@/assets/work-horeca-new.webp";
+import wOpl from "@/assets/work-oplevering.webp";
+import wFloor from "@/assets/work-floor.webp";
+import wGlass from "@/assets/work-glass.webp";
+/** Prefer optimized JPEG/WebP over the large PNG sibling — same frame, far less mobile payload. */
+import aboutVision from "@/assets/mccoy-about-vision.webp";
 import { useI18n } from "@/lib/i18n";
 import { GALLERY_IMAGE_SIZES } from "@/lib/image-delivery";
 import { DeliveryImage } from "../DeliveryImage";

@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from "motion/react";
 import type { FocusEvent, KeyboardEvent } from "react";
 import { useEffect, useState } from "react";
 import {
@@ -16,7 +15,7 @@ import { useHomeHeroContent } from "@/lib/cms/use-section-content";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
 import { localizedHeroCopy } from "@/lib/cms-i18n";
-import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 
 /** Public optimized hero — avoid bundling the ~430KB JPEG into the home chunk. */
 const HERO_PUBLIC_JPG = "/images/cms/hero-cleaning.jpg";
@@ -93,9 +92,8 @@ export function Hero() {
   const content = useHomeHeroContent();
   const copy = localizedHeroCopy(content, t);
   const { isEdit, sendMutation } = useLiveEditApi();
-  const reducedMotion = useReducedMotion();
-  const mobileLite = useMobileLiteMotion();
-  const softMotion = Boolean(reducedMotion) || mobileLite;
+  // SSR + mobile: skip decorative CSS motion (ping / scroll cue).
+  const softMotion = useMobileLiteMotion();
   const [imageSrc, setImageSrc] = useState(() => resolveHeroImageSrc(content.image?.src));
 
   useEffect(() => {
@@ -109,7 +107,8 @@ export function Hero() {
     width: 640,
     height: 480,
     sizes: HERO_IMAGE_SIZES,
-    decoding: "async" as const,
+    // Sync decode for LCP — async can defer the largest paint.
+    decoding: "sync" as const,
     fetchPriority: "high" as const,
     loading: "eager" as const,
     // Fill the card; 4:3 matches the hero asset so cover doesn’t over-crop.
@@ -121,12 +120,9 @@ export function Hero() {
       <div className="absolute inset-0 -z-10 bg-grid opacity-40" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background via-background to-background/90" />
 
-      {/* Accent blobs — desktop only; skip Motion on the mobile LCP path */}
-      <motion.div
+      {/* Accent blobs — desktop only; CSS only (no Motion on the LCP path) */}
+      <div
         aria-hidden
-        initial={softMotion ? false : { opacity: 0, scale: 0.6 }}
-        animate={{ opacity: 0.9, scale: 1 }}
-        transition={{ duration: softMotion ? 0 : 1.6, ease: "easeOut" }}
         className="pointer-events-none absolute -top-32 -right-24 -z-10 hidden h-[34rem] w-[34rem] rounded-full bg-primary/20 blur-[90px] md:block"
       />
       <div
@@ -146,12 +142,7 @@ export function Hero() {
 
       <div className={cn(SECTION_PAGE_RAIL, "grid w-full items-center gap-12 py-20 lg:grid-cols-12")}>
         <div className="lg:col-span-7">
-          <motion.div
-            initial={softMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: softMotion ? 0 : 0.6 }}
-            className="group inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary shadow-[0_0_40px_-10px_rgba(63,182,242,0.6)] backdrop-blur"
-          >
+          <div className="group inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary shadow-[0_0_40px_-10px_rgba(63,182,242,0.6)] backdrop-blur">
             <span className="relative flex h-2 w-2">
               {!softMotion ? (
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
@@ -164,7 +155,7 @@ export function Hero() {
               value={copy.eyebrow}
               onCommit={(next) => patchHero({ eyebrow: next })}
             />
-          </motion.div>
+          </div>
 
           {/* LCP-critical copy: paint immediately (no opacity:0). */}
           <h1 className="font-display mt-6 text-6xl leading-[0.98] tracking-tight text-white sm:text-7xl lg:text-[5.75rem] xl:text-[6.5rem]">
@@ -173,26 +164,24 @@ export function Hero() {
               editable={isEdit}
               value={copy.heading}
               onCommit={(next) => patchHero({ heading: next })}
-            />{" "}
-            <span className="relative inline-block bg-gradient-to-br from-primary via-primary to-white/90 bg-clip-text text-transparent">
-              <HeroEditableText
-                as="span"
-                editable={isEdit}
-                value={copy.headingAccent}
-                onCommit={(next) => patchHero({ headingAccent: next })}
-              />
-              <motion.span
-                aria-hidden
-                initial={softMotion ? false : { scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{
-                  delay: softMotion ? 0 : 0.9,
-                  duration: softMotion ? 0 : 0.9,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="absolute -bottom-2 left-0 h-1 w-full origin-left rounded-full bg-primary/70"
-              />
-            </span>
+            />
+            {copy.headingAccent ? (
+              <>
+                {" "}
+                <span className="relative inline-block bg-gradient-to-br from-primary via-primary to-white/90 bg-clip-text text-transparent">
+                  <HeroEditableText
+                    as="span"
+                    editable={isEdit}
+                    value={copy.headingAccent}
+                    onCommit={(next) => patchHero({ headingAccent: next })}
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute -bottom-2 left-0 h-1 w-full rounded-full bg-primary/70"
+                  />
+                </span>
+              </>
+            ) : null}
           </h1>
 
           <p className="mt-8 max-w-xl whitespace-pre-line text-lg text-white/75 md:text-xl">
@@ -205,12 +194,7 @@ export function Hero() {
             />
           </p>
 
-          <motion.div
-            initial={softMotion ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: softMotion ? 0 : 0.7, delay: softMotion ? 0 : 0.4 }}
-            className="mt-9 flex flex-wrap gap-3"
-          >
+          <div className="mt-9 flex flex-wrap gap-3">
             {content.primaryCta ? (
               <CmsLinkAnchor
                 link={content.primaryCta.link}
@@ -251,30 +235,21 @@ export function Hero() {
                 />
               </CmsLinkAnchor>
             ) : null}
-          </motion.div>
+          </div>
 
           {/* Trust strip */}
-          <motion.div
-            initial={softMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: softMotion ? 0 : 0.7, delay: softMotion ? 0 : 0.65 }}
-            className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-xs uppercase tracking-[0.2em] text-white/55"
-          >
+          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-xs uppercase tracking-[0.2em] text-white/55">
             {t.stats.items.map((it) => (
               <span key={it.label} className="flex items-center gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> {it.value} {it.label}
               </span>
             ))}
-          </motion.div>
+          </div>
         </div>
 
-        {/* Right side image card — always painted (no fade-from-zero) so the photo stays visible */}
+        {/* Right side image card — always painted so the photo stays on the LCP path */}
         {content.image ? (
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="relative lg:col-span-5"
-        >
+        <div className="relative lg:col-span-5">
           <div className="relative mx-auto max-w-md">
             <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
               {content.image.decorative ? (
@@ -297,12 +272,7 @@ export function Hero() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
             </div>
-            <motion.div
-              initial={softMotion ? false : { opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: softMotion ? 0 : 0.9, duration: softMotion ? 0 : 0.6 }}
-              className="absolute -bottom-6 -left-6 hidden rounded-2xl border border-white/15 bg-card/95 px-5 py-4 shadow-2xl sm:block"
-            >
+            <div className="absolute -bottom-6 -left-6 hidden rounded-2xl border border-white/15 bg-card/95 px-5 py-4 shadow-2xl sm:block">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
                   <Award className="h-5 w-5" />
@@ -314,46 +284,28 @@ export function Hero() {
                   </div>
                 </div>
               </div>
-            </motion.div>
-            <motion.div
-              initial={softMotion ? false : { opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: softMotion ? 0 : 1.1, duration: softMotion ? 0 : 0.6 }}
-              className="absolute -top-4 -right-4 hidden rounded-2xl border border-primary/30 bg-primary/20 px-4 py-3 sm:block"
-            >
+            </div>
+            <div className="absolute -top-4 -right-4 hidden rounded-2xl border border-primary/30 bg-primary/20 px-4 py-3 sm:block">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white">
                 <ShieldCheck className="h-4 w-4 text-primary" /> {isEn ? "Certified" : "Gecertificeerd"}
               </div>
-            </motion.div>
+            </div>
           </div>
-        </motion.div>
+        </div>
         ) : null}
       </div>
 
-      {/* scroll indicator — CSS only on mobile (no infinite JS animation) */}
-      {!softMotion ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2"
-        >
-          <div className="h-10 w-6 rounded-full border border-white/20 p-1">
-            <motion.div
-              animate={{ y: [0, 12, 0] }}
-              transition={{ duration: 1.6, repeat: Infinity }}
-              className="mx-auto h-2 w-1 rounded-full bg-primary"
-            />
-          </div>
-        </motion.div>
-      ) : (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2" aria-hidden>
-          <div className="h-10 w-6 rounded-full border border-white/20 p-1">
-            <div className="mx-auto h-2 w-1 rounded-full bg-primary" />
-          </div>
+      {/* scroll indicator — static on mobile; CSS bounce on desktop only */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2" aria-hidden>
+        <div className="h-10 w-6 rounded-full border border-white/20 p-1">
+          <div
+            className={cn(
+              "mx-auto h-2 w-1 rounded-full bg-primary",
+              !softMotion && "motion-safe:animate-bounce",
+            )}
+          />
         </div>
-      )}
+      </div>
     </section>
   );
 }
-

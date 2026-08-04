@@ -18,11 +18,13 @@ import {
 import {
   cmsTextOrFallback,
   DEFAULT_PRODUCTS_INTRO_METRICS,
+  type CmsButton,
   type CmsImage,
   type CmsLink,
 } from "@mccoy/cms-schema";
 import { CmsLinkAnchor } from "../CmsLinkAnchor";
 import {
+  CmsButtonView,
   CmsImageView,
   SECTION_PAGE_RAIL,
   SectionSurface,
@@ -233,7 +235,8 @@ export type ProductsAssortmentCard = {
   id: string;
   title: string;
   description: string;
-  link?: CmsLink | null;
+  /** Per-card CTA (label + geen link / pagina / extern / popup). */
+  cta?: CmsButton | null;
 };
 
 export type ProductsAssortmentViewProps = {
@@ -241,7 +244,6 @@ export type ProductsAssortmentViewProps = {
   heading: string;
   intro: string;
   cards: ProductsAssortmentCard[];
-  ctaLabel: string;
 };
 
 /** Exact Producten assortment card grid. */
@@ -250,7 +252,6 @@ export function ProductsAssortmentView({
   heading,
   intro,
   cards,
-  ctaLabel,
 }: ProductsAssortmentViewProps) {
   const reduced = useReducedMotion();
   const cardIcons = [Package, Droplets, SprayCan, Wrench] as const;
@@ -305,15 +306,14 @@ export function ProductsAssortmentView({
                           ) : null}
                         </div>
                       </div>
-                      {card.link ? (
-                        <CmsLinkAnchor
-                          link={card.link}
-                          fallbackHref="/contact"
+                      {card.cta ? (
+                        <CmsButtonView
+                          button={card.cta}
                           className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
                         >
-                          {ctaLabel}
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </CmsLinkAnchor>
+                          {card.cta.label}
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                        </CmsButtonView>
                       ) : null}
                     </SectionSurface>
                   </motion.div>

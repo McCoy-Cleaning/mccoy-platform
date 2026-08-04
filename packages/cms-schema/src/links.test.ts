@@ -3,6 +3,7 @@ import {
   isSafeExternalUrl,
   linkFromLegacyHref,
   parseCmsLink,
+  parseCmsLinkDraft,
   resolveCmsLinkHref,
 } from "./links";
 import { normalizeSlug, validateCustomSlug } from "./slugs";
@@ -18,6 +19,16 @@ describe("links", () => {
 
   it("accepts https URLs", () => {
     expect(isSafeExternalUrl("https://example.com/a")).toBe(true);
+  });
+
+  it("parseCmsLink rejects incomplete https:// but draft parse keeps it", () => {
+    expect(parseCmsLink({ type: "external", url: "https://" })).toBeNull();
+    expect(parseCmsLinkDraft({ type: "external", url: "https://", openInNewTab: true })).toEqual({
+      type: "external",
+      url: "https://",
+      openInNewTab: true,
+    });
+    expect(parseCmsLinkDraft({ type: "external", url: "javascript:alert(1)" })).toBeNull();
   });
 
   it("resolves internal_route and pageId", () => {

@@ -1315,8 +1315,10 @@ export async function listFormInboxMessages(options?: {
   }
 
   const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems);
-  const facets = buildInboxFacets(merged);
-  const filtered = filterInboxMessages(merged, {
+  const { withActivePublishedScopesCleared } = await import("./apply-active-form-scopes");
+  const scoped = await withActivePublishedScopesCleared(merged);
+  const facets = buildInboxFacets(scoped);
+  const filtered = filterInboxMessages(scoped, {
     kind: options?.kind,
     scopeKey: options?.scopeKey,
     q: options?.q,
@@ -1328,52 +1330,60 @@ export async function getFormInboxMessage(id: string): Promise<FormInboxMessage 
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
   if (decoded.provider === "e2e" || decoded.provider === "request") {
     const { getWebsiteRequestFormInboxMessage } = await import("./website-request-inbox");
+    // Already clears orphan scopes for request-backed rows.
     return getWebsiteRequestFormInboxMessage(id);
   }
+
+  let message: FormInboxMessage | null = null;
   if (decoded.provider === "graph") {
     if (!shouldAttemptGraphMail()) {
       throw new FormInboxError(
         "Dit bericht komt van Microsoft Graph, maar Graph is uitgeschakeld (FORM_INBOX_PROVIDER=imap). Vernieuw de Aanvragen-lijst.",
       );
     }
-    return getGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
-  }
-  const { mailbox, uid } = decoded;
+    message = await getGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
+  } else {
+    const { mailbox, uid } = decoded;
 
-  return withImapClient(async (client, config) => {
-    const lock = await client.getMailboxLock(mailbox || config.mailbox);
-    try {
-      const parts = await fetchMessageTextOnly(client, uid);
+    message = await withImapClient(async (client, config) => {
+      const lock = await client.getMailboxLock(mailbox || config.mailbox);
+      try {
+        const parts = await fetchMessageTextOnly(client, uid);
 
-      let found = messageFromTextParts(
-        uid,
-        mailbox || config.mailbox,
-        config.user,
-        parts.envelope,
-        parts.flags,
-        parts.text,
-        parts.html,
-        parts.attachments,
-      );
+        let found = messageFromTextParts(
+          uid,
+          mailbox || config.mailbox,
+          config.user,
+          parts.envelope,
+          parts.flags,
+          parts.text,
+          parts.html,
+          parts.attachments,
+        );
 
-      if (!found) {
-        return null;
-      }
-
-      if (found.unread) {
-        try {
-          await client.messageFlagsAdd({ uid }, ["\\Seen"], { uid: true });
-          found = { ...found, unread: false };
-        } catch {
-          // non-fatal
+        if (!found) {
+          return null;
         }
-      }
 
-      return found;
-    } finally {
-      lock.release();
-    }
-  });
+        if (found.unread) {
+          try {
+            await client.messageFlagsAdd({ uid }, ["\\Seen"], { uid: true });
+            found = { ...found, unread: false };
+          } catch {
+            // non-fatal
+          }
+        }
+
+        return found;
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  // Graph/IMAP still carry FORM_SCOPE in the subject — strip retired scopes for UI.
+  const { withActivePublishedScopeCleared } = await import("./apply-active-form-scopes");
+  return withActivePublishedScopeCleared(message);
 }
 
 /** Load conversation replies (separate call so opening a mail stays fast). */

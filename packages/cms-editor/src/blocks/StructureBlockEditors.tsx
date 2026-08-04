@@ -8,6 +8,7 @@ import {
   type ComparisonTableBlockData,
   type LatestPostsBlockData,
   type PortfolioBlockData,
+  type StepItem,
   type StepsBlockData,
   type TextListItem,
   type TimelineBlockData,
@@ -77,48 +78,77 @@ export function StepsBlockEditor({
   value,
   onChange,
   blockId,
+  projectImages,
+  assetBaseUrl,
+  uploadToMediaLibrary,
+  mediaLibraryItems,
+  resolveProjectImage,
 }: {
   value: StepsBlockData;
   onChange: (next: StepsBlockData) => void;
   presentation?: BlockEditorPresentation;
   blockId?: string;
-}) {
+} & CmsImagePickerProps) {
+  const imageProps: CmsImagePickerProps = {
+    projectImages,
+    assetBaseUrl,
+    uploadToMediaLibrary,
+    mediaLibraryItems,
+    resolveProjectImage,
+  };
   return (
     <div className="space-y-4">
-      <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
-        <input
-          className={inputClass}
-          value={value.title}
-          onChange={(e) => onChange({ ...value, title: e.target.value })}
-        />
-      </NlEnField>
-      <ObjectListEditor
+      <Section title="Stappen">
+        <p className="text-[11px] text-white/45">
+          Horizontale slider op de site — actieve stap vergroot. Optionele afbeelding per stap.
+        </p>
+        <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
+          <input
+            className={inputClass}
+            value={value.title}
+            onChange={(e) => onChange({ ...value, title: e.target.value })}
+          />
+        </NlEnField>
+      </Section>
+      <ObjectListEditor<StepItem>
         items={value.steps}
         onChange={(steps) => onChange({ ...value, steps })}
-        createItem={() => ({ id: createItemId("step"), title: "Stap", body: "" })}
+        createItem={(): StepItem => ({ id: createItemId("step"), title: "Stap", body: "" })}
         addLabel="Stap toevoegen"
         renderItem={(item, actions, index) => (
-          <div className="grid gap-2">
-            <input
-              className={inputClass}
-              placeholder="Titel"
-              value={item.title}
-              onChange={(e) => actions.update({ ...item, title: e.target.value })}
-            />
+          <div className="grid gap-3">
+            <Field label="Titel">
+              <input
+                className={inputClass}
+                placeholder="Titel"
+                value={item.title}
+                onChange={(e) => actions.update({ ...item, title: e.target.value })}
+              />
+            </Field>
             <EnDraftFor
               fieldPath={blockEnPath(blockId, `steps.${index}.title`)}
               label="Titel"
             />
-            <textarea
-              className={inputClass}
-              placeholder="Tekst"
-              value={item.body}
-              onChange={(e) => actions.update({ ...item, body: e.target.value })}
-            />
+            <Field label="Tekst">
+              <textarea
+                className={`${inputClass} min-h-[3rem]`}
+                placeholder="Tekst"
+                value={item.body}
+                onChange={(e) => actions.update({ ...item, body: e.target.value })}
+              />
+            </Field>
             <EnDraftFor
               fieldPath={blockEnPath(blockId, `steps.${index}.body`)}
               label="Tekst"
               multiline
+            />
+            <BlockImageField
+              label="Afbeelding"
+              value={item.image}
+              preferTags={["steps", "process", "cms"]}
+              enAltPath={blockEnPath(blockId, `steps.${index}.image.alt`)}
+              {...imageProps}
+              onChange={(image) => actions.update({ ...item, image: image ?? undefined })}
             />
           </div>
         )}

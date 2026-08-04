@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cmsButtonSchema, createItemId, type CmsButton, type CmsImage } from "../content";
+import { cmsButtonSchema, createItemId, normalizeCmsButton, type CmsButton, type CmsImage } from "../content";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot, type FormScopeSnapshot } from "../form-scope";
 import { cmsLinkSchema, linkFromLegacyHref, parseCmsLink } from "../links";
 import type { BlockType, CmsLink } from "../types";
@@ -30,6 +30,7 @@ import {
   quoteRequestFormDefinition,
   statsCountersDefinition,
 } from "./new-sections";
+import { offersDefinition } from "./offers";
 
 export type {
   JobsBlockData,
@@ -315,12 +316,24 @@ export function normalizeQuoteBlockData(value: unknown): QuoteBlockData {
 
 // —— Gallery ——
 export type GalleryImageShape = "wide" | "square" | "tall";
+/** Where per-item text sits relative to its image (text+image mode). */
+export type GalleryTextPlacement = "above" | "below" | "left" | "right";
+/** Images-only keeps classic gallery; textAndImage enables title/caption/body layouts. */
+export type GalleryContentMode = "imagesOnly" | "textAndImage";
+/** Column count for above/below text+image grids. */
+export type GalleryColumns = 2 | 3 | 4;
+
 export type GalleryImageItem = {
   id: string;
   image: CmsImage;
   title?: string;
   caption?: string;
-  /** Tile shape for featured mosaic — default square. */
+  /** Longer body copy next to / with the image (text+image mode). */
+  body?: string;
+  /**
+   * Tile shape for featured mosaic.
+   * Omit for classic Ons-werk index spans; never invent a shape on normalize.
+   */
   shape?: GalleryImageShape;
 };
 export type GalleryBlockData = {
@@ -328,8 +341,14 @@ export type GalleryBlockData = {
   eyebrow?: string;
   body?: string;
   images: GalleryImageItem[];
-  /** `featured` = homepage Ons-werk mosaic. */
+  /** `featured` = homepage Ons-werk mosaic. Used when contentMode is imagesOnly. */
   layout?: "grid" | "masonry" | "featured";
+  /** Default `imagesOnly` so published galleries keep prior behavior. */
+  contentMode?: GalleryContentMode;
+  /** Section-level text placement when contentMode is textAndImage. Default `below`. */
+  textPlacement?: GalleryTextPlacement;
+  /** Grid columns when textPlacement is above|below. Default 2. */
+  columns?: GalleryColumns;
 };
 
 /** Span classes for the featured mosaic grid (`auto-rows-[220px]` × 4 cols). */
@@ -342,6 +361,25 @@ export const galleryShapeConfig = {
 
 export function normalizeGalleryShape(raw: unknown): GalleryImageShape {
   return raw === "wide" || raw === "tall" ? raw : "square";
+}
+
+/** Explicit editor shape only — omit when unset so featured keeps classic mosaic spans. */
+export function parseOptionalGalleryShape(raw: unknown): GalleryImageShape | undefined {
+  if (raw === "wide" || raw === "tall" || raw === "square") return raw;
+  return undefined;
+}
+
+export function normalizeGalleryTextPlacement(raw: unknown): GalleryTextPlacement {
+  return raw === "above" || raw === "left" || raw === "right" ? raw : "below";
+}
+
+export function normalizeGalleryContentMode(raw: unknown): GalleryContentMode {
+  return raw === "textAndImage" ? "textAndImage" : "imagesOnly";
+}
+
+export function normalizeGalleryColumns(raw: unknown): GalleryColumns {
+  const n = typeof raw === "string" ? Number(raw) : raw;
+  return n === 3 || n === 4 ? n : 2;
 }
 
 // —— Video ——
@@ -371,7 +409,7 @@ export type CarouselSlide = {
 export type CarouselBlockData = { slides: CarouselSlide[] };
 
 // —— Steps ——
-export type StepItem = { id: string; title: string; body: string };
+export type StepItem = { id: string; title: string; body: string; image?: CmsImage };
 export type StepsBlockData = { title: string; steps: StepItem[] };
 
 // —— Comparison ——
@@ -388,8 +426,10 @@ export type FeatureItem = {
   icon: string;
   title: string;
   body: string;
-  /** Optional CTA on assortment cards (Producten presentation). */
+  /** @deprecated Prefer `cta`. Kept for normalize of older Producten drafts. */
   link?: CmsLink;
+  /** Per-card button on assortment cards (Producten presentation). */
+  cta?: CmsButton;
 };
 export type FeatureGridPresentation = "default" | "productsAssortment";
 export type FeatureGridBlockData = {
@@ -672,7 +712,7 @@ export const catalogDefinitions = {
     type: "gallery",
     label: "Galerij",
     category: "Media",
-    dataVersion: 3,
+    dataVersion: 4,
     schema: z.object({
       title: z.string(),
       eyebrow: z.string().optional(),
@@ -683,10 +723,14 @@ export const catalogDefinitions = {
           image: z.custom<CmsImage>((v) => normalizeCmsImage(v) != null),
           title: z.string().optional(),
           caption: z.string().optional(),
+          body: z.string().optional(),
           shape: z.enum(["wide", "square", "tall"]).optional(),
         }),
       ),
       layout: z.enum(["grid", "masonry", "featured"]).optional(),
+      contentMode: z.enum(["imagesOnly", "textAndImage"]).optional(),
+      textPlacement: z.enum(["above", "below", "left", "right"]).optional(),
+      columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
     }),
     createDefault: (): GalleryBlockData => ({
       title: "Een blik op wat wij doen",
@@ -694,6 +738,9 @@ export const catalogDefinitions = {
       body: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
       images: [],
       layout: "featured",
+      contentMode: "imagesOnly",
+      textPlacement: "below",
+      columns: 2,
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -702,17 +749,20 @@ export const catalogDefinitions = {
         for (const entry of rec.images) {
           if (typeof entry === "string") {
             const img = normalizeCmsImage(entry);
-            if (img) images.push({ id: createItemId("img"), image: img, shape: "square" });
+            // Legacy URL-only entries: no explicit shape → classic mosaic when featured.
+            if (img) images.push({ id: createItemId("img"), image: img });
           } else if (entry && typeof entry === "object") {
             const row = entry as Record<string, unknown>;
             const img = normalizeCmsImage(row.image ?? row.src ?? row);
             if (img) {
+              const shape = parseOptionalGalleryShape(row.shape);
               images.push({
                 id: typeof row.id === "string" && row.id ? row.id : createItemId("img"),
                 image: img,
                 title: str(row, "title") || undefined,
                 caption: str(row, "caption") || undefined,
-                shape: normalizeGalleryShape(row.shape),
+                body: str(row, "body") || undefined,
+                ...(shape ? { shape } : {}),
               });
             }
           }
@@ -729,6 +779,9 @@ export const catalogDefinitions = {
         body: str(rec, "body") || undefined,
         images,
         layout,
+        contentMode: normalizeGalleryContentMode(rec.contentMode),
+        textPlacement: normalizeGalleryTextPlacement(rec.textPlacement),
+        columns: normalizeGalleryColumns(rec.columns),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
@@ -826,7 +879,16 @@ export const catalogDefinitions = {
     dataVersion: 1,
     schema: z.object({
       title: z.string(),
-      steps: z.array(z.object({ id: z.string(), title: z.string(), body: z.string() })),
+      steps: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          body: z.string(),
+          image: z
+            .custom<CmsImage | undefined>((v) => v === undefined || normalizeCmsImage(v) != null)
+            .optional(),
+        }),
+      ),
     }),
     createDefault: (): StepsBlockData => ({
       title: "Onze aanpak",
@@ -839,11 +901,15 @@ export const catalogDefinitions = {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
       return {
         title: str(rec, "title", "Stappen"),
-        steps: mapIdList(rec.steps, (row, id) => ({
-          id,
-          title: str(row, "title"),
-          body: str(row, "body"),
-        })),
+        steps: mapIdList(rec.steps, (row, id) => {
+          const image = normalizeCmsImage(row.image);
+          return {
+            id,
+            title: str(row, "title"),
+            body: str(row, "body"),
+            ...(image ? { image } : {}),
+          };
+        }),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
@@ -906,6 +972,7 @@ export const catalogDefinitions = {
           title: z.string(),
           body: z.string(),
           link: cmsLinkSchema.optional(),
+          cta: cmsButtonSchema.optional(),
         }),
       ),
       presentation: z.enum(["default", "productsAssortment"]).optional(),
@@ -929,13 +996,22 @@ export const catalogDefinitions = {
       return {
         title: str(rec, "title", "Kenmerken"),
         features: mapIdList(rec.features, (row, id) => {
-          const link = parseCmsLink(row.link);
+          const legacyLink = parseCmsLink(row.link);
+          const cta =
+            normalizeCmsButton(row.cta) ??
+            (legacyLink && legacyLink.type !== "none"
+              ? {
+                  label: "Productofferte aanvragen",
+                  action: "link" as const,
+                  link: legacyLink,
+                }
+              : undefined);
           return {
             id,
             icon: str(row, "icon", "sparkles"),
             title: str(row, "title"),
             body: str(row, "body") || str(row, "description"),
-            ...(link && link.type !== "none" ? { link } : {}),
+            ...(cta ? { cta } : {}),
           };
         }),
         ...(presentation ? { presentation } : {}),
@@ -1259,6 +1335,7 @@ export const catalogDefinitions = {
   contactInfoCards: contactInfoCardsDefinition,
   quoteRequestForm: quoteRequestFormDefinition,
   legalArticles: legalArticlesDefinition,
+  offers: offersDefinition,
 } as const satisfies Record<BlockType, CmsBlockDataDefinition>;
 
 export type CatalogDefinitions = typeof catalogDefinitions;

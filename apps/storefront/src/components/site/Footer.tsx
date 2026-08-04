@@ -4,7 +4,7 @@ import logoUrl from "@/assets/logo-mccoy.png";
 import logoWebpUrl from "@/assets/logo-mccoy.webp";
 import { useI18n } from "@/lib/i18n";
 import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
-import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 import { cn } from "@/lib/utils";
 
 export function Footer() {

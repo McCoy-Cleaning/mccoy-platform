@@ -25,6 +25,9 @@ async function loadPublishedBundle(): Promise<CmsPage[] | null> {
  * B5 / Phase C — load published CMS from server (file or Supabase), not localStorage.
  * Navigation is derived from page.inNav so custom in-nav pages appear in Navbar/MobileMenu.
  *
+ * Deferred until after first paint / idle so homepage LCP is not blocked by the
+ * full published bundle round-trip (route loaders already supply the page body).
+ *
  * Also re-fetches when the tab becomes visible so Opslaan → shared `.data` shows up even
  * when the cross-origin chrome iframe / BroadcastChannel bridge was missed.
  *
@@ -37,11 +40,24 @@ export function PublishedCmsProvider({ children }: { children: React.ReactNode }
   React.useEffect(() => {
     ensurePublishedChromeBroadcastListener();
     let cancelled = false;
-    void (async () => {
-      await loadPublishedBundle();
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const run = () => {
       if (cancelled) return;
-      setReady(true);
-    })();
+      void (async () => {
+        await loadPublishedBundle();
+        if (cancelled) return;
+        setReady(true);
+      })();
+    };
+
+    // After LCP opportunity: idle when available, else short timeout.
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 2500 });
+    } else {
+      timeoutId = setTimeout(run, 1);
+    }
 
     const refresh = () => {
       void loadPublishedBundle();
@@ -54,6 +70,10 @@ export function PublishedCmsProvider({ children }: { children: React.ReactNode }
 
     return () => {
       cancelled = true;
+      if (idleId != null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisibility);
     };

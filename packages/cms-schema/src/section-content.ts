@@ -16,10 +16,13 @@ import {
   type ProductsMainContent,
   type ServicesMainContent,
   type StatsContent,
+  type VacaturesApplicationContent,
+  type VacaturesMainContent,
   type WorkGalleryContent,
 } from "./content";
 import { FIXED_SECTIONS_BY_PAGE, type FixedSectionKey } from "./sections";
 import type { BuiltinCmsPage } from "./types";
+import { normalizeVacaturesApplicationContent } from "./vacatures-application";
 
 const LEGACY_PRODUCTS_MAIN_HEADING = "McCoy Products";
 const LEGACY_PRODUCTS_MAIN_INTRO = "Hygiënepapier, zepen, reinigingsmiddelen en meer.";
@@ -240,6 +243,13 @@ export function ensureBuiltinSectionContent(
       if (key === "services.main") {
         next = migrateOriginalServicesImages(parsed as ServicesMainContent) as typeof parsed;
       }
+      if (key === "vacatures.application") {
+        const main = out["vacatures.main"] as VacaturesMainContent | undefined;
+        next = normalizeVacaturesApplicationContent(
+          parsed,
+          main?.applicationScope,
+        ) as typeof parsed;
+      }
       // Do not rehydrate removed CTAs, cards, or items — editors may clear them deliberately.
       // Exception: empty partners list is treated as "never seeded" and gets default logos.
       (out as Record<string, unknown>)[key] = next;
@@ -258,6 +268,13 @@ export function ensureBuiltinSectionContent(
     }
     if (key === "services.main") {
       def = migrateOriginalServicesImages(def as ServicesMainContent);
+    }
+    if (key === "vacatures.application") {
+      const main = out["vacatures.main"] as VacaturesMainContent | undefined;
+      def = normalizeVacaturesApplicationContent(
+        def,
+        main?.applicationScope,
+      ) as VacaturesApplicationContent;
     }
     (out as Record<string, unknown>)[key] = def;
   }

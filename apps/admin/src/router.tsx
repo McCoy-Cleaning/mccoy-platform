@@ -9,7 +9,10 @@ export const getRouter = () => {
   const router = createRouter({
     routeTree,
     context: { queryClient },
-    defaultPreloadStaleTime: 0,
+    // Admin routes have no loaders today; intent preload still warms route chunks.
+    defaultPreload: "intent",
+    defaultPreloadDelay: 0,
+    defaultPreloadStaleTime: 30_000,
   });
 
   return router;

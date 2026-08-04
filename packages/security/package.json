@@ -7,16 +7,19 @@
     ".": "./src/index.ts",
     "./host": "./src/host.ts",
     "./env": "./src/env.ts",
+    "./indexing": "./src/indexing.ts",
     "./load-monorepo-env": "./src/load-monorepo-env.server.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-start": "^1.168.27"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }

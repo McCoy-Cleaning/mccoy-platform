@@ -23,6 +23,28 @@ import { AdminAuthError } from "@mccoy/security";
 const CMS_PAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * After CMS publish/delete/rollback, retire website_request scopes that no longer
+ * exist on published forms. Never fails the CMS mutation.
+ */
+async function reconcileOrphanScopesAfterCmsChange(): Promise<void> {
+  try {
+    const { reconcileOrphanWebsiteRequestScopes } = await import("@mccoy/database/server");
+    const result = await reconcileOrphanWebsiteRequestScopes();
+    if (result.cleared > 0) {
+      console.info(
+        JSON.stringify({
+          type: "website_requests.orphan_scopes_cleared",
+          cleared: result.cleared,
+          activeKeyCount: result.activeKeys.length,
+        }),
+      );
+    }
+  } catch (error) {
+    console.error("[cms] orphan scope reconcile failed", error);
+  }
+}
+
+/**
  * Stage D — best-effort `cms.publish_failed` notice to the acting staff member.
  * Never throws: a notification failure must not mask the original publish error.
  * Skips auth errors, optimistic-concurrency conflicts (expected/retryable), and
@@ -256,6 +278,7 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
         expectedDraftRevision: data.expectedDraftRevision ?? null,
       });
       await processCmsOutbox(10);
+      await reconcileOrphanScopesAfterCmsChange();
       return jsonClone({
         ok: true as const,
         result: {
@@ -289,6 +312,7 @@ export const adminRollbackCmsPage = createServerFn({ method: "POST" })
         createdBy: session.username,
       });
       await processCmsOutbox(10);
+      await reconcileOrphanScopesAfterCmsChange();
       return jsonClone({
         ok: true as const,
         result: {
@@ -346,6 +370,7 @@ export const adminDeleteCmsPage = createServerFn({ method: "POST" })
         };
       }
       await processCmsOutbox(10);
+      await reconcileOrphanScopesAfterCmsChange();
       return jsonClone({
         ok: true as const,
         deleted: result.deleted || !existing,

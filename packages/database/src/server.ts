@@ -19,10 +19,14 @@ export {
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
   countWebsiteRequests,
+  clearOrphanWebsiteRequestScopes,
   getWebsiteRequestsStore,
   supabaseWebsiteRequestsStore,
+  loadActivePublishedFormScopeKeys,
+  reconcileOrphanWebsiteRequestScopes,
   type WebsiteRequestRow,
   type WebsiteRequestReplyRow,
+  type ReconcileOrphanScopesResult,
 } from "./website-requests";
 
 export {

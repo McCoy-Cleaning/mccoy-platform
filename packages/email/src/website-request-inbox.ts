@@ -168,8 +168,10 @@ export async function listWebsiteRequestFormInboxMessages(
   const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
   const messages = await listWebsiteRequestInboxSummaries({ ...options, limit: 200 });
   messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const facets = buildInboxFacets(messages);
-  const filtered = filterInboxMessages(messages, {
+  const { withActivePublishedScopesCleared } = await import("./apply-active-form-scopes");
+  const scoped = await withActivePublishedScopesCleared(messages);
+  const facets = buildInboxFacets(scoped);
+  const filtered = filterInboxMessages(scoped, {
     kind: options?.kind,
     scopeKey: options?.scopeKey,
     q: options?.q,
@@ -184,7 +186,9 @@ export async function getWebsiteRequestFormInboxMessage(
   if (decoded.provider !== "request" && decoded.provider !== "e2e") return null;
   const request = await getWebsiteRequest(decoded.requestId);
   if (!request || !isActiveRequestStatus(request.status)) return null;
-  return websiteRequestToMessage(request);
+  const message = websiteRequestToMessage(request);
+  const { withActivePublishedScopeCleared } = await import("./apply-active-form-scopes");
+  return withActivePublishedScopeCleared(message);
 }
 
 export async function getWebsiteRequestFormInboxThread(

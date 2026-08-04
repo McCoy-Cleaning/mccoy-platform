@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createItemId } from "../content";
 import { cmsLinkSchema, isActionableCmsLink, linkFromLegacyHref, parseCmsLink } from "../links";
-import { newBlockLayoutItem } from "../layout";
+import { newBlockLayoutItem, ensureLastLocked } from "../layout";
 import type { Block, BuiltinCmsPage, CmsLink, CmsPage } from "../types";
 import type { CmsBlockDataDefinition } from "./definition";
 import type { PublishValidationError } from "./validation-codes";
@@ -618,7 +618,10 @@ export function ensureVacaturesJobsBlock(page: CmsPage): CmsPage {
     };
     const next = structuredClone(page) as BuiltinCmsPage;
     next.blocks = [...next.blocks, block];
-    next.layout = [...next.layout, { ...newBlockLayoutItem(block.id), hidden: true }];
+    next.layout = ensureLastLocked(
+      [...next.layout, { ...newBlockLayoutItem(block.id), hidden: true }],
+      "vacatures",
+    );
     return next;
   }
 

@@ -1,11 +1,15 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
+
+const Footer = lazy(() =>
+  import("@/components/site/Footer").then((m) => ({ default: m.Footer })),
+);
 
 export const Route = createFileRoute("/en/")({
   loader: async () => {
@@ -57,7 +61,9 @@ function EnglishHomePage() {
           />
         ) : null}
       </main>
-      <Footer />
+      <Suspense fallback={<div className="min-h-[16rem]" aria-hidden />}>
+        <Footer />
+      </Suspense>
     </div>
   );
 }

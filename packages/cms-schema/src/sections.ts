@@ -4,7 +4,7 @@
  * Current publishable layout version for fixed+block hybrid layouts.
  * Blocks-only target is {@link BLOCKS_ONLY_LAYOUT_VERSION} in migration/ — applied only after verified migration (Gate 5+).
  */
-export const CURRENT_LAYOUT_VERSION = 6 as const;
+export const CURRENT_LAYOUT_VERSION = 7 as const;
 
 /** @deprecated Use CURRENT_LAYOUT_VERSION — alias documenting the last fixed-section layout era. */
 export const FIXED_SECTIONS_LAYOUT_VERSION = CURRENT_LAYOUT_VERSION;
@@ -33,6 +33,7 @@ export type FixedSectionKey =
   | "contact.info"
   | "contact.form"
   | "vacatures.main"
+  | "vacatures.application"
   | "offerte.main"
   | "offerte.info"
   | "offerte.form"
@@ -58,7 +59,7 @@ export const FIXED_SECTIONS_BY_PAGE: Record<BuiltinPageKey, readonly FixedSectio
   services: ["services.main"],
   products: ["products.main", "products.info"],
   contact: ["contact.main", "contact.info", "contact.form"],
-  vacatures: ["vacatures.main"],
+  vacatures: ["vacatures.main", "vacatures.application"],
   offerte: ["offerte.main", "offerte.info", "offerte.form"],
   privacy: ["privacy.main"],
   terms: ["terms.main"],
@@ -67,7 +68,8 @@ export const FIXED_SECTIONS_BY_PAGE: Record<BuiltinPageKey, readonly FixedSectio
 /**
  * Fixed section capabilities — all hideable/removable so existing page chrome
  * can be managed like flexible blocks, except contact.form / offerte.form
- * (required, hide-only). Vacatures jobs block policy remains separate
+ * (required, hide-only). Vacatures application is required + last-locked so it
+ * stays below jobs listing chrome. Vacatures jobs block policy remains separate
  * (`page-block-policies`: minInstances 1).
  */
 export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition> = {
@@ -142,6 +144,13 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     movable: true,
     hideable: true,
     required: false,
+  },
+  "vacatures.application": {
+    label: "Sollicitatie + video",
+    movable: true,
+    hideable: true,
+    required: true,
+    lockedPosition: "last",
   },
   "offerte.main": {
     label: "Intro",

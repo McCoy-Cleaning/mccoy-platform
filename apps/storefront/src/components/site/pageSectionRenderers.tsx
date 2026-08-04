@@ -4,6 +4,7 @@ import { About, Services, ProductsMain, ProductsInfo } from "./sections/SitePage
 import { ContactMainChrome, VacaturesMainChrome, OfferteMainChrome } from "./FormPageChrome";
 import { ContactFormSection, ContactInfoSection, OfferteInfoSection } from "./sections/ContactSections";
 import { OfferteFormSection } from "./sections/OfferteSections";
+import { VacaturesApplicationSection } from "./sections/VacaturesApplicationSection";
 import { PrivacyMainSection, TermsMainSection } from "./sections/LegalSections";
 
 /** Full builtin-page renderer map (about/services/products/forms + home). */
@@ -26,6 +27,7 @@ export const pageSectionRenderers: PageSectionRenderers = {
   },
   vacatures: {
     "vacatures.main": VacaturesMainChrome,
+    "vacatures.application": VacaturesApplicationSection,
   },
   offerte: {
     "offerte.main": OfferteMainChrome,

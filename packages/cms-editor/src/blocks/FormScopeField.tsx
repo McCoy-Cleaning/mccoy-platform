@@ -52,7 +52,7 @@ export function FormScopeField({
         }}
       />
       {value?.key ? (
-        <p className="mt-1 text-[10px] text-white/40">
+        <p className="mt-1 text-xs text-white/40">
           Sleutel: <code className="text-white/55">{value.key}</code>
         </p>
       ) : null}

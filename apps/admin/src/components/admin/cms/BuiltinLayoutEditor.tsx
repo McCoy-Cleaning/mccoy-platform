@@ -181,6 +181,8 @@ export function BuiltinLayoutEditor({
           /* ignore */
         }
       }
+    } else if (layoutItem?.kind === "fixed" && layoutItem.key === "vacatures.application") {
+      summary = r.hidden ? undefined : "Formulier en video/foto";
     } else if (!r.hidden) {
       summary = "Zichtbaar";
     }

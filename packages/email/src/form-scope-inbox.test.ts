@@ -10,6 +10,12 @@ import { enrichInboxSummariesWithRequestScopes } from "./enrich-inbox-scopes";
 import type { FormInboxMessageSummary } from "./form-inbox-contracts";
 import { classifyFormEmailSubject, extractFormScopeKeyFromSubject } from "./classify-form-email";
 import { mergeMailboxAndWebsiteRequestSummaries } from "./enrich-inbox-scopes";
+import {
+  activePublishedScopeKeySet,
+  clearOrphanScopesOnInboxSummaries,
+  findOrphanedScopeKeys,
+  isOrphanFormScope,
+} from "./orphan-form-scopes";
 import { buildFormEmail } from "./templates";
 
 function msg(
@@ -86,13 +92,101 @@ describe("filterInboxMessages", () => {
     expect(facets).toEqual([{ key: "questions", label: "questions", count: 0 }]);
   });
 
-  it("keeps deleted-form scopes that still have mailbox mail", () => {
+  it("drops deleted-form scopes even when mailbox still has mail (retire to Algemeen)", () => {
     const facets = buildAanvragenScopeFacets({
       published: [],
       mailbox: [{ key: "test", label: "test", count: 1 }],
       storeLabels: [{ key: "test", label: "test", count: 9 }],
     });
-    expect(facets).toEqual([{ key: "test", label: "test", count: 1 }]);
+    expect(facets).toEqual([]);
+  });
+
+  it("keeps published scope tabs with mailbox counts after orphan mail is cleared", () => {
+    const facets = buildAanvragenScopeFacets({
+      published: [{ key: "amsterdam", label: "Amsterdam", count: 0 }],
+      mailbox: [{ key: "amsterdam", label: "Amsterdam", count: 2 }],
+    });
+    expect(facets).toEqual([{ key: "amsterdam", label: "Amsterdam", count: 2 }]);
+  });
+});
+
+describe("orphan form scopes", () => {
+  it("detects scopes missing from published forms", () => {
+    const active = activePublishedScopeKeySet([
+      { key: "amsterdam" },
+      { key: "Rotterdam" },
+    ]);
+    expect(active.has("amsterdam")).toBe(true);
+    expect(active.has("rotterdam")).toBe(true);
+    expect(isOrphanFormScope("questions", active)).toBe(true);
+    expect(isOrphanFormScope("amsterdam", active)).toBe(false);
+    expect(isOrphanFormScope(null, active)).toBe(false);
+    expect(findOrphanedScopeKeys(["amsterdam", "test", "TEST", null], active)).toEqual([
+      "test",
+    ]);
+  });
+
+  it("clears orphan scopeKey/scopeLabel without changing kind", () => {
+    const active = activePublishedScopeKeySet([{ key: "amsterdam" }]);
+    const cleared = clearOrphanScopesOnInboxSummaries(
+      [
+        msg({
+          id: "1",
+          kind: "inquiry",
+          scopeKey: "questions",
+          scopeLabel: "questions",
+        }),
+        msg({
+          id: "2",
+          kind: "job_application",
+          scopeKey: "amsterdam",
+          scopeLabel: "Amsterdam",
+        }),
+        msg({ id: "3", kind: "inquiry", scopeKey: null }),
+      ],
+      active,
+    );
+    expect(cleared[0]).toMatchObject({
+      id: "1",
+      kind: "inquiry",
+      scopeKey: null,
+      scopeLabel: null,
+    });
+    expect(cleared[1]).toMatchObject({
+      id: "2",
+      kind: "job_application",
+      scopeKey: "amsterdam",
+      scopeLabel: "Amsterdam",
+    });
+    expect(cleared[2]?.scopeKey).toBeNull();
+  });
+
+  it("after clearing orphans, facets no longer expose dead scope tabs", () => {
+    const active = activePublishedScopeKeySet([{ key: "amsterdam" }]);
+    const cleared = clearOrphanScopesOnInboxSummaries(
+      [
+        msg({
+          id: "1",
+          kind: "inquiry",
+          scopeKey: "test",
+          scopeLabel: "test",
+        }),
+        msg({
+          id: "2",
+          kind: "inquiry",
+          scopeKey: "amsterdam",
+          scopeLabel: "Amsterdam",
+        }),
+      ],
+      active,
+    );
+    const mailboxFacets = buildInboxFacets(cleared);
+    const tabs = buildAanvragenScopeFacets({
+      published: [{ key: "amsterdam", label: "Amsterdam", count: 0 }],
+      mailbox: mailboxFacets.scopes,
+    });
+    expect(tabs).toEqual([{ key: "amsterdam", label: "Amsterdam", count: 1 }]);
+    expect(cleared.find((m) => m.id === "1")?.scopeKey).toBeNull();
   });
 });
 
@@ -130,6 +224,35 @@ describe("mergeMailboxAndWebsiteRequestSummaries", () => {
     expect(wr1?.id).toBe("graph:1");
     expect(wr1?.scopeKey).toBe("test");
     expect(wr2?.id).toBe("req:2");
+  });
+
+  it("strips Graph subject scopes that are no longer published after merge", () => {
+    const active = activePublishedScopeKeySet([{ key: "live" }]);
+    const merged = mergeMailboxAndWebsiteRequestSummaries(
+      [
+        msg({
+          id: "graph:1",
+          kind: "inquiry",
+          requestNumber: "WR-9",
+          scopeKey: "dead",
+          scopeLabel: "dead",
+        }),
+      ],
+      [
+        msg({
+          id: "req:9",
+          kind: "inquiry",
+          requestNumber: "WR-9",
+          scopeKey: null,
+          scopeLabel: null,
+        }),
+      ],
+    );
+    const cleared = clearOrphanScopesOnInboxSummaries(merged, active);
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]?.scopeKey).toBeNull();
+    expect(cleared[0]?.scopeLabel).toBeNull();
+    expect(cleared[0]?.kind).toBe("inquiry");
   });
 });
 

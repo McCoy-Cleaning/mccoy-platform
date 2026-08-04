@@ -48,4 +48,11 @@ export type WebsiteRequestsStore = {
     nextStatus?: RequestStatus,
   ): Promise<WebsiteRequest | null>;
   countWebsiteRequests(): Promise<number>;
+  /**
+   * Clear scope_key/scope_label on rows whose scope is not in `activeScopeKeys`.
+   * Empty active set clears every scoped row. Does not change kind or delete rows.
+   */
+  clearOrphanWebsiteRequestScopes(
+    activeScopeKeys: string[],
+  ): Promise<{ cleared: number }>;
 };

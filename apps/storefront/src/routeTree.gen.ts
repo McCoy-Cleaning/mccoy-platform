@@ -15,6 +15,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SchoonmaakbedrijfHengeloRouteImport } from './routes/schoonmaakbedrijf-hengelo'
 import { Route as SchoonmaakbedrijfEnschedeRouteImport } from './routes/schoonmaakbedrijf-enschede'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OfferteRouteImport } from './routes/offerte'
@@ -60,6 +61,11 @@ const SchoonmaakbedrijfEnschedeRoute =
     path: '/schoonmaakbedrijf-enschede',
     getParentRoute: () => rootRouteImport,
   } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/offerte': typeof OfferteRoute
   '/privacy': typeof PrivacyRoute
   '/products': typeof ProductsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/schoonmaakbedrijf-enschede': typeof SchoonmaakbedrijfEnschedeRoute
   '/schoonmaakbedrijf-hengelo': typeof SchoonmaakbedrijfHengeloRoute
   '/services': typeof ServicesRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/offerte': typeof OfferteRoute
   '/privacy': typeof PrivacyRoute
   '/products': typeof ProductsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/schoonmaakbedrijf-enschede': typeof SchoonmaakbedrijfEnschedeRoute
   '/schoonmaakbedrijf-hengelo': typeof SchoonmaakbedrijfHengeloRoute
   '/services': typeof ServicesRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/offerte': typeof OfferteRoute
   '/privacy': typeof PrivacyRoute
   '/products': typeof ProductsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/schoonmaakbedrijf-enschede': typeof SchoonmaakbedrijfEnschedeRoute
   '/schoonmaakbedrijf-hengelo': typeof SchoonmaakbedrijfHengeloRoute
   '/services': typeof ServicesRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/offerte'
     | '/privacy'
     | '/products'
+    | '/robots.txt'
     | '/schoonmaakbedrijf-enschede'
     | '/schoonmaakbedrijf-hengelo'
     | '/services'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/offerte'
     | '/privacy'
     | '/products'
+    | '/robots.txt'
     | '/schoonmaakbedrijf-enschede'
     | '/schoonmaakbedrijf-hengelo'
     | '/services'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/offerte'
     | '/privacy'
     | '/products'
+    | '/robots.txt'
     | '/schoonmaakbedrijf-enschede'
     | '/schoonmaakbedrijf-hengelo'
     | '/services'
@@ -255,6 +267,7 @@ export interface RootRouteChildren {
   OfferteRoute: typeof OfferteRoute
   PrivacyRoute: typeof PrivacyRoute
   ProductsRoute: typeof ProductsRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SchoonmaakbedrijfEnschedeRoute: typeof SchoonmaakbedrijfEnschedeRoute
   SchoonmaakbedrijfHengeloRoute: typeof SchoonmaakbedrijfHengeloRoute
   ServicesRoute: typeof ServicesRoute
@@ -307,6 +320,13 @@ declare module '@tanstack/react-router' {
       path: '/schoonmaakbedrijf-enschede'
       fullPath: '/schoonmaakbedrijf-enschede'
       preLoaderRoute: typeof SchoonmaakbedrijfEnschedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -418,6 +438,7 @@ const rootRouteChildren: RootRouteChildren = {
   OfferteRoute: OfferteRoute,
   PrivacyRoute: PrivacyRoute,
   ProductsRoute: ProductsRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SchoonmaakbedrijfEnschedeRoute: SchoonmaakbedrijfEnschedeRoute,
   SchoonmaakbedrijfHengeloRoute: SchoonmaakbedrijfHengeloRoute,
   ServicesRoute: ServicesRoute,

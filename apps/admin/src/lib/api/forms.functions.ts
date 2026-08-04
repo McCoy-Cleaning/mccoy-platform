@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { resolvePublishedFormScope, resolveVacancyApplication } from "@mccoy/cms-schema";
+import {
+  resolvePublishedFormScope,
+  resolvePublishedJobApplicationFields,
+  resolveVacancyApplication,
+  validateContactFormSubmission,
+} from "@mccoy/cms-schema";
 import { websiteFormPayloadSchema } from "@mccoy/validation";
 
 export const submitWebsiteForm = createServerFn({ method: "POST" })
@@ -28,8 +33,31 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
       };
 
       if (data.kind === "job_application") {
-        const resolved = resolveVacancyApplication(page, data.fields?.vacancyId, new Date(), {
-          vacancySlug: data.fields?.vacancySlug,
+        const resolvedFields = resolvePublishedJobApplicationFields(page);
+        let workingFields = data.fields ?? {};
+        if (resolvedFields.ok) {
+          const {
+            vacancyId: _vacancyId,
+            vacancySlug: _vacancySlugIn,
+            vacancyTitleSnapshot: _vacancyTitleSnapshotIn,
+            role: _clientRoleIn,
+            ...formFields
+          } = workingFields;
+          const validated = validateContactFormSubmission(resolvedFields.fields, formFields);
+          if (!validated.ok) {
+            return { ok: false as const, error: validated.reason, code: "validation" as const };
+          }
+          workingFields = {
+            ...validated.sanitized,
+            vacancyId: data.fields?.vacancyId ?? "",
+            vacancySlug: data.fields?.vacancySlug ?? "",
+            vacancyTitleSnapshot: data.fields?.vacancyTitleSnapshot ?? "",
+            role: data.fields?.role ?? "",
+          };
+        }
+
+        const resolved = resolveVacancyApplication(page, workingFields.vacancyId, new Date(), {
+          vacancySlug: workingFields.vacancySlug,
         });
         const hasJobsBlock = Boolean(page?.blocks?.some((b) => b.type === "jobs"));
         if (hasJobsBlock) {
@@ -41,7 +69,7 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
             vacancyTitleSnapshot: _vacancyTitleSnapshot,
             role: _clientRole,
             ...restFields
-          } = data.fields ?? {};
+          } = workingFields;
           payload = {
             ...payload,
             fields: {
@@ -56,7 +84,7 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
             vacancyTitleSnapshot: _vacancyTitleSnapshot,
             role: _clientRole,
             ...restFields
-          } = data.fields ?? {};
+          } = workingFields;
           payload = {
             ...payload,
             fields: {
@@ -65,6 +93,8 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
               role: resolved.fields.vacancyTitleSnapshot,
             },
           };
+        } else {
+          payload = { ...payload, fields: workingFields };
         }
       }
 

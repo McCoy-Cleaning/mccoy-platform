@@ -51,6 +51,7 @@ const EXPECTED_BLOCK_TYPES = [
   "contactInfoCards",
   "quoteRequestForm",
   "legalArticles",
+  "offers",
 ] as const satisfies readonly BlockType[];
 
 type MissingFromExpected = Exclude<BlockType, (typeof EXPECTED_BLOCK_TYPES)[number]>;
@@ -105,6 +106,12 @@ describe("block data registry", () => {
     expect(blockDataRegistry.latestPosts.label).toBe("Uitgelichte artikelen");
     const data = blockDataRegistry.latestPosts.createDefault() as { title: string };
     expect(data.title).toBe("Uitgelichte artikelen");
+  });
+
+  it("offers is labeled Aanbiedingen", () => {
+    expect(blockDataRegistry.offers.label).toBe("Aanbiedingen");
+    const data = blockDataRegistry.offers.createDefault() as { title: string };
+    expect(data.title).toBe("Aanbiedingen");
   });
 
   it("newsletter, contactForm, and popup are publishable and duplicable", () => {

@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
@@ -13,6 +13,11 @@ import {
   supabasePhotoSrcSets,
   supabaseTransformedUrl,
 } from "@/lib/image-delivery";
+
+/** Footer is below the fold — keep lucide social icons off the LCP/TBT path. */
+const Footer = lazy(() =>
+  import("@/components/site/Footer").then((m) => ({ default: m.Footer })),
+);
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -98,7 +103,9 @@ function HomePage() {
           />
         ) : null}
       </main>
-      <Footer />
+      <Suspense fallback={<div className="min-h-[16rem]" aria-hidden />}>
+        <Footer />
+      </Suspense>
     </div>
   );
 }

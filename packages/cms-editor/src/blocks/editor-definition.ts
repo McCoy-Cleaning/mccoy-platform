@@ -24,7 +24,15 @@ export type BlockEditorDefinition<T = any> = {
 export type BlockEditorRegistryMap = Partial<Record<BlockType, BlockEditorDefinition>>;
 
 /** Nested CmsButton paths edited by CmsButtonEditor. */
-export const CTA_SUPPORTED_PATHS = ["cta", "cta.label", "cta.link"] as const;
+export const CTA_SUPPORTED_PATHS = [
+  "cta",
+  "cta.label",
+  "cta.link",
+  "cta.action",
+  "cta.popup",
+  "cta.popup.type",
+  "cta.popup.data",
+] as const;
 
 /** Nested CmsImage paths edited by BlockImageField. */
 export function imageSupportedPaths(prefix: string): string[] {

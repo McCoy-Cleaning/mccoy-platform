@@ -145,8 +145,8 @@ describe("validatePageBlocksForPublish", () => {
     }
   });
 
-  it("allows publishable defaults (hero, roadmap, plans, latestPosts)", () => {
-    for (const type of ["hero", "roadmap", "plans", "latestPosts"] as const) {
+  it("allows publishable defaults (hero, roadmap, plans, latestPosts, offers)", () => {
+    for (const type of ["hero", "roadmap", "plans", "latestPosts", "offers"] as const) {
       const result = validatePageBlocksForPublish([createDefaultBlock(type)]);
       expect(result.ok, type).toBe(true);
     }

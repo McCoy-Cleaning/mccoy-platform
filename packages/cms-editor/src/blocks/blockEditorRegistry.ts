@@ -52,6 +52,7 @@ import {
   QuoteRequestFormBlockEditor,
   StatsCountersBlockEditor,
 } from "./NewSectionsBlockEditors";
+import { OffersBlockEditor } from "./OffersBlockEditor";
 import {
   BenefitsBlockEditor,
   ColumnsBlockEditor,
@@ -68,6 +69,7 @@ import type {
   ContactInfoCardsBlockData,
   LegalArticlesBlockData,
   NewsletterBlockData,
+  OffersBlockData,
   PartnersMarqueeBlockData,
   PopupBlockData,
   QuoteRequestFormBlockData,
@@ -138,6 +140,11 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
       "features.icon",
       "features.title",
       "features.body",
+      "features.cta",
+      "features.cta.label",
+      "features.cta.link",
+      "features.cta.action",
+      "features.cta.popup",
     ],
   ),
   textImage: def(
@@ -299,6 +306,7 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
     "steps.id",
     "steps.title",
     "steps.body",
+    ...imageSupportedPaths("steps.image"),
   ]),
   values: def(ValuesBlockEditor, "typed-composed", [
     "title",
@@ -421,6 +429,22 @@ export const blockEditorRegistry: BlockEditorRegistryMap = {
       "articles.heading",
       "articles.anchor",
       "articles.content",
+    ],
+  ),
+  offers: def(
+    OffersBlockEditor as ComponentType<BlockEditorProps<OffersBlockData>>,
+    "dedicated",
+    [
+      "title",
+      "subtitle",
+      "offers",
+      "offers.id",
+      "offers.badge",
+      "offers.title",
+      "offers.description",
+      "offers.originalPrice",
+      "offers.discountPrice",
+      ...imageSupportedPaths("offers.image"),
     ],
   ),
 };

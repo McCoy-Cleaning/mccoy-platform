@@ -1,12 +1,19 @@
 import * as React from "react";
 import {
+  createDefaultBlock,
   localImage,
+  resolveCmsButtonUiMode,
   type CmsButton,
+  type CmsButtonUiMode,
   type CmsImage,
   type CmsLink,
+  type PopupContentBlockType,
 } from "@mccoy/cms-schema";
 import { StructuredLinkField, PAGE_DESTINATION_LINK_KINDS } from "./StructuredLinkField";
 import { EnDraftFor } from "./en-draft-fields";
+import { getBlockEditorDefinition } from "./blockEditorRegistry";
+import { PopupContentTypeChooser } from "./PopupContentTypePicker";
+import type { CmsImagePickerProps } from "../image-picker-props";
 
 export const inputClass =
   "w-full rounded-xl border border-white/15 bg-black/40 px-4 py-2.5 text-[15px] text-white outline-none placeholder:text-white/35 focus-visible:ring-2 focus-visible:ring-sky-400/50";
@@ -76,26 +83,198 @@ export function BlockLinkField({
   );
 }
 
+function ActionToggle({
+  mode,
+  onChange,
+  allowPopup,
+}: {
+  mode: CmsButtonUiMode;
+  onChange: (next: CmsButtonUiMode) => void;
+  allowPopup: boolean;
+}) {
+  const options: Array<{ key: CmsButtonUiMode; label: string }> = [
+    { key: "none", label: "Geen link" },
+    { key: "page", label: "Pagina" },
+    { key: "external", label: "Externe link" },
+  ];
+  if (allowPopup) options.push({ key: "popup", label: "Open popup" });
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium text-white/70">Wat doet de knop?</p>
+      <div
+        className="inline-flex flex-wrap rounded-xl border border-white/[0.08] bg-black/30 p-1"
+        role="group"
+        aria-label="Wat doet de knop?"
+      >
+        {options.map((opt) => {
+          const active = mode === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onChange(opt.key)}
+              className={
+                active
+                  ? "rounded-lg bg-sky-500 px-3 py-2 text-[13px] font-semibold text-white"
+                  : "rounded-lg px-3 py-2 text-[13px] font-semibold text-white/55 hover:text-white"
+              }
+              aria-pressed={active}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function defaultPopupContent(type: PopupContentBlockType = "richText"): NonNullable<CmsButton["popup"]> {
+  const block = createDefaultBlock(type);
+  return { type, data: block.data };
+}
+
+/** True while editing content that lives inside a button popup (disables nested popup action). */
+const InsideButtonPopupContext = React.createContext(false);
+
+/** Resolve after modules load — registry imports editors that import this file. */
+function getPopupContentEditor(type: PopupContentBlockType) {
+  return getBlockEditorDefinition(type)?.Editor ?? null;
+}
+
 export function CmsButtonEditor({
   label,
   value,
   onChange,
   enLabelPath,
+  allowPopupAction = true,
+  nestedPopup = false,
+  defaultLabel = "",
+  blockId,
+  projectImages,
+  assetBaseUrl,
+  uploadToMediaLibrary,
+  mediaLibraryItems,
+  resolveProjectImage,
 }: {
   label: string;
   value: CmsButton | undefined;
   onChange: (next: CmsButton | undefined) => void;
   /** Full EN draft path for the button label (e.g. `block:{id}:cta.label`). */
   enLabelPath?: string;
-}) {
-  const active = value ?? { label: "", link: { type: "internal_route" as const, route: "contact" as const } };
+  /** When false, popup is hidden (used inside popup content). */
+  allowPopupAction?: boolean;
+  /** True when editing a button that lives inside popup content. */
+  nestedPopup?: boolean;
+  /** Prefill knoptekst when the editor creates a button from empty. */
+  defaultLabel?: string;
+  blockId?: string;
+} & CmsImagePickerProps) {
+  const insidePopupContent = React.useContext(InsideButtonPopupContext);
+  const active = value ?? {
+    label: defaultLabel,
+    link: { type: "none" as const },
+  };
+  const canPopup = allowPopupAction && !nestedPopup && !insidePopupContent;
+  const rawMode = resolveCmsButtonUiMode(active);
+  const resolvedMode: CmsButtonUiMode = !canPopup && rawMode === "popup" ? "none" : rawMode;
+  const [pinnedMode, setPinnedMode] = React.useState<CmsButtonUiMode | null>(null);
+  const mode: CmsButtonUiMode =
+    pinnedMode && (pinnedMode !== "popup" || canPopup) ? pinnedMode : resolvedMode;
+
+  React.useEffect(() => {
+    if (pinnedMode && resolvedMode === pinnedMode) {
+      setPinnedMode(null);
+    }
+  }, [pinnedMode, resolvedMode]);
+
+  const popup = active.popup ?? defaultPopupContent();
+  const popupType: PopupContentBlockType = popup.type;
+  const NestedEditor = mode === "popup" ? getPopupContentEditor(popupType) : null;
+
+  const imagePickerProps: CmsImagePickerProps = {
+    projectImages,
+    assetBaseUrl,
+    uploadToMediaLibrary,
+    mediaLibraryItems,
+    resolveProjectImage,
+  };
+
+  const setMode = (next: CmsButtonUiMode) => {
+    if (!value?.label.trim()) return;
+    setPinnedMode(next);
+    if (next === "none") {
+      onChange({
+        label: value.label,
+        action: "link",
+        link: { type: "none" },
+        popup: value.popup,
+      });
+      return;
+    }
+    if (next === "page") {
+      onChange({
+        label: value.label,
+        action: "link",
+        link:
+          value.link?.type === "internal" || value.link?.type === "internal_route"
+            ? value.link
+            : { type: "internal_route", route: "contact" },
+        popup: value.popup,
+      });
+      return;
+    }
+    if (next === "external") {
+      onChange({
+        label: value.label,
+        action: "link",
+        link:
+          value.link?.type === "external"
+            ? value.link
+            : { type: "external", url: "https://", openInNewTab: true },
+        popup: value.popup,
+      });
+      return;
+    }
+    onChange({
+      label: value.label,
+      action: "popup",
+      link: { type: "none" },
+      popup: value.popup ?? defaultPopupContent(),
+    });
+  };
+
+  const nestedEditor = NestedEditor ? (
+    <NestedEditor
+      value={popup.data}
+      onChange={(next) => {
+        const data =
+          next && typeof next === "object" && !Array.isArray(next)
+            ? (next as Record<string, unknown>)
+            : popup.data;
+        onChange({
+          ...value!,
+          action: "popup",
+          link: { type: "none" },
+          popup: { type: popupType, data },
+        });
+      }}
+      presentation="inspector"
+      blockId={blockId ? `${blockId}-popup` : undefined}
+      {...imagePickerProps}
+    />
+  ) : (
+    <EmptyHint>Deze inhoud kan hier niet worden bewerkt.</EmptyHint>
+  );
+
   return (
     <Section title={label}>
       <Field label="Knoptekst" hint={!value ? "Leeg laten om knop te verbergen" : undefined}>
         <input
           className={inputClass}
           value={value?.label ?? ""}
-          placeholder="Bijv. Neem contact op"
+          placeholder={defaultLabel || "Bijv. Neem contact op"}
           onChange={(e) => {
             const labelText = e.target.value;
             if (!labelText.trim()) {
@@ -108,17 +287,68 @@ export function CmsButtonEditor({
       </Field>
       <EnDraftFor fieldPath={enLabelPath} label="Knoptekst" />
       {value ? (
-        <BlockLinkField
-          label="Link"
-          value={value.link}
-          onChange={(link) => {
-            if (!link) {
-              onChange(undefined);
-              return;
-            }
-            onChange({ ...value, link });
-          }}
-        />
+        <div className="space-y-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <ActionToggle mode={mode} onChange={setMode} allowPopup={canPopup} />
+
+          {mode === "none" ? (
+            <p className="text-[13px] leading-relaxed text-white/45">
+              De knoptekst wordt niet getoond als klikbare link op de website.
+            </p>
+          ) : null}
+
+          {mode === "page" || mode === "external" ? (
+            <StructuredLinkField
+              label={mode === "page" ? "Welke pagina?" : "Externe URL"}
+              value={
+                mode === "external" && value.link?.type !== "external"
+                  ? { type: "external", url: "https://", openInNewTab: true }
+                  : value.link
+              }
+              onChange={(link) => {
+                if (!link) {
+                  onChange({ ...value, action: "link", link: { type: "none" } });
+                  setPinnedMode("none");
+                  return;
+                }
+                if (link.type === "external") setPinnedMode("external");
+                if (link.type === "internal" || link.type === "internal_route") {
+                  setPinnedMode("page");
+                }
+                onChange({ ...value, action: "link", link });
+              }}
+              hideTypeToggle
+              allowedKinds={
+                mode === "page"
+                  ? ["internal_route", "internal"]
+                  : ["external"]
+              }
+            />
+          ) : null}
+
+          {mode === "popup" ? (
+            <div className="space-y-4">
+              <PopupContentTypeChooser
+                value={popupType}
+                onChange={(type) => {
+                  onChange({
+                    ...value,
+                    action: "popup",
+                    link: { type: "none" },
+                    popup: defaultPopupContent(type),
+                  });
+                }}
+              />
+              <div className="space-y-3 rounded-xl border border-white/[0.08] bg-black/25 p-3.5">
+                <p className="text-[12px] font-semibold uppercase tracking-wider text-white/45">
+                  Inhoud van de popup
+                </p>
+                <InsideButtonPopupContext.Provider value={true}>
+                  {nestedEditor}
+                </InsideButtonPopupContext.Provider>
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </Section>
   );

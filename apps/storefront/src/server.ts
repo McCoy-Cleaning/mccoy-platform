@@ -1,4 +1,5 @@
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
+import { isStorefrontIndexable, readIndexingEnv } from "@mccoy/security/indexing";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 import "./lib/error-capture";
 
@@ -100,6 +101,22 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+function withIndexingHeaders(response: Response): Response {
+  if (isStorefrontIndexable(readIndexingEnv())) return response;
+  // Align with Vercel preview X-Robots-Tag; also covers staging prod-like deploys
+  // that set MCCOY_ALLOW_INDEXING=0.
+  if (response.headers.get("x-robots-tag")?.toLowerCase().includes("noindex")) {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  headers.set("X-Robots-Tag", "noindex, nofollow");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -107,13 +124,16 @@ export default {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response);
-      return await maybeCompressResponse(request, normalized);
+      const withRobots = withIndexingHeaders(normalized);
+      return await maybeCompressResponse(request, withRobots);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withIndexingHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

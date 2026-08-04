@@ -23,15 +23,27 @@ export {
 export {
   stripModelWrappers,
   sanitizePlainText,
+  preserveTranslatedFieldStructure,
+  expandFieldsToLineUnits,
+  collapseLineUnitsToFields,
+  lineSkeletonFingerprint,
+  repairCommonJsonIssues,
+  extractBalancedJsonSlice,
+  extractPartialStringFields,
   extractJsonObject,
   parseTextResult,
   parseFieldsResult,
+  estimateTranslateMaxTokens,
+  type TranslateLinePlan,
+  type TranslateLineSlot,
 } from "./parse";
 
 export {
   buildGenerateDutchCopyMessages,
   buildGenerateSectionDutchMessages,
   fieldRoleGuidance,
+  aliasTranslateFields,
+  remapAliasedFields,
   buildTranslateNlToEnMessages,
 } from "./prompts";
 

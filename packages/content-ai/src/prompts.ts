@@ -146,29 +146,83 @@ export function buildGenerateSectionDutchMessages(input: {
   return { system, user: userParts.join("\n") };
 }
 
+/**
+ * Map long CMS draft paths (`section:home.hero:columns.0.title`) to short
+ * aliases (`f0`…) so the model JSON schema stays simple and less error-prone.
+ */
+export function aliasTranslateFields(fields: Record<string, string>): {
+  aliased: Record<string, string>;
+  aliasToKey: Record<string, string>;
+  keyToAlias: Record<string, string>;
+} {
+  const keys = Object.keys(fields);
+  const aliasToKey: Record<string, string> = {};
+  const keyToAlias: Record<string, string> = {};
+  const aliased: Record<string, string> = {};
+  keys.forEach((key, index) => {
+    const alias = `f${index}`;
+    aliasToKey[alias] = key;
+    keyToAlias[key] = alias;
+    aliased[alias] = fields[key]!;
+  });
+  return { aliased, aliasToKey, keyToAlias };
+}
+
+export function remapAliasedFields(
+  aliasedFields: Record<string, string>,
+  aliasToKey: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [alias, value] of Object.entries(aliasedFields)) {
+    const key = aliasToKey[alias] ?? alias;
+    out[key] = value;
+  }
+  return out;
+}
+
 export function buildTranslateNlToEnMessages(input: {
   fields: Record<string, string>;
   preserveTerms?: string[];
   maxCharsPerField: number;
-}): { system: string; user: string } {
-  const keys = Object.keys(input.fields);
+  /** Prefer short f0… aliases for JSON stability with long CMS paths. */
+  useFieldAliases?: boolean;
+}): { system: string; user: string; aliasToKey: Record<string, string> } {
+  const useAliases = input.useFieldAliases !== false;
+  const { aliased, aliasToKey } = useAliases
+    ? aliasTranslateFields(input.fields)
+    : {
+        aliased: input.fields,
+        aliasToKey: Object.fromEntries(Object.keys(input.fields).map((k) => [k, k])),
+      };
+  const keys = Object.keys(aliased);
   const system = [
     "You are a professional NL→EN translator for McCoy Cleaning (B2B cleaning services).",
     "Translate faithfully; keep meaning, tone, and CTA intent.",
     "Prefer natural marketing English over literal word-for-word translation.",
     "Do not invent prices, VAT, discounts, or legal claims.",
-    "No HTML, no markdown, no emoji.",
+    "No HTML, no markdown, no emoji, no code fences.",
     "Keep brand names unchanged: McCoy, McCoy Cleaning.",
+    // Structure is part of CMS plain-text layout (whitespace-pre-line); only translate words.
+    "STRUCTURE LOCK — identical pagination to Dutch; translate words only:",
+    "Multiline CMS text is often split into one JSON field per source line. Never merge fields or glue bullet/subheading lines together.",
+    "Each value must keep the same line count as its Dutch source (same number of \\n sequences). Do not reflow into fewer lines.",
+    "Preserve bullet markers (•), quotation marks („ “ \" ' « »), and leading/trailing spaces on that line.",
+    "Preserve decorative separator lines (underscores/dashes) as their own line(s) — never glue them onto the last sentence.",
+    "Do not flatten blank lines, subheadings, or list items into one dense paragraph.",
     input.preserveTerms?.length
       ? `Also preserve these terms unchanged: ${input.preserveTerms.join(", ")}.`
       : "",
-    `Return ONLY JSON: {"fields":{${keys.map((k) => `"${k}":"..."`).join(",")}}}`,
+    // Short f0… keys avoid colon/dot CMS paths breaking weaker JSON generators.
+    `Return ONLY a single JSON object: {"fields":{${keys.map((k) => `"${k}":"..."`).join(",")}}}`,
+    "Use exactly these field keys. Every key must be present with a non-empty string.",
+    "Prefer a single line per value unless the Dutch value itself contains \\n (then encode those as \\n).",
     `Each value max ${input.maxCharsPerField} characters.`,
     `promptVersion=${CONTENT_AI_PROMPT_VERSION}`,
   ]
     .filter(Boolean)
     .join(" ");
 
-  const user = `Translate these Dutch CMS fields to English:\n${JSON.stringify(input.fields, null, 2)}`;
-  return { system, user };
+  const user = `Translate these Dutch CMS fields to English (keys are stable aliases). Keep each value's line breaks, bullets, quotes, and separators identical to the Dutch source — same line skeleton:\n${JSON.stringify(aliased, null, 2)}`;
+  return { system, user, aliasToKey };
 }
+

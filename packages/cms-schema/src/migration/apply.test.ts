@@ -9,6 +9,7 @@ import {
   resolveCanonicalFormSourceKey,
   CANONICAL_FORM_SOURCE_KEYS,
   normalizeGalleryShape,
+  parseOptionalGalleryShape,
   getBlockDataDefinition,
 } from "../index";
 
@@ -31,6 +32,11 @@ describe("gallery shape", () => {
     expect(normalizeGalleryShape(undefined)).toBe("square");
     expect(normalizeGalleryShape("wide")).toBe("wide");
     expect(normalizeGalleryShape("tall")).toBe("tall");
+  });
+
+  it("parseOptionalGalleryShape omits unset values", () => {
+    expect(parseOptionalGalleryShape(undefined)).toBeUndefined();
+    expect(parseOptionalGalleryShape("wide")).toBe("wide");
   });
 });
 

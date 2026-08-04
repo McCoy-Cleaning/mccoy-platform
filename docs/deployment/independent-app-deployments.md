@@ -172,6 +172,17 @@ One git push ≠ two histories. **Independent deployment** means scoped commits 
 
 ---
 
+## Staging / preview indexing
+
+| Environment | `VERCEL_ENV` | Indexing default | Override |
+|-------------|--------------|------------------|----------|
+| Production deploy | `production` | **index** | `MCCOY_ALLOW_INDEXING=0` to force off |
+| Preview / PR | `preview` | **noindex** | `MCCOY_ALLOW_INDEXING=1` only if intentionally testing crawl |
+| Local / CI | unset | **noindex** | `MCCOY_ALLOW_INDEXING=1` for rare prod-like hosts |
+| Staging project (prod branch) | often `production` | Would index — set **`MCCOY_ALLOW_INDEXING=0`** | required |
+
+Signals: env-gated `<meta name="robots">`, dynamic `/robots.txt`, and `X-Robots-Tag` on non-indexable responses (`packages/security/src/indexing.ts`).
+
 ## Verification commands
 
 ```bash

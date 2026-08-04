@@ -66,5 +66,6 @@
 - NL marketing routes (`/services`, etc.) still use static head fallbacks until each route wires `loadPublishedPageSnapshot` like `/`
 - Dual-write file fallback when Supabase publish succeeds may lag; prefer one backend per environment
 - Static `public/sitemap.xml` is legacy; prefer dynamic `/sitemap.xml` in robots.txt when cutting over
+- Dynamic `/robots.txt` is env-gated (`MCCOY_ALLOW_INDEXING` / `VERCEL_ENV`) — see `packages/security/src/indexing.ts`
 - Image **alt** EN drafts are editable in dedicated block image fields; some fixed-section
   `PrototypeImageField` alt controls may still rely on Opslaan auto-sync rather than an inline EN box

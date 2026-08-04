@@ -3,7 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.tsx" },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.tsx",
+    "./section-layout": "./src/sectionLayout.ts",
+    "./content-align": "./src/contentAlign.tsx"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"

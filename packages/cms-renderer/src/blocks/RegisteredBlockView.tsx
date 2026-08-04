@@ -15,6 +15,7 @@ import {
 } from "@mccoy/cms-schema";
 import { CmsButtonView, CmsImageView, type LinkResolverPages } from "./primitives";
 import { WorkMosaicGallery } from "./WorkMosaicGallery";
+import { GalleryTextAndImageView } from "./GalleryTextAndImageView";
 import { blockViewRegistry } from "./blockViewRegistry";
 import {
   ContactFormSectionView,
@@ -78,6 +79,34 @@ function FitImage({
       )}
     >
       <CmsImageView image={image} className={cn("h-full w-full object-contain", imgClassName)} />
+    </div>
+  );
+}
+
+/**
+ * Gallery / media tile: image crops to fill the entire frame edge-to-edge (no letterboxing).
+ */
+function CoverFillImage({
+  image,
+  aspectClass,
+  className,
+  imgClassName,
+}: {
+  image?: CmsImage;
+  aspectClass: string;
+  className?: string;
+  imgClassName?: string;
+}) {
+  if (!image) return null;
+  return (
+    <div className={cn("relative overflow-hidden bg-white/[0.04]", aspectClass, className)}>
+      <CmsImageView
+        image={image}
+        className={cn(
+          "absolute inset-0 h-full w-full object-cover object-center",
+          imgClassName,
+        )}
+      />
     </div>
   );
 }
@@ -471,25 +500,11 @@ export function RegisteredBlockView({
       );
     }
     case "steps": {
-      const steps = (d.steps as Array<{ id: string; title: string; body: string }>) ?? [];
-      return (
-        <SectionShell blockType={type}>
-          <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-          <ol className="relative space-y-4 border-l border-border pl-6 sm:pl-8">
-            {steps.map((s, i) => (
-              <li key={s.id}>
-                <SectionSurface variant="outlined" className="flex gap-4 p-4 sm:p-5">
-                  <SectionIndex value={i + 1} />
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-foreground">{s.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
-                  </div>
-                </SectionSurface>
-              </li>
-            ))}
-          </ol>
-        </SectionShell>
-      );
+      const StepsView = blockViewRegistry.steps;
+      if (StepsView) {
+        return <StepsView data={d} />;
+      }
+      return null;
     }
     case "comparisonTable": {
       const columns = (d.columns as string[]) ?? [];
@@ -533,9 +548,37 @@ export function RegisteredBlockView({
           image: CmsImage;
           title?: string;
           caption?: string;
+          body?: string;
           shape?: "wide" | "square" | "tall";
         }>) ?? [];
+      const contentMode = d.contentMode === "textAndImage" ? "textAndImage" : "imagesOnly";
       const layout = d.layout === "masonry" || d.layout === "featured" ? d.layout : "grid";
+
+      if (contentMode === "textAndImage") {
+        return (
+          <GalleryTextAndImageView
+            title={String(d.title ?? "Galerij")}
+            eyebrow={typeof d.eyebrow === "string" ? d.eyebrow : undefined}
+            intro={typeof d.body === "string" ? d.body : undefined}
+            textPlacement={
+              d.textPlacement === "above" ||
+              d.textPlacement === "left" ||
+              d.textPlacement === "right" ||
+              d.textPlacement === "below"
+                ? d.textPlacement
+                : "below"
+            }
+            columns={d.columns === 3 || d.columns === 4 ? d.columns : 2}
+            items={images.map((img) => ({
+              id: img.id,
+              image: img.image,
+              title: img.title,
+              caption: img.caption,
+              body: img.body,
+            }))}
+          />
+        );
+      }
 
       if (layout === "featured") {
         return (
@@ -562,10 +605,13 @@ export function RegisteredBlockView({
           ) : layout === "masonry" ? (
             <div className="columns-1 gap-6 sm:columns-2 sm:gap-8 lg:columns-3 lg:gap-10">
               {images.map((img) => (
-                <div key={img.id} className="mb-6 break-inside-avoid sm:mb-8 lg:mb-10">
-                  <OptionalImage
+                <div
+                  key={img.id}
+                  className="group relative mb-6 break-inside-avoid overflow-hidden rounded-3xl ring-1 ring-white/10 transition duration-500 hover:ring-white/20 sm:mb-8 lg:mb-10"
+                >
+                  <CmsImageView
                     image={img.image}
-                    className="block w-full rounded-3xl object-contain ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
+                    className="block h-auto w-full object-cover transition duration-700 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   />
                 </div>
               ))}
@@ -586,10 +632,11 @@ export function RegisteredBlockView({
                   key={img.id}
                   className="group relative overflow-hidden rounded-3xl ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
                 >
-                  <FitImage
+                  <CoverFillImage
                     image={img.image}
                     aspectClass="aspect-square"
                     className="w-full"
+                    imgClassName="transition duration-700 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   />
                 </div>
               ))}
@@ -1231,6 +1278,13 @@ export function RegisteredBlockView({
           </div>
         </SectionShell>
       );
+    }
+    case "offers": {
+      const OffersView = blockViewRegistry.offers;
+      if (OffersView) {
+        return <OffersView data={d} />;
+      }
+      return null;
     }
     default: {
       console.error("[cms-renderer] missing renderer case", type);

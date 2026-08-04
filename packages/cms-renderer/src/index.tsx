@@ -18,8 +18,17 @@ export {
 /** @deprecated Prefer shape-based `workMosaicShapeClass` or `workMosaicLegacyIndexClass`. */
 export { workMosaicLegacyIndexClass as workMosaicTileClass } from "./blocks/WorkMosaicGallery";
 export type { WorkMosaicGalleryItem, WorkMosaicGalleryProps } from "./blocks/WorkMosaicGallery";
+export { GalleryTextAndImageView } from "./blocks/GalleryTextAndImageView";
+export type {
+  GalleryTextAndImageItem,
+  GalleryTextAndImageProps,
+} from "./blocks/GalleryTextAndImageView";
 export { JobsSectionView } from "./blocks/JobsSectionView";
 export type { JobsSectionViewProps, JobsRenderMode } from "./blocks/JobsSectionView";
+export { OffersSectionView } from "./blocks/OffersSectionView";
+export type { OffersSectionViewProps } from "./blocks/OffersSectionView";
+export { StepsSectionView } from "./blocks/StepsSectionView";
+export type { StepsSectionViewProps } from "./blocks/StepsSectionView";
 export { blockViewRegistry } from "./blocks/blockViewRegistry";
 export {
   CmsFormAdaptersProvider,

@@ -12,6 +12,14 @@ export {
 } from "./host";
 
 export {
+  isStorefrontIndexable,
+  storefrontRobotsMetaContent,
+  storefrontRobotsTxt,
+  readIndexingEnv,
+  type IndexingEnv,
+} from "./indexing";
+
+export {
   assertRateLimit,
   isHoneypotTriggered,
   RateLimitError,

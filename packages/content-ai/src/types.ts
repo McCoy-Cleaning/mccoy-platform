@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONTENT_AI_PROMPT_VERSION = "v2" as const;
+export const CONTENT_AI_PROMPT_VERSION = "v5" as const;
 
 export const contentAiToneSchema = z.enum([
   "professional",
@@ -31,14 +31,14 @@ export type GenerateDutchCopyInput = z.input<typeof generateDutchCopyInputSchema
 
 export const translateNlToEnInputSchema = z.object({
   /** Single Dutch string — used when fields is omitted. */
-  text: z.string().trim().min(1).max(4000).optional(),
-  /** Batch: stable field keys → Dutch source strings. */
-  fields: z.record(z.string().trim().min(1).max(4000)).optional(),
+  text: z.string().max(4000).optional(),
+  /** Batch: stable field keys → Dutch source strings (blank values are ignored). */
+  fields: z.record(z.string().max(4000)).optional(),
   /** Preserve brand names / product names. */
   preserveTerms: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   maxCharsPerField: z.number().int().min(20).max(4000).default(2000),
 }).refine(
-  (v) => Boolean(v.text?.trim()) || (v.fields && Object.keys(v.fields).length > 0),
+  (v) => v.text != null || v.fields != null,
   { message: "text or fields required" },
 );
 export type TranslateNlToEnInput = z.input<typeof translateNlToEnInputSchema>;

@@ -1,7 +1,7 @@
 import type { FormScopeSnapshot } from "@mccoy/domain";
 import type { CmsPage } from "./types";
 import { getBlockDataDefinition, type ContactFormBlockData, type NewsletterBlockData } from "./blocks";
-import type { ContactFormContent, VacaturesMainContent } from "./content";
+import type { ContactFormContent, VacaturesApplicationContent, VacaturesMainContent } from "./content";
 import { isLayoutItemHidden } from "./layout";
 import { normalizeCmsPage } from "./pipeline";
 import { fixedLayoutId } from "./sections";
@@ -73,8 +73,13 @@ export function collectPublishedFormScopes(pages: CmsPage[]): PublishedFormScope
       addScope(map, offerteFormContent?.furnitureScope);
     }
 
+    const vacaturesApplication = page.sectionContent?.[
+      "vacatures.application"
+    ] as VacaturesApplicationContent | undefined;
     const vacaturesMain = page.sectionContent?.["vacatures.main"] as VacaturesMainContent | undefined;
-    if (fixedSectionVisible(page, "vacatures.main")) {
+    if (fixedSectionVisible(page, "vacatures.application")) {
+      addScope(map, vacaturesApplication?.applicationScope ?? vacaturesMain?.applicationScope);
+    } else if (fixedSectionVisible(page, "vacatures.main")) {
       addScope(map, vacaturesMain?.applicationScope);
     }
   }

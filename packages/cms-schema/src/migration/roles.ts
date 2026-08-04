@@ -31,6 +31,7 @@ export const FIXED_SECTION_MIGRATION_ROLES: Record<FixedSectionKey, readonly Mig
   "contact.info": [{ role: "primary", blockType: "contactInfoCards" }],
   "contact.form": [{ role: "primary", blockType: "contactForm" }],
   "vacatures.main": [{ role: "primary", blockType: "hero" }],
+  "vacatures.application": [{ role: "primary", blockType: "contactForm" }],
   "offerte.main": [{ role: "primary", blockType: "hero" }],
   "offerte.info": [{ role: "primary", blockType: "contactInfoCards" }],
   "offerte.form": [{ role: "primary", blockType: "quoteRequestForm" }],

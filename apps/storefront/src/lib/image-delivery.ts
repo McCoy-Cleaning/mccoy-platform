@@ -30,7 +30,26 @@ export function heroWebpSrcSet(src: string): string | undefined {
   return `${base}-640.webp 640w, ${base}-960.webp 960w, ${base}-1280.webp 1280w`;
 }
 
-/** Same-directory `.webp` sibling for a local jpeg/png path.
+/** CMS filenames that `optimize-storefront-delivery-images.mjs` emits as `.webp`. */
+const LOCAL_CMS_WEBP_BASENAMES = new Set([
+  "about-history",
+  "about-vision",
+  "about-vision-alt",
+  "about-mission",
+  "products-flyer",
+  "work-horeca",
+  "work-regular",
+  "work-oplevering",
+  "work-floor",
+  "work-glass",
+  "work-oplevering-hal",
+  "work-regular-sander",
+  "work-floor-scrubber",
+  "work-furniture-bank",
+]);
+
+/**
+ * Same-directory `.webp` sibling for a local jpeg/png path.
  * Only use when the WebP is known to exist (e.g. optimize script output).
  * Inventing this path for gallery CMS photos causes 404s — prefer JPEG/PNG. */
 export function localWebpSibling(src: string): string | undefined {
@@ -44,7 +63,21 @@ export function localWebpSibling(src: string): string | undefined {
   if (/\/images\/(logo|brand)\//i.test(src) && /\.png$/i.test(src)) {
     return src.replace(/\.png$/i, ".webp");
   }
+  // Known CMS delivery photos with sibling `.webp` from the optimize script.
+  if (src.includes("/images/cms/") && /\.(jpe?g|png)$/i.test(src)) {
+    const base = src.split("/").pop()?.replace(/\.(jpe?g|png)$/i, "") ?? "";
+    if (LOCAL_CMS_WEBP_BASENAMES.has(base)) {
+      return src.replace(/\.(jpe?g|png)$/i, ".webp");
+    }
+  }
   return undefined;
+}
+
+/** Gallery/photo WebP srcset for known local CMS delivery variants. */
+export function localCmsPhotoWebpSrcSet(src: string): string | undefined {
+  const sibling = localWebpSibling(src);
+  if (!sibling || !src.includes("/images/cms/")) return undefined;
+  return `${sibling} 1200w`;
 }
 
 /**

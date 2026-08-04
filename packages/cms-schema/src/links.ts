@@ -135,6 +135,63 @@ export function parseCmsLink(value: unknown): CmsLink | null {
   return parsed.data;
 }
 
+/**
+ * Editor-facing parse: keep incomplete destinations (e.g. `https://` while typing)
+ * so UI mode does not snap back to “geen link”. Still rejects dangerous schemes.
+ * Publish / actionable checks continue to use {@link parseCmsLink}.
+ */
+export function parseCmsLinkDraft(value: unknown): CmsLink | null {
+  const strict = parseCmsLink(value);
+  if (strict) return strict;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  const type = rec.type;
+
+  if (type === "none") return { type: "none" };
+
+  if (type === "external" && typeof rec.url === "string") {
+    const trimmed = rec.url.trim();
+    if (/^(javascript|data|vbscript):/i.test(trimmed)) return null;
+    return {
+      type: "external",
+      url: rec.url,
+      openInNewTab: typeof rec.openInNewTab === "boolean" ? rec.openInNewTab : true,
+    };
+  }
+
+  if (type === "email" && typeof rec.email === "string") {
+    return {
+      type: "email",
+      email: rec.email,
+      subject: typeof rec.subject === "string" ? rec.subject : undefined,
+    };
+  }
+
+  if (type === "phone" && typeof rec.phone === "string") {
+    return { type: "phone", phone: rec.phone };
+  }
+
+  if (type === "internal" && typeof rec.pageId === "string" && rec.pageId.trim()) {
+    return {
+      type: "internal",
+      pageId: rec.pageId,
+      openInNewTab: typeof rec.openInNewTab === "boolean" ? rec.openInNewTab : undefined,
+    };
+  }
+
+  if (type === "internal_route" && typeof rec.route === "string") {
+    const route = rec.route as BuiltinRouteKey;
+    if (!(route in BUILTIN_ROUTE_PATHS)) return null;
+    return {
+      type: "internal_route",
+      route,
+      openInNewTab: typeof rec.openInNewTab === "boolean" ? rec.openInNewTab : undefined,
+    };
+  }
+
+  return null;
+}
+
 /** True when the link is a usable destination (not none / empty). */
 export function isActionableCmsLink(link: CmsLink | null | undefined): boolean {
   if (!link || link.type === "none") return false;

@@ -53,3 +53,12 @@ export const appendWebsiteRequestReply: WebsiteRequestsStore["appendWebsiteReque
 
 export const countWebsiteRequests: WebsiteRequestsStore["countWebsiteRequests"] = () =>
   getWebsiteRequestsStore().countWebsiteRequests();
+
+export const clearOrphanWebsiteRequestScopes: WebsiteRequestsStore["clearOrphanWebsiteRequestScopes"] =
+  (activeScopeKeys) => getWebsiteRequestsStore().clearOrphanWebsiteRequestScopes(activeScopeKeys);
+
+export {
+  loadActivePublishedFormScopeKeys,
+  reconcileOrphanWebsiteRequestScopes,
+  type ReconcileOrphanScopesResult,
+} from "./reconcile-orphan-scopes";

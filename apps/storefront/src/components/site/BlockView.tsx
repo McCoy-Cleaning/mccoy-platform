@@ -9,7 +9,9 @@ import {
   parseBlockData,
   productAssortmentTemplateData,
   productIntroTemplateData,
+  resolveLegacyLinkAsCmsButton,
   type Block,
+  type CmsButton,
   type CmsImage,
   type CmsLink,
 } from "@mccoy/cms-schema";
@@ -131,22 +133,30 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
         title: string;
         body: string;
         link?: CmsLink;
+        cta?: CmsButton;
       }>) ?? [];
     const rawEyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
     const rawTitle = String(d.title ?? "");
     const rawIntro = typeof d.intro === "string" ? d.intro : "";
     const eyebrowFallback = isEn ? ASSORTMENT_EYEBROW_EN : def.eyebrow;
     const introFallback = isEn ? ASSORTMENT_INTRO_EN : def.intro;
+    const defaultCtaLabel = isEn ? t.products.cta : "Productofferte aanvragen";
     const cards = features.map((f) => {
       const factory = def.features.find((item) => item.id === f.id);
       const enCard = ASSORTMENT_CARD_EN[f.id];
       const titleFallback = isEn && enCard ? enCard.title : f.title;
       const bodyFallback = isEn && enCard ? enCard.body : f.body;
+      const cta = resolveLegacyLinkAsCmsButton(f.cta, f.link, defaultCtaLabel);
       return {
         id: f.id,
         title: cmsTextOrFallback(f.title, titleFallback, factory?.title),
         description: cmsTextOrFallback(f.body, bodyFallback, factory?.body),
-        link: f.link,
+        cta: cta
+          ? {
+              ...cta,
+              label: cmsTextOrFallback(cta.label, isEn ? t.products.cta : cta.label, factory?.cta?.label),
+            }
+          : null,
       };
     });
 
@@ -165,7 +175,6 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
         intro={
           rawIntro === "" ? "" : cmsTextOrFallback(rawIntro, introFallback, def.intro)
         }
-        ctaLabel={t.products.cta}
         cards={cards}
       />
     );

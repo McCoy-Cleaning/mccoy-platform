@@ -1,4 +1,4 @@
-﻿import * as React from "react";
+import * as React from "react";
 import {
   FIXED_SECTION_DEFS,
   type AboutMainContent,
@@ -8,7 +8,6 @@ import {
   type FixedSectionKey,
   type HomeHeroContent,
   type FormPageChromeContent,
-  type VacaturesMainContent,
   type ContactInfoContent,
   type ContactInfoItem,
   type ContactFormContent,
@@ -23,6 +22,7 @@ import {
   type ProductCard,
   type LegalMainContent,
   type LegalArticle,
+  type VacaturesApplicationContent,
   cmsLinkSchema,
   createItemId,
   externalImage,
@@ -52,10 +52,17 @@ import { FeatureGridBlockEditor } from "./blocks/FeatureGridBlockEditor";
 import { CarouselBlockEditor, GalleryBlockEditor } from "./blocks/GalleryBlockEditor";
 import { JobsBlockEditor, TeamGridBlockEditor } from "./blocks/TeamJobsBlockEditor";
 import { FormScopeField } from "./blocks/FormScopeField";
+import { VacaturesApplicationInspector } from "./blocks/VacaturesApplicationInspector";
 import {
   StructuredLinkField,
   PAGE_DESTINATION_LINK_KINDS,
 } from "./blocks/StructuredLinkField";
+import { CmsButtonEditor } from "./blocks/shared-fields";
+import {
+  PopupContentTypeChooser,
+  PopupContentTypePicker,
+} from "./blocks/PopupContentTypePicker";
+import { SectionTypeThumbnail } from "./blocks/SectionTypeThumbnail";
 import {
   blockEditorRegistry,
   getRegisteredBlockEditor,
@@ -97,6 +104,10 @@ export {
   imageSupportedPaths,
   BulkImageAddButton,
   ImageStripPreview,
+  CmsButtonEditor,
+  PopupContentTypeChooser,
+  PopupContentTypePicker,
+  SectionTypeThumbnail,
 };
 
 export type { CmsImagePickerProps, BlockEditorDefinition, EditorQuality };
@@ -1164,15 +1175,6 @@ export function FormChromeInspector({
           </button>
         )}
       </Field>
-      {sectionKey === "vacatures.main" ? (
-        <FormScopeField
-          label="Scope sollicitatieformulier"
-          value={(content as VacaturesMainContent).applicationScope}
-          onChange={(applicationScope) => {
-            (onPatch as (patch: Partial<VacaturesMainContent>) => void)({ applicationScope });
-          }}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1956,51 +1958,30 @@ export function ProductsInfoInspector({
               label="Beschrijving"
               multiline
             />
-            {card.link ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-medium text-white/50">Kaartlink</p>
-                  <button
-                    type="button"
-                    className={smallBtnClass}
-                    onClick={() => {
-                      onPatch({
-                        cards: content.cards.map((c) => {
-                          if (c.id !== card.id) return c;
-                          const { link: _removed, ...rest } = c;
-                          return rest;
-                        }),
-                      });
-                    }}
-                  >
-                    Link verwijderen
-                  </button>
-                </div>
-                <TypedLinkField
-                  label="Link"
-                  value={card.link}
-                  onChange={(link) =>
-                    onPatch({
-                      cards: updateCardAt(content.cards, card.id, { link: link ?? undefined }),
-                    })
-                  }
-                />
-              </div>
-            ) : (
-              <button
-                type="button"
-                className={addBtnClass}
-                onClick={() =>
-                  onPatch({
-                    cards: updateCardAt(content.cards, card.id, {
-                      link: { type: "internal_route", route: "contact" },
-                    }),
-                  })
-                }
-              >
-                Link toevoegen
-              </button>
-            )}
+            <CmsButtonEditor
+              label="Knop op deze kaart"
+              value={
+                card.cta ??
+                (card.link
+                  ? {
+                      label: "Productofferte aanvragen",
+                      action: "link" as const,
+                      link: card.link,
+                    }
+                  : undefined)
+              }
+              defaultLabel="Productofferte aanvragen"
+              enLabelPath={`section:products.info:cards.${index}.cta.label`}
+              onChange={(cta) =>
+                onPatch({
+                  cards: content.cards.map((c) => {
+                    if (c.id !== card.id) return c;
+                    const { link: _legacy, ...rest } = c;
+                    return { ...rest, cta };
+                  }),
+                })
+              }
+            />
           </div>
         ))}
         <button
@@ -2014,7 +1995,11 @@ export function ProductsInfoInspector({
                   id: createItemId("card"),
                   title: "Nieuwe kaart",
                   description: "",
-                  link: { type: "internal_route", route: "contact" },
+                  cta: {
+                    label: "Productofferte aanvragen",
+                    action: "link",
+                    link: { type: "internal_route", route: "contact" },
+                  },
                 },
               ],
             })
@@ -3014,6 +2999,15 @@ export function SelectedSectionInspector({
         onPatch={(patch) => onSectionPatch(key, patch)}
         formLabel={key === "offerte.form" ? "Offerteformulier" : "Contactformulier"}
         sectionKey={key}
+      />
+    );
+  }
+  if (key === "vacatures.application") {
+    return (
+      <VacaturesApplicationInspector
+        content={content as VacaturesApplicationContent}
+        {...imageProps}
+        onPatch={(patch) => onSectionPatch(key, patch)}
       />
     );
   }

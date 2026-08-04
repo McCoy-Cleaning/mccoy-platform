@@ -48,7 +48,8 @@ import {
   MAX_EXTRA_CUSTOM_NAV_PAGES,
   applyTranslatedEnFields,
   collectPageNlFieldDraftMap,
-  chunkRecord,
+  chunkRecordByBudget,
+  filterNonEmptyTranslateFields,
   planEnFieldDraftSync,
   type Block,
   type BlockType,
@@ -1200,33 +1201,39 @@ export const cms = {
       }
     }
 
-    // Auto-sync EN drafts for every translatable NL string (nested columns/cards included).
-    // Existing hand-written EN is never overwritten by Groq. Empty/deleted NL prunes EN.
+    // Auto-sync EN drafts only for NL fields that changed since the last saved page.
+    // Unchanged missing-EN paths are skipped (no whole-page retranslate). Hand EN wins.
+    const baselineNlFields = collectPageNlFieldDraftMap(published);
     const nlFields = collectPageNlFieldDraftMap(nextPage);
     const plan = planEnFieldDraftSync({
       nlFields,
       existingDrafts: nextPage.enFieldDrafts,
       existingSources: nextPage.enFieldDraftSources,
+      baselineNlFields,
     });
 
     const translated: Record<string, string> = {};
     let translateWarning: string | undefined;
-    if (Object.keys(plan.toTranslate).length > 0) {
-      for (const chunk of chunkRecord(plan.toTranslate, 12)) {
+    const toTranslate = filterNonEmptyTranslateFields(plan.toTranslate);
+    if (Object.keys(toTranslate).length > 0) {
+      // Budget-aware chunks reduce Groq json_validate_failed from truncated JSON.
+      for (const chunk of chunkRecordByBudget(toTranslate, { maxItems: 8, maxChars: 3500 })) {
+        const fields = filterNonEmptyTranslateFields(chunk);
+        if (Object.keys(fields).length === 0) continue;
         try {
           const res = await translateNlToEn({
-            data: { fields: chunk, maxCharsPerField: 2000 },
+            data: { fields, maxCharsPerField: 2000 },
           });
           if (!res.ok) {
-            // Groq unavailable / failed — still publish NL + any hand-written EN drafts.
+            // Keep successful prior chunks; continue so later fields may still translate.
             translateWarning = res.error;
-            break;
+            continue;
           }
           Object.assign(translated, res.result.fields);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Onbekende fout";
           translateWarning = message;
-          break;
+          continue;
         }
       }
     }
@@ -1234,7 +1241,7 @@ export const cms = {
     const synced = applyTranslatedEnFields({
       retainedDrafts: plan.retainedDrafts,
       retainedSources: plan.retainedSources,
-      toTranslate: plan.toTranslate,
+      toTranslate,
       translated,
     });
     nextPage.enFieldDrafts = synced.enFieldDrafts;
@@ -1318,7 +1325,7 @@ export const cms = {
     }
     if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
     if (translateWarning) {
-      const missing = Object.keys(plan.toTranslate).filter((k) => !translated[k]?.trim()).length;
+      const missing = Object.keys(toTranslate).filter((k) => !translated[k]?.trim()).length;
       return {
         ok: true,
         warning:

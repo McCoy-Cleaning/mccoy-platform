@@ -86,7 +86,7 @@ export function WorkMosaicGallery({
                 ? workMosaicShapeClass(normalizeGalleryShape(item.shape))
                 : workMosaicLegacyIndexClass(index);
               const imgClass =
-                "h-full w-full object-cover object-center transition duration-700 group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100";
+                "absolute inset-0 h-full w-full object-cover object-center transition duration-700 group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100";
               return (
                 <div
                   key={item.id}

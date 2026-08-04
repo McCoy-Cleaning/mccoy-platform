@@ -23,6 +23,14 @@ export {
   type InboxKindFacet,
 } from "./filter-inbox-messages";
 export {
+  activePublishedScopeKeySet,
+  clearOrphanScopeOnInboxItem,
+  clearOrphanScopesOnInboxSummaries,
+  findOrphanedScopeKeys,
+  isOrphanFormScope,
+  type ScopedInboxFields,
+} from "./orphan-form-scopes";
+export {
   enrichInboxSummariesWithRequestScopes,
   mergeMailboxAndWebsiteRequestSummaries,
   type InboxScopeEnrichmentSource,

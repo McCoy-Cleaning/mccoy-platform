@@ -25,6 +25,14 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     envDir: monorepoRoot,
+    // Bake crawl policy into client + server so SSR meta robots matches hydrate.
+    // Vercel sets VERCEL_ENV per deployment; local/preview stay noindex by default.
+    define: {
+      "process.env.VERCEL_ENV": JSON.stringify(process.env.VERCEL_ENV ?? ""),
+      "process.env.MCCOY_ALLOW_INDEXING": JSON.stringify(
+        process.env.MCCOY_ALLOW_INDEXING ?? "",
+      ),
+    },
     // `build:dev` (used by Playwright E2E via E2E_BUILD_MODE=development)
     // needs a build that behaves like dev mode: real NODE_ENV branches and
     // readable function/class names for debugging.
@@ -69,6 +77,18 @@ export default defineConfig(({ command, mode }) => {
     preview: {
       port: 4173,
       strictPort: true,
+    },
+    build: {
+      // McCoy B2B audience — modern evergreen only. Drops legacy polyfill / transform
+      // cost that Lighthouse flags as “Legacy JavaScript”.
+      target: ["es2022", "chrome111", "firefox115", "safari16"],
+      cssTarget: ["chrome111", "firefox115", "safari16"],
+      modulePreload: {
+        polyfill: false,
+      },
+      cssCodeSplit: true,
+      // Do not force Motion into a shared manual chunk — that pulled React.lazy /
+      // Suspense through the Motion graph and modulepreloaded ~144KB on `/`.
     },
     resolve: {
       alias: {

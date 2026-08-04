@@ -373,6 +373,14 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
 
       // listFormInboxMessages merges mailbox + website_requests (by WR- number).
       // Requests remain visible when the CMS form or mailbox copy is gone.
+      // Safety net: persist-clear orphan scopes before listing (publish also reconciles).
+      try {
+        const { reconcileOrphanWebsiteRequestScopes } = await import("@mccoy/database/server");
+        await reconcileOrphanWebsiteRequestScopes();
+      } catch {
+        /* display-time clear in listFormInboxMessages still applies */
+      }
+
       let result: Awaited<ReturnType<typeof listFormInboxMessages>>;
       try {
         result = await listFormInboxMessages({

@@ -1,4 +1,9 @@
-import { cmsButtonSchema, type CmsImage } from "../content";
+import {
+  cmsButtonSchema,
+  validateCmsButtonForPublish,
+  type CmsImage,
+  type PopupContentBlockType,
+} from "../content";
 import type { Block } from "../types";
 import type {
   BeforeAfterBlockData,
@@ -36,6 +41,93 @@ function imageNeedsAlt(image: CmsImage | undefined | null): boolean {
   if (!image) return false;
   if (image.decorative) return false;
   return !image.alt?.trim();
+}
+
+function walkBlockButtons(
+  data: unknown,
+  basePath: PublishValidationPath,
+): Array<{ value: unknown; path: PublishValidationPath }> {
+  const out: Array<{ value: unknown; path: PublishValidationPath }> = [];
+  if (!data || typeof data !== "object") return out;
+  const rec = data as Record<string, unknown>;
+  for (const key of ["cta", "secondaryCta"] as const) {
+    if (rec[key] != null) out.push({ value: rec[key], path: [...basePath, key] });
+  }
+  if (Array.isArray(rec.plans)) {
+    rec.plans.forEach((plan, index) => {
+      if (!plan || typeof plan !== "object") return;
+      const row = plan as Record<string, unknown>;
+      if (row.cta != null) out.push({ value: row.cta, path: [...basePath, "plans", index, "cta"] });
+    });
+  }
+  if (Array.isArray(rec.features)) {
+    rec.features.forEach((feat, index) => {
+      if (!feat || typeof feat !== "object") return;
+      const row = feat as Record<string, unknown>;
+      if (row.cta != null) out.push({ value: row.cta, path: [...basePath, "features", index, "cta"] });
+    });
+  }
+  return out;
+}
+
+function collectButtonPublishErrors(
+  block: Block,
+  blockLabel: string,
+): PublishValidationError[] {
+  const errors: PublishValidationError[] = [];
+  const buttons = walkBlockButtons(block.data, [block.id]);
+
+  const pushIssues = (
+    issues: ReturnType<typeof validateCmsButtonForPublish>,
+  ) => {
+    for (const issue of issues) {
+      const code =
+        issue.code === "BUTTON_LINK_REQUIRED"
+          ? PUBLISH_VALIDATION_CODES.BUTTON_LINK_REQUIRED
+          : issue.code === "BUTTON_POPUP_CONTENT_REQUIRED"
+            ? PUBLISH_VALIDATION_CODES.BUTTON_POPUP_CONTENT_REQUIRED
+            : issue.code === "BUTTON_POPUP_CONTENT_INVALID"
+              ? PUBLISH_VALIDATION_CODES.BUTTON_POPUP_CONTENT_INVALID
+              : PUBLISH_VALIDATION_CODES.BUTTON_INVALID;
+      errors.push(
+        err(code, issue.path, {
+          blockType: block.type,
+          blockLabel,
+          message: "message" in issue ? issue.message : undefined,
+        }),
+      );
+    }
+  };
+
+  for (const { value, path } of buttons) {
+    pushIssues(
+      validateCmsButtonForPublish(value, path, (type, data) => {
+        const parsed = parseBlockData(type as PopupContentBlockType, data);
+        if (!parsed.ok) return { ok: false as const, message: parsed.error };
+        return { ok: true as const };
+      }),
+    );
+
+    const btnParsed = cmsButtonSchema.safeParse(value);
+    if (!btnParsed.success || btnParsed.data.action !== "popup" || !btnParsed.data.popup) {
+      continue;
+    }
+
+    // One nesting level: CTAs inside popup content may only use link (no popup-in-popup).
+    for (const nested of walkBlockButtons(btnParsed.data.popup.data, [...path, "popup", "data"])) {
+      const nestedBtn = cmsButtonSchema.safeParse(nested.value);
+      if (nestedBtn.success && nestedBtn.data.action === "popup") {
+        errors.push(
+          err(PUBLISH_VALIDATION_CODES.BUTTON_POPUP_CONTENT_INVALID, nested.path, {
+            blockType: block.type,
+            blockLabel,
+            message: "Popup in popup is niet toegestaan — kies een pagina/link.",
+          }),
+        );
+      }
+    }
+  }
+  return errors;
 }
 
 function collectMediaPublishErrors(block: Block): PublishValidationError[] {
@@ -271,6 +363,7 @@ function collectContentPublishErrors(block: Block): PublishValidationError[] {
   }
 
   errors.push(...collectMediaPublishErrors(block));
+  errors.push(...collectButtonPublishErrors(block, def.label));
   return errors;
 }
 

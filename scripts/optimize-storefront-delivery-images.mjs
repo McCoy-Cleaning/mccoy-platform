@@ -167,6 +167,10 @@ async function main() {
     "work-oplevering.jpg",
     "work-floor.jpg",
     "work-glass.jpg",
+    "work-oplevering-hal.png",
+    "work-regular-sander.png",
+    "work-floor-scrubber.jpg",
+    "work-furniture-bank.jpg",
     "about-mission.png",
   ];
   for (const name of cmsPhotos) {
@@ -177,6 +181,23 @@ async function main() {
     } else {
       await optimizePhotoLike(p, { maxEdge: 1280, preferJpeg: true });
     }
+  }
+
+  // Vite-bundled gallery fallbacks used by HomeWorkGallery (lazy, but still
+  // counted in Lighthouse "improve image delivery" once they load).
+  const assetPhotos = [
+    "work-horeca-new.jpg",
+    "work-regular.jpg",
+    "work-oplevering.jpg",
+    "work-floor.jpg",
+    "work-glass.jpg",
+    "work-exterior.jpg",
+    "mccoy-about-vision.jpg",
+  ];
+  for (const name of assetPhotos) {
+    const p = path.join(root, "apps/storefront/src/assets", name);
+    if (!fs.existsSync(p)) continue;
+    await optimizePhotoLike(p, { maxEdge: 1200, preferJpeg: true });
   }
 
   const partnersDir = path.join(root, "apps/storefront/public/images/partners");

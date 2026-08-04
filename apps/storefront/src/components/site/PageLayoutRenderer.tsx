@@ -1,10 +1,14 @@
 import * as React from "react";
 import type { BuiltinPageKey, BuiltinCmsPage, CmsPage, FixedSectionKey, LayoutItem } from "@mccoy/cms-schema";
 import { resolveLayoutItemContentAlign, suppressedProductsFixedKeys } from "@mccoy/cms-schema";
-import { ContentAlignProvider } from "@mccoy/cms-renderer";
-import { BlocksView } from "@/components/site/BlockView";
+import { ContentAlignProvider } from "@mccoy/cms-renderer/content-align";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
+
+/** Custom layout blocks (and Motion) stay off fixed-section routes like `/`. */
+const BlocksView = React.lazy(() =>
+  import("@/components/site/BlockView").then((m) => ({ default: m.BlocksView })),
+);
 
 export type SectionRenderMode = "public" | "preview" | "admin";
 
@@ -367,7 +371,11 @@ function LayoutItemView({
 
   if (respectHidden && item.hidden) return null;
 
-  const blockBody = <BlocksView blocks={[block]} pageId={pageId} />;
+  const blockBody = (
+    <React.Suspense fallback={<div className="min-h-[12rem]" aria-hidden />}>
+      <BlocksView blocks={[block]} pageId={pageId} />
+    </React.Suspense>
+  );
 
   return (
     <ContentAlignProvider align={contentAlign}>

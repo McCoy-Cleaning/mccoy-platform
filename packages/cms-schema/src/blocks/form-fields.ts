@@ -9,6 +9,7 @@ export const FORM_FIELD_TYPES = [
   "text",
   "textarea",
   "select",
+  "file",
 ] as const;
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
 
@@ -21,6 +22,7 @@ export const FORM_FIELD_TYPE_LABELS_NL: Record<FormFieldType, string> = {
   text: "Tekst (één regel)",
   textarea: "Tekstvak (meer regels)",
   select: "Keuzelijst",
+  file: "Bestandsupload",
 };
 
 export type FormFieldOption = {
@@ -92,6 +94,11 @@ export const BUILTIN_CONTACT_FORM_EMAIL_FIELD: FormFieldItem = {
 
 /** Field types editors may add as extra contact-form fields (name/email are built-in). */
 export const CONTACT_FORM_CUSTOM_FIELD_TYPES = FORM_FIELD_TYPES.filter(
+  (type) => type !== "name" && type !== "email" && type !== "file",
+);
+
+/** Field types editors may add on the vacatures application form (name/email are built-in). */
+export const JOB_APPLICATION_CUSTOM_FIELD_TYPES = FORM_FIELD_TYPES.filter(
   (type) => type !== "name" && type !== "email",
 );
 
@@ -100,13 +107,44 @@ export const DEFAULT_CONTACT_FORM_FIELDS: FormFieldItem[] = [
   createFormFieldItem("Bericht", "textarea"),
 ];
 
+/** Stable ids for default job-application upload / motivation fields. */
+export const BUILTIN_JOB_CV_ID = "builtin-job-cv";
+export const BUILTIN_JOB_LETTER_ID = "builtin-job-letter";
+export const BUILTIN_JOB_MOTIVATION_ID = "builtin-job-motivation";
+
+/**
+ * Default extras for the vacatures sollicitatieformulier.
+ * Name/email remain built-in via {@link resolveJobApplicationFields}.
+ */
+export const DEFAULT_JOB_APPLICATION_FIELDS: FormFieldItem[] = [
+  createFormFieldItem("Telefoon", "phone"),
+  {
+    id: BUILTIN_JOB_CV_ID,
+    label: "CV / Resumé (PDF, DOC)",
+    type: "file",
+  },
+  {
+    id: BUILTIN_JOB_LETTER_ID,
+    label: "Motivatiebrief (PDF, DOC)",
+    type: "file",
+  },
+  {
+    id: BUILTIN_JOB_MOTIVATION_ID,
+    label: "Korte motivatie",
+    type: "textarea",
+  },
+];
+
 function inferFieldTypeFromLabel(label: string): FormFieldType {
   const lower = label.trim().toLowerCase();
   if (/^(e-?mail|email)$/i.test(lower)) return "email";
   if (/^(naam|name)$/i.test(lower)) return "name";
   if (/^(telefoon|phone|tel|mobiel)$/i.test(lower)) return "phone";
   if (/^(bedrijf|company|organisatie|organization)$/i.test(lower)) return "company";
-  if (/^(bericht|message|opmerking|vraag)$/i.test(lower)) return "textarea";
+  if (/^(bericht|message|opmerking|vraag|motivatie|motivation)$/i.test(lower)) {
+    return "textarea";
+  }
+  if (/^(cv|curriculum|resumé|resume|motivatiebrief|letter)$/i.test(lower)) return "file";
   return "text";
 }
 
@@ -219,18 +257,34 @@ export function resolveContactFormFields(customFields: unknown): FormFieldItem[]
   return [BUILTIN_CONTACT_FORM_NAME_FIELD, BUILTIN_CONTACT_FORM_EMAIL_FIELD, ...custom];
 }
 
+/**
+ * Built-in name/email plus CMS-configured job-application extras (phone, file, textarea, …).
+ */
+export function resolveJobApplicationFields(customFields: unknown): FormFieldItem[] {
+  const custom = normalizeFormFields(customFields).filter(
+    (field) => field.label.trim() && !isReservedContactFormField(field),
+  );
+  return [BUILTIN_CONTACT_FORM_NAME_FIELD, BUILTIN_CONTACT_FORM_EMAIL_FIELD, ...custom];
+}
+
 /** Map a configured field to the payload key used by website form submit. */
 export function formFieldPayloadKey(field: FormFieldItem): string {
   if (field.type === "name") return "name";
   if (field.type === "email") return "email";
   if (field.type === "phone") return "phone";
   if (field.type === "company") return "company";
+  if (field.id === BUILTIN_JOB_CV_ID) return "cv";
+  if (field.id === BUILTIN_JOB_LETTER_ID) return "letter";
+  if (field.id === BUILTIN_JOB_MOTIVATION_ID) return "motivation";
   const lower = field.label.trim().toLowerCase();
   if (/^(naam|name)$/i.test(lower)) return "name";
   if (/^(e-?mail|email)$/i.test(lower)) return "email";
   if (/^(bericht|message|opmerking)$/i.test(lower)) return "message";
+  if (/^(motivatie|motivation|korte motivatie)$/i.test(lower)) return "motivation";
   if (/^(telefoon|phone|tel|mobiel)$/i.test(lower)) return "phone";
   if (/^(bedrijf|company|organisatie)$/i.test(lower)) return "company";
+  if (/^(cv|curriculum|resumé|resume)(\b|\/|\s|$)/i.test(lower)) return "cv";
+  if (/^(motivatiebrief|letter|cover\s*letter)$/i.test(lower)) return "letter";
   return slugFromLabel(field.label, field.id);
 }
 
@@ -256,6 +310,9 @@ export function validateContactFormSubmission(
   const sanitized: Record<string, string> = {};
 
   for (const field of fields) {
+    // File inputs are submitted as attachments, not string fields.
+    if (field.type === "file") continue;
+
     const key = formFieldPayloadKey(field);
     const raw = payload[key] ?? payload[field.id] ?? "";
     const value = typeof raw === "string" ? raw.trim().slice(0, 2000) : "";

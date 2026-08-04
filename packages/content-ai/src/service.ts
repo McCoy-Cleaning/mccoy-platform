@@ -1,7 +1,15 @@
 import { recordContentAiAudit } from "./audit";
 import { globalContentAiCache } from "./cache";
 import { hashSourcePayload } from "./hash";
-import { parseFieldsResult, parseTextResult, sanitizePlainText } from "./parse";
+import {
+  collapseLineUnitsToFields,
+  estimateTranslateMaxTokens,
+  expandFieldsToLineUnits,
+  parseFieldsResult,
+  parseTextResult,
+  preserveTranslatedFieldStructure,
+  sanitizePlainText,
+} from "./parse";
 import {
   buildGenerateDutchCopyMessages,
   buildGenerateSectionDutchMessages,
@@ -146,11 +154,36 @@ export function createContentAiService(
 
     async translateNlToEn(rawInput) {
       const input = translateNlToEnInputSchema.parse(rawInput);
-      const fields: Record<string, string> = input.fields
+      const rawFields: Record<string, string> = input.fields
         ? { ...input.fields }
         : { text: input.text!.trim() };
+      // Never call the provider for blank strings (avoids empty JSON / empty responses).
+      const fields: Record<string, string> = {};
+      for (const [key, value] of Object.entries(rawFields)) {
+        const trimmed = value.trim();
+        if (trimmed) fields[key] = trimmed;
+      }
       const maxChars = input.maxCharsPerField ?? 2000;
-      const sourceHash = hashSourcePayload({ fields, op: "translate_nl_en" });
+      const sourceHash = hashSourcePayload({
+        fields,
+        op: "translate_nl_en",
+        promptVersion: CONTENT_AI_PROMPT_VERSION,
+      });
+
+      if (Object.keys(fields).length === 0) {
+        const emptyResult: TranslateNlToEnResult = {
+          fields: {},
+          warnings: ["Geen vertaalbare NL-velden."],
+          provenance: {
+            generatedBy: "groq",
+            model: provider.getStatus().model ?? "none",
+            promptVersion: CONTENT_AI_PROMPT_VERSION,
+            generatedAt: new Date().toISOString(),
+            sourceHash,
+          },
+        };
+        return emptyResult;
+      }
 
       if (useCache) {
         const cached = globalContentAiCache.get<TranslateNlToEnResult>(sourceHash);
@@ -175,8 +208,11 @@ export function createContentAiService(
         }
       }
 
-      const { system, user } = buildTranslateNlToEnMessages({
-        fields,
+      // Multiline CMS strings → one translate unit per content line so the model
+      // cannot flatten bullets/blank lines/subheads into a single paragraph.
+      const { units, plans } = expandFieldsToLineUnits(fields);
+      const { system, user, aliasToKey } = buildTranslateNlToEnMessages({
+        fields: units,
         preserveTerms: input.preserveTerms,
         maxCharsPerField: maxChars,
       });
@@ -186,15 +222,48 @@ export function createContentAiService(
           { role: "user", content: user },
         ],
         temperature: 0.2,
-        maxTokens: 1200,
+        maxTokens: estimateTranslateMaxTokens(units),
       });
       try {
-        const { fields: out, warnings } = parseFieldsResult(
+        const aliasKeys = Object.keys(aliasToKey);
+        const unitKeys = Object.keys(units);
+        const originalKeys = Object.keys(fields);
+        const parsed = parseFieldsResult(
           completion.content,
-          Object.keys(fields),
+          [...aliasKeys, ...unitKeys],
           maxChars,
         );
-        for (const key of Object.keys(fields)) {
+        const unitOut: Record<string, string> = {};
+        for (const [alias, unitKey] of Object.entries(aliasToKey)) {
+          const value = parsed.fields[alias] ?? parsed.fields[unitKey];
+          if (value?.trim()) {
+            unitOut[unitKey] = value;
+          }
+        }
+        const collapsed = collapseLineUnitsToFields(unitOut, plans);
+        const out: Record<string, string> = {};
+        for (const key of originalKeys) {
+          const value = collapsed[key];
+          if (value?.trim()) {
+            out[key] = preserveTranslatedFieldStructure(fields[key] ?? "", value);
+          }
+        }
+        // Drop "missing" warnings for unit/alias keys we successfully resolved.
+        const resolvedUnits = new Set(Object.keys(unitOut));
+        const resolvedFields = new Set(Object.keys(out));
+        const warnings = parsed.warnings.filter((w) => {
+          for (const key of resolvedUnits) {
+            if (w.includes(`"${key}"`)) return false;
+          }
+          for (const [alias, unitKey] of Object.entries(aliasToKey)) {
+            if (resolvedUnits.has(unitKey) && w.includes(`"${alias}"`)) return false;
+          }
+          for (const key of resolvedFields) {
+            if (w.includes(`"${key}"`)) return false;
+          }
+          return true;
+        });
+        for (const key of originalKeys) {
           const src = fields[key] ?? "";
           const tgt = out[key] ?? "";
           if (src && tgt) {
@@ -321,8 +390,13 @@ export function createContentAiService(
         400,
         ...fieldKeys.map((key) => input.fields[key]?.maxChars ?? 280),
       );
-      const { system: enSystem, user: enUser } = buildTranslateNlToEnMessages({
-        fields: nl,
+      const { units: enUnits, plans: enPlans } = expandFieldsToLineUnits(nl);
+      const {
+        system: enSystem,
+        user: enUser,
+        aliasToKey: enAliasToKey,
+      } = buildTranslateNlToEnMessages({
+        fields: enUnits,
         maxCharsPerField: enMax,
       });
       const enCompletion = await provider.complete({
@@ -331,21 +405,33 @@ export function createContentAiService(
           { role: "user", content: enUser },
         ],
         temperature: 0.2,
-        maxTokens: 1600,
+        maxTokens: estimateTranslateMaxTokens(enUnits),
       });
 
       let en: Record<string, string>;
       try {
-        const parsedEn = parseFieldsResult(enCompletion.content, fieldKeys, enMax);
+        const enAliasKeys = Object.keys(enAliasToKey);
+        const enUnitKeys = Object.keys(enUnits);
+        const parsedEn = parseFieldsResult(
+          enCompletion.content,
+          [...enAliasKeys, ...enUnitKeys],
+          enMax,
+        );
         warnings.push(...parsedEn.warnings);
+        const unitOut: Record<string, string> = {};
+        for (const [alias, unitKey] of Object.entries(enAliasToKey)) {
+          const value = parsedEn.fields[alias] ?? parsedEn.fields[unitKey];
+          if (value?.trim()) unitOut[unitKey] = value;
+        }
+        const collapsed = collapseLineUnitsToFields(unitOut, enPlans);
         en = {};
         for (const key of fieldKeys) {
-          const text = parsedEn.fields[key]?.trim();
+          const text = collapsed[key]?.trim();
           if (!text) {
             throw new Error(`Lege EN-vertaling voor veld ${key}`);
           }
-          en[key] = text;
-          const semantic = checkSemanticPreservation({ source: nl[key] ?? "", target: text });
+          en[key] = preserveTranslatedFieldStructure(nl[key] ?? "", text);
+          const semantic = checkSemanticPreservation({ source: nl[key] ?? "", target: en[key]! });
           warnings.push(...semantic.warnings.map((w) => `${key}: ${w}`));
         }
       } catch (error) {

@@ -40,7 +40,7 @@ import {
   localizedAboutCopy,
   localizedServicesCopy,
 } from "@/lib/cms-i18n";
-import { cmsTextOrFallback, defaultSectionContent } from "@mccoy/cms-schema";
+import { cmsTextOrFallback, defaultSectionContent, resolveLegacyLinkAsCmsButton } from "@mccoy/cms-schema";
 import {
   CmsImageView,
   SECTION_PAGE_RAIL,
@@ -577,8 +577,8 @@ export function ProductsInfo() {
       ? ""
       : cmsTextOrFallback(
           content.eyebrow,
-          isEn ? "Our range" : productsInfoDef.eyebrow,
-          productsInfoDef.eyebrow,
+          isEn ? "Our range" : (productsInfoDef.eyebrow ?? ""),
+          productsInfoDef.eyebrow ?? "",
         );
   const heading =
     content.heading == null || content.heading === ""
@@ -591,8 +591,8 @@ export function ProductsInfo() {
           content.intro,
           isEn
             ? "Hygiene paper, professional soaps, cleaning agents and hardware for a fresh, presentable environment."
-            : productsInfoDef.intro,
-          productsInfoDef.intro,
+            : (productsInfoDef.intro ?? ""),
+          productsInfoDef.intro ?? "",
         );
 
   const cardEn: Record<string, { title: string; body: string }> = {
@@ -615,10 +615,11 @@ export function ProductsInfo() {
       eyebrow={eyebrow}
       heading={heading}
       intro={intro}
-      ctaLabel={t.products.cta}
       cards={content.cards.map((card) => {
         const factory = productsInfoDef.cards.find((c) => c.id === card.id);
         const en = cardEn[card.id];
+        const defaultCtaLabel = isEn ? t.products.cta : "Productofferte aanvragen";
+        const cta = resolveLegacyLinkAsCmsButton(card.cta, card.link, defaultCtaLabel);
         return {
           id: card.id,
           title: cmsTextOrFallback(
@@ -631,7 +632,16 @@ export function ProductsInfo() {
             isEn && en ? en.body : card.description ?? "",
             factory?.description,
           ),
-          link: card.link,
+          cta: cta
+            ? {
+                ...cta,
+                label: cmsTextOrFallback(
+                  cta.label,
+                  isEn ? t.products.cta : cta.label,
+                  factory?.cta?.label ?? defaultCtaLabel,
+                ),
+              }
+            : null,
         };
       })}
     />

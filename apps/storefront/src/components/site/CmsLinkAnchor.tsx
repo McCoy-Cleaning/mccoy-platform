@@ -46,7 +46,7 @@ export function CmsLinkAnchor({
       );
     }
     return (
-      <Link to={href} className={className}>
+      <Link to={href} preload="intent" className={className}>
         {children}
       </Link>
     );

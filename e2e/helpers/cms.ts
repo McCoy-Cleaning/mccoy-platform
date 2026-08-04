@@ -51,6 +51,7 @@ export const TEMPLATE_TYPE: Record<string, string> = {
   "Portfolio / projecten": "portfolio",
   Vacatures: "jobs",
   "Uitgelichte artikelen": "latestPosts",
+  Aanbiedingen: "offers",
 };
 
 /** Every publishable picker entry for coverage gates. */

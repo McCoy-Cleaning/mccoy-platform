@@ -118,6 +118,12 @@ export const BLOCK_CHROME_CONFIG: Record<BlockType, SectionChromeConfig> = {
     ambient: false,
     itemVariant: "outlined",
   },
+  offers: {
+    headerMode: "block",
+    surfaceMode: "none",
+    widthMode: "page",
+    ambient: true,
+  },
 };
 
 export function getBlockChromeConfig(type: BlockType): SectionChromeConfig {

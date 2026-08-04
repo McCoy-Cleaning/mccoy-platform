@@ -262,6 +262,27 @@
     0 0 80px -30px rgba(63, 182, 242, 0.35);
 }
 
+.offer-price-glow {
+  text-shadow:
+    0 0 24px rgba(63, 182, 242, 0.45),
+    0 0 48px rgba(63, 182, 242, 0.2);
+}
+
+.offer-pct-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(63, 182, 242, 0.4);
+  background: rgba(63, 182, 242, 0.12);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(147, 214, 255);
+  box-shadow: 0 0 20px -6px rgba(63, 182, 242, 0.55);
+}
+
 @keyframes marquee {
   from {
     transform: translateX(0);

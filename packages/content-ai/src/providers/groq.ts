@@ -52,12 +52,32 @@ function isJsonValidateFailed(errorCode: string | undefined): boolean {
   return errorCode === "json_validate_failed";
 }
 
+function isEmptyResponse(errorCode: string | undefined): boolean {
+  return errorCode === "empty_response";
+}
+
+function isGptOssModel(model: string): boolean {
+  return model.includes("gpt-oss");
+}
+
+function boostMaxTokens(maxTokens: number | undefined): number {
+  const base = maxTokens ?? 800;
+  return Math.min(8_192, Math.max(base * 2, 4_096));
+}
+
 export type GroqProviderOptions = {
   apiKey?: string;
   model?: string;
   timeoutMs?: number;
   /** Injected for tests. */
   fetchImpl?: typeof fetch;
+};
+
+type CompletionMode = {
+  /** When false, omit response_format so we can parse imperfect JSON ourselves. */
+  jsonObjectMode?: boolean;
+  /** Override max_tokens for empty-response retries. */
+  maxTokensOverride?: number;
 };
 
 export class GroqContentAiProvider implements ContentAiProvider {
@@ -95,29 +115,55 @@ export class GroqContentAiProvider implements ContentAiProvider {
       );
     }
 
-    const primary = await this.requestCompletion(request, this.model);
+    const primary = await this.requestCompletion(request, this.model, { jsonObjectMode: true });
     if (primary.ok) {
       return primary.result;
     }
 
-    let retryModel: string | null = null;
+    // Empty content: gpt-oss often burns max_tokens on reasoning CoT. Retry once
+    // with a larger budget and without json_object mode so content can land.
+    if (isEmptyResponse(primary.error.code)) {
+      const boosted: ContentAiCompletionRequest = {
+        ...request,
+        maxTokens: boostMaxTokens(request.maxTokens),
+      };
+      const retry = await this.requestCompletion(boosted, this.model, {
+        jsonObjectMode: false,
+        maxTokensOverride: boosted.maxTokens,
+      });
+      if (retry.ok) {
+        return retry.result;
+      }
+      throw new ContentAiError(
+        "parse",
+        "Lege reactie van AI-provider (reasoning-model verbruikte mogelijk het tokenbudget). Probeer opnieuw of vertaal minder velden tegelijk.",
+      );
+    }
+
+    // Groq json_object validation failed (often truncation / mid-JSON). Retry once
+    // without response_format so our hardened parser can recover partial output.
     if (isJsonValidateFailed(primary.error.code)) {
-      // Intermittent on smaller/deprecated models; one same-model retry often succeeds.
-      retryModel = this.model;
-    } else if (isModelMissing(primary.httpStatus, primary.error.code) && FALLBACK_MODEL !== this.model) {
-      retryModel = FALLBACK_MODEL;
+      const loose = await this.requestCompletion(request, this.model, { jsonObjectMode: false });
+      if (loose.ok) {
+        return loose.result;
+      }
+      // Same model + json mode as a second attempt (intermittent provider glitches).
+      const sameJson = await this.requestCompletion(request, this.model, { jsonObjectMode: true });
+      if (sameJson.ok) {
+        return sameJson.result;
+      }
+      this.throwFromHttpError(sameJson.httpStatus, sameJson.error);
     }
 
-    if (!retryModel) {
-      this.throwFromHttpError(primary.httpStatus, primary.error);
+    if (isModelMissing(primary.httpStatus, primary.error.code) && FALLBACK_MODEL !== this.model) {
+      const retry = await this.requestCompletion(request, FALLBACK_MODEL, { jsonObjectMode: true });
+      if (retry.ok) {
+        return retry.result;
+      }
+      this.throwFromHttpError(retry.httpStatus, retry.error);
     }
 
-    const retry = await this.requestCompletion(request, retryModel);
-    if (retry.ok) {
-      return retry.result;
-    }
-
-    this.throwFromHttpError(retry.httpStatus, retry.error);
+    this.throwFromHttpError(primary.httpStatus, primary.error);
   }
 
   private throwFromHttpError(httpStatus: number, error: GroqErrorInfo): never {
@@ -145,27 +191,38 @@ export class GroqContentAiProvider implements ContentAiProvider {
   private async requestCompletion(
     request: ContentAiCompletionRequest,
     model: string,
+    mode: CompletionMode = { jsonObjectMode: true },
   ): Promise<
     | { ok: true; result: ContentAiCompletionResult }
     | { ok: false; httpStatus: number; error: GroqErrorInfo }
   > {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const jsonObjectMode = mode.jsonObjectMode !== false;
+    const maxTokens = mode.maxTokensOverride ?? request.maxTokens ?? 800;
 
     try {
+      const body: Record<string, unknown> = {
+        model,
+        temperature: request.temperature ?? 0.4,
+        max_tokens: maxTokens,
+        messages: request.messages,
+      };
+      if (jsonObjectMode) {
+        body.response_format = { type: "json_object" };
+      }
+      // gpt-oss burns completion budget on CoT; keep effort low for CMS JSON translate.
+      if (isGptOssModel(model)) {
+        body.reasoning_effort = "low";
+      }
+
       const res = await this.fetchImpl(GROQ_CHAT_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model,
-          temperature: request.temperature ?? 0.4,
-          max_tokens: request.maxTokens ?? 800,
-          response_format: { type: "json_object" },
-          messages: request.messages,
-        }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -183,11 +240,26 @@ export class GroqContentAiProvider implements ContentAiProvider {
 
       const data = (await res.json()) as {
         model?: string;
-        choices?: Array<{ message?: { content?: string } }>;
+        choices?: Array<{
+          message?: { content?: string | null; reasoning?: string | null };
+          finish_reason?: string;
+        }>;
       };
-      const content = data.choices?.[0]?.message?.content;
+      const choice = data.choices?.[0];
+      const content = choice?.message?.content;
       if (typeof content !== "string" || !content.trim()) {
-        throw new ContentAiError("parse", "Lege reactie van AI-provider.");
+        // Soft-fail so complete() can retry with a larger token budget.
+        return {
+          ok: false,
+          httpStatus: 200,
+          error: {
+            code: "empty_response",
+            messageSnippet:
+              choice?.finish_reason === "length"
+                ? "empty content (finish_reason=length)"
+                : "empty content",
+          },
+        };
       }
       return {
         ok: true,

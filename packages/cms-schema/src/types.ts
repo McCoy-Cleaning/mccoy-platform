@@ -43,7 +43,8 @@ export type BlockType =
   | "statsCounters"
   | "contactInfoCards"
   | "quoteRequestForm"
-  | "legalArticles";
+  | "legalArticles"
+  | "offers";
 
 export type BlockCategory =
   | "Hero & intro"

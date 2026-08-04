@@ -7,8 +7,8 @@ import { useI18n } from "@/lib/i18n";
  *
  * Priority:
  * 1. Authenticated preview `?_cmsLocale=`
- * 2. Client i18n lang (language toggle / localStorage) — same source as chrome catalogs
- * 3. URL `/en/...` as a floor when already on an English route
+ * 2. URL `/en/...`
+ * 3. Client i18n lang (SSR-seeded from cookie / Accept-Language / URL — same as chrome)
  *
  * This keeps static UI and database-driven sections on one locale, including when
  * `/en` is unpublished and the toggle stays on the NL path (historical storefront UX).

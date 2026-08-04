@@ -11,10 +11,15 @@ import {
 // Side-effect import so Start can discover CSS for Early Hints.
 // Do not use `?url` + head link when relying on Start-managed stylesheet assets.
 import "../styles.css";
-import { I18nProvider } from "@/lib/i18n";
+import { I18nProvider, resolveInitialUiLang } from "@/lib/i18n";
 import logoUrl from "@/assets/logo-mccoy.png";
 import { PublishedCmsProvider } from "@/lib/cms/published-provider";
 import { DeferredCmsEditShell } from "@/components/site/DeferredCmsEditShell";
+import {
+  readIndexingEnv,
+  storefrontRobotsMetaContent,
+} from "@mccoy/security/indexing";
+import { UI_LOCALE_COOKIE } from "@mccoy/cms-schema";
 
 function NotFoundComponent() {
   return (
@@ -91,7 +96,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "schoonmaakbedrijf Twente, schoonmaakbedrijf Oldenzaal, kantoorschoonmaak Hengelo, schoonmaak Enschede, glasbewassing Twente, glazenwasser Oldenzaal, opleveringsschoonmaak, vloeronderhoud, tapijtreiniging, horeca schoonmaak, dieptereiniging sanitair, professionele schoonmaak bedrijven, commercial cleaning Twente, office cleaning Netherlands, window cleaning Twente",
       },
       { name: "author", content: "McCoy Cleaning" },
-      { name: "robots", content: "index, follow" },
+      {
+        name: "robots",
+        content: storefrontRobotsMetaContent(readIndexingEnv()),
+      },
+      { name: "theme-color", content: "#141a28" },
+      { name: "color-scheme", content: "dark" },
       { name: "geo.region", content: "NL-OV" },
       { name: "geo.placename", content: "Oldenzaal" },
       { property: "og:site_name", content: "McCoy Cleaning" },
@@ -114,30 +124,31 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       {
-        rel: "preconnect",
-        href: "https://fonts.googleapis.com",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
+        // Same-origin Archivo for `.font-display` — no Google Fonts CSS chain.
+        rel: "preload",
+        as: "font",
+        type: "font/woff2",
+        href: "/fonts/archivo-latin.woff2",
         crossOrigin: "anonymous",
       },
+    ],
+    styles: [
       {
-        rel: "preload",
-        as: "style",
-        href: "https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap",
-        // Avoid render-blocking: start as print, promote after load (see RootShell).
-        media: "print",
-        "data-mccoy-fonts": "",
+        children: [
+          "html{color-scheme:dark}",
+          "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
+          'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
+          "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
+          "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
+          "header{background:rgba(20,26,40,.92)}",
+        ].join(""),
       },
     ],
     scripts: [
       {
-        children: `(function(){try{document.querySelectorAll('link[data-mccoy-fonts]').forEach(function(l){l.addEventListener('load',function(){l.media='all'});if(l.sheet)l.media='all';});}catch(e){}})();`,
+        // Migrate legacy localStorage → cookie, then reload once so SSR HTML
+        // matches preference (avoids NL→EN filmstrip on the first post-deploy visit).
+        children: `(function(){try{var k=${JSON.stringify(UI_LOCALE_COOKIE)};if(document.cookie.split(";").some(function(c){return c.trim().indexOf(k+"=")===0;}))return;var s=localStorage.getItem(k);if(s!=="nl"&&s!=="en")return;document.cookie=k+"="+s+"; Path=/; Max-Age=31536000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"");if(s!=="en")return;if(sessionStorage.getItem("mccoy-lang-migrated")==="1")return;sessionStorage.setItem("mccoy-lang-migrated","1");location.reload();}catch(e){}})();`,
       },
       {
         type: "application/ld+json",
@@ -193,25 +204,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  // SSR seeds lang from cookie / Accept-Language; client may differ until the
+  // I18nProvider effect syncs documentElement.lang (suppress mismatch warning).
+  const htmlLang = resolveInitialUiLang();
   return (
-    <html lang="nl" translate="no" className="notranslate">
+    <html lang={htmlLang} translate="no" className="notranslate" suppressHydrationWarning>
       <head>
-        {/* Paint dark brand bg before the full stylesheet arrives / hydrates. */}
+        {/* Dark shell + hero LCP text before the main Tailwind stylesheet arrives. */}
         <style
           dangerouslySetInnerHTML={{
-            __html:
-              "html,body{background:#141a28;color:#f5f7fb;margin:0}#home h1{font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.02em;font-weight:700}",
+            __html: [
+              "html{color-scheme:dark}",
+              "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
+              'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
+              "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
+              "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
+              "header{background:rgba(20,26,40,.92)}",
+            ].join(""),
           }}
         />
         <HeadContent />
-        <noscript>
-          <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap"
-          />
-        </noscript>
       </head>
-      <body translate="no" className="notranslate">
+      <body
+        translate="no"
+        className="notranslate"
+        style={{ background: "#141a28", color: "#f5f7fb", margin: 0 }}
+        suppressHydrationWarning
+      >
         {/* Above CatchBoundary so leaf useCmsPageForView/useI18n always have context. */}
         <I18nProvider>{children}</I18nProvider>
         <Scripts />

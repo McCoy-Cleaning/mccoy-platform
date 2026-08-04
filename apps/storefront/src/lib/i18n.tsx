@@ -7,10 +7,18 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeader, getRequestUrl } from "@tanstack/react-start/server";
+import {
+  resolveUiLangFromHints,
+  UI_LOCALE_COOKIE,
+  type Locale,
+} from "@mccoy/cms-schema";
 
-const STORAGE_KEY = "mccoy-lang";
+const STORAGE_KEY = UI_LOCALE_COOKIE;
+const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
-export type Lang = "nl" | "en";
+export type Lang = Locale;
 
 type Dict = typeof translations.nl;
 
@@ -524,22 +532,60 @@ const translations = {
 type Ctx = { lang: Lang; setLang: (l: Lang) => void; t: Dict };
 const I18nContext = createContext<Ctx | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  // Hydrate from URL first (SSR-safe via pathname), then localStorage as fallback.
-  // URL is authoritative so CMS body locale and chrome catalogs stay aligned.
-  const [lang, setLangState] = useState<Lang>("nl");
+function persistLocalePreference(lang: Lang): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, lang);
+  } catch {
+    /* private mode / quota */
+  }
+  const secure =
+    typeof window.location !== "undefined" && window.location.protocol === "https:"
+      ? "; Secure"
+      : "";
+  document.cookie = `${UI_LOCALE_COOKIE}=${lang}; Path=/; Max-Age=${COOKIE_MAX_AGE_SEC}; SameSite=Lax${secure}`;
+}
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const path = window.location.pathname;
-    if (path === "/en" || path.startsWith("/en/")) {
-      setLangState("en");
-      window.localStorage.setItem(STORAGE_KEY, "en");
-      return;
+/**
+ * SSR: URL → cookie → Accept-Language → nl (via request headers).
+ * Client CSR: URL → cookie → localStorage → nl.
+ * Hydration reuses the SSR useState seed — never flip from storage after paint.
+ *
+ * Uses createIsomorphicFn so `@tanstack/react-start/server` stays out of the
+ * client graph (no CommonJS `require` — ESM SSR has no `require`).
+ */
+export const resolveInitialUiLang = createIsomorphicFn()
+  .server((): Lang =>
+    resolveUiLangFromHints({
+      pathname: getRequestUrl().pathname,
+      cookieHeader: getRequestHeader("cookie"),
+      acceptLanguage: getRequestHeader("accept-language"),
+    }),
+  )
+  .client((): Lang => {
+    let stored: Lang | null = null;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      stored = raw === "nl" || raw === "en" ? raw : null;
+    } catch {
+      stored = null;
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY) as Lang | null;
-    if (stored === "nl" || stored === "en") setLangState(stored);
-  }, []);
+    return resolveUiLangFromHints({
+      pathname: window.location.pathname,
+      cookieHeader: document.cookie,
+      acceptLanguage: null,
+      fallbackLocale: stored,
+    });
+  });
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Lang>(() => resolveInitialUiLang());
+
+  // Write-through cookie + localStorage. Never flip lang after paint — SSR already
+  // resolved URL / cookie / Accept-Language (legacy localStorage migrates via head script).
+  useEffect(() => {
+    persistLocalePreference(lang);
+  }, [lang]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -560,7 +606,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
-    if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, l);
+    persistLocalePreference(l);
   }, []);
 
   const value = useMemo(() => ({ lang, setLang, t: translations[lang] as Dict }), [lang, setLang]);

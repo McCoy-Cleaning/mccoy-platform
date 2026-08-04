@@ -110,7 +110,7 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
                       <span onClick={onClose}>{inner}</span>
                     </CmsLinkAnchor>
                   ) : (
-                    <Link to={href} onClick={onClose} className={cls}>
+                    <Link to={href} preload="render" onClick={onClose} className={cls}>
                       {inner}
                     </Link>
                   )}

@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { Menu, ArrowUpRight, Briefcase } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 import { resolveCmsLinkHref, resolveLogoHeightDesktop, resolveStorefrontNavLinks } from "@mccoy/cms-schema";
 import { LanguageToggle } from "./LanguageToggle";
-import { MobileMenu } from "./MobileMenu";
 import { AnimatedLogo } from "./AnimatedLogo";
 import { CmsLinkAnchor } from "./CmsLinkAnchor";
 import { useCms, useSiteNavigation } from "@/lib/cms/store";
 import { useI18n } from "@/lib/i18n";
 import { localizedNavLabel } from "@/lib/cms-i18n";
 import { localWebpSibling, NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
-import { useMobileLiteMotion } from "@/lib/use-mobile-lite-motion";
-import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 import { cn } from "@/lib/utils";
+
+const MobileMenu = lazy(() =>
+  import("./MobileMenu").then((m) => ({ default: m.MobileMenu })),
+);
 
 export function Navbar() {
   const cmsState = useCms();
@@ -21,9 +22,6 @@ export function Navbar() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
-  const reducedMotion = useReducedMotion();
-  const mobileLite = useMobileLiteMotion();
-  const softMotion = Boolean(reducedMotion) || mobileLite;
 
   useEffect(() => {
     setOpen(false);
@@ -38,17 +36,12 @@ export function Navbar() {
 
   return (
     <>
-      <motion.header
-        initial={softMotion ? false : { y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: softMotion ? 0 : 0.5, ease: "easeOut" }}
-        className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]"
-      >
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]">
         <div
           className={cn(SECTION_PAGE_RAIL, "flex items-center justify-between gap-3")}
           style={{ minHeight: Math.max(80, logoHeightPx + 24) }}
         >
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" preload="render" className="flex items-center gap-2">
             {logoSrc ? (
               <picture>
                 {logoWebp ? <source type="image/webp" srcSet={logoWebp} /> : null}
@@ -112,8 +105,12 @@ export function Navbar() {
             </button>
           </div>
         </div>
-      </motion.header>
-      {open && <MobileMenu onClose={() => setOpen(false)} />}
+      </header>
+      {open ? (
+        <Suspense fallback={null}>
+          <MobileMenu onClose={() => setOpen(false)} />
+        </Suspense>
+      ) : null}
     </>
   );
 }
@@ -143,6 +140,7 @@ function NavLinkItem({
   return (
     <Link
       to={to}
+      preload="render"
       activeOptions={{ exact }}
       className="group relative rounded-full px-4 py-2 text-[13px] font-medium uppercase tracking-[0.1em] text-white/65 transition hover:text-white lg:px-5"
     >

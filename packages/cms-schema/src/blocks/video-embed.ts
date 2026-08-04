@@ -2,9 +2,11 @@
 const YOUTUBE =
   /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i;
 const VIMEO = /(?:vimeo\.com\/)(\d+)/i;
+const FACEBOOK_VIDEO =
+  /facebook\.com\/(?:[^/?#]+\/)?(?:videos|reel|watch|share\/v)\/|fb\.watch\//i;
 
 export type SafeVideoEmbed =
-  | { ok: true; embedUrl: string; provider: "youtube" | "vimeo" }
+  | { ok: true; embedUrl: string; provider: "youtube" | "vimeo" | "facebook" }
   | { ok: false; reason: string };
 
 export function resolveSafeVideoEmbed(rawUrl: string): SafeVideoEmbed {
@@ -39,6 +41,17 @@ export function resolveSafeVideoEmbed(rawUrl: string): SafeVideoEmbed {
       provider: "vimeo",
       embedUrl: `https://player.vimeo.com/video/${id}`,
     };
+  }
+  if (host === "facebook.com" || host === "fb.com" || host === "fb.watch") {
+    if (host === "fb.watch" || FACEBOOK_VIDEO.test(trimmed) || parsed.searchParams.has("v")) {
+      const href = encodeURIComponent(trimmed);
+      return {
+        ok: true,
+        provider: "facebook",
+        embedUrl: `https://www.facebook.com/plugins/video.php?href=${href}&show_text=false&width=560&height=315`,
+      };
+    }
+    return { ok: false, reason: "Facebook-videolink niet herkend" };
   }
   if (host.endsWith("mccoy.nl") || host.endsWith("mccoy.cleaning")) {
     if (/\.(mp4|webm)(\?|$)/i.test(parsed.pathname)) {

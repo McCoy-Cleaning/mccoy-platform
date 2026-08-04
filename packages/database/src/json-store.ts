@@ -276,6 +276,30 @@ export async function countWebsiteRequests(): Promise<number> {
   return store.requests.length;
 }
 
+export async function clearOrphanWebsiteRequestScopes(
+  activeScopeKeys: string[],
+): Promise<{ cleared: number }> {
+  return withLock(async () => {
+    const store = await readStore();
+    const active = new Set(
+      activeScopeKeys.map((key) => key.trim().toLowerCase()).filter(Boolean),
+    );
+    let cleared = 0;
+    const now = new Date().toISOString();
+    for (const request of store.requests) {
+      if (!request.scopeKey?.trim()) continue;
+      const key = request.scopeKey.trim().toLowerCase();
+      if (active.has(key)) continue;
+      request.scopeKey = null;
+      request.scopeLabel = null;
+      request.updatedAt = now;
+      cleared += 1;
+    }
+    if (cleared > 0) await writeStore(store);
+    return { cleared };
+  });
+}
+
 export function attachmentMetaFromBase64(
   filename: string,
   contentType: string,
@@ -298,4 +322,5 @@ export const jsonWebsiteRequestsStore: WebsiteRequestsStore = {
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
   countWebsiteRequests,
+  clearOrphanWebsiteRequestScopes,
 };

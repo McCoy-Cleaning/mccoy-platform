@@ -25,9 +25,11 @@ import {
   Mail,
   MessageSquare,
   PanelTop,
+  Tag,
 } from "lucide-react";
 import {
   assertPickerTypesMatchRegistry,
+  createDefaultOffers,
   productAssortmentTemplateData,
   productIntroTemplateData,
 } from "@mccoy/cms-schema";
@@ -213,7 +215,7 @@ export const TEMPLATES: TemplateDef[] = [
   {
     type: "steps",
     name: "Proces / stappen",
-    description: "Drie tot zes genummerde stappen.",
+    description: "Horizontale stappenslider met zoom op de actieve stap.",
     category: "Structure",
     icon: ListOrdered,
     defaultData: {
@@ -495,6 +497,14 @@ export const TEMPLATES: TemplateDef[] = [
         { id: "legal_1", heading: "Artikel 1", anchor: "artikel-1", content: "Inhoud." },
       ],
     },
+  },
+  {
+    type: "offers",
+    name: "Aanbiedingen",
+    description: "Promotionele aanbiedingen met afbeelding, badge, tekst en prijzen.",
+    category: "Showcase",
+    icon: Tag,
+    defaultData: createDefaultOffers(),
   },
 ];
 

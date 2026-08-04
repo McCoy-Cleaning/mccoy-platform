@@ -153,15 +153,36 @@ export type EnFieldDraftSyncPlan = {
 };
 
 /**
+ * True when current NL differs from the last saved/published baseline for this path.
+ * New paths (absent or empty in baseline) count as changed.
+ */
+export function isNlFieldChangedSinceBaseline(
+  path: string,
+  currentNl: string,
+  baselineNlFields?: Record<string, string>,
+): boolean {
+  if (baselineNlFields == null) return true;
+  const baseline = baselineNlFields[path]?.trim() ?? "";
+  return baseline !== currentNl.trim();
+}
+
+/**
  * Plan EN draft updates from current NL fields.
  * - Deleted / empty NL → drop EN draft
  * - Existing non-empty EN (manual or prior AI) → keep; never send to Groq
- * - NL present with no EN → queue for translation
+ * - NL present with no EN → queue for translation only when NL changed vs baseline
+ *   (when `baselineNlFields` is omitted, all missing-EN paths are queued — legacy)
  */
 export function planEnFieldDraftSync(input: {
   nlFields: Record<string, string>;
   existingDrafts?: Record<string, string>;
   existingSources?: Record<string, string>;
+  /**
+   * NL snapshot from the last saved/published page (before this save's edits).
+   * When set, only paths whose NL text actually changed are sent to the AI —
+   * unchanged missing-EN fields are left alone (no whole-page retranslate).
+   */
+  baselineNlFields?: Record<string, string>;
 }): EnFieldDraftSyncPlan {
   const existingDrafts = input.existingDrafts ?? {};
   const existingSources = input.existingSources ?? {};
@@ -188,10 +209,25 @@ export function planEnFieldDraftSync(input: {
       retainedSources[path] = existingSources[path] ?? nl;
       continue;
     }
+    if (!isNlFieldChangedSinceBaseline(path, nl, input.baselineNlFields)) {
+      continue;
+    }
     toTranslate[path] = nl;
   }
 
   return { retainedDrafts, retainedSources, toTranslate, prunedPaths };
+}
+
+/** Drop blank values so empty chunks never hit the AI provider. */
+export function filterNonEmptyTranslateFields(
+  fields: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    const trimmed = value.trim();
+    if (trimmed) out[key] = trimmed;
+  }
+  return out;
 }
 
 export function applyTranslatedEnFields(input: {
@@ -219,5 +255,37 @@ export function chunkRecord<T>(record: Record<string, T>, size: number): Array<R
   for (let i = 0; i < entries.length; i += size) {
     chunks.push(Object.fromEntries(entries.slice(i, i + size)));
   }
+  return chunks;
+}
+
+/**
+ * Chunk by item count AND total character budget so translate completions
+ * stay within provider token limits (avoids truncated JSON).
+ */
+export function chunkRecordByBudget(
+  record: Record<string, string>,
+  options: { maxItems?: number; maxChars?: number } = {},
+): Array<Record<string, string>> {
+  const maxItems = options.maxItems ?? 8;
+  const maxChars = options.maxChars ?? 3_500;
+  const entries = Object.entries(record);
+  if (entries.length === 0) return [];
+  const chunks: Array<Record<string, string>> = [];
+  let current: Array<[string, string]> = [];
+  let chars = 0;
+  for (const [key, value] of entries) {
+    const nextChars = chars + value.length + key.length;
+    if (
+      current.length > 0 &&
+      (current.length >= maxItems || nextChars > maxChars)
+    ) {
+      chunks.push(Object.fromEntries(current));
+      current = [];
+      chars = 0;
+    }
+    current.push([key, value]);
+    chars += value.length + key.length;
+  }
+  if (current.length > 0) chunks.push(Object.fromEntries(current));
   return chunks;
 }

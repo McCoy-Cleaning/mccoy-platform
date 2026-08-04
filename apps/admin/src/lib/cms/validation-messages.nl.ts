@@ -19,6 +19,13 @@ export const PUBLISH_VALIDATION_MESSAGES_NL: Record<string, string> = {
   [PUBLISH_VALIDATION_CODES.PLANS_CTA_INVALID]:
     "Pakket heeft een ongeldige CTA en kan niet worden gepubliceerd.",
   [PUBLISH_VALIDATION_CODES.PLANS_UNKNOWN_FEATURE]: "Pakket verwijst naar een onbekend kenmerk.",
+  [PUBLISH_VALIDATION_CODES.BUTTON_LINK_REQUIRED]:
+    "Knop: kies een pagina of vul een geldige link in.",
+  [PUBLISH_VALIDATION_CODES.BUTTON_POPUP_CONTENT_REQUIRED]:
+    "Knop: kies wat er in de popup te zien is.",
+  [PUBLISH_VALIDATION_CODES.BUTTON_POPUP_CONTENT_INVALID]:
+    "Knop: de popup-inhoud is ongeldig. Controleer de inhoud.",
+  [PUBLISH_VALIDATION_CODES.BUTTON_INVALID]: "Knop is ongeldig.",
   [PUBLISH_VALIDATION_CODES.JOBS_TITLE_REQUIRED]: "Vacature: titel is verplicht.",
   [PUBLISH_VALIDATION_CODES.JOBS_LOCATION_REQUIRED]: "Vacature: locatie is verplicht.",
   [PUBLISH_VALIDATION_CODES.JOBS_DESCRIPTION_REQUIRED]:

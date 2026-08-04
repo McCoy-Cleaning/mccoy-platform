@@ -186,15 +186,15 @@ export const contentAiGenerateDutchSchema = z
 
 export const contentAiTranslateSchema = z
   .object({
-    text: z.string().trim().min(1).max(4000).optional(),
-    fields: z.record(z.string().trim().min(1).max(4000)).optional(),
+    text: z.string().max(4000).optional(),
+    /** Blank values are ignored server-side (no provider call). */
+    fields: z.record(z.string().max(4000)).optional(),
     preserveTerms: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
     maxCharsPerField: z.number().int().min(20).max(4000).default(2000),
   })
-  .refine(
-    (v) => Boolean(v.text?.trim()) || (v.fields && Object.keys(v.fields).length > 0),
-    { message: "text or fields required" },
-  );
+  .refine((v) => v.text != null || v.fields != null, {
+    message: "text or fields required",
+  });
 
 export const contentAiGenerateSectionSchema = z.object({
   brief: z.string().trim().max(2000).optional(),

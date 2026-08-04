@@ -65,6 +65,27 @@ export function ensureFirstLocked(layout: LayoutItem[], pageKey: BuiltinPageKey)
   return [item, ...copy];
 }
 
+/**
+ * Keep locked-last fixed sections at the end (e.g. vacatures.application after jobs).
+ */
+export function ensureLastLocked(layout: LayoutItem[], pageKey: BuiltinPageKey): LayoutItem[] {
+  const lastKeys = FIXED_SECTIONS_BY_PAGE[pageKey].filter(
+    (key) => FIXED_SECTION_DEFS[key].lockedPosition === "last",
+  );
+  if (lastKeys.length === 0) return layout;
+
+  const copy = layout.slice();
+  const moved: LayoutItem[] = [];
+  for (const key of lastKeys) {
+    const idx = copy.findIndex((i) => i.kind === "fixed" && i.key === key);
+    if (idx === -1) continue;
+    const [item] = copy.splice(idx, 1);
+    if (item) moved.push(item);
+  }
+  if (moved.length === 0) return layout;
+  return [...copy, ...moved];
+}
+
 export function buildDefaultLayout(
   pageKey: BuiltinPageKey,
   blockItems: BlockLayoutItem[] = [],

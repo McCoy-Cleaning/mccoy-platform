@@ -5,7 +5,11 @@ import {
   type FormScopeSnapshot,
 } from "@mccoy/domain";
 import type { CmsPage } from "./types";
-import type { ContactFormContent, VacaturesMainContent } from "./content";
+import type {
+  ContactFormContent,
+  VacaturesApplicationContent,
+  VacaturesMainContent,
+} from "./content";
 import { isLayoutItemHidden, type LayoutItem } from "./layout";
 import { fixedLayoutId } from "./sections";
 import {
@@ -14,12 +18,14 @@ import {
   type FormFieldItem,
   type NewsletterBlockData,
   resolveContactFormFields,
+  resolveJobApplicationFields,
 } from "./blocks";
 import {
   CANONICAL_FORM_SOURCE_KEYS,
   resolveCanonicalFormSourceKey,
 } from "./form-source";
 import { normalizeCmsPage } from "./pipeline";
+import { normalizeVacaturesApplicationContent } from "./vacatures-application";
 
 export type ResolvedPublishedForm = {
   formId: string;
@@ -254,11 +260,25 @@ export function resolvePublishedFormScope(
     if (!isVacaturesPage(normalized)) {
       return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
     }
-    const mainItem = findLayoutItem(normalized, fixedLayoutId("vacatures.main"));
-    if (mainItem && isLayoutItemHidden(mainItem)) {
+    const applicationItem = findLayoutItem(normalized, fixedLayoutId("vacatures.application"));
+    if (applicationItem && isLayoutItemHidden(applicationItem)) {
       return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
     }
-    const content = normalized.sectionContent?.["vacatures.main"] as VacaturesMainContent | undefined;
+    // Legacy pages without vacatures.application still gate on vacatures.main visibility.
+    if (!applicationItem) {
+      const mainItem = findLayoutItem(normalized, fixedLayoutId("vacatures.main"));
+      if (mainItem && isLayoutItemHidden(mainItem)) {
+        return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
+      }
+    }
+    const applicationContent = normalized.sectionContent?.[
+      "vacatures.application"
+    ] as VacaturesApplicationContent | undefined;
+    const mainContent = normalized.sectionContent?.["vacatures.main"] as
+      | VacaturesMainContent
+      | undefined;
+    const scope =
+      applicationContent?.applicationScope ?? mainContent?.applicationScope ?? null;
     return {
       ok: true,
       form: {
@@ -266,7 +286,7 @@ export function resolvePublishedFormScope(
         pageId,
         sourceId: FIXED_FORM_SOURCE_IDS.vacaturesApplication,
         kind,
-        scope: content?.applicationScope ?? null,
+        scope,
       },
     };
   }
@@ -364,4 +384,25 @@ export function resolvePublishedContactFormFields(
   const def = getBlockDataDefinition("contactForm");
   const data = def.normalize(block.data) as ContactFormBlockData;
   return { ok: true, fields: resolveContactFormFields(data.fields) };
+}
+
+export type ResolvePublishedJobApplicationFieldsResult =
+  | { ok: true; fields: FormFieldItem[] }
+  | { ok: false };
+
+/** Resolve sollicitatieformulier fields from published vacatures.application (or defaults). */
+export function resolvePublishedJobApplicationFields(
+  page: CmsPage | null | undefined,
+): ResolvePublishedJobApplicationFieldsResult {
+  if (!page) return { ok: false };
+  const normalized = normalizeCmsPage(page);
+  if (!isVacaturesPage(normalized)) return { ok: false };
+
+  const applicationItem = findLayoutItem(normalized, fixedLayoutId("vacatures.application"));
+  if (applicationItem && isLayoutItemHidden(applicationItem)) return { ok: false };
+
+  const main = normalized.sectionContent?.["vacatures.main"] as VacaturesMainContent | undefined;
+  const raw = normalized.sectionContent?.["vacatures.application"];
+  const content = normalizeVacaturesApplicationContent(raw, main?.applicationScope);
+  return { ok: true, fields: resolveJobApplicationFields(content.fields) };
 }

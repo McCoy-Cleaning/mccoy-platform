@@ -5,7 +5,7 @@ import {
   CMS_LINK_UI_LABELS_NL,
   isSafeExternalUrl,
   linkFromLegacyHref,
-  parseCmsLink,
+  parseCmsLinkDraft,
   type BuiltinRouteKey,
   type CmsLink,
   type CmsLinkKind,
@@ -35,6 +35,11 @@ export type StructuredLinkFieldProps = {
   /** Custom pages for the Pagina grouped picker. */
   pages?: StructuredLinkPageOption[];
   className?: string;
+  /**
+   * When true, hide the type segmented control and only show the destination
+   * control(s) for the current value (used when a parent already chose “Externe link”).
+   */
+  hideTypeToggle?: boolean;
 };
 
 type UiMode = "none" | "page" | "external" | "email" | "phone";
@@ -47,19 +52,7 @@ type UiMode = "none" | "page" | "external" | "email" | "phone";
 function toLink(value: CmsLink | string | null | undefined): CmsLink | null {
   if (!value) return null;
   if (typeof value === "string") return linkFromLegacyHref(value);
-  const parsed = parseCmsLink(value);
-  if (parsed) return parsed;
-  if (
-    value.type === "none" ||
-    value.type === "external" ||
-    value.type === "email" ||
-    value.type === "phone" ||
-    value.type === "internal" ||
-    value.type === "internal_route"
-  ) {
-    return value;
-  }
-  return null;
+  return parseCmsLinkDraft(value);
 }
 
 function kindToUi(kind: CmsLinkKind): UiMode {
@@ -88,6 +81,7 @@ export function StructuredLinkField({
   allowedKinds = PAGE_DESTINATION_LINK_KINDS,
   pages = [],
   className,
+  hideTypeToggle = false,
 }: StructuredLinkFieldProps) {
   const link = toLink(value);
   const kinds = allowedKinds.length ? allowedKinds : PAGE_DESTINATION_LINK_KINDS;
@@ -95,6 +89,8 @@ export function StructuredLinkField({
   const [advancedOpen, setAdvancedOpen] = React.useState(
     Boolean(link && "openInNewTab" in link && link.openInNewTab),
   );
+  // Keep the chosen type visible even if a parent briefly passes a stale/empty value.
+  const [pinnedMode, setPinnedMode] = React.useState<UiMode | null>(null);
   const builtinKeys = Object.keys(BUILTIN_ROUTE_PATHS) as BuiltinRouteKey[];
 
   const allowNone = kinds.includes("none");
@@ -111,12 +107,26 @@ export function StructuredLinkField({
   if (allowPhone) uiModes.push("phone");
 
   const storedMode = kindToUi(link?.type ?? "none");
-  const mode = uiModes.includes(storedMode) ? storedMode : allowNone ? "none" : (uiModes[0] ?? "none");
+  const resolvedMode = uiModes.includes(storedMode)
+    ? storedMode
+    : allowNone
+      ? "none"
+      : (uiModes[0] ?? "none");
+  const mode =
+    pinnedMode && uiModes.includes(pinnedMode) ? pinnedMode : resolvedMode;
+
+  React.useEffect(() => {
+    if (pinnedMode && storedMode === pinnedMode) {
+      setPinnedMode(null);
+    }
+  }, [pinnedMode, storedMode]);
+
   const legacyUnsupported =
     (storedMode === "email" || storedMode === "phone") && !uiModes.includes(storedMode);
 
   const setMode = (next: UiMode) => {
     setExternalError(null);
+    setPinnedMode(next);
     if (next === "none") {
       onChange({ type: "none" });
       return;
@@ -168,31 +178,33 @@ export function StructuredLinkField({
     <div className={className ? `space-y-2 ${className}` : "space-y-2"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">{label}</p>
-        <div
-          className="inline-flex flex-wrap rounded-lg border border-white/[0.08] bg-black/30 p-0.5"
-          role="group"
-          aria-label={`${label} — linktype`}
-        >
-          {uiModes.map((key) => {
-            const text = CMS_LINK_UI_LABELS_NL[key];
-            const active = mode === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMode(key)}
-                className={
-                  active
-                    ? "rounded-md bg-sky-500 px-2 py-1 text-[10px] font-semibold text-white"
-                    : "rounded-md px-2 py-1 text-[10px] font-semibold text-white/50 hover:text-white"
-                }
-                aria-pressed={active}
-              >
-                {text}
-              </button>
-            );
-          })}
-        </div>
+        {!hideTypeToggle ? (
+          <div
+            className="inline-flex flex-wrap rounded-lg border border-white/[0.08] bg-black/30 p-0.5"
+            role="group"
+            aria-label={`${label} — linktype`}
+          >
+            {uiModes.map((key) => {
+              const text = CMS_LINK_UI_LABELS_NL[key];
+              const active = mode === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMode(key)}
+                  className={
+                    active
+                      ? "rounded-md bg-sky-500 px-2 py-1 text-[10px] font-semibold text-white"
+                      : "rounded-md px-2 py-1 text-[10px] font-semibold text-white/50 hover:text-white"
+                  }
+                  aria-pressed={active}
+                >
+                  {text}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       {legacyUnsupported ? (
@@ -242,7 +254,7 @@ export function StructuredLinkField({
             className={inputClass}
             placeholder="https://…"
             aria-label="Externe URL"
-            value={link?.type === "external" ? link.url : ""}
+            value={link?.type === "external" ? link.url : mode === "external" ? "https://" : ""}
             onChange={(e) => {
               const url = e.target.value;
               if (url && !isSafeExternalUrl(url, { allowHttpInDev: true }) && url !== "https://") {
@@ -250,6 +262,7 @@ export function StructuredLinkField({
               } else {
                 setExternalError(null);
               }
+              setPinnedMode("external");
               onChange({
                 type: "external",
                 url,

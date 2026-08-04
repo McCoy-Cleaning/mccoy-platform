@@ -27,6 +27,27 @@ npm run build:admin && npm run start:admin             # http://localhost:4174
 # Or: npm run preview:storefront / npm run preview:admin
 ```
 
+### Lighthouse / performance audits
+
+Run mobile Lighthouse against a **production build**, not `vite dev` (`localhost:5173`):
+
+```bash
+npm run build:storefront && npm run preview:storefront   # http://localhost:4173
+```
+
+Then Chrome DevTools → Lighthouse → Mobile → Performance (throttling: Simulated / applied 4G).
+
+Vite DEV will not score ≥90: unminified modules, HMR, and no production asset graph. Treat DEV scores as directional only.
+
+Production-oriented wins already in the storefront shell:
+
+- Self-hosted Archivo (`/fonts/*.woff2`) — no Google Fonts CSS waterfall
+- Inline dark critical CSS before the main stylesheet
+- Deferred CMS edit stack + idle published-bundle hydrate
+- Lazy below-fold home sections / Footer; Motion chunked off the home fixed-section path
+
+Vite dev serves unminified source maps and large transformed modules, so “Minify JS”, “Enormous network payloads”, and unused-JS estimates are mostly **dev noise**. Prefer opportunities that also apply to the preview/production bundle (images, fonts, LCP preload, code-splitting).
+
 Convenience: `npm run dev` starts the storefront only (no `/admin*` routes).
 
 Optional hosts file aliases:
@@ -71,6 +92,7 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 - `FORM_INBOX_*` — optional IMAP overrides (Gmail-style); not recommended for `outlook.office365.com`
 - `ADMIN_*` — admin credentials + session secret (**Admin Vercel project only**)
 - `ADMIN_HOST`, `PUBLIC_HOST`, `HOST_ENFORCE` — host routing
+- `MCCOY_ALLOW_INDEXING` — storefront crawl override (`1` force allow, `0` force deny). Default: allow only when `VERCEL_ENV=production`; preview/local/staging stay `noindex` (see `packages/security/src/indexing.ts`)
 - `MCCOY_DATA_DIR` — optional override for local/file CMS and request stores
 - `GROQ_*` — content AI (**Admin only**)
 

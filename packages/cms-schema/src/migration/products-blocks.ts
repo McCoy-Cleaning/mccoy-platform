@@ -152,6 +152,7 @@ export function mapProductsInfoToFeatureGridData(
       icon: typeof row.icon === "string" && row.icon ? row.icon : "sparkles",
       title: nonEmptyString(row.title) || nonEmptyString(row.label) || "Item",
       body: nonEmptyString(row.body) || nonEmptyString(row.description) || "",
+      ...(row.cta && typeof row.cta === "object" ? { cta: row.cta } : {}),
       ...(row.link && typeof row.link === "object" ? { link: row.link } : {}),
     };
   });

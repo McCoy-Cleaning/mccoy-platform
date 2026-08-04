@@ -271,6 +271,45 @@ export async function countWebsiteRequests(): Promise<number> {
   return count ?? 0;
 }
 
+export async function clearOrphanWebsiteRequestScopes(
+  activeScopeKeys: string[],
+): Promise<{ cleared: number }> {
+  const supabase = createSupabaseServiceClient();
+  const active = new Set(
+    activeScopeKeys.map((key) => key.trim().toLowerCase()).filter(Boolean),
+  );
+
+  const { data, error } = await supabase
+    .from("website_requests")
+    .select("id, scope_key")
+    .not("scope_key", "is", null)
+    .limit(2000);
+
+  if (error) {
+    throw new Error(`clearOrphanWebsiteRequestScopes list failed: ${error.message}`);
+  }
+
+  const orphanIds = ((data as Array<{ id: string; scope_key: string | null }> | null) ?? [])
+    .filter((row) => {
+      const key = row.scope_key?.trim().toLowerCase() ?? "";
+      return key.length > 0 && !active.has(key);
+    })
+    .map((row) => row.id);
+
+  if (orphanIds.length === 0) return { cleared: 0 };
+
+  const { error: updateError } = await supabase
+    .from("website_requests")
+    .update({ scope_key: null, scope_label: null })
+    .in("id", orphanIds);
+
+  if (updateError) {
+    throw new Error(`clearOrphanWebsiteRequestScopes update failed: ${updateError.message}`);
+  }
+
+  return { cleared: orphanIds.length };
+}
+
 /** Postgres-backed implementation of WebsiteRequestsStore. */
 export const supabaseWebsiteRequestsStore: WebsiteRequestsStore = {
   createWebsiteRequest,
@@ -280,4 +319,5 @@ export const supabaseWebsiteRequestsStore: WebsiteRequestsStore = {
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
   countWebsiteRequests,
+  clearOrphanWebsiteRequestScopes,
 };

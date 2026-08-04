@@ -62,6 +62,17 @@ const KNOWN_SECTION_KEYS: Partial<Record<FixedSectionKey, readonly string[]>> = 
   "contact.info": ["items", "eyebrow", "heading"],
   "contact.form": ["heading", "body", "submitLabel", "successMessage", "formScope"],
   "vacatures.main": ["eyebrow", "heading", "body", "image", "applicationScope"],
+  "vacatures.application": [
+    "formEyebrow",
+    "formIntro",
+    "fields",
+    "mediaEyebrow",
+    "mediaHeading",
+    "mediaBadge",
+    "mediaLinkLabel",
+    "media",
+    "applicationScope",
+  ],
   "offerte.main": ["eyebrow", "heading", "body", "image"],
   "offerte.info": ["items", "eyebrow", "heading"],
   "offerte.form": [

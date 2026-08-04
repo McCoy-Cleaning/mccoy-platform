@@ -14,6 +14,13 @@ import {
 import type { FormScopeSnapshot } from "./form-scope";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot } from "./form-scope";
 import { defaultPrivacyMainContent, defaultTermsMainContent } from "./legal-defaults";
+import {
+  defaultVacaturesApplicationContent,
+  vacaturesApplicationContentSchema,
+  type VacaturesApplicationContent,
+} from "./vacatures-application";
+
+export type { VacaturesApplicationContent } from "./vacatures-application";
 
 export type CmsImage = {
   assetId: string;
@@ -25,10 +32,29 @@ export type CmsImage = {
   focalPoint?: { x: number; y: number };
 };
 
-export type CmsButton = {
-  label: string;
-  link: CmsLink;
-};
+export {
+  CMS_BUTTON_ACTIONS,
+  POPUP_CONTENT_BLOCK_TYPES,
+  POPUP_CONTENT_EXCLUDED_BLOCK_TYPES,
+  cmsButtonSchema,
+  isCmsButtonInteractive,
+  isPopupContentBlockType,
+  normalizeCmsButton,
+  resolveCmsButtonAction,
+  resolveCmsButtonUiMode,
+  resolveLegacyLinkAsCmsButton,
+  validateCmsButtonForPublish,
+} from "./button";
+export type {
+  CmsButton,
+  CmsButtonAction,
+  CmsButtonPopupContent,
+  CmsButtonUiMode,
+  PopupContentBlockType,
+  PopupContentExcludedBlockType,
+} from "./button";
+import type { CmsButton } from "./button";
+import { cmsButtonSchema } from "./button";
 
 export type IdItem = { id: string };
 
@@ -59,7 +85,10 @@ export type ProductCard = IdItem & {
   description: string;
   /** Optional legacy field — Producten-info renders icons, not photos. */
   image?: CmsImage;
+  /** @deprecated Prefer `cta`. Kept for normalize of older drafts. */
   link?: CmsLink;
+  /** Per-card button (label + geen link / pagina / extern / popup). */
+  cta?: CmsButton;
 };
 
 export type HomeHeroContent = {
@@ -207,6 +236,7 @@ export type SectionContentMap = {
   "contact.info": ContactInfoContent;
   "contact.form": ContactFormContent;
   "vacatures.main": VacaturesMainContent;
+  "vacatures.application": VacaturesApplicationContent;
   "offerte.main": FormPageChromeContent;
   "offerte.info": ContactInfoContent;
   "offerte.form": ContactFormContent;
@@ -232,19 +262,31 @@ function defaultProductCards(): ProductCard[] {
       id: "prod_hygiene",
       title: "Hygiëne papier",
       description: "Professioneel hygiënepapier voor sanitair, keukens en bedrijfspanden.",
-      link: { type: "internal_route", route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link",
+        link: { type: "internal_route", route: "contact" },
+      },
     },
     {
       id: "prod_soaps",
       title: "Professionele zepen",
       description: "Hoogwaardige zepen en dispensers voor een frisse, representatieve sanitaire ruimte.",
-      link: { type: "internal_route", route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link",
+        link: { type: "internal_route", route: "contact" },
+      },
     },
     {
       id: "prod_agents",
       title: "Reinigingsmiddelen & hardware",
       description: "Reinigingsmiddelen voor horeca plus apparatuur en hardware om schoon te maken.",
-      link: { type: "internal_route", route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link",
+        link: { type: "internal_route", route: "contact" },
+      },
     },
   ];
 }
@@ -262,11 +304,6 @@ export const cmsImageSchema: z.ZodType<CmsImage> = z.object({
       y: z.number().min(0).max(1),
     })
     .optional(),
-});
-
-export const cmsButtonSchema: z.ZodType<CmsButton> = z.object({
-  label: z.string().min(1),
-  link: cmsLinkSchema,
 });
 
 const statItemSchema = z.object({
@@ -309,6 +346,7 @@ const productCardSchema = z.object({
   description: z.string(),
   image: cmsImageSchema.optional(),
   link: cmsLinkSchema.optional(),
+  cta: cmsButtonSchema.optional(),
 });
 
 export const homeHeroContentSchema: z.ZodType<HomeHeroContent> = z.object({
@@ -444,6 +482,7 @@ export const SECTION_CONTENT_SCHEMAS: {
   "contact.info": contactInfoContentSchema,
   "contact.form": contactFormContentSchema,
   "vacatures.main": vacaturesMainContentSchema,
+  "vacatures.application": vacaturesApplicationContentSchema,
   "offerte.main": formPageChromeContentSchema,
   "offerte.info": contactInfoContentSchema,
   "offerte.form": contactFormContentSchema,
@@ -785,6 +824,8 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         heading: "Werken bij McCoy",
         body: "Word onderdeel van ons vaste team.",
       } satisfies VacaturesMainContent;
+    case "vacatures.application":
+      return defaultVacaturesApplicationContent() satisfies VacaturesApplicationContent;
     case "offerte.main":
       return {
         eyebrow: "Offerte",

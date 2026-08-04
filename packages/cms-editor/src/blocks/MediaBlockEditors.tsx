@@ -60,7 +60,7 @@ export function VideoBlockEditor({
           hint={
             embed.ok
               ? `Embed: ${embed.provider}`
-              : embed.reason || "Alleen YouTube, Vimeo of McCoy-host"
+              : embed.reason || "Alleen YouTube, Vimeo, Facebook of McCoy-host"
           }
         >
           <input

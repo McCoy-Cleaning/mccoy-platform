@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { motion } from "motion/react";
 import { Sparkles, ArrowRight, CheckCircle2, MapPin } from "lucide-react";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
@@ -8,7 +7,7 @@ import {
   SECTION_HEADER_TO_CONTENT,
   SECTION_INNER,
   SECTION_SHELL_Y,
-} from "@mccoy/cms-renderer";
+} from "@mccoy/cms-renderer/section-layout";
 
 export interface CityLandingProps {
   city: string;
@@ -25,22 +24,13 @@ export function CityLanding({ city, intro, services, reasons }: CityLandingProps
         <section className={`${SECTION_SHELL_Y} px-4 sm:px-6 lg:px-8`}>
           <div className="pointer-events-none absolute -top-20 right-0 h-96 w-96 rounded-full bg-primary/15 blur-3xl" />
           <div className="mx-auto max-w-[96rem]">
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary"
-            >
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               <MapPin className="h-3.5 w-3.5" />
               Schoonmaakbedrijf {city}
-            </motion.div>
-            <motion.h1
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05, duration: 0.7 }}
-              className="font-display mt-6 max-w-3xl text-5xl text-white md:text-7xl"
-            >
+            </div>
+            <h1 className="font-display mt-6 max-w-3xl text-5xl text-white md:text-7xl">
               Schoonmaakbedrijf in {city}
-            </motion.h1>
+            </h1>
             <p className="mt-5 max-w-2xl text-lg font-medium text-white/70">{intro}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link

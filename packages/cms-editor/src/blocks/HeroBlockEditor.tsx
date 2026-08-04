@@ -71,6 +71,12 @@ export function HeroBlockEditor({
             value={value.cta}
             enLabelPath={blockEnPath(blockId, "cta.label")}
             onChange={(cta) => onChange({ ...value, cta })}
+            blockId={blockId}
+            projectImages={projectImages}
+            assetBaseUrl={assetBaseUrl}
+            uploadToMediaLibrary={uploadToMediaLibrary}
+            mediaLibraryItems={mediaLibraryItems}
+            resolveProjectImage={resolveProjectImage}
           />
           <Section title="Afbeelding">
             <BlockImageField

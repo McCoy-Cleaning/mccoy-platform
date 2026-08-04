@@ -3,6 +3,7 @@ import {
   buildDefaultLayout,
   defaultFixedLayout,
   ensureFirstLocked,
+  ensureLastLocked,
   layoutFromBlocks,
   newBlockLayoutItem,
   newFixedLayoutItem,
@@ -117,12 +118,24 @@ export function reconcileLayoutVersion(
 
   let next = layout.slice();
   if (missing.length) {
-    // Insert missing fixed sections after the first locked item (or at start).
-    const insertAt = next.length > 0 && next[0]?.kind === "fixed" ? 1 : 0;
-    next = [...next.slice(0, insertAt), ...missing, ...next.slice(insertAt)];
+    const lastLocked = missing.filter(
+      (item) => FIXED_SECTION_DEFS[item.key].lockedPosition === "last",
+    );
+    const rest = missing.filter(
+      (item) => FIXED_SECTION_DEFS[item.key].lockedPosition !== "last",
+    );
+    if (rest.length) {
+      // Insert missing fixed sections after the first locked item (or at start).
+      const insertAt = next.length > 0 && next[0]?.kind === "fixed" ? 1 : 0;
+      next = [...next.slice(0, insertAt), ...rest, ...next.slice(insertAt)];
+    }
+    if (lastLocked.length) {
+      next = [...next, ...lastLocked];
+    }
   }
 
   next = ensureFirstLocked(next, pageKey);
+  next = ensureLastLocked(next, pageKey);
   return { layout: next, layoutVersion: CURRENT_LAYOUT_VERSION };
 }
 
@@ -236,7 +249,7 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
     seenFixed.add(key);
   }
 
-  next.layout = ensureFirstLocked(rebuilt, pageKey);
+  next.layout = ensureLastLocked(ensureFirstLocked(rebuilt, pageKey), pageKey);
   next.layoutVersion = CURRENT_LAYOUT_VERSION;
   next.sectionContent = ensureBuiltinSectionContent(next);
   delete next.extraBlocks;

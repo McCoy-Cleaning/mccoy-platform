@@ -28,21 +28,33 @@ export const productAssortmentTemplateData = {
       icon: "sparkles",
       title: "Hygiëne papier",
       body: "Professioneel hygiënepapier voor sanitair, keukens en bedrijfspanden.",
-      link: { type: "internal_route" as const, route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link" as const,
+        link: { type: "internal_route" as const, route: "contact" as const },
+      },
     },
     {
       id: "prod_soaps",
       icon: "sparkles",
       title: "Professionele zepen",
       body: "Hoogwaardige zepen en dispensers voor een frisse, representatieve sanitaire ruimte.",
-      link: { type: "internal_route" as const, route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link" as const,
+        link: { type: "internal_route" as const, route: "contact" as const },
+      },
     },
     {
       id: "prod_agents",
       icon: "sparkles",
       title: "Reinigingsmiddelen & hardware",
       body: "Reinigingsmiddelen voor horeca plus apparatuur en hardware om schoon te maken.",
-      link: { type: "internal_route" as const, route: "contact" },
+      cta: {
+        label: "Productofferte aanvragen",
+        action: "link" as const,
+        link: { type: "internal_route" as const, route: "contact" as const },
+      },
     },
   ],
 } as const;
