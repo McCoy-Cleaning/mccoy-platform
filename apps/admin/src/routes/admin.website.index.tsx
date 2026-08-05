@@ -32,7 +32,20 @@ function WebsitePage() {
   const publishedNav = effectiveSiteNavigation(state.navigation, null);
 
   React.useEffect(() => {
-    void cms.reconcileLocalCustomPagesWithServer();
+    const refresh = () => {
+      void cms.reconcileLocalCustomPagesWithServer();
+    };
+    refresh();
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   return (

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createItemId } from "../content";
+import { createItemId } from "../ids";
 
 export const FORM_FIELD_TYPES = [
   "name",

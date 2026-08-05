@@ -1,0 +1,45 @@
+name: Cursor Guardian
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            corepack enable
+            yarn install --immutable
+          elif [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Cursor Guardian smoke test
+        run: node .cursor/guardian/cli.mjs smoke
+
+      - name: Cursor Guardian qualification
+        env:
+          # CI intentionally does not receive production credentials.
+          CURSOR_GUARDIAN_LIVE_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+        run: node .cursor/guardian/cli.mjs verify

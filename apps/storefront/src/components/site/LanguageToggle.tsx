@@ -1,11 +1,16 @@
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCms } from "@/lib/cms/store";
-import { useRouterState } from "@tanstack/react-router";
-import { normalizeCmsPath } from "@mccoy/cms-schema";
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+  canonicalizePublicIdentityPath,
+  stripLocalePrefix,
+} from "@mccoy/cms-schema";
+import { mapPathnameToLocale } from "@/lib/locale-path";
 
 /**
  * Language toggle — always offers NL and EN on the public storefront.
- * EN copy uses i18n catalogs; when EN is published, also navigates to `/en` routes.
+ * EN copy uses i18n catalogs; when EN is published, soft-navigates to `/en` routes
+ * via TanStack Router (no full document reload).
  * When EN is not published, switches client locale in-place (no 302 bounce back to NL).
  */
 export function LanguageToggle({ className = "" }: { className?: string }) {
@@ -13,20 +18,27 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
   const cms = useCms();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const pathIdentity = canonicalizePublicIdentityPath(
+    stripLocalePrefix(pathname).path.replace(/\/+$/, "") || "/",
+  );
+
   const currentPage = cms.pages.find((p) => {
-    const nl = p.paths?.nl ?? p.slug;
-    const en = p.paths?.en ?? nl;
-    const nlPath = normalizeCmsPath("nl", nl);
-    const enPath = normalizeCmsPath("en", en);
-    return pathname === nlPath || pathname === enPath;
+    const nl = canonicalizePublicIdentityPath(
+      (p.paths?.nl ?? p.slug ?? "/").replace(/\/+$/, "") || "/",
+    );
+    const en = canonicalizePublicIdentityPath(
+      (p.paths?.en ?? p.paths?.nl ?? p.slug ?? "/").replace(/\/+$/, "") || "/",
+    );
+    return (
+      pathIdentity === nl ||
+      pathIdentity === en ||
+      (nl !== "/" && pathIdentity.startsWith(`${nl}/`)) ||
+      (en !== "/" && pathIdentity.startsWith(`${en}/`))
+    );
   });
 
-  const siblingHref = (target: Lang): string => {
-    if (!currentPage) return target === "en" ? "/en" : "/";
-    const nl = currentPage.paths?.nl ?? currentPage.slug;
-    const en = currentPage.paths?.en ?? nl;
-    return target === "en" ? normalizeCmsPath("en", en) : normalizeCmsPath("nl", nl);
-  };
+  const siblingHref = (target: Lang): string =>
+    mapPathnameToLocale(pathname, target, cms.pages);
 
   const enPublishedForTarget = (target: Lang): boolean => {
     if (target !== "en") return true;
@@ -44,6 +56,8 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
   return (
     <div
       translate="no"
+      role="group"
+      aria-label="Language"
       className={`relative inline-flex items-center rounded-full border border-white/15 bg-white/5 p-1 ${className}`}
     >
       <span
@@ -54,20 +68,24 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
       {langs.map((l) => {
         const href = siblingHref(l);
         const allowNavigate = enPublishedForTarget(l) || l === "nl";
+        const stayInPlace = !allowNavigate || href === pathname;
+        const label = l === "nl" ? "Nederlands" : "English";
         return (
-          <a
+          <Link
             key={l}
-            href={href}
+            to={href}
+            preload="intent"
+            resetScroll={false}
             onClick={(e) => {
               setLang(l);
-              // Unpublished EN → stay on current path; setLang drives chrome + CMS overlays.
-              if (!allowNavigate || href === pathname) {
+              if (stayInPlace) {
                 e.preventDefault();
               }
             }}
             translate="no"
             className="notranslate relative z-10 grid h-7 w-9 place-items-center text-xs font-semibold uppercase tracking-wider"
-            aria-label={l === "nl" ? "Nederlands" : "English"}
+            aria-label={label}
+            aria-current={effectiveLang === l ? "true" : undefined}
             lang={l}
           >
             <span
@@ -78,7 +96,7 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
             >
               {l.toUpperCase()}
             </span>
-          </a>
+          </Link>
         );
       })}
     </div>

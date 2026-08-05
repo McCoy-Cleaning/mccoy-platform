@@ -6,8 +6,11 @@ import {
   type GalleryColumns,
   type GalleryTextPlacement,
 } from "@mccoy/cms-schema";
-import { CmsImageView } from "./primitives";
-import { SectionHeader } from "../sectionChromeUi";
+import { CmsImageView } from "./CmsImageView";
+import {
+  GallerySectionIntro,
+  GalleryUnifiedPanel,
+} from "./GallerySectionIntro";
 import { SectionShell } from "../SectionShell";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -45,90 +48,80 @@ function readCopy(item: GalleryTextAndImageItem): CopyFields | null {
   return { title, caption, body };
 }
 
-/** Edge-to-edge cover — fill the media plane; framing owned by parent. */
-function CoverImage({
+function formatIndex(index: number): string {
+  return String(index + 1).padStart(2, "0");
+}
+
+function gridColumnsClass(columns: GalleryColumns): string {
+  if (columns === 4) return "sm:grid-cols-2 xl:grid-cols-4";
+  if (columns === 3) return "sm:grid-cols-2 lg:grid-cols-3";
+  return "sm:grid-cols-2";
+}
+
+/**
+ * Portrait service photo: tall 3:4 frame filled edge-to-edge (`object-cover`).
+ */
+function ServicePhoto({
   image,
   className,
-  framed = false,
 }: {
   image: CmsImage;
   className?: string;
-  framed?: boolean;
 }) {
   return (
     <div
+      data-cms-media-fit="portrait-cover"
       className={cn(
-        "relative overflow-hidden bg-white/[0.03]",
-        framed && "rounded-3xl border border-white/10",
+        "relative aspect-[3/4] w-full overflow-hidden rounded-xl",
+        "ring-1 ring-white/10",
         className,
       )}
     >
       <CmsImageView
         image={image}
-        className="absolute inset-0 h-full w-full object-cover object-center transition duration-700 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        className="absolute inset-0 h-full w-full object-cover object-center"
       />
     </div>
   );
 }
 
-/**
- * Integrated caption for grid (above/below): lives inside the same framed
- * media plane as the photo — not a lonely paragraph under a floating image.
- * Below: panel overlaps the image bottom. Above: panel sits as the frame header.
- *
- * Typography: Archivo display for primary lines; editorial left alignment with
- * a measured measure; bijschrift as tight uppercase accent; body as support.
- */
-function CellCaptionStrip({
+function ServiceCopy({
   fields,
-  position,
+  index,
+  textFirst,
 }: {
   fields: CopyFields;
-  position: "above" | "below";
+  index: number;
+  textFirst: boolean;
 }) {
   const { title, caption, body } = fields;
   const bodyOnly = !title && !caption && !!body;
-  const hasLead = !!(title || caption);
-  // Short body-only captions under the photo read cleaner centered; longer copy stays left.
-  const centerShortBodyOnly =
-    position === "below" && bodyOnly && (body?.length ?? 0) <= 72;
 
   return (
     <div
       className={cn(
-        "relative z-[1] px-4 py-4 sm:px-5 sm:py-5",
-        centerShortBodyOnly ? "text-center" : "text-left",
-        position === "below"
-          ? // Pull up into the photo so caption reads as part of the media plane.
-            "-mt-11 mx-3 mb-3 rounded-2xl border border-white/14 bg-[#0b1220]/92 shadow-[0_-8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm sm:-mt-12 sm:mx-4 sm:mb-4"
-          : "border-b border-white/12 bg-gradient-to-b from-white/[0.09] to-white/[0.03]",
+        "min-w-0 text-left",
+        textFirst ? "mb-4 sm:mb-5" : "mt-5",
       )}
     >
-      {/* Thin accent rule — editorial cue even when only body is filled. */}
-      <div
-        className={cn(
-          "mb-3.5 h-px w-11 bg-primary/70",
-          centerShortBodyOnly && "mx-auto",
-        )}
-        aria-hidden
-      />
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span
+          className="text-sm font-semibold tabular-nums tracking-[0.04em] text-primary"
+          aria-hidden
+        >
+          {formatIndex(index)}
+        </span>
+        {caption ? (
+          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-white/45">
+            {caption}
+          </p>
+        ) : null}
+      </div>
 
       {title ? (
-        <h3 className="font-display max-w-[22ch] text-[1.35rem] font-semibold leading-[1.12] tracking-[-0.03em] text-white break-words sm:text-2xl sm:leading-[1.1]">
+        <h3 className="mt-2.5 font-display text-xl font-semibold leading-[1.15] tracking-[-0.025em] text-[#f2f4f7] break-words sm:text-[1.35rem] sm:leading-[1.12]">
           {title}
         </h3>
-      ) : null}
-
-      {caption ? (
-        <p
-          className={cn(
-            "font-semibold uppercase tracking-[0.22em] text-primary",
-            "text-[0.625rem] sm:text-[0.6875rem]",
-            title ? "mt-2.5" : undefined,
-          )}
-        >
-          {caption}
-        </p>
       ) : null}
 
       {body ? (
@@ -136,14 +129,10 @@ function CellCaptionStrip({
           className={cn(
             "whitespace-pre-wrap break-words",
             bodyOnly
-              ? cn(
-                  "font-display text-xl font-semibold leading-[1.2] tracking-[-0.03em] text-white sm:text-2xl sm:leading-[1.15]",
-                  !centerShortBodyOnly && "max-w-[28ch]",
-                  centerShortBodyOnly && "mx-auto max-w-[20ch]",
-                )
+              ? "mt-2.5 font-display text-lg font-semibold leading-[1.2] tracking-[-0.02em] text-[#f2f4f7]"
               : cn(
-                  "max-w-[36ch] text-[0.9375rem] leading-relaxed text-white/78 sm:text-base",
-                  hasLead ? "mt-3" : undefined,
+                  "mt-2.5 text-sm leading-[1.65] text-white/58 sm:text-[0.9375rem]",
+                  !title && !caption ? "mt-2" : undefined,
                 ),
           )}
         >
@@ -154,7 +143,33 @@ function CellCaptionStrip({
   );
 }
 
-/** Side-by-side editorial column — large type, accent rail, reading measure. */
+function ServiceColumn({
+  item,
+  index,
+  textFirst,
+}: {
+  item: GalleryTextAndImageItem;
+  index: number;
+  textFirst: boolean;
+}) {
+  const fields = readCopy(item);
+  const copy = fields ? (
+    <ServiceCopy fields={fields} index={index} textFirst={textFirst} />
+  ) : null;
+
+  return (
+    <article
+      data-cms-gallery-item="service"
+      className="group flex h-full min-w-0 flex-col"
+    >
+      {textFirst ? copy : null}
+      <ServicePhoto image={item.image} />
+      {!textFirst ? copy : null}
+    </article>
+  );
+}
+
+/** Side-by-side rows — compact intrinsic photo beside copy (left/right placement). */
 function RowCopy({
   fields,
   className,
@@ -167,43 +182,31 @@ function RowCopy({
   const hasLead = !!(title || caption);
 
   return (
-    <div
-      className={cn(
-        "min-w-0 flex flex-col justify-center text-left",
-        "border-l-2 border-primary/55 pl-6 sm:pl-8 lg:pl-10",
-        className,
-      )}
-    >
-      {title ? (
-        <h3 className="font-display max-w-[16ch] text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-white break-words sm:text-4xl lg:text-[2.85rem] lg:leading-[1.02]">
-          {title}
-        </h3>
-      ) : null}
-
+    <div className={cn("min-w-0 flex flex-col justify-center text-left", className)}>
       {caption ? (
-        <p
-          className={cn(
-            "font-semibold uppercase tracking-[0.22em] text-primary text-[0.6875rem]",
-            title ? "mt-4" : undefined,
-          )}
-        >
+        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-white/45">
           {caption}
         </p>
       ) : null}
-
-      {hasLead ? (
-        <div className="mt-6 h-px w-14 bg-primary/50" aria-hidden />
+      {title ? (
+        <h3
+          className={cn(
+            "font-display max-w-[16ch] text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-[#f2f4f7] break-words sm:text-4xl lg:text-[2.65rem] lg:leading-[1.02]",
+            caption ? "mt-3" : undefined,
+          )}
+        >
+          {title}
+        </h3>
       ) : null}
-
       {body ? (
         <p
           className={cn(
             "whitespace-pre-wrap break-words",
             bodyOnly
-              ? "font-display max-w-[18ch] text-2xl font-semibold leading-[1.12] tracking-[-0.03em] text-white sm:text-3xl lg:text-[2.15rem] lg:leading-[1.08]"
+              ? "font-display max-w-[18ch] text-2xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#f2f4f7] sm:text-3xl"
               : cn(
-                  "max-w-md text-base leading-relaxed text-white/78 sm:text-[1.0625rem]",
-                  hasLead ? "mt-6" : undefined,
+                  "max-w-md text-base leading-relaxed text-white/60",
+                  hasLead ? "mt-5" : undefined,
                 ),
           )}
         >
@@ -214,17 +217,9 @@ function RowCopy({
   );
 }
 
-function gridColumnsClass(columns: GalleryColumns): string {
-  if (columns === 4) return "sm:grid-cols-2 lg:grid-cols-4";
-  if (columns === 3) return "sm:grid-cols-2 lg:grid-cols-3";
-  return "sm:grid-cols-2";
-}
-
 /**
- * Premium text+image gallery:
- * - above/below → multi-column grid; image + caption share one framed plane
- * - left/right → full-width asymmetric rows (image ~58%, text column with accent)
- * Images fill their media frame edge-to-edge (`object-cover`).
+ * Text+image gallery on the page background:
+ * equal portrait columns with edge-to-edge photos (3:4 cover, no text panel).
  */
 export function GalleryTextAndImageView({
   title,
@@ -242,95 +237,73 @@ export function GalleryTextAndImageView({
 
   return (
     <SectionShell blockType="gallery">
-      <SectionHeader
-        eyebrow={eyebrow}
-        title={title}
-        body={intro}
-        align="left"
-      />
+      <GalleryUnifiedPanel>
+        <GallerySectionIntro eyebrow={eyebrow} title={title} intro={intro} />
 
-      {items.length === 0 ? (
-        <p className="text-sm text-white/55">Nog geen afbeeldingen in deze galerij.</p>
-      ) : sideBySide ? (
-        <div className="space-y-16 sm:space-y-20 lg:space-y-24">
-          {items.map((item) => {
-            const fields = readCopy(item);
-            const media = (
-              <div className="group relative min-h-[14rem] overflow-hidden sm:min-h-[18rem] md:min-h-0 md:aspect-[5/4] lg:aspect-[4/3]">
-                <CoverImage
+        {items.length === 0 ? (
+          <p className="text-sm text-white/55">
+            Nog geen afbeeldingen in deze galerij.
+          </p>
+        ) : sideBySide ? (
+          <div
+            data-cms-gallery-media="rows"
+            className="space-y-14 sm:space-y-16 lg:space-y-20"
+          >
+            {items.map((item) => {
+              const fields = readCopy(item);
+              const media = (
+                <ServicePhoto
                   image={item.image}
-                  framed
-                  className="absolute inset-0 h-full w-full"
+                  className="mx-auto w-full max-w-xs md:mx-0 md:max-w-sm"
                 />
-              </div>
-            );
-            const copy = fields ? (
-              <RowCopy
-                fields={fields}
-                className="py-2 md:py-6"
+              );
+              const copy = fields ? (
+                <RowCopy fields={fields} className="py-2 md:py-4" />
+              ) : null;
+              return (
+                <article
+                  key={item.id}
+                  className={cn(
+                    "grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-14",
+                    textFirst
+                      ? "md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
+                      : "md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]",
+                  )}
+                >
+                  {textFirst ? (
+                    <>
+                      {copy}
+                      {media}
+                    </>
+                  ) : (
+                    <>
+                      {media}
+                      {copy}
+                    </>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            data-cms-gallery-media="services"
+            className={cn(
+              "grid items-start gap-x-6 gap-y-10 sm:gap-x-7 sm:gap-y-12 lg:gap-x-8 lg:gap-y-12",
+              gridColumnsClass(columns),
+            )}
+          >
+            {items.map((item, index) => (
+              <ServiceColumn
+                key={item.id}
+                item={item}
+                index={index}
+                textFirst={textFirst}
               />
-            ) : null;
-            return (
-              <article
-                key={item.id}
-                className={cn(
-                  "grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-16",
-                  // Image dominates (~58%); text stays a deliberate reading column.
-                  textFirst
-                    ? "md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]"
-                    : "md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]",
-                )}
-              >
-                {textFirst ? (
-                  <>
-                    {copy}
-                    {media}
-                  </>
-                ) : (
-                  <>
-                    {media}
-                    {copy}
-                  </>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <div
-          className={cn(
-            "grid gap-x-5 gap-y-8 sm:gap-x-6 sm:gap-y-10 lg:gap-x-8 lg:gap-y-12",
-            gridColumnsClass(columns),
-          )}
-        >
-          {items.map((item) => {
-            const fields = readCopy(item);
-            const stripPosition = textFirst ? "above" : "below";
-            return (
-              <article
-                key={item.id}
-                className={cn(
-                  // One composition: photo + caption share a single framed plane.
-                  "gallery-text-image-cell flex flex-col overflow-hidden rounded-3xl border border-white/12 bg-white/[0.03]",
-                )}
-              >
-                {fields && textFirst ? (
-                  <CellCaptionStrip fields={fields} position={stripPosition} />
-                ) : null}
-                <div className="group relative aspect-[4/3] min-h-0 w-full shrink-0 overflow-hidden">
-                  <CoverImage
-                    image={item.image}
-                    className="absolute inset-0 h-full w-full"
-                  />
-                </div>
-                {fields && !textFirst ? (
-                  <CellCaptionStrip fields={fields} position={stripPosition} />
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </GalleryUnifiedPanel>
     </SectionShell>
   );
 }

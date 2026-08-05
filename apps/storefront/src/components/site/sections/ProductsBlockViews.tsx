@@ -206,7 +206,7 @@ export function ProductsIntroView({
                   aria-hidden
                 />
                 <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
-                  <CmsImageView image={image} className="h-auto w-full object-cover" />
+                  <CmsImageView image={image} className="h-auto w-full object-contain" />
                 </div>
                 <figcaption className="sr-only">{image.alt || heading}</figcaption>
               </figure>

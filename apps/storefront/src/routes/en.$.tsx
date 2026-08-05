@@ -1,3 +1,4 @@
+import * as React from "react";
 import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
@@ -7,7 +8,20 @@ import { BlocksView } from "@/components/site/BlockView";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
-import type { BuiltinPageKey } from "@mccoy/cms-schema";
+import {
+  localizeCmsPageForLocale,
+  resolveProductsBlocksLayout,
+  type BuiltinCmsPage,
+  type BuiltinPageKey,
+  type CmsPage,
+} from "@mccoy/cms-schema";
+
+/** Match /products: in-memory Producten fixed→blocks, then re-apply EN overlays. */
+function withProductsBlocksCompat(page: CmsPage): CmsPage {
+  if (page.kind !== "builtin" || page.pageKey !== "products") return page;
+  const migrated = resolveProductsBlocksLayout(page as BuiltinCmsPage).page;
+  return localizeCmsPageForLocale(migrated, "en");
+}
 
 /**
  * Phase C — English public routes. Pending EN → 302 to NL (locked policy).
@@ -25,8 +39,14 @@ export const Route = createFileRoute("/en/$")({
     if (result.kind === "redirect") {
       throw redirect({ href: result.toPath, statusCode: result.statusCode });
     }
-    if (result.kind === "not_found") throw notFound();
-    return { snapshot: result.snapshot, head: result.head, pathname };
+    if (result.kind === "not_found") {
+      throw notFound();
+    }
+    const snapshot = {
+      ...result.snapshot,
+      page: withProductsBlocksCompat(result.snapshot.page),
+    };
+    return { snapshot, head: result.head, pathname };
   },
   head: ({ loaderData }) => {
     if (!loaderData?.head) return { meta: [{ name: "robots", content: "noindex" }] };
@@ -47,7 +67,8 @@ function EnglishCmsPage() {
 function EnglishCmsPageBody() {
   const { snapshot } = Route.useLoaderData();
   // Prefer client hydrate (includes enFieldDrafts) localized for /en; fall back to loader snapshot.
-  const page = useCmsPageForView(snapshot.page.id) ?? snapshot.page;
+  const viewed = useCmsPageForView(snapshot.page.id) ?? snapshot.page;
+  const page = React.useMemo(() => withProductsBlocksCompat(viewed), [viewed]);
   const pageKey = page.kind === "builtin" ? (page.pageKey as BuiltinPageKey | null) : null;
 
   return (

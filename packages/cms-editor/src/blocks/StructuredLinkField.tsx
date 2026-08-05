@@ -10,7 +10,7 @@ import {
   type CmsLink,
   type CmsLinkKind,
 } from "@mccoy/cms-schema";
-import { inputClass, selectClass } from "./shared-fields";
+import { inputClass, selectClass } from "./field-chrome";
 
 export type StructuredLinkPageOption = {
   id: string;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { cmsImageSchema, cmsButtonSchema, createItemId, type CmsImage, type CmsButton } from "./content";
 import { cmsLinkSchema } from "./links";
-import type { CmsLink } from "./types";
+import type { CmsLink } from "./cms-link-model";
 
 export type SiteNavLink = {
   id: string;

@@ -1,5 +1,10 @@
 import * as React from "react";
-import type { CmsPage, Locale, LocalePublicationState } from "@mccoy/cms-schema";
+import type { CmsPage, Locale, LocalePublicationState, TranslationCoverageResult } from "@mccoy/cms-schema";
+import {
+  ensureEnglishLocaleContentFromDrafts,
+  enPublishBlockedByCoverage,
+  scanTranslationCoverage,
+} from "@mccoy/cms-schema";
 import {
   adminGetCmsPageStatus,
   adminListCmsRevisions,
@@ -34,6 +39,7 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
   const [draftRevision, setDraftRevision] = React.useState(1);
+  const [coverage, setCoverage] = React.useState<TranslationCoverageResult | null>(null);
   const [revisions, setRevisions] = React.useState<
     Array<{ id: string; revisionNumber: number; status: string; publishedAt: string | null }>
   >([]);
@@ -57,6 +63,17 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
   }, [refresh]);
 
   const editable = cms.getEditablePage(page.id) ?? page;
+
+  React.useEffect(() => {
+    const next = cms.getTranslationCoverage(page.id);
+    setCoverage(next ?? scanTranslationCoverage({ page: editable }));
+  }, [
+    page.id,
+    editable.enFieldDrafts,
+    editable.enFieldDraftSources,
+    editable.enFieldDraftMeta,
+    editable.updatedAt,
+  ]);
 
   const setState = async (publicationState: LocalePublicationState) => {
     setBusy(true);
@@ -87,11 +104,47 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
     }
   };
 
+  const translateMissing = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await cms.translateMissingEnFields(page.id);
+      if (!result.ok) {
+        setMessage(result.reason);
+        return;
+      }
+      const updated = cms.getEditablePage(page.id);
+      if (updated) onPageChange?.(updated);
+      setCoverage(cms.getTranslationCoverage(page.id));
+      setMessage(
+        result.translated > 0
+          ? `${result.translated} ontbrekende velden vertaald.${result.warning ? ` (${result.warning})` : ""}`
+          : result.warning
+            ? `Geen velden vertaald: ${result.warning}`
+            : "Geen ontbrekende velden om te vertalen.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const publish = async () => {
     setBusy(true);
     setMessage(null);
     try {
-      const payload = {
+      if (locale === "en") {
+        const cov =
+          cms.getTranslationCoverage(page.id) ??
+          scanTranslationCoverage({ page: editable });
+        if (enPublishBlockedByCoverage(cov)) {
+          setMessage(
+            `EN publicatie geblokkeerd: ${cov.missing} ontbrekend, ${cov.blank} leeg, ${cov.invalid} ongeldig. Vertaal eerst ontbrekende velden.`,
+          );
+          setCoverage(cov);
+          return;
+        }
+      }
+      let payload: CmsPage = {
         ...editable,
         localeStates: {
           ...editable.localeStates!,
@@ -110,7 +163,8 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
         locale === "en" ||
         payload.localeStates?.en?.publicationState === "published"
       ) {
-        if (payload.localeContent?.en) publishedLocales.push("en");
+        payload = ensureEnglishLocaleContentFromDrafts(payload);
+        publishedLocales.push("en");
       }
       if (locale === "en" && !payload.localeContent?.en) {
         setMessage("Voeg eerst Engelse content toe voordat je EN publiceert.");
@@ -128,7 +182,24 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
         setMessage(result.error);
         return;
       }
-      setMessage(`Gepubliceerd (revisie ${result.result.revisionNumber}).`);
+      // Sync editor store so subsequent Opslaan keeps EN published (and refreshes overlays).
+      const publishedPage: CmsPage = {
+        ...payload,
+        localeStates: result.localeStates ?? payload.localeStates,
+      };
+      cms.updatePage(page.id, {
+        localeStates: publishedPage.localeStates,
+        localeContent: publishedPage.localeContent,
+        enFieldDrafts: publishedPage.enFieldDrafts,
+        enFieldDraftSources: publishedPage.enFieldDraftSources,
+        enFieldDraftMeta: publishedPage.enFieldDraftMeta,
+      });
+      onPageChange?.(publishedPage);
+      setMessage(
+        locale === "en"
+          ? `EN gepubliceerd (revisie ${result.result.revisionNumber}). Live op /en.`
+          : `Gepubliceerd (revisie ${result.result.revisionNumber}).`,
+      );
       await refresh();
     } finally {
       setBusy(false);
@@ -209,7 +280,34 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
 
       <p className="text-xs text-white/50">
         Publicatie en vertaal-frisheid zijn gescheiden. AI publiceert nooit automatisch.
+        Opslaan &amp; publiceren zet NL live; als er EN-vertalingen in het concept staan
+        (of EN al live is), gaat EN mee live. “Publiceer EN” blijft beschikbaar voor
+        handmatig publiceren of republish; EN kan hier ook terug naar concept.
       </p>
+
+      {coverage ? (
+        <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70">
+          <div className="font-semibold text-white/80">EN velddekking</div>
+          <p className="mt-1">
+            {coverage.translated}/{coverage.totalRequired} vertaald
+            {coverage.missing ? ` · ${coverage.missing} ontbrekend` : ""}
+            {coverage.blank ? ` · ${coverage.blank} leeg` : ""}
+            {coverage.stale ? ` · ${coverage.stale} verouderd` : ""}
+            {coverage.overrideRemoved
+              ? ` · ${coverage.overrideRemoved} gewist (nog EN nodig)`
+              : ""}
+            {coverage.intentionalBlank ? ` · ${coverage.intentionalBlank} bewust leeg` : ""}
+            {coverage.complete && coverage.overrideRemoved === 0 ? " · compleet" : ""}
+          </p>
+          {coverage.missing + coverage.blank + coverage.overrideRemoved > 0 ? (
+            <p className="mt-1 text-white/50">
+              {coverage.missing + coverage.blank + coverage.overrideRemoved} veld(en) hebben
+              nog geen geldige EN-vertaling. Opslaan of “Ontbrekende velden vertalen” vult
+              ontbrekende, lege en gewiste velden (NL-echo) opnieuw.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -235,6 +333,18 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
           className="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/5 disabled:opacity-40"
         >
           Goedkeuren
+        </button>
+        <button
+          type="button"
+          disabled={
+            busy ||
+            (coverage != null &&
+              coverage.missing + coverage.blank + coverage.overrideRemoved === 0)
+          }
+          onClick={() => void translateMissing()}
+          className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-40"
+        >
+          Ontbrekende velden vertalen
         </button>
         <button
           type="button"

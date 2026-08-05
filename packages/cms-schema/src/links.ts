@@ -1,5 +1,7 @@
 import { z } from "zod";
-import type { BuiltinRouteKey, CmsLink, Page } from "./types";
+import type { BuiltinRouteKey, CmsLink, CmsLinkPageRef } from "./cms-link-model";
+
+export type { BuiltinRouteKey, CmsLink, CmsLinkPageRef } from "./cms-link-model";
 
 export const BUILTIN_ROUTE_PATHS: Record<BuiltinRouteKey, string> = {
   home: "/",
@@ -227,7 +229,7 @@ export function linkFromLegacyHref(href: string | undefined | null): CmsLink | n
 
 export function resolveCmsLinkHref(
   link: CmsLink | null | undefined,
-  pages: Pick<Page, "id" | "slug">[],
+  pages: Pick<CmsLinkPageRef, "id" | "slug">[],
 ): string | null {
   if (!link || link.type === "none") return null;
   if (link.type === "external") {
@@ -263,7 +265,7 @@ export function linkTarget(link: CmsLink | null | undefined): "_blank" | undefin
 /** Human-readable destination for preview tooltips (NL). */
 export function describeCmsLink(
   link: CmsLink | null | undefined,
-  pages: Pick<Page, "id" | "slug" | "title">[] = [],
+  pages: Pick<CmsLinkPageRef, "id" | "slug" | "title">[] = [],
 ): string {
   if (!link || link.type === "none") return "Geen link";
   if (link.type === "internal_route") return BUILTIN_ROUTE_LABELS[link.route] ?? link.route;

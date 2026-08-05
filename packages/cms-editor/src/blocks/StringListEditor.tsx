@@ -39,9 +39,11 @@ export function StringListEditor({
       createItem={() => createTextListItem("")}
       addLabel={addLabel}
       renderItem={(item, actions, index) => {
+        // Prefer stable item ids (matches NL discovery / canonicalize). Plain string
+        // arrays (enItemField="") keep index paths — those items have no real ids.
         const enPath = enPathPrefix
           ? enItemField
-            ? `${enPathPrefix}.${index}.${enItemField}`
+            ? `${enPathPrefix}.${item.id}.${enItemField}`
             : `${enPathPrefix}.${index}`
           : undefined;
         return (

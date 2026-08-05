@@ -112,7 +112,7 @@ export function ImageEdit({
       }}
     >
       {src ? (
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
+        <img src={src} alt={alt} className="h-full w-full bg-black/35 object-contain" />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs text-white/50">
           <Upload className="h-5 w-5" />

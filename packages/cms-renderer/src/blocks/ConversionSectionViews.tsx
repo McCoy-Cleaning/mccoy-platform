@@ -16,7 +16,8 @@ import {
 import { SectionShell } from "../SectionShell";
 import { SectionEyebrow, SectionHeader, SectionSurface } from "../sectionChromeUi";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
-import { CmsButtonView, type LinkResolverPages } from "./primitives";
+import { CmsButtonView } from "./CmsButtonView";
+import type { LinkResolverPages } from "./CmsImageView";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");

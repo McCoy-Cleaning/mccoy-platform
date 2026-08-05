@@ -127,7 +127,7 @@ export function FeatureGridBlockEditor({
                 />
               </Field>
               <EnDraftFor
-                fieldPath={blockEnPath(blockId, `features.${index}.title`)}
+                fieldPath={blockEnPath(blockId, `features.${item.id}.title`)}
                 label="Titel"
               />
               <Field label="Tekst">
@@ -138,7 +138,7 @@ export function FeatureGridBlockEditor({
                 />
               </Field>
               <EnDraftFor
-                fieldPath={blockEnPath(blockId, `features.${index}.body`)}
+                fieldPath={blockEnPath(blockId, `features.${item.id}.body`)}
                 label="Tekst"
                 multiline
               />
@@ -147,7 +147,7 @@ export function FeatureGridBlockEditor({
                   label="Knop op deze kaart"
                   value={item.cta}
                   defaultLabel="Productofferte aanvragen"
-                  enLabelPath={blockEnPath(blockId, `features.${index}.cta.label`)}
+                  enLabelPath={blockEnPath(blockId, `features.${item.id}.cta.label`)}
                   blockId={blockId ? `${blockId}-feat-${item.id}` : undefined}
                   onChange={(cta) => actions.update({ ...item, cta })}
                   {...imagePickerProps}

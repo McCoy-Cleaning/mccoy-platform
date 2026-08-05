@@ -2,7 +2,7 @@ import * as React from "react";
 import type { CmsImage, StepItem, StepsBlockData } from "@mccoy/cms-schema";
 import { SectionShell } from "../SectionShell";
 import { SectionHeader, SectionIndex } from "../sectionChromeUi";
-import { CmsImageView } from "./primitives";
+import { OrientationMediaFrame } from "./OrientationMediaFrame";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -64,10 +64,11 @@ function StepCard({
         aria-label={`Stap ${index + 1}: ${step.title}`}
       >
         {image ? (
-          <div className="relative isolate aspect-[16/10] w-full overflow-hidden bg-black/40">
-            <CmsImageView
+          <div className="relative isolate w-full overflow-hidden bg-black/40">
+            <OrientationMediaFrame
               image={image}
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              className="w-full"
+              fallbackAspectClass="aspect-[16/10]"
             />
             <div
               className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"

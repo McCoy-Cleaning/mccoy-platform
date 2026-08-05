@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { cmsLinkSchema } from "./links";
-import type { CmsLink } from "./types";
+import type { CmsLink } from "./cms-link-model";
+import type { CmsImage } from "./cms-image";
+import { createItemId } from "./ids";
 import type { FixedSectionKey } from "./sections";
 import { defaultPartnerCmsItems, defaultPartnerResolvedBackdrop, getPartnerBackdropOverride } from "./default-partners";
 import {
@@ -13,7 +15,12 @@ import {
 } from "./infer-logo-backdrop";
 import type { FormScopeSnapshot } from "./form-scope";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot } from "./form-scope";
-import { defaultPrivacyMainContent, defaultTermsMainContent } from "./legal-defaults";
+import {
+  defaultPrivacyMainContent,
+  defaultTermsMainContent,
+  type LegalArticle,
+  type LegalMainContent,
+} from "./legal-defaults";
 import {
   defaultVacaturesApplicationContent,
   vacaturesApplicationContentSchema,
@@ -21,16 +28,9 @@ import {
 } from "./vacatures-application";
 
 export type { VacaturesApplicationContent } from "./vacatures-application";
-
-export type CmsImage = {
-  assetId: string;
-  src: string;
-  alt: string;
-  decorative: boolean;
-  width?: number;
-  height?: number;
-  focalPoint?: { x: number; y: number };
-};
+export type { CmsImage } from "./cms-image";
+export type { LegalArticle, LegalMainContent } from "./legal-defaults";
+export { createItemId } from "./ids";
 
 export {
   CMS_BUTTON_ACTIONS,
@@ -210,19 +210,6 @@ export type ContactFormContent = {
 };
 
 /** Shared shape for privacy / terms pages — header + ordered text blocks. */
-export type LegalArticle = {
-  id: string;
-  title: string;
-  body: string;
-};
-
-export type LegalMainContent = {
-  eyebrow?: string;
-  heading: string;
-  updatedLabel?: string;
-  articles: LegalArticle[];
-};
-
 export type SectionContentMap = {
   "home.hero": HomeHeroContent;
   "home.partners": PartnersContent;
@@ -247,14 +234,6 @@ export type SectionContentMap = {
 export type PageSectionContent = Partial<{
   [K in FixedSectionKey]: SectionContentMap[K];
 }>;
-
-function newId(prefix = "item"): string {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-export function createItemId(prefix = "item"): string {
-  return newId(prefix);
-}
 
 function defaultProductCards(): ProductCard[] {
   return [
@@ -521,7 +500,7 @@ export function externalImage(url: string, alt: string): CmsImage | null {
 export function uploadedImage(dataUrl: string, alt: string, uploadId?: string): CmsImage | null {
   const trimmed = dataUrl.trim();
   if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(trimmed)) return null;
-  const id = uploadId?.trim() || newId("upload");
+  const id = uploadId?.trim() || createItemId("upload");
   return {
     assetId: `upload:${id}`,
     src: trimmed,
@@ -654,8 +633,8 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "home.workGallery":
       return {
         eyebrow: "Ons werk",
-        heading: "Een blik op wat wij doen",
-        body: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
+        heading: "Alles voor een professioneel schone werkomgeving",
+        body: "Van sanitaire voorzieningen en hygiënepapier tot professionele reinigingsmiddelen. McCoy combineert betrouwbare producten, praktisch advies en persoonlijke service in één complete oplossing.",
         items: [
           {
             id: "gallery_regular",
@@ -1233,8 +1212,8 @@ export function ensureStableCollectionIds<T extends { id?: string }>(
 ): Array<T & { id: string }> {
   const seen = new Set<string>();
   return items.map((item, i) => {
-    let id = item.id && item.id.length > 0 ? item.id : `${prefix}_${i}_${newId("x")}`;
-    while (seen.has(id)) id = `${prefix}_${newId("x")}`;
+    let id = item.id && item.id.length > 0 ? item.id : `${prefix}_${i}_${createItemId("x")}`;
+    while (seen.has(id)) id = `${prefix}_${createItemId("x")}`;
     seen.add(id);
     return { ...item, id };
   });

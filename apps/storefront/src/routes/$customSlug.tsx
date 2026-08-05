@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { getPublishedCmsBundle } from "@/lib/api/cms-published.functions";
 import { useCms, hydratePublishedCmsState } from "@/lib/cms/store";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
@@ -6,7 +6,7 @@ import { useEdit } from "@/lib/cms/edit-context";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { BlocksView } from "@/components/site/BlockView";
-import type { CmsPage } from "@mccoy/cms-schema";
+import { canonicalizePublicIdentityPath, type CmsPage } from "@mccoy/cms-schema";
 
 type CustomSlugLoaderData = {
   slug: string;
@@ -19,6 +19,10 @@ type CustomSlugLoaderData = {
 export const Route = createFileRoute("/$customSlug")({
   loader: async ({ params }): Promise<CustomSlugLoaderData> => {
     const slug = `/${params.customSlug}`;
+    const canonical = canonicalizePublicIdentityPath(slug);
+    if (canonical !== slug) {
+      throw redirect({ href: canonical, statusCode: 301 });
+    }
     try {
       const bundle = await getPublishedCmsBundle();
       if (!bundle.ok) {

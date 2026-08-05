@@ -296,7 +296,7 @@ export function GalleryBlockEditor({
           onChange={(images) => onChange({ ...value, images })}
           createItem={createGalleryItem}
           addLabel="Afbeelding toevoegen"
-          renderItem={(item, actions, index) => (
+          renderItem={(item, actions) => (
             <div
               className={
                 selectedId === item.id
@@ -308,7 +308,7 @@ export function GalleryBlockEditor({
                 label="Foto"
                 value={item.image}
                 preferTags={["gallery", "work"]}
-                enAltPath={blockEnPath(blockId, `images.${index}.image.alt`)}
+                enAltPath={blockEnPath(blockId, `images.${item.id}.image.alt`)}
                 {...imageProps}
                 onChange={(image) => {
                   if (!image) return;
@@ -378,7 +378,7 @@ export function GalleryBlockEditor({
                 </p>
                 <NlEnField
                   label={featured ? "Titel op foto" : "Titel"}
-                  enPath={blockEnPath(blockId, `images.${index}.title`)}
+                  enPath={blockEnPath(blockId, `images.${item.id}.title`)}
                 >
                   <input
                     className={inputClass}
@@ -389,7 +389,7 @@ export function GalleryBlockEditor({
                 </NlEnField>
                 <NlEnField
                   label="Bijschrift"
-                  enPath={blockEnPath(blockId, `images.${index}.caption`)}
+                  enPath={blockEnPath(blockId, `images.${item.id}.caption`)}
                 >
                   <input
                     className={inputClass}
@@ -402,7 +402,7 @@ export function GalleryBlockEditor({
                 </NlEnField>
                 <NlEnField
                   label="Tekst"
-                  enPath={blockEnPath(blockId, `images.${index}.body`)}
+                  enPath={blockEnPath(blockId, `images.${item.id}.body`)}
                   multiline
                 >
                   <textarea

@@ -175,9 +175,9 @@ export const TEMPLATES: TemplateDef[] = [
     category: "Media",
     icon: Grid3x3,
     defaultData: {
-      title: "Een blik op wat wij doen",
+      title: "Alles voor een professioneel schone werkomgeving",
       eyebrow: "Ons werk",
-      body: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
+      body: "Van sanitaire voorzieningen en hygiënepapier tot professionele reinigingsmiddelen. McCoy combineert betrouwbare producten, praktisch advies en persoonlijke service in één complete oplossing.",
       images: [] as string[],
       layout: "featured",
     },

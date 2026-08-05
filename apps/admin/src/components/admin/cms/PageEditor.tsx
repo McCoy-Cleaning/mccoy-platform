@@ -139,7 +139,12 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
 
       {settingsOpen && <PageSettings page={page} onClose={() => setSettingsOpen(false)} />}
 
-      <LocalePublishPanel page={page} />
+      <LocalePublishPanel
+        page={page}
+        onPageChange={() => {
+          /* LocalePublishPanel writes cms store; parent re-reads via store subscription. */
+        }}
+      />
     </div>
     </AdminCmsContentAiProvider>
   );

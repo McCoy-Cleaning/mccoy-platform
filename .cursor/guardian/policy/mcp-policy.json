@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "default": "deny",
+  "blockedToolPatterns": [
+    "(^|_)(delete|drop|truncate|destroy|reset|force_push|deploy|publish|send_email|execute_sql|apply_migration|grant|revoke)($|_)",
+    "(production|prod)_"
+  ],
+  "blockedArgumentPatterns": [
+    "BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY",
+    "\\bgh[pousr]_[A-Za-z0-9]{20,}\\b",
+    "\\bsk-[A-Za-z0-9_-]{20,}\\b",
+    "\\bAKIA[0-9A-Z]{16}\\b",
+    "\\b(prod|production)[-_ ]?(database|db|host|url)\\b"
+  ],
+  "servers": {}
+}

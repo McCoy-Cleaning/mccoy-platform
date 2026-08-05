@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ManualEnDraftField, isTranslatableFieldKey } from "../ai-assist";
-import { Field } from "./shared-fields";
+import { Field } from "./field-chrome";
 
 /** `block:{id}:{dottedField}` — undefined when no block id (tests / compact). */
 export function blockEnPath(blockId: string | undefined, field: string): string | undefined {

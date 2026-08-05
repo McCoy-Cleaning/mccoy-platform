@@ -778,10 +778,8 @@ export function createSupabaseCmsStore(): CmsStore {
           ...draft,
           localeStates: {
             nl: { publicationState: "published", freshness: "current" },
-            en: draft.localeStates?.en ?? {
-              publicationState: "missing",
-              freshness: "unknown",
-            },
+            // First seed is NL-only; EN stays missing until explicit Publiceer EN.
+            en: { publicationState: "missing", freshness: "unknown" },
           },
         });
         await this.publishPage({

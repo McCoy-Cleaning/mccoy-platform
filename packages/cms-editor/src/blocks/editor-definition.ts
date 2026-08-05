@@ -1,6 +1,15 @@
 import type { ComponentType } from "react";
 import type { BlockType } from "@mccoy/cms-schema";
-import type { BlockEditorProps } from "./blockEditorRegistry";
+import type { CmsImagePickerProps } from "../image-picker-props";
+
+/** Props shared by every registered block inspector. */
+export type BlockEditorProps<T = unknown> = {
+  value: T;
+  onChange: (next: T) => void;
+  presentation?: "inspector" | "inline" | "compact";
+  /** Stable block id for `block:{id}:{field}` EN draft paths. */
+  blockId?: string;
+} & CmsImagePickerProps;
 
 /** Editor maturity for a block type. */
 export type EditorQuality = "dedicated" | "typed-composed" | "unsupported";

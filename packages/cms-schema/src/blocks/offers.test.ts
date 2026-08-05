@@ -7,6 +7,7 @@ import {
 import {
   createDefaultOffers,
   createOfferItem,
+  formatOfferPrice,
   formatOfferPriceNl,
   normalizeOffers,
   offerDiscountPercent,
@@ -58,12 +59,14 @@ describe("offers block", () => {
     expect(offersBlockSchema.safeParse(bad).success).toBe(false);
   });
 
-  it("computes discount percent and formats EUR (nl-NL)", () => {
+  it("computes discount percent and formats EUR", () => {
     expect(offerDiscountPercent(100, 75)).toBe(25);
     expect(offerDiscountPercent(0, 10)).toBe(0);
     expect(offerDiscountPercent(50, 50)).toBe(0);
     expect(formatOfferPriceNl(79)).toMatch(/€/);
     expect(formatOfferPriceNl(79)).toMatch(/79/);
+    expect(formatOfferPrice(79, "en")).toMatch(/€/);
+    expect(formatOfferPrice(79, "en")).toMatch(/79/);
   });
 
   it("normalizes empty/invalid payloads without crashing", () => {
@@ -71,5 +74,13 @@ describe("offers block", () => {
     expect(empty.title).toBe("Aanbiedingen");
     expect(empty.offers).toEqual([]);
     expect(offersBlockSchema.safeParse(empty).success).toBe(true);
+  });
+
+  it("normalizes the layout control with a safe rows fallback", () => {
+    expect(normalizeOffers({ title: "X", layout: "cards", offers: [] }).layout).toBe("cards");
+    expect(normalizeOffers({ title: "X", layout: "rows", offers: [] }).layout).toBe("rows");
+    expect(normalizeOffers({ title: "X", layout: "bogus", offers: [] }).layout).toBe("rows");
+    expect(normalizeOffers({ title: "X", offers: [] }).layout).toBe("rows");
+    expect(createDefaultOffers().layout).toBe("rows");
   });
 });

@@ -13,9 +13,11 @@ import {
   CTA_SUPPORTED_PATHS,
   imageSupportedPaths,
   type BlockEditorDefinition,
+  type BlockEditorProps,
   type BlockEditorRegistryMap,
   type EditorQuality,
 } from "./editor-definition";
+import { setPopupContentEditorLookup } from "./popup-editor-bridge";
 import { CtaBlockEditor, type CtaBlockData } from "./CtaBlockEditor";
 import { FeatureGridBlockEditor, type FeatureGridBlockData } from "./FeatureGridBlockEditor";
 import { HeroBlockEditor } from "./HeroBlockEditor";
@@ -63,7 +65,6 @@ import {
   TimelineBlockEditor,
   ValuesBlockEditor,
 } from "./StructureBlockEditors";
-import type { CmsImagePickerProps } from "../image-picker-props";
 import type {
   ContactFormBlockData,
   ContactInfoCardsBlockData,
@@ -76,13 +77,7 @@ import type {
   StatsCountersBlockData,
 } from "@mccoy/cms-schema";
 
-export type BlockEditorProps<T = unknown> = {
-  value: T;
-  onChange: (next: T) => void;
-  presentation?: "inspector" | "inline" | "compact";
-  /** Stable block id for `block:{id}:{field}` EN draft paths. */
-  blockId?: string;
-} & CmsImagePickerProps;
+export type { BlockEditorProps } from "./editor-definition";
 
 type AnyEditor = ComponentType<BlockEditorProps<unknown>>;
 
@@ -500,3 +495,5 @@ export function blockEditorSummary(type: BlockType, data: unknown): string | nul
 
 export type { BlockEditorDefinition, EditorQuality, BlockEditorRegistryMap };
 export { CTA_SUPPORTED_PATHS, imageSupportedPaths } from "./editor-definition";
+
+setPopupContentEditorLookup((type) => getBlockEditorDefinition(type)?.Editor ?? null);

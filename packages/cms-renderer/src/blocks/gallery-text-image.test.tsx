@@ -34,18 +34,19 @@ describe("gallery text+image render", () => {
     );
     expect(html).toContain("Project A");
     expect(html).toContain("Beschrijving A");
+    expect(html).toContain('data-cms-media-fit="portrait-cover"');
+    expect(html).toContain("aspect-[3/4]");
     expect(html).toContain("object-cover");
-    // Side-by-side: asymmetric row with image-dominant column (~58/42).
-    expect(html).toContain("md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]");
-    // Editorial accent rail on the text column.
-    expect(html).toContain("border-l-2 border-primary/55");
+    expect(html).toContain("md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]");
   });
 
-  it("renders multi-column grid for below placement with integrated caption strip", () => {
+  it("renders equal portrait service columns on the page background", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
-          title: "Raster galerij",
+          title: "Alles voor een professioneel schone werkomgeving",
+          eyebrow: "Ons werk",
+          body: "Van sanitaire voorzieningen en hygiënepapier tot professionele reinigingsmiddelen.",
           contentMode: "textAndImage",
           textPlacement: "below",
           columns: 3,
@@ -53,31 +54,48 @@ describe("gallery text+image render", () => {
             {
               id: "img_1",
               image: localImage("/images/a.jpg", "A"),
-              title: "Eén",
+              title: "Sanitaire dispensers",
+              body: "Functionele dispensers voor een verzorgde, hygiënische en professioneel ingerichte sanitaire ruimte.",
             },
             {
               id: "img_2",
               image: localImage("/images/b.jpg", "B"),
-              title: "Twee",
+              title: "Hygiënepapier",
+              body: "Een compleet assortiment toiletpapier, handdoekrollen en vouwhanddoekjes voor iedere werkomgeving.",
+            },
+            {
+              id: "img_3",
+              image: localImage("/images/c.jpg", "C"),
+              title: "Professionele reinigingsmiddelen",
+              body: "Doeltreffende producten voor de dagelijkse reiniging van interieurs, vloeren en sanitaire ruimtes.",
             },
           ],
         }),
       }),
     );
-    expect(html).toContain("Eén");
-    expect(html).toContain("Twee");
-    expect(html).toContain("lg:grid-cols-3");
+    expect(html).toContain("Alles voor een professioneel schone werkomgeving");
+    expect(html).toContain("Sanitaire dispensers");
+    expect(html).toContain("Hygiënepapier");
+    expect(html).toContain("Professionele reinigingsmiddelen");
+    expect(html).not.toContain("bg-[#F3F1EB]");
+    expect(html).not.toContain('data-cms-gallery-surface="light"');
+    expect(html).toContain('data-cms-gallery-intro="centered"');
+    expect(html).toContain("text-center");
+    expect(html).toContain('data-cms-gallery-media="services"');
+    expect(html).toContain('data-cms-gallery-item="service"');
+    expect(html).toContain('data-cms-media-fit="portrait-cover"');
+    expect(html).toContain("aspect-[3/4]");
     expect(html).toContain("object-cover");
-    // Unified framed cell — not orphan text under a floating image.
-    expect(html).toContain("gallery-text-image-cell");
-    expect(html).toContain("rounded-3xl border border-white/12");
-    // Below: caption panel overlaps the image bottom.
-    expect(html).toContain("-mt-11");
-    expect(html).toContain("bg-[#0b1220]/92");
-    expect(html).toContain("bg-primary/70");
+    expect(html).toContain("lg:grid-cols-3");
+    expect(html).toContain("text-left");
+    expect(html).not.toContain("bg-[#152033]");
+    expect(html).not.toContain("lg:border-l");
+    expect(html).not.toContain('data-cms-gallery-item="featured"');
+    expect(html).not.toContain("lg:col-span-7");
+    expect(html).not.toContain('data-cms-media-fit="portrait-contain"');
   });
 
-  it("places caption as frame header for above placement", () => {
+  it("places copy above media when textPlacement is above", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
@@ -97,15 +115,14 @@ describe("gallery text+image render", () => {
       }),
     );
     expect(html).toContain("Header titel");
-    expect(html).toContain("gallery-text-image-cell");
-    expect(html).toContain("border-b border-white/12");
-    expect(html).not.toContain("-mt-11");
-    // Above strip: display title with editorial weight (left-aligned, not centered).
-    expect(html).toContain("font-display max-w-[22ch] text-[1.35rem] font-semibold");
-    expect(html).toContain("text-left");
+    expect(html).toContain("Ondersteuning");
+    expect(html).toContain('data-cms-gallery-item="service"');
+    expect(html).toContain("mb-4");
+    expect(html).toContain("object-cover");
+    expect(html).toContain('data-cms-media-fit="portrait-cover"');
   });
 
-  it("styles body-only copy as primary caption in the integrated strip", () => {
+  it("styles body-only copy as primary text under the portrait photo", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
@@ -124,14 +141,10 @@ describe("gallery text+image render", () => {
       }),
     );
     expect(html).toContain("This is text for image 1");
-    expect(html).toContain("gallery-text-image-cell");
-    // Body-only uses display type as the primary caption (not muted orphan body).
-    expect(html).toContain("font-display text-xl font-semibold");
-    expect(html).toContain("bg-primary/70");
-    // Short below body-only captions center under the image.
-    expect(html).toContain("text-center");
+    expect(html).toContain('data-cms-gallery-item="service"');
+    expect(html).toContain("font-display text-lg font-semibold");
+    expect(html).toContain("object-cover");
   });
-
 
   it("keeps featured mosaic for imagesOnly without contentMode", () => {
     const html = renderToStaticMarkup(
@@ -151,12 +164,13 @@ describe("gallery text+image render", () => {
     );
     expect(html).toContain("Klassiek");
     expect(html).toContain("Mozaïek titel");
-    // Mosaic uses auto-rows rhythm, not text+image SectionShell grid columns.
     expect(html).toContain("auto-rows-[220px]");
-    expect(html).not.toContain("gallery-text-image-cell");
+    expect(html).not.toContain('data-cms-gallery-item="service"');
+    expect(html).toContain('data-cms-gallery-intro="centered"');
+    expect(html).toContain("text-center");
   });
 
-  it("fills grid cells edge-to-edge with object-cover (no letterboxing)", () => {
+  it("matches photo orientation in the media frame (fill without crop-zoom)", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
@@ -172,8 +186,8 @@ describe("gallery text+image render", () => {
         }),
       }),
     );
-    expect(html).toContain("object-cover");
-    expect(html).not.toContain("object-contain");
+    expect(html).toContain("object-contain");
+    expect(html).not.toContain("object-cover");
     expect(html).toContain("aspect-square");
   });
 });

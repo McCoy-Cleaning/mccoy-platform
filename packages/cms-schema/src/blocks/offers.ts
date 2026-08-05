@@ -21,9 +21,13 @@ export type OfferItem = {
   discountPrice: number;
 };
 
+/** rows = wide editorial rows; cards = compact premium grid cards. */
+export type OffersLayout = "rows" | "cards";
+
 export type OffersBlockData = {
   title: string;
   subtitle?: string;
+  layout?: OffersLayout;
   offers: OfferItem[];
 };
 
@@ -72,8 +76,13 @@ const offerItemSchema: z.ZodType<OfferItem> = z
 export const offersBlockSchema: z.ZodType<OffersBlockData> = z.object({
   title: z.string(),
   subtitle: z.string().optional(),
+  layout: z.enum(["rows", "cards"]).optional(),
   offers: z.array(offerItemSchema),
 });
+
+export function normalizeOffersLayout(raw: unknown): OffersLayout {
+  return raw === "cards" ? "cards" : "rows";
+}
 
 export function createOfferItem(partial?: Partial<Omit<OfferItem, "id">>): OfferItem {
   return {
@@ -91,6 +100,7 @@ export function createDefaultOffers(): OffersBlockData {
   return {
     title: "Aanbiedingen",
     subtitle: "Tijdelijke acties en scherpe prijzen — volledig aanpasbaar in de CMS.",
+    layout: "rows",
     offers: [
       createOfferItem({
         badge: "Actie",
@@ -123,6 +133,7 @@ export function normalizeOffers(value: unknown): OffersBlockData {
   const data: OffersBlockData = {
     title: str(rec, "title") || "Aanbiedingen",
     subtitle: str(rec, "subtitle") || undefined,
+    layout: normalizeOffersLayout(rec.layout),
     offers,
   };
   const parsed = offersBlockSchema.safeParse(data);
@@ -136,9 +147,17 @@ export function offerDiscountPercent(originalPrice: number, discountPrice: numbe
   return Math.round((1 - discountPrice / originalPrice) * 100);
 }
 
-/** Dutch EUR formatting for promotional CMS display prices. */
+/** EUR formatting for promotional CMS display prices (content only, not checkout). */
+export function formatOfferPrice(amount: number, locale: "nl" | "en" = "nl"): string {
+  return new Intl.NumberFormat(locale === "en" ? "en-NL" : "nl-NL", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amount);
+}
+
+/** @deprecated Prefer `formatOfferPrice(amount, "nl")`. */
 export function formatOfferPriceNl(amount: number): string {
-  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(amount);
+  return formatOfferPrice(amount, "nl");
 }
 
 export const offersDefinition: CmsBlockDataDefinition<"offers", OffersBlockData> = {

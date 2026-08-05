@@ -1,5 +1,6 @@
 import {
   buildCmsHeadFromSnapshot,
+  canonicalizePublicIdentityPath,
   normalizeCmsPage,
   resolvePublishedCmsPage,
   stripLocalePrefix,
@@ -43,7 +44,9 @@ function isHomePathname(pathname: string): boolean {
 
 /** Map public identity path → builtin seed page id. */
 function builtinPageIdForPathname(pathname: string): string | null {
-  const identity = stripLocalePrefix(pathname).path.replace(/\/+$/, "") || "/";
+  const identity = canonicalizePublicIdentityPath(
+    stripLocalePrefix(pathname).path.replace(/\/+$/, "") || "/",
+  );
   const byPath: Record<string, string> = {
     "/": "page_home",
     "/about": "page_about",

@@ -52,28 +52,101 @@ describe("gallery block normalize", () => {
     expect(data.columns).toBe(2);
   });
 
-  it("legacy published gallery without new fields stays imagesOnly", () => {
+  it("upgrades legacy product gallery copy in textAndImage mode", () => {
     const normalized = def.normalize({
-      title: "Ons werk",
+      title: "Een blik op wat wij doen",
+      body: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
+      contentMode: "textAndImage",
+      textPlacement: "below",
+      columns: 3,
+      images: [
+        {
+          id: "img_1",
+          image: localImage("/images/a.jpg", "A"),
+          title: "Dispensers",
+          caption: "DISPENSERS",
+          body: "Alles is mogelijk voor een efficiënte inrichting.",
+        },
+        {
+          id: "img_2",
+          image: localImage("/images/b.jpg", "B"),
+          title: "Hygiene papier",
+          caption: "HYGIENE PAPIER",
+        },
+        {
+          id: "img_3",
+          image: localImage("/images/c.jpg", "C"),
+          title: "Schoonmaakmiddelen",
+          caption: "SCHOONMAAKMIDDELEN",
+        },
+      ],
+    }) as GalleryBlockData;
+
+    expect(normalized.title).toBe("Alles voor een professioneel schone werkomgeving");
+    expect(normalized.body).toContain("sanitaire voorzieningen");
+    expect(normalized.images[0]?.title).toBe("Sanitaire dispensers");
+    expect(normalized.images[1]?.title).toBe("Hygiënepapier");
+    expect(normalized.images[2]?.title).toBe("Professionele reinigingsmiddelen");
+    expect(normalized.images[0]?.body).toContain("Functionele dispensers");
+    expect(normalized.images[0]?.caption).toBeUndefined();
+  });
+
+  it("preserves EN-localized / customized gallery copy (no Dutch rewrite on normalize)", () => {
+    const normalized = def.normalize({
+      title: "A look at what we do",
+      body: "Everything for a clean and hygienic working environment under one roof.",
+      contentMode: "textAndImage",
+      textPlacement: "below",
+      columns: 3,
+      images: [
+        {
+          id: "img_q4fpvnop",
+          image: localImage("/images/a.jpg", "Dispensers"),
+          caption: "Dispenser",
+          body: "Everything is possible for an efficient layout of your toilet group",
+          shape: "square",
+        },
+        {
+          id: "img_n3wrjj5s",
+          image: localImage("/images/b.jpg", "Hygiene paper"),
+          caption: "Hygiene paper",
+          body: "A wide selection of toilet paper, towel rolls and paper towels",
+          shape: "square",
+        },
+        {
+          id: "img_ubrnczrs",
+          image: localImage("/images/c.jpg", "Cleaning agents"),
+          caption: "Cleaning agents",
+          body: "Cleaners for Interior, Floors and Sanitary.",
+          shape: "square",
+        },
+      ],
+    }) as GalleryBlockData;
+
+    expect(normalized.title).toBe("A look at what we do");
+    expect(normalized.body).toContain("clean and hygienic");
+    expect(normalized.images[0]?.body).toContain("efficient layout");
+    expect(normalized.images[1]?.caption).toBe("Hygiene paper");
+    expect(normalized.images[2]?.body).toContain("Cleaners for Interior");
+    expect(normalized.images[0]?.title).toBeUndefined();
+  });
+
+  it("does not rewrite imagesOnly mosaic titles", () => {
+    const normalized = def.normalize({
+      title: "Een blik op wat wij doen",
       layout: "featured",
       images: [
         {
           id: "img_1",
           image: localImage("/images/a.jpg", "A"),
           title: "Reguliere schoonmaak",
-          caption: "Twente",
         },
       ],
     }) as GalleryBlockData;
 
     expect(normalized.contentMode).toBe("imagesOnly");
-    expect(normalized.textPlacement).toBe("below");
-    expect(normalized.columns).toBe(2);
-    expect(normalized.images[0]?.shape).toBeUndefined();
+    expect(normalized.title).toBe("Een blik op wat wij doen");
     expect(normalized.images[0]?.title).toBe("Reguliere schoonmaak");
-
-    const parsed = parseBlockData("gallery", normalized);
-    expect(parsed.ok).toBe(true);
   });
 
   it("preserves explicit shape and text+image fields", () => {

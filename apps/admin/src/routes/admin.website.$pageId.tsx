@@ -186,15 +186,30 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
     if (pageId === "page_products") {
       cms.ensureProductsBlocksMigration(pageId);
     }
-    void cms.reconcileLocalCustomPagesWithServer().then(() => {
-      if (pageId === "page_products") {
-        cms.ensureProductsBlocksMigration(pageId);
-      }
-    });
-  }, [pageId]);
+    const refreshFromServer = () => {
+      void cms.reconcileLocalCustomPagesWithServer().then(() => {
+        if (pageId === "page_products") {
+          cms.ensureProductsBlocksMigration(pageId);
+        }
+        bridge.bump();
+      });
+    };
+    refreshFromServer();
+    const onFocus = () => refreshFromServer();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshFromServer();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [pageId, bridge.bump]);
 
   const editUrl = storefrontPageUrl(slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
   const page = cms.getEditablePage(pageId) ?? state.pages.find((p) => p.id === pageId);
+  const publishedUpdatedAt = state.pages.find((p) => p.id === pageId)?.updatedAt;
 
   // Re-push the revisioned draft whenever local admin state changes (layout ops,
   // section-content patches from Secties, saved/discard, etc.). Depend only on
@@ -204,7 +219,7 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   React.useEffect(() => {
     bridge.bump();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId]]);
+  }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId], publishedUpdatedAt]);
 
   React.useEffect(() => {
     if (bridge.selection) setSectionsOpen(true);
@@ -237,7 +252,10 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
       if ("warning" in result && result.warning) {
         notifyToast({ kind: "warning", title: result.warning });
       } else {
-        notifyToast({ kind: "success", title: "Opgeslagen." });
+        notifyToast({
+          kind: "success",
+          title: ("message" in result && result.message) || "Opgeslagen.",
+        });
       }
       setTimeout(() => {
         try {
@@ -387,13 +405,28 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   const editUrl = storefrontPageUrl(page.slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
 
   React.useEffect(() => {
-    void cms.reconcileLocalCustomPagesWithServer();
-  }, []);
+    const refreshFromServer = () => {
+      void cms.reconcileLocalCustomPagesWithServer().then(() => bridge.bump());
+    };
+    refreshFromServer();
+    const onFocus = () => refreshFromServer();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshFromServer();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [bridge.bump]);
+
+  const publishedUpdatedAt = state.pages.find((p) => p.id === pageId)?.updatedAt;
 
   React.useEffect(() => {
     bridge.bump();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId]]);
+  }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId], publishedUpdatedAt]);
 
   const onSave = () => {
     void (async () => {
@@ -422,7 +455,10 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       if ("warning" in result && result.warning) {
         notifyToast({ kind: "warning", title: result.warning });
       } else {
-        notifyToast({ kind: "success", title: "Opgeslagen." });
+        notifyToast({
+          kind: "success",
+          title: ("message" in result && result.message) || "Opgeslagen.",
+        });
       }
       setTimeout(() => {
         try {

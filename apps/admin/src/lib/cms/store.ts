@@ -48,9 +48,19 @@ import {
   MAX_EXTRA_CUSTOM_NAV_PAGES,
   applyTranslatedEnFields,
   collectPageNlFieldDraftMap,
+  collectPageNlFieldDraftCollection,
   chunkRecordByBudget,
+  ensureEnglishLocaleContentFromDrafts,
   filterNonEmptyTranslateFields,
   planEnFieldDraftSync,
+  remapEnFieldDraftsToCanonicalPaths,
+  scanTranslationCoverage,
+  selectTranslateMissingFromPage,
+  enPublishBlockedByCoverage,
+  applyEnFieldDraftEditorPatch,
+  createTranslationSourceHash,
+  decideOpslaanPublishedLocales,
+  opslaanSuccessToastTitle,
   type Block,
   type BlockType,
   type BuiltinPageKey,
@@ -65,10 +75,15 @@ import {
   type PageSectionContent,
   type PreviewSnapshot,
   type SiteNavigationContent,
+  type TranslationFieldMetadata,
 } from "@mccoy/cms-schema";
 import { pushPublishedChromeToStorefront } from "./publish-sync";
 import { deleteSavedPageFromServer, publishSavedPageToServer, saveConceptPageToServer } from "./server-publish";
-import { adminGetPublishedCmsPages, adminListPublishedCustomPageIds } from "@/lib/api/cms-publish.functions";
+import {
+  adminGetCmsPageStatus,
+  adminGetPublishedCmsPages,
+  adminListPublishedCustomPageIds,
+} from "@/lib/api/cms-publish.functions";
 import { translateNlToEn } from "@/lib/api/content-ai.functions";
 import { getTemplate, getTemplateById } from "./templates";
 
@@ -645,13 +660,30 @@ export const cms = {
       const importedCustoms = [...byId.values()].filter(
         (remote) => remote.isCustom && !localIds.has(remote.id) && allowed.has(remote.id),
       );
+      const nextDraft = { ...next.draft };
       const mergedPages = [
         ...next.pages.map((local) => {
-          if (isDraftDirty(next.draft[local.id])) return local;
           const remote = byId.get(local.id);
           if (!remote) return local;
-          if (remote !== local) pagesTouched = true;
-          return remote;
+          const localFresh =
+            typeof local.updatedAt === "number" ? local.updatedAt : 0;
+          const remoteFresh =
+            typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
+          const dirty = isDraftDirty(nextDraft[local.id]);
+
+          // Newer published server copy always wins (multi-admin last write).
+          if (remoteFresh > localFresh) {
+            if (dirty) delete nextDraft[local.id];
+            pagesTouched = true;
+            return remote;
+          }
+          // Keep local unsaved work when timestamps are equal or local is newer.
+          if (dirty) return local;
+          if (remote !== local) {
+            pagesTouched = true;
+            return remote;
+          }
+          return local;
         }),
         ...importedCustoms,
       ];
@@ -659,6 +691,7 @@ export const cms = {
       next = {
         ...next,
         pages: mergedPages,
+        draft: nextDraft,
       };
     }
 
@@ -901,6 +934,13 @@ export const cms = {
       }
       next.enFieldDraftSources = cleaned;
     }
+    if (next.enFieldDraftMeta) {
+      const cleaned: NonNullable<CmsPage["enFieldDraftMeta"]> = {};
+      for (const [key, value] of Object.entries(next.enFieldDraftMeta)) {
+        if (!key.startsWith(prefix)) cleaned[key] = value;
+      }
+      next.enFieldDraftMeta = Object.keys(cleaned).length > 0 ? cleaned : undefined;
+    }
     return applyLayoutResult(pageId, { ok: true, page: next });
   },
   duplicateLayoutBlock(pageId: string, blockId: string) {
@@ -937,29 +977,25 @@ export const cms = {
     const page = editablePage(s, pageId);
     if (!page) return;
     const next = structuredClone(page);
-    const merged = { ...(next.enFieldDrafts ?? {}) };
-    const sources = { ...(next.enFieldDraftSources ?? {}) };
-    const nlNow = collectPageNlFieldDraftMap(next);
-    for (const [key, value] of Object.entries(patch)) {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        delete merged[key];
-        delete sources[key];
-      } else {
-        merged[key] = trimmed;
-        // Pin current NL so Opslaan will not overwrite a manual/AI EN draft.
-        const nl = nlNow[key]?.trim();
-        if (nl) sources[key] = nl;
-        else delete sources[key];
-      }
-    }
-    next.enFieldDrafts = merged;
-    next.enFieldDraftSources = sources;
+    const { fields: nlNow, aliases } = collectPageNlFieldDraftCollection(next);
+    const patched = applyEnFieldDraftEditorPatch({
+      drafts: next.enFieldDrafts,
+      sources: next.enFieldDraftSources,
+      meta: next.enFieldDraftMeta,
+      patch,
+      nlFields: nlNow,
+      aliases,
+    });
+    next.enFieldDrafts = patched.enFieldDrafts;
+    next.enFieldDraftSources = patched.enFieldDraftSources;
+    next.enFieldDraftMeta =
+      Object.keys(patched.enFieldDraftMeta).length > 0 ? patched.enFieldDraftMeta : undefined;
     next.updatedAt = Date.now();
     next.version += 1;
     // Editing EN drafts must not unpublish a live EN locale — publication and
     // freshness are separate. Mark published EN as stale until Opslaan republishes.
-    if (Object.keys(merged).length > 0) {
+    const merged = patched.enFieldDrafts;
+    if (Object.keys(merged).length > 0 || Object.keys(patch).length > 0) {
       const prevEn = next.localeStates?.en;
       const keepPublication =
         prevEn?.publicationState && prevEn.publicationState !== "missing"
@@ -975,6 +1011,115 @@ export const cms = {
       };
     }
     commitDraftPage(s, pageId, next);
+  },
+
+  /**
+   * Translate only missing/blank EN fields (never overwrites manual or intentional_blank).
+   * Persists into enFieldDrafts as drafts — does not publish.
+   */
+  async translateMissingEnFields(
+    pageId: string,
+    includeStates: Array<"missing" | "blank" | "stale" | "override_removed"> = [
+      "missing",
+      "blank",
+      "override_removed",
+    ],
+  ): Promise<
+    | { ok: true; translated: number; skipped: number; warning?: string }
+    | { ok: false; reason: string }
+  > {
+    const s = read();
+    const page = editablePage(s, pageId);
+    if (!page) return { ok: false, reason: "Pagina niet gevonden." };
+
+    const remapped = remapEnFieldDraftsToCanonicalPaths(page);
+    const working: CmsPage = {
+      ...page,
+      enFieldDrafts: remapped.enFieldDrafts,
+      enFieldDraftSources: remapped.enFieldDraftSources,
+      enFieldDraftMeta: remapped.enFieldDraftMeta ?? page.enFieldDraftMeta,
+    };
+
+    const selected = selectTranslateMissingFromPage(working, includeStates);
+    if (selected.length === 0) {
+      return { ok: true, translated: 0, skipped: 0 };
+    }
+
+    const toTranslate: Record<string, string> = {};
+    for (const field of selected) toTranslate[field.path] = field.sourceValue;
+
+    const translated: Record<string, string> = {};
+    let warning: string | undefined;
+    for (const chunk of chunkRecordByBudget(toTranslate, { maxItems: 8, maxChars: 3500 })) {
+      const fields = filterNonEmptyTranslateFields(chunk);
+      if (Object.keys(fields).length === 0) continue;
+      try {
+        const res = await translateNlToEn({
+          data: { fields, maxCharsPerField: 2000 },
+        });
+        if (!res.ok) {
+          warning = res.error;
+          continue;
+        }
+        Object.assign(translated, res.result.fields);
+      } catch (error) {
+        warning = error instanceof Error ? error.message : "Onbekende fout";
+      }
+    }
+
+    const next = structuredClone(working);
+    const drafts = { ...(next.enFieldDrafts ?? {}) };
+    const sources = { ...(next.enFieldDraftSources ?? {}) };
+    const meta: Record<string, TranslationFieldMetadata> = {
+      ...(next.enFieldDraftMeta ?? {}),
+    };
+    let applied = 0;
+    for (const field of selected) {
+      // Never overwrite intentional_blank / manually_translated.
+      // override_removed may be refilled by an explicit “vertaal ontbrekende”.
+      const existingMeta = meta[field.path]?.status;
+      if (existingMeta === "intentional_blank" || existingMeta === "manually_translated") {
+        continue;
+      }
+      const en = translated[field.path]?.trim();
+      if (!en || en === field.sourceValue.trim()) continue;
+      drafts[field.path] = en;
+      sources[field.path] = field.sourceValue;
+      meta[field.path] = {
+        status: "machine_translated",
+        sourceHash: createTranslationSourceHash(field.sourceValue),
+        translatedAt: new Date().toISOString(),
+        provider: "groq",
+      };
+      applied += 1;
+    }
+    next.enFieldDrafts = drafts;
+    next.enFieldDraftSources = sources;
+    next.enFieldDraftMeta = meta;
+    next.updatedAt = Date.now();
+    next.version += 1;
+    commitDraftPage(s, pageId, next);
+    return {
+      ok: true,
+      translated: applied,
+      skipped: selected.length - applied,
+      warning,
+    };
+  },
+
+  /** Field-level EN coverage for the editable page (editor UI). */
+  getTranslationCoverage(pageId: string) {
+    const page = editablePage(read(), pageId);
+    if (!page) return null;
+    const remapped = remapEnFieldDraftsToCanonicalPaths(page);
+    return scanTranslationCoverage({
+      page: {
+        ...page,
+        enFieldDrafts: remapped.enFieldDrafts,
+        enFieldDraftSources: remapped.enFieldDraftSources,
+        enFieldDraftMeta: remapped.enFieldDraftMeta ?? page.enFieldDraftMeta,
+      },
+    });
   },
 
   /**
@@ -1173,7 +1318,10 @@ export const cms = {
   },
   async savePage(
     pageId: string,
-  ): Promise<{ ok: true; warning?: string } | { ok: false; reason: string }> {
+  ): Promise<
+    | { ok: true; warning?: string; message?: string; publishedLocales?: Array<"nl" | "en"> }
+    | { ok: false; reason: string }
+  > {
     const s = read();
     const published = publishedPage(s, pageId);
     if (!published) return { ok: false, reason: "Pagina niet gevonden." };
@@ -1201,15 +1349,25 @@ export const cms = {
       }
     }
 
-    // Auto-sync EN drafts only for NL fields that changed since the last saved page.
-    // Unchanged missing-EN paths are skipped (no whole-page retranslate). Hand EN wins.
+    // Canonicalize legacy index/colon draft keys onto stable-id discovery paths.
+    const remapped = remapEnFieldDraftsToCanonicalPaths(nextPage);
+    nextPage.enFieldDrafts = remapped.enFieldDrafts;
+    nextPage.enFieldDraftSources = remapped.enFieldDraftSources;
+    if (remapped.enFieldDraftMeta) {
+      nextPage.enFieldDraftMeta = remapped.enFieldDraftMeta;
+    }
+
+    // Auto-sync EN drafts: missing/blank/source_echo/empty override_removed → Groq.
+    // Valid distinct EN and intentional_blank / manually_translated are retained.
     const baselineNlFields = collectPageNlFieldDraftMap(published);
     const nlFields = collectPageNlFieldDraftMap(nextPage);
     const plan = planEnFieldDraftSync({
       nlFields,
       existingDrafts: nextPage.enFieldDrafts,
       existingSources: nextPage.enFieldDraftSources,
+      existingMeta: nextPage.enFieldDraftMeta,
       baselineNlFields,
+      baselineEnDrafts: published.enFieldDrafts,
     });
 
     const translated: Record<string, string> = {};
@@ -1247,54 +1405,72 @@ export const cms = {
     nextPage.enFieldDrafts = synced.enFieldDrafts;
     nextPage.enFieldDraftSources = synced.enFieldDraftSources;
 
-    // Keep localeContent.en SEO in sync with page meta EN drafts when present.
-    const enTitle = synced.enFieldDrafts["page:meta:title"]?.trim();
-    const enDesc = synced.enFieldDrafts["page:meta:description"]?.trim();
-    if (enTitle || enDesc) {
-      const nlBag = nextPage.localeContent?.nl ?? {
-        navigationLabel: nextPage.title,
-        pageTitle: nextPage.title,
-        seo: { title: nextPage.title, description: nextPage.description },
-      };
-      nextPage.localeContent = {
-        ...(nextPage.localeContent ?? { nl: nlBag }),
-        nl: nlBag,
-        en: {
-          navigationLabel: enTitle || nextPage.title,
-          pageTitle: enTitle || nextPage.title,
-          seo: {
-            title: enTitle || nextPage.title,
-            description: enDesc || nextPage.description,
-          },
-        },
-      };
+    // Mark successfully auto-filled paths as machine_translated (durable meta).
+    const appliedPaths = Object.keys(toTranslate).filter((p) => synced.enFieldDrafts[p]?.trim());
+    if (appliedPaths.length > 0) {
+      const meta = { ...(nextPage.enFieldDraftMeta ?? {}) };
+      for (const path of appliedPaths) {
+        const nl = toTranslate[path] ?? "";
+        meta[path] = {
+          status: "machine_translated",
+          sourceHash: createTranslationSourceHash(nl),
+          translatedAt: new Date().toISOString(),
+          provider: "groq",
+        };
+      }
+      nextPage.enFieldDraftMeta = meta;
+    }
+    const rejectedAsDutch = Object.keys(toTranslate).filter((p) => {
+      const en = translated[p]?.trim();
+      return en && !synced.enFieldDrafts[p]?.trim();
+    }).length;
+    const missingAfterApply = Object.keys(toTranslate).filter(
+      (p) => !synced.enFieldDrafts[p]?.trim(),
+    ).length;
+    if (Object.keys(toTranslate).length > 0 && missingAfterApply > 0 && !translateWarning) {
+      translateWarning =
+        rejectedAsDutch > 0
+          ? `AI gaf ${rejectedAsDutch} veld(en) terug die gelijk bleven aan NL (afgewezen).`
+          : `${missingAfterApply} veld(en) niet vertaald.`;
+    }
+
+    // Keep localeContent.en SEO bag available whenever EN drafts exist (publish gate).
+    const hasEnDraftKeys = Object.keys(synced.enFieldDrafts).length > 0;
+    if (hasEnDraftKeys || nextPage.localeContent?.en) {
+      Object.assign(nextPage, ensureEnglishLocaleContentFromDrafts(nextPage));
     }
 
     // Durable publish first — never clear the local draft until the live store accepts it.
-    // Always include EN when the page is marked EN-published, and ensure localeContent.en
-    // exists so public /en resolve does not fail after NL-only SEO bags.
-    const publishedLocales: Array<"nl" | "en"> = ["nl"];
-    if (nextPage.localeStates?.en?.publicationState === "published") {
-      const nlBag = nextPage.localeContent?.nl ?? {
-        navigationLabel: nextPage.title,
-        pageTitle: nextPage.title,
-        seo: { title: nextPage.title, description: nextPage.description },
-      };
-      if (!nextPage.localeContent?.en) {
-        const enTitle = synced.enFieldDrafts["page:meta:title"]?.trim() || nextPage.title;
-        const enDesc =
-          synced.enFieldDrafts["page:meta:description"]?.trim() || nextPage.description;
-        nextPage.localeContent = {
-          ...(nextPage.localeContent ?? { nl: nlBag }),
-          nl: nlBag,
-          en: {
-            navigationLabel: enTitle,
-            pageTitle: enTitle,
-            seo: { title: enTitle, description: enDesc },
-          },
-        };
+    // Include EN when already live (republish overlays) OR when EN drafts exist so first
+    // go-live happens on Opslaan without a separate Publiceer EN click.
+    let serverEnPublished = false;
+    try {
+      const status = await adminGetCmsPageStatus({ data: { pageId } });
+      if (status.ok) {
+        serverEnPublished = status.localeStates?.en?.publicationState === "published";
       }
-      publishedLocales.push("en");
+    } catch {
+      /* local-only / offline — fall back to editor state */
+    }
+    const localEnPublished = nextPage.localeStates?.en?.publicationState === "published";
+    const publishedLocales = decideOpslaanPublishedLocales({
+      localEnPublished,
+      serverEnPublished,
+      hasEnDraftKeys,
+    });
+    const shouldPublishEn = publishedLocales.includes("en");
+    if (shouldPublishEn) {
+      Object.assign(nextPage, ensureEnglishLocaleContentFromDrafts(nextPage));
+      nextPage.localeStates = {
+        ...(nextPage.localeStates ?? {
+          nl: { publicationState: "published", freshness: "current" },
+        }),
+        nl: nextPage.localeStates?.nl ?? {
+          publicationState: "published",
+          freshness: "current",
+        },
+        en: { publicationState: "published", freshness: "current" },
+      };
     }
     const pub = await publishSavedPageToServer(nextPage, publishedLocales);
     if (!pub.ok) {
@@ -1324,17 +1500,20 @@ export const cms = {
       });
     }
     if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
+    const successMessage = opslaanSuccessToastTitle(publishedLocales);
     if (translateWarning) {
       const missing = Object.keys(toTranslate).filter((k) => !translated[k]?.trim()).length;
       return {
         ok: true,
+        publishedLocales,
+        message: successMessage,
         warning:
           missing > 0
             ? `Opgeslagen. Automatische EN-vertaling mislukte (${translateWarning}). Vul ontbrekende EN-velden handmatig in — bestaande handmatige EN blijft behouden.`
             : undefined,
       };
     }
-    return { ok: true };
+    return { ok: true, publishedLocales, message: successMessage };
   },
   discardDraft(pageId: string) {
     const s = read();

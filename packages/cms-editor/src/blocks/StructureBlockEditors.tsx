@@ -53,7 +53,7 @@ export function ColumnsBlockEditor({
               onChange={(e) => actions.update({ ...item, title: e.target.value })}
             />
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `columns.${index}.title`)}
+              fieldPath={blockEnPath(blockId, `columns.${item.id}.title`)}
               label="Titel"
             />
             <textarea
@@ -63,7 +63,7 @@ export function ColumnsBlockEditor({
               onChange={(e) => actions.update({ ...item, body: e.target.value })}
             />
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `columns.${index}.body`)}
+              fieldPath={blockEnPath(blockId, `columns.${item.id}.body`)}
               label="Tekst"
               multiline
             />
@@ -126,7 +126,7 @@ export function StepsBlockEditor({
               />
             </Field>
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `steps.${index}.title`)}
+              fieldPath={blockEnPath(blockId, `steps.${item.id}.title`)}
               label="Titel"
             />
             <Field label="Tekst">
@@ -138,7 +138,7 @@ export function StepsBlockEditor({
               />
             </Field>
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `steps.${index}.body`)}
+              fieldPath={blockEnPath(blockId, `steps.${item.id}.body`)}
               label="Tekst"
               multiline
             />
@@ -146,7 +146,7 @@ export function StepsBlockEditor({
               label="Afbeelding"
               value={item.image}
               preferTags={["steps", "process", "cms"]}
-              enAltPath={blockEnPath(blockId, `steps.${index}.image.alt`)}
+              enAltPath={blockEnPath(blockId, `steps.${item.id}.image.alt`)}
               {...imageProps}
               onChange={(image) => actions.update({ ...item, image: image ?? undefined })}
             />
@@ -190,7 +190,7 @@ export function ValuesBlockEditor({
               onChange={(e) => actions.update({ ...item, title: e.target.value })}
             />
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `values.${index}.title`)}
+              fieldPath={blockEnPath(blockId, `values.${item.id}.title`)}
               label="Titel"
             />
             <textarea
@@ -200,7 +200,7 @@ export function ValuesBlockEditor({
               onChange={(e) => actions.update({ ...item, body: e.target.value })}
             />
             <EnDraftFor
-              fieldPath={blockEnPath(blockId, `values.${index}.body`)}
+              fieldPath={blockEnPath(blockId, `values.${item.id}.body`)}
               label="Tekst"
               multiline
             />

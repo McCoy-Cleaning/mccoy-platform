@@ -1,0 +1,183 @@
+{
+  "mode": "enforce",
+  "maxStopRepairLoops": 3,
+  "sourceExtensions": [
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".py",
+    ".go",
+    ".rs",
+    ".java",
+    ".cs",
+    ".vue",
+    ".svelte"
+  ],
+  "sourceRoots": [
+    "apps",
+    "packages",
+    "src",
+    "services",
+    "crates"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/target/**",
+    "**/.cursor/guardian/.state/**"
+  ],
+  "security": {
+    "blockSensitiveReads": true,
+    "blockUnpinnedNpx": true,
+    "blockProductionTargets": true,
+    "productionTokens": [
+      "production",
+      "prod-db",
+      "prod_database",
+      "mainnet"
+    ],
+    "allowedShellPatterns": [],
+    "blockedShellPatterns": []
+  },
+  "mcp": {
+    "unknownServer": "deny",
+    "unknownToolOnApprovedServer": "deny",
+    "reviewModeAllowsReadOnlyHeuristic": true,
+    "readOnlyPrefixes": [
+      "get",
+      "list",
+      "read",
+      "search",
+      "find",
+      "inspect",
+      "describe",
+      "query",
+      "fetch",
+      "view",
+      "explain",
+      "analyze",
+      "scan"
+    ],
+    "writeLikePrefixes": [
+      "create",
+      "update",
+      "delete",
+      "remove",
+      "drop",
+      "truncate",
+      "apply",
+      "execute",
+      "run",
+      "send",
+      "publish",
+      "deploy",
+      "write",
+      "edit",
+      "patch",
+      "merge",
+      "push",
+      "reset",
+      "migrate",
+      "invite",
+      "grant",
+      "revoke"
+    ]
+  },
+  "architecture": {
+    "blockOnErrors": true,
+    "reportCircularDependencies": true
+  },
+  "reuse": {
+    "strict": false,
+    "maxComponentLines": 350,
+    "duplicateBlockMinLines": 12,
+    "similarNameThreshold": 0.82
+  },
+  "refactor": {
+    "strict": false,
+    "maxFileLines": 700,
+    "maxBranchKeywords": 35,
+    "warnOnAny": true,
+    "warnOnTsIgnore": true,
+    "warnOnBroadLintDisable": true
+  },
+  "qualification": {
+    "majorChangeMinSourceFiles": 4,
+    "majorChangeMinChangedLines": 150,
+    "requireMajorMockTests": true,
+    "requireMajorContractTests": true,
+    "requireMajorIntegrationTests": true,
+    "requireMajorLiveTests": false,
+    "allowedLiveHostPatterns": [
+      "^localhost$",
+      "^127\\.0\\.0\\.1$",
+      "^\\[::1\\]$",
+      "(^|\\.)staging\\.",
+      "(^|\\.)preview\\.",
+      "(^|\\.)test\\.",
+      "\\.vercel\\.app$"
+    ],
+    "scriptGroups": {
+      "lint": [
+        "lint",
+        "check:lint"
+      ],
+      "typecheck": [
+        "typecheck",
+        "type-check",
+        "check:types"
+      ],
+      "test": [
+        "test:ci",
+        "test"
+      ],
+      "architecture": [
+        "check:architecture",
+        "architecture:check",
+        "lint:boundaries"
+      ],
+      "security": [
+        "security:scan",
+        "test:security",
+        "check:security"
+      ],
+      "mock": [
+        "test:mock",
+        "test:mocks"
+      ],
+      "contract": [
+        "test:contract",
+        "test:contracts"
+      ],
+      "integration": [
+        "test:integration",
+        "test:integrations"
+      ],
+      "live": [
+        "test:live",
+        "test:e2e:staging",
+        "test:staging"
+      ],
+      "seo": [
+        "test:seo",
+        "seo:check",
+        "lighthouse:ci"
+      ]
+    },
+    "webPathPatterns": [
+      "apps/web/",
+      "src/app/",
+      "src/pages/",
+      "src/routes/",
+      "packages/seo/",
+      "packages/cms/"
+    ]
+  }
+}

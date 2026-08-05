@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyEnFieldDraftsToPage,
+  ensureEnglishLocaleContentFromDrafts,
   enFieldDraftPath,
   localizeCmsPageForLocale,
   mergeEnFieldDrafts,
@@ -106,6 +107,18 @@ describe("localizeCmsPageForLocale", () => {
       version: 1,
     }) as unknown as BuiltinCmsPage;
 
+  it("builds localeContent.en from meta drafts when missing", () => {
+    const page = builtin();
+    page.enFieldDrafts = {
+      "page:meta:title": "EN Title",
+      "page:meta:description": "EN Description",
+    };
+    delete (page as { localeContent?: unknown }).localeContent;
+    const next = ensureEnglishLocaleContentFromDrafts(page);
+    expect(next.localeContent?.en?.seo.title).toBe("EN Title");
+    expect(next.localeContent?.en?.seo.description).toBe("EN Description");
+  });
+
   it("leaves NL page body unchanged", () => {
     const page = builtin();
     const localized = localizeCmsPageForLocale(page, "nl");
@@ -185,5 +198,123 @@ describe("localizeCmsPageForLocale", () => {
     } as unknown as CustomCmsPage;
     const localized = localizeCmsPageForLocale(page, "en");
     expect(localized.blocks[0]?.data.html).toBe("<p>EN</p>");
+  });
+
+  it("overlays block:X:body EN draft when NL body is present", () => {
+    const page = {
+      ...builtin(),
+      id: "page_products",
+      pageKey: "products",
+      blocks: [
+        {
+          id: "b_cv7xo09j",
+          type: "gallery",
+          data: {
+            title: "NL title",
+            body: "NL gallery intro",
+            images: [
+              {
+                id: "img_q4fpvnop",
+                image: { src: "/x.jpg", alt: "x", decorative: false },
+                body: "NL image body",
+              },
+            ],
+          },
+        },
+        {
+          id: "b_ha9mlx32",
+          type: "featureGrid",
+          data: {
+            presentation: "productsAssortment",
+            title: "Assortiment",
+            features: [
+              { id: "prod_hygiene", title: "Hygiëne", body: "NL feature body" },
+            ],
+          },
+        },
+      ],
+      enFieldDrafts: {
+        "block:b_cv7xo09j:body": "Quality starts with the right products",
+        "block:b_cv7xo09j:images.img_q4fpvnop.body": "EN image body",
+        "block:b_ha9mlx32:features.prod_hygiene.body": "EN feature body",
+      },
+    } as unknown as BuiltinCmsPage;
+    const localized = localizeCmsPageForLocale(page, "en");
+    const gallery = localized.blocks.find((b) => b.id === "b_cv7xo09j");
+    const features = localized.blocks.find((b) => b.id === "b_ha9mlx32");
+    expect(gallery?.data).toMatchObject({
+      body: "Quality starts with the right products",
+      images: [{ id: "img_q4fpvnop", body: "EN image body" }],
+    });
+    expect(features?.data).toMatchObject({
+      features: [{ id: "prod_hygiene", body: "EN feature body" }],
+    });
+  });
+
+  it("does not overlay structural presentation/contentMode EN drafts", () => {
+    const page = {
+      ...builtin(),
+      id: "page_products",
+      pageKey: "products",
+      blocks: [
+        {
+          id: "blk_assort",
+          type: "featureGrid",
+          data: {
+            presentation: "productsAssortment",
+            title: "Assortiment",
+            features: [{ id: "prod_hygiene", title: "Hygiëne", body: "NL" }],
+          },
+        },
+        {
+          id: "b_ha9mlx32",
+          type: "gallery",
+          data: {
+            title: "Een blik op wat wij doen",
+            contentMode: "textAndImage",
+            images: [],
+          },
+        },
+      ],
+      enFieldDrafts: {
+        "block:blk_assort:presentation": "Product Assortment",
+        "block:blk_assort:features.prod_hygiene.body": "EN feature",
+        "block:b_ha9mlx32:contentMode": "Text and image",
+        "block:b_ha9mlx32:title": "A look at what we do",
+      },
+    } as unknown as BuiltinCmsPage;
+    const localized = localizeCmsPageForLocale(page, "en");
+    const assortment = localized.blocks.find((b) => b.id === "blk_assort");
+    const gallery = localized.blocks.find((b) => b.id === "b_ha9mlx32");
+    expect(assortment?.data).toMatchObject({
+      presentation: "productsAssortment",
+      features: [{ id: "prod_hygiene", body: "EN feature" }],
+    });
+    expect(gallery?.data).toMatchObject({
+      contentMode: "textAndImage",
+      title: "A look at what we do",
+    });
+  });
+
+  it("overlays block:X:body EN draft even when NL body is null/empty", () => {
+    const page = {
+      ...builtin(),
+      id: "page_products",
+      pageKey: "products",
+      blocks: [
+        {
+          id: "b_cv7xo09j",
+          type: "gallery",
+          data: { title: "NL title", body: null, images: [] },
+        },
+      ],
+      enFieldDrafts: {
+        "block:b_cv7xo09j:body": "Quality starts with the right products",
+      },
+    } as unknown as BuiltinCmsPage;
+    const localized = localizeCmsPageForLocale(page, "en");
+    expect(localized.blocks.find((b) => b.id === "b_cv7xo09j")?.data).toMatchObject({
+      body: "Quality starts with the right products",
+    });
   });
 });

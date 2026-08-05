@@ -10,7 +10,7 @@ import {
 
 /**
  * Phase 11 — NL and EN must stay separate after publish.
- * Seeded custom page already has EN locale published; Opslaan includes EN when drafts exist.
+ * Opslaan with EN drafts publishes EN (first go-live or republish); NL/EN stay distinct.
  */
 test.describe("CMS NL/EN publish", () => {
   test("custom page: distinct NL + EN hero titles publish to / and /en/", async ({

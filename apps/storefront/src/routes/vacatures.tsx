@@ -47,7 +47,7 @@ export const Route = createFileRoute("/vacatures")({
     links: [
       { rel: "canonical", href: "/vacatures" },
       { rel: "alternate", hrefLang: "nl", href: "/vacatures" },
-      { rel: "alternate", hrefLang: "en", href: "/en/jobs" },
+      { rel: "alternate", hrefLang: "en", href: "/en/vacatures" },
       { rel: "alternate", hrefLang: "x-default", href: "/vacatures" },
     ],
     scripts: [

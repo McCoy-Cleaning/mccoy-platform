@@ -4,6 +4,8 @@ import {
   type HomeHeroContent,
   type FormPageChromeContent,
 } from "@mccoy/cms-schema";
+// Ensure popup CTA rendering is registered whenever the package entry loads.
+import "./blocks/RegisteredBlockView";
 import { CmsButtonView, CmsImageView, type LinkResolverPages } from "./blocks/primitives";
 
 export type { LinkResolverPages };
@@ -27,6 +29,9 @@ export { JobsSectionView } from "./blocks/JobsSectionView";
 export type { JobsSectionViewProps, JobsRenderMode } from "./blocks/JobsSectionView";
 export { OffersSectionView } from "./blocks/OffersSectionView";
 export type { OffersSectionViewProps } from "./blocks/OffersSectionView";
+export { CmsUiLocaleProvider, useCmsUiLocale } from "./uiLocale";
+export { offerUiCopy } from "./offerUiCopy";
+export type { OfferUiCopy } from "./offerUiCopy";
 export { StepsSectionView } from "./blocks/StepsSectionView";
 export type { StepsSectionViewProps } from "./blocks/StepsSectionView";
 export { blockViewRegistry } from "./blocks/blockViewRegistry";
@@ -133,9 +138,12 @@ export function HomeHeroView({
           />
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-white/10">
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/35">
         {content.image ? (
-          <CmsImageView image={content.image} className="h-64 w-full object-cover md:h-80" />
+          <CmsImageView
+            image={content.image}
+            className="h-64 w-full object-contain object-center md:h-80"
+          />
         ) : (
           <div className="grid h-64 place-items-center bg-white/[0.03] text-sm text-white/40 md:h-80">
             Geen hero-afbeelding
@@ -161,7 +169,10 @@ export function FormPageChromeView({
       <h1 className="text-4xl font-bold text-white">{content.heading}</h1>
       {content.body ? <p className="max-w-2xl text-white/70">{content.body}</p> : null}
       {content.image ? (
-        <CmsImageView image={content.image} className="mt-4 max-h-64 rounded-xl object-cover" />
+        <CmsImageView
+          image={content.image}
+          className="mt-4 max-h-64 w-auto max-w-full rounded-xl object-contain"
+        />
       ) : null}
     </header>
   );

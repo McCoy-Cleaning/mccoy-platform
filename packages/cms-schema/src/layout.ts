@@ -1,4 +1,4 @@
-import type { Block } from "./types";
+import type { Block } from "./block-model";
 import {
   CURRENT_LAYOUT_VERSION,
   FIXED_SECTION_DEFS,
@@ -11,7 +11,7 @@ import {
   DEFAULT_CONTENT_ALIGN,
   type ContentAlign,
   parseContentAlign,
-} from "./layout-presentation";
+} from "./content-align";
 
 export type FixedLayoutItem = {
   id: `fixed:${string}`;
@@ -181,4 +181,4 @@ export function missingFixedSectionKeys(
 }
 
 export { CURRENT_LAYOUT_VERSION };
-export type { ContentAlign };
+export type { ContentAlign } from "./content-align";

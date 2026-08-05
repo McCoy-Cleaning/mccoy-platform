@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { cmsLinkSchema, parseCmsLink, parseCmsLinkDraft } from "./links";
-import type { CmsLink } from "./types";
-import type { BlockType } from "./types";
+import type { CmsLink } from "./cms-link-model";
+import type { BlockType } from "./block-types";
 
 /**
  * Shared CMS button / CTA model.

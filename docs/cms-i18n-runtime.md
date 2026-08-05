@@ -23,9 +23,28 @@
 
 - Groq server-only (`GROQ_API_KEY`)
 - Zod structural validation, semantic warnings, source-hash cache, audit log
-- **Never auto-publishes** public locales
+- **AI never auto-publishes** by itself — only Opslaan / Publiceer actions write live
+  revisions
+- **Opslaan & publiceren** always publishes NL. It also publishes EN when:
+  1. EN is already `published` (local or server) — republish so `enFieldDrafts` refresh
+     live `/en` overlays and freshness returns to `current`, or
+  2. the page has any `enFieldDrafts` keys — **first EN go-live** happens on Opslaan
+     (toast: “NL + EN gepubliceerd”), synthesizing `localeContent.en` the same way as
+     **Publiceer EN**
+- **Publiceer EN** in `LocalePublishPanel` remains for explicit republish / coverage-gated
+  publish; EN can still be moved back to concept separately
 - **Opslaan auto-syncs EN drafts** for every translatable NL string (including nested
-  `columns.0.title` / card fields): translates missing/changed NL, prunes deleted fields
+  `columns.0.title` / card fields) via `classifyEnOverlayValidity`: missing, blank,
+  EN===NL (`source_echo`), and empty `override_removed` are queued for NL→EN;
+  distinct EN drafts are kept; empty/deleted NL prunes EN
+- **Clearing a previous EN override** deletes the overlay key and marks
+  `enFieldDraftMeta` as `override_removed` (NL fallback on `/en` until refill).
+  Opslaan and “Ontbrekende velden vertalen” both refill empty `override_removed`
+  (no second clear required for stuck pages). Clearing an empty/never-translated
+  EN slot does **not** set `override_removed` — it stays `missing` and Opslaan
+  auto-fills it. `intentional_blank` remains a separate choice (render empty EN,
+  not NL; never auto-filled). Limitation: distinct non-empty EN that differs from
+  NL is treated as valid English (no ML language detection).
 - **Manual EN inputs** in admin inspectors: every editable NL copy field has an EN
   counterpart via `SectionAiToolbar` (“Engelse vertaling”), `InspectTextField`, or
   `ManualEnDraftField` / `NlEnField` (`block:{id}:{dottedField}` or
@@ -38,14 +57,16 @@
 
 1. `npm run dev:admin` + `npm run dev:storefront`
 2. Admin → Website → page → locale panel → Preview (noindex)
-3. With `GROQ_API_KEY`, generate NL / translate EN drafts; apply manually; do not expect public EN until publish
+3. With `GROQ_API_KEY`, generate NL / translate EN drafts; apply manually; Opslaan with EN
+   drafts publishes `/en` (no separate Publiceer EN required)
 
 ### Production bilingual gates
 
 1. Seed/publish NL via admin **Publiceer NL** (or auto-seed on first storefront request)
 2. `GET /` serves NL snapshot head=body
-3. `GET /en` → **302** `/` until EN published
-4. Publish EN for home → `GET /en` renders English SEO + body (section/block `enFieldDrafts` overlaid onto NL base — not Dutch-only body)
+3. `GET /en` → **302** `/` until EN published (no drafts / EN never published)
+4. Fill EN fields + **Opslaan & publiceren** (or **Publiceer EN**) → `GET /en` renders
+   English SEO + body (section/block `enFieldDrafts` overlaid onto NL base)
 5. `/sitemap.xml` includes EN only when `publicationState=published`
 6. Language toggle switches client locale immediately; navigates to `/en` only when that locale is published (avoids 302 bounce). Static i18n and CMS section overlays share `useI18n().lang` / `useActiveCmsLocale`.
 

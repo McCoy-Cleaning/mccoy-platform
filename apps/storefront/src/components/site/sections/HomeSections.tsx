@@ -111,8 +111,8 @@ export function Hero() {
     decoding: "sync" as const,
     fetchPriority: "high" as const,
     loading: "eager" as const,
-    // Fill the card; 4:3 matches the hero asset so cover doesn’t over-crop.
-    className: "aspect-[4/3] h-auto w-full object-cover object-center",
+    // Fit the whole visual inside the 4:3 card — admin uploads must never crop-zoom.
+    className: "aspect-[4/3] h-auto w-full bg-black/35 object-contain object-center",
     onError: () => setImageSrc(HERO_PUBLIC_WEBP_640),
   };
   return (

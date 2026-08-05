@@ -55,6 +55,24 @@ export function stripLocalePrefix(pathname: string): { locale: Locale; path: str
   return { locale: "nl", path: p === "" ? "/" : p };
 }
 
+/**
+ * Common mistaken / legacy identity paths → canonical NL identity (no `/en` prefix).
+ * Used so `/en/producten` and `/en/jobs` resolve instead of hard 404.
+ */
+export const PUBLIC_IDENTITY_PATH_ALIASES: Readonly<Record<string, string>> = {
+  "/producten": "/products",
+  "/aanbiedingen": "/products",
+  "/offers": "/products",
+  "/jobs": "/vacatures",
+  "/careers": "/vacatures",
+};
+
+/** Map alias identity paths to the canonical page identity. */
+export function canonicalizePublicIdentityPath(path: string): string {
+  const trimmed = path.replace(/\/+$/, "") || "/";
+  return PUBLIC_IDENTITY_PATH_ALIASES[trimmed] ?? trimmed;
+}
+
 export function pathsFromLegacySlug(slug: string): LocalizedPagePath {
   const nl = slug.startsWith("/") ? slug : slugToPath(normalizeSlug(slug));
   return { nl: nl === "" ? "/" : nl.replace(/\/+$/, "") || "/" };

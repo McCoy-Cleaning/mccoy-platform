@@ -1,0 +1,23 @@
+{
+  "enforceAppIsolation": true,
+  "forbidPackageSourceDeepImports": true,
+  "forbidRelativeBoundaryEscape": true,
+  "allowCycles": [],
+  "exceptions": [],
+  "zones": [
+    {
+      "name": "example-domain-is-framework-free",
+      "enabled": false,
+      "from": [
+        "packages/domain/**"
+      ],
+      "deny": [
+        "react",
+        "next",
+        "express",
+        "@prisma/client",
+        "packages/infrastructure/**"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CmsImage } from "./content";
+import type { CmsImage } from "./cms-image";
 import {
   DEFAULT_JOB_APPLICATION_FIELDS,
   formFieldItemSchema,

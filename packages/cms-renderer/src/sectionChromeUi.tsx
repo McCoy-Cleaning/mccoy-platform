@@ -17,7 +17,7 @@ export function SectionEyebrow({
   return (
     <p
       className={cn(
-        "text-xs font-semibold uppercase tracking-[0.2em] text-primary",
+        "text-[11px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs",
         className,
       )}
     >
@@ -66,39 +66,77 @@ export function SectionHeader({
 }) {
   const ctxAlign = useContentAlign();
   const resolved = align ?? ctxAlign ?? "center";
-  if (!title?.trim() && !eyebrow?.trim() && !body?.trim()) return null;
+  const hasEyebrow = !!eyebrow?.trim();
+  const hasTitle = !!title?.trim();
+  const hasBody = !!body?.trim();
+  if (!hasTitle && !hasEyebrow && !hasBody) return null;
 
   const textAlign =
     resolved === "left" ? "text-left" : resolved === "right" ? "text-right" : "text-center";
 
   return (
-    <header className={cn("mb-14 sm:mb-20", textAlign, className)}>
+    <header
+      data-cms-section-header="premium"
+      className={cn("mb-16 sm:mb-24", textAlign, className)}
+    >
       <div className={cn(sectionInnerAlignRowClass(resolved))}>
         <div className="min-w-0 max-w-3xl">
-          {eyebrow?.trim() ? <SectionEyebrow>{eyebrow}</SectionEyebrow> : null}
-          {title?.trim() ? (
+          {hasEyebrow ? (
+            <div
+              className={cn(
+                "flex items-center gap-3",
+                resolved === "center" && "justify-center",
+                resolved === "right" && "justify-end",
+              )}
+            >
+              {resolved === "left" ? (
+                <span
+                  aria-hidden
+                  className="h-px w-8 shrink-0 bg-primary/80 sm:w-10"
+                />
+              ) : null}
+              <SectionEyebrow>{eyebrow}</SectionEyebrow>
+              {resolved !== "left" ? (
+                <span
+                  aria-hidden
+                  className="h-px w-8 shrink-0 bg-primary/80 sm:w-10"
+                />
+              ) : null}
+            </div>
+          ) : null}
+          {hasTitle ? (
             <TitleTag
               className={cn(
-                "font-display text-3xl font-semibold tracking-tight text-foreground break-words sm:text-4xl",
-                eyebrow?.trim() ? "mt-4" : null,
+                "font-display text-4xl font-semibold leading-[1.08] tracking-[-0.02em] text-foreground break-words sm:text-5xl lg:text-[3.25rem]",
+                hasEyebrow ? "mt-5 sm:mt-6" : null,
               )}
             >
               {title}
             </TitleTag>
           ) : null}
-          {body?.trim() ? (
-            <p className="mt-4 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground sm:text-lg">
+          {hasTitle || hasEyebrow ? (
+            <div
+              className={cn(
+                "mt-6 h-px w-20 sm:w-24",
+                resolved === "right"
+                  ? "ml-auto bg-gradient-to-l from-primary via-primary/55 to-transparent"
+                  : "bg-gradient-to-r from-primary via-primary/55 to-transparent",
+                resolved === "center" && "mx-auto",
+              )}
+              aria-hidden
+            />
+          ) : null}
+          {hasBody ? (
+            <p
+              className={cn(
+                "mt-6 max-w-2xl whitespace-pre-wrap text-[15px] leading-[1.75] text-muted-foreground sm:mt-7 sm:text-lg sm:leading-[1.7]",
+                resolved === "center" && "mx-auto",
+                resolved === "right" && "ml-auto",
+              )}
+            >
               {body}
             </p>
           ) : null}
-          <div
-            className={cn(
-              "mt-6 h-px w-16 bg-primary/50",
-              resolved === "center" && "mx-auto",
-              resolved === "right" && "ml-auto",
-            )}
-            aria-hidden
-          />
         </div>
       </div>
     </header>

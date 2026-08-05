@@ -13,10 +13,12 @@ import {
   type RoadmapBlockData,
   type TimelineBlockData,
 } from "@mccoy/cms-schema";
-import { CmsButtonView, CmsImageView, type LinkResolverPages } from "./primitives";
+import { CmsButtonView } from "./CmsButtonView";
+import { CmsImageView, type LinkResolverPages } from "./CmsImageView";
 import { WorkMosaicGallery } from "./WorkMosaicGallery";
 import { GalleryTextAndImageView } from "./GalleryTextAndImageView";
 import { blockViewRegistry } from "./blockViewRegistry";
+import { registerPopupBlockView } from "./popupBlockRenderer";
 import {
   ContactFormSectionView,
   NewsletterSectionView,
@@ -84,7 +86,7 @@ function FitImage({
 }
 
 /**
- * Gallery / media tile: image crops to fill the entire frame edge-to-edge (no letterboxing).
+ * Gallery / media tile: photo fits fully inside the frame (no crop-zoom).
  */
 function CoverFillImage({
   image,
@@ -99,11 +101,11 @@ function CoverFillImage({
 }) {
   if (!image) return null;
   return (
-    <div className={cn("relative overflow-hidden bg-white/[0.04]", aspectClass, className)}>
+    <div className={cn("relative overflow-hidden bg-black/35", aspectClass, className)}>
       <CmsImageView
         image={image}
         className={cn(
-          "absolute inset-0 h-full w-full object-cover object-center",
+          "absolute inset-0 h-full w-full object-contain object-center",
           imgClassName,
         )}
       />
@@ -555,6 +557,12 @@ export function RegisteredBlockView({
       const layout = d.layout === "masonry" || d.layout === "featured" ? d.layout : "grid";
 
       if (contentMode === "textAndImage") {
+        const columns =
+          d.columns === 3 || d.columns === 4
+            ? d.columns
+            : images.length === 3
+              ? 3
+              : 2;
         return (
           <GalleryTextAndImageView
             title={String(d.title ?? "Galerij")}
@@ -568,7 +576,7 @@ export function RegisteredBlockView({
                 ? d.textPlacement
                 : "below"
             }
-            columns={d.columns === 3 || d.columns === 4 ? d.columns : 2}
+            columns={columns}
             items={images.map((img) => ({
               id: img.id,
               image: img.image,
@@ -611,7 +619,7 @@ export function RegisteredBlockView({
                 >
                   <CmsImageView
                     image={img.image}
-                    className="block h-auto w-full object-cover transition duration-700 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                    className="block h-auto w-full object-contain"
                   />
                 </div>
               ))}
@@ -636,7 +644,6 @@ export function RegisteredBlockView({
                     image={img.image}
                     aspectClass="aspect-square"
                     className="w-full"
-                    imgClassName="transition duration-700 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   />
                 </div>
               ))}
@@ -785,7 +792,7 @@ export function RegisteredBlockView({
             <div className="flex items-center justify-center gap-3">
               <OptionalImage
                 image={item.avatar}
-                className="h-14 w-14 shrink-0 rounded-full object-cover"
+                className="h-14 w-14 shrink-0 rounded-full bg-black/35 object-contain p-0.5 ring-1 ring-white/10"
               />
               <div className="min-w-0 text-left">
                 {author ? <p className="text-sm font-semibold text-foreground">{author}</p> : null}
@@ -1309,3 +1316,5 @@ export function CmsBlockView({ type, data }: { type: string; data: Record<string
     />
   );
 }
+
+registerPopupBlockView(RegisteredBlockView);

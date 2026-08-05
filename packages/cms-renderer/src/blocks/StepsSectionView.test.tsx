@@ -39,7 +39,8 @@ describe("StepsSectionView", () => {
     };
     const html = renderToStaticMarkup(React.createElement(StepsSectionView, { data }));
     expect(html).toContain('alt="Inspectie op locatie"');
-    expect(html).toContain("object-cover");
+    expect(html).toContain("object-contain");
+    expect(html).toContain("data-cms-media-fit=\"square-contain\"");
     expect(html).toContain("Inspectie");
     expect(html).toContain("Uitvoering");
     expect(html).toContain('data-step-card="active"');

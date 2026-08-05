@@ -74,7 +74,10 @@ function FormPageChromeSection({
             transition={{ delay: 0.1, duration: 0.6 }}
             className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10"
           >
-            <CmsImageView image={content.image} className="max-h-64 w-full object-cover" />
+            <CmsImageView
+              image={content.image}
+              className="max-h-64 w-full bg-black/35 object-contain object-center"
+            />
           </motion.div>
         ) : null}
       </SectionInner>

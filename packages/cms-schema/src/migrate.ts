@@ -69,6 +69,8 @@ const pageSchema = z.object({
   enFieldDrafts: z.record(z.string()).optional(),
   /** NL sources paired with enFieldDrafts for stale detection. */
   enFieldDraftSources: z.record(z.string()).optional(),
+  /** Per-field EN translation status metadata. */
+  enFieldDraftMeta: z.record(z.unknown()).optional(),
   /** Producten fixed→blocks pilot — never infer from empty layout. */
   productsBlocksMigration: z
     .object({
@@ -187,6 +189,7 @@ export function migratePage(raw: z.infer<typeof pageSchema>): CmsPage {
       isDraftOnly: raw.isDraftOnly,
       enFieldDrafts: raw.enFieldDrafts,
       enFieldDraftSources: raw.enFieldDraftSources,
+      enFieldDraftMeta: raw.enFieldDraftMeta as CmsPage["enFieldDraftMeta"],
       paths: (raw.paths as CmsPage["paths"]) ?? { nl: raw.slug },
       localeContent: raw.localeContent as CmsPage["localeContent"],
       localeStates: raw.localeStates as CmsPage["localeStates"],
@@ -222,6 +225,7 @@ export function migratePage(raw: z.infer<typeof pageSchema>): CmsPage {
     isDraftOnly: raw.isDraftOnly,
     enFieldDrafts: raw.enFieldDrafts,
     enFieldDraftSources: raw.enFieldDraftSources,
+    enFieldDraftMeta: raw.enFieldDraftMeta as CmsPage["enFieldDraftMeta"],
     productsBlocksMigration: raw.productsBlocksMigration,
     // Pass extras through once so normalize can merge if layout was empty defaults path
     extraBlocks: extras.length ? extras : undefined,

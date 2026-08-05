@@ -12,6 +12,10 @@ import {
   shouldSyncParagraphStructure,
   syncParagraphStructure,
 } from "./paragraph-structure";
+import {
+  createTranslationSourceHash,
+  resolveLocalizedField,
+} from "./translation-field";
 import type { Block, CmsPage } from "./types";
 
 export function enFieldDraftPath(
@@ -31,6 +35,45 @@ export function parseEnFieldDraftPath(
   if (scope !== "section" && scope !== "block" && scope !== "page") return null;
   if (!id || fieldParts.length === 0) return null;
   return { scope, id, field: fieldParts.join(":") };
+}
+
+/** Structural / enum leaves that must never overlay NL (legacy bad EN drafts). */
+const NON_COPY_EN_DRAFT_LEAF_KEYS = new Set([
+  "presentation",
+  "contentMode",
+  "textPlacement",
+  "shape",
+  "columns",
+  "action",
+  "layout",
+  "align",
+  "variant",
+  "size",
+  "hidden",
+  "reverse",
+  "id",
+  "type",
+  "kind",
+  "src",
+  "href",
+  "url",
+  "route",
+  "pageId",
+  "openInNewTab",
+  "icon",
+  "email",
+  "phone",
+]);
+
+function isCopyEnDraftField(field: string): boolean {
+  const segments = field.includes(".")
+    ? field.split(".").filter(Boolean)
+    : field.split(":").filter(Boolean);
+  const leaf = segments[segments.length - 1] ?? "";
+  if (!leaf || NON_COPY_EN_DRAFT_LEAF_KEYS.has(leaf)) return false;
+  const lower = leaf.toLowerCase();
+  if (lower.endsWith("url") || lower.endsWith("href") || lower.endsWith("src")) return false;
+  return true;
 }
 
 /** Merge EN drafts; empty string removes a key. */
@@ -59,12 +102,12 @@ export function setValueAtDotPath(
   root: Record<string, unknown>,
   fieldPath: string,
   value: string,
-): void {
+): boolean {
   const segments =
     fieldPath.includes(":") && !fieldPath.includes(".")
       ? fieldPath.split(":").filter(Boolean)
       : fieldPath.split(".").filter(Boolean);
-  if (segments.length === 0) return;
+  if (segments.length === 0) return false;
 
   let cursor: unknown = root;
   for (let i = 0; i < segments.length - 1; i++) {
@@ -85,7 +128,7 @@ export function setValueAtDotPath(
             (item as Record<string, unknown>).id === key,
         );
       }
-      if (index < 0) return;
+      if (index < 0) return false;
       while (arr.length <= index) arr.push({});
       if (arr[index] == null || typeof arr[index] !== "object") {
         arr[index] = Number.isInteger(Number(nextKey)) ? [] : {};
@@ -94,7 +137,7 @@ export function setValueAtDotPath(
       continue;
     }
 
-    if (cursor == null || typeof cursor !== "object") return;
+    if (cursor == null || typeof cursor !== "object") return false;
     const obj = cursor as Record<string, unknown>;
     const existing = obj[key];
     if (existing == null || typeof existing !== "object") {
@@ -110,7 +153,7 @@ export function setValueAtDotPath(
     if (String(leafIndex) === leaf) {
       while (arr.length <= leafIndex) arr.push("");
       arr[leafIndex] = value;
-      return;
+      return true;
     }
     const byId = arr.findIndex(
       (item) =>
@@ -119,12 +162,13 @@ export function setValueAtDotPath(
         !Array.isArray(item) &&
         (item as Record<string, unknown>).id === leaf,
     );
-    if (byId < 0) return;
+    if (byId < 0) return false;
     arr[byId] = value;
-    return;
+    return true;
   }
-  if (cursor == null || typeof cursor !== "object") return;
+  if (cursor == null || typeof cursor !== "object") return false;
   (cursor as Record<string, unknown>)[leaf] = value;
+  return true;
 }
 
 /** Read a dotted path previously written by {@link setValueAtDotPath}. */
@@ -168,7 +212,7 @@ function applyDraftToSectionContent(
   sectionKey: string,
   field: string,
   value: string,
-): void {
+): boolean {
   const bag = sectionContent as Record<string, unknown>;
   const existing = bag[sectionKey];
   const section =
@@ -177,45 +221,117 @@ function applyDraftToSectionContent(
       : {};
   if (existing !== section) bag[sectionKey] = section;
   const nlValue = getValueAtDotPath(section, field);
-  setValueAtDotPath(section, field, withSyncedParagraphStructure(nlValue, value));
+  return setValueAtDotPath(section, field, withSyncedParagraphStructure(nlValue, value));
 }
 
-function applyDraftToBlocks(blocks: Block[], blockId: string, field: string, value: string): void {
+function applyDraftToBlocks(
+  blocks: Block[],
+  blockId: string,
+  field: string,
+  value: string,
+): boolean {
   const block = blocks.find((b) => b.id === blockId);
-  if (!block) return;
+  if (!block) return false;
   const data =
     block.data != null && typeof block.data === "object" && !Array.isArray(block.data)
       ? ({ ...block.data } as Record<string, unknown>)
       : {};
   const nlValue = getValueAtDotPath(data, field);
-  setValueAtDotPath(data, field, withSyncedParagraphStructure(nlValue, value));
+  const ok = setValueAtDotPath(data, field, withSyncedParagraphStructure(nlValue, value));
+  if (!ok) return false;
   block.data = data;
+  return true;
+}
+
+function readSourceValueAtDraftPath(page: CmsPage, path: string): unknown {
+  const parsed = parseEnFieldDraftPath(path);
+  if (!parsed) return undefined;
+  if (parsed.scope === "section" && page.kind === "builtin") {
+    const bag = (page.sectionContent ?? {}) as Record<string, unknown>;
+    const section = bag[parsed.id];
+    if (section == null || typeof section !== "object" || Array.isArray(section)) {
+      return undefined;
+    }
+    return getValueAtDotPath(section as Record<string, unknown>, parsed.field);
+  }
+  if (parsed.scope === "block") {
+    const block = page.blocks.find((b) => b.id === parsed.id);
+    if (!block?.data || typeof block.data !== "object" || Array.isArray(block.data)) {
+      return undefined;
+    }
+    return getValueAtDotPath(block.data as Record<string, unknown>, parsed.field);
+  }
+  if (parsed.scope === "page" && parsed.id === "meta") {
+    if (parsed.field === "title") return page.title;
+    if (parsed.field === "description") return page.description;
+  }
+  return undefined;
 }
 
 /**
  * Overlay `enFieldDrafts` onto NL `sectionContent` / `blocks` (and page meta when needed).
- * Missing drafts keep the Dutch base value (explicit partial-translation fallback).
+ * Missing / blank drafts keep the Dutch base value unless marked intentional_blank.
+ * Never invents copy at render time. Uses {@link resolveLocalizedField} as the contract.
  */
 export function applyEnFieldDraftsToPage(page: CmsPage): CmsPage {
   const drafts = page.enFieldDrafts;
-  if (!drafts || Object.keys(drafts).length === 0) return page;
+  const meta = page.enFieldDraftMeta ?? {};
+  const sources = page.enFieldDraftSources ?? {};
+  const hasDrafts = drafts && Object.keys(drafts).length > 0;
+  const intentionalBlankPaths = Object.entries(meta)
+    .filter(([, m]) => m.status === "intentional_blank")
+    .map(([path]) => path);
+  if (!hasDrafts && intentionalBlankPaths.length === 0) return page;
 
   const next = structuredClone(page);
+  const paths = new Set([
+    ...Object.keys(drafts ?? {}),
+    ...intentionalBlankPaths,
+  ]);
 
-  for (const [path, raw] of Object.entries(drafts)) {
-    const value = raw.trim();
-    if (!value) continue;
+  for (const path of paths) {
     const parsed = parseEnFieldDraftPath(path);
     if (!parsed) continue;
+    // Ignore legacy enum drafts (e.g. presentation → "Product Assortment").
+    if (!isCopyEnDraftField(parsed.field)) continue;
+
+    const sourceValue = readSourceValueAtDraftPath(page, path);
+    const sourceText =
+      typeof sourceValue === "string" ? sourceValue : sourceValue == null ? "" : String(sourceValue);
+    const sourceHash = createTranslationSourceHash(sourceText);
+    const sourceBaseline = sources[path];
+    const translatedSourceHash = sourceBaseline
+      ? createTranslationSourceHash(sourceBaseline)
+      : meta[path]?.sourceHash;
+
+    const resolved = resolveLocalizedField({
+      sourceValue,
+      translatedValue: Object.prototype.hasOwnProperty.call(drafts ?? {}, path)
+        ? drafts?.[path]
+        : undefined,
+      metadata: meta[path],
+      sourceHash,
+      translatedSourceHash,
+      fallbackToSource: true,
+    });
+
+    // Blank / missing without intentional_blank → keep NL (do not write).
+    if (resolved.usedFallback) continue;
+    const applied =
+      resolved.state === "intentional_blank"
+        ? ""
+        : typeof resolved.value === "string"
+          ? resolved.value
+          : String(resolved.value ?? "");
 
     if (parsed.scope === "section" && next.kind === "builtin") {
       next.sectionContent = { ...(next.sectionContent ?? {}) };
-      applyDraftToSectionContent(next.sectionContent, parsed.id, parsed.field, value);
+      applyDraftToSectionContent(next.sectionContent, parsed.id, parsed.field, applied);
       continue;
     }
 
     if (parsed.scope === "block") {
-      applyDraftToBlocks(next.blocks, parsed.id, parsed.field, value);
+      applyDraftToBlocks(next.blocks, parsed.id, parsed.field, applied);
       continue;
     }
 
@@ -226,11 +342,11 @@ export function applyEnFieldDraftsToPage(page: CmsPage): CmsPage {
         seo: { title: next.title, description: next.description },
       };
       if (parsed.field === "title") {
-        en.pageTitle = value;
-        en.navigationLabel = value;
-        en.seo = { ...en.seo, title: value };
+        en.pageTitle = applied;
+        en.navigationLabel = applied;
+        en.seo = { ...en.seo, title: applied };
       } else if (parsed.field === "description") {
-        en.seo = { ...en.seo, description: value };
+        en.seo = { ...en.seo, description: applied };
       }
       next.localeContent = {
         ...(next.localeContent ?? {
@@ -246,6 +362,44 @@ export function applyEnFieldDraftsToPage(page: CmsPage): CmsPage {
   }
 
   return next;
+}
+
+/**
+ * Ensure `localeContent.en` exists for publish/resolve gates.
+ * Prefers page meta EN drafts, then any existing EN SEO bag, then NL title/description.
+ */
+export function ensureEnglishLocaleContentFromDrafts(page: CmsPage): CmsPage {
+  const drafts = page.enFieldDrafts ?? {};
+  const prevEn = page.localeContent?.en;
+  const enTitle =
+    drafts["page:meta:title"]?.trim() ||
+    prevEn?.pageTitle?.trim() ||
+    prevEn?.seo.title?.trim() ||
+    page.title;
+  const enDesc =
+    drafts["page:meta:description"]?.trim() ||
+    prevEn?.seo.description?.trim() ||
+    page.description;
+  const nlBag = page.localeContent?.nl ?? {
+    navigationLabel: page.title,
+    pageTitle: page.title,
+    seo: { title: page.title, description: page.description },
+  };
+  return {
+    ...page,
+    localeContent: {
+      ...(page.localeContent ?? { nl: nlBag }),
+      nl: nlBag,
+      en: {
+        navigationLabel: prevEn?.navigationLabel?.trim() || enTitle,
+        pageTitle: prevEn?.pageTitle?.trim() || enTitle,
+        seo: {
+          title: prevEn?.seo.title?.trim() || enTitle,
+          description: prevEn?.seo.description?.trim() || enDesc,
+        },
+      },
+    },
+  };
 }
 
 /**

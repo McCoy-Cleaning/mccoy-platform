@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   CMS_PAGE_CREATE_FORBIDDEN_REASON,
+  ensureEnglishLocaleContentFromDrafts,
   ensurePageLocaleFields,
   validatePublishableCmsPage,
   type CmsPage,
@@ -248,9 +249,34 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
       const session = await requireAdminSession();
       actorUserId = session.userId;
       const store = await ensureSeeded();
-      const payload = ensurePageLocaleFields(data.payload as unknown as CmsPage);
+      let payload = ensurePageLocaleFields(data.payload as unknown as CmsPage);
       const gate = await requireExistingCmsPage(store, data.pageId, payload.id);
       if (!gate.ok) return gate;
+
+      const publishedLocales = Array.from(new Set(data.publishedLocales)) as Locale[];
+      const activeRev = await store.getActivePublishedRevision(data.pageId);
+      const serverEnPublished =
+        activeRev?.payload.localeStates?.en?.publicationState === "published";
+
+      // Explicit EN publish, or Opslaan while EN is already live → keep EN public and
+      // ensure SEO bag exists so /en resolve cannot fail on missing localeContent.en.
+      if (publishedLocales.includes("en") || serverEnPublished) {
+        if (!publishedLocales.includes("en")) publishedLocales.push("en");
+        payload = ensureEnglishLocaleContentFromDrafts(payload);
+        payload = {
+          ...payload,
+          localeStates: {
+            ...(payload.localeStates ?? {
+              nl: { publicationState: "published", freshness: "current" },
+            }),
+            nl: payload.localeStates?.nl ?? {
+              publicationState: "published",
+              freshness: "current",
+            },
+            en: { publicationState: "published", freshness: "current" },
+          },
+        };
+      }
 
       // Validate-all-then-write: never persist an invalid publish payload.
       const validated = validatePublishableCmsPage(payload);
@@ -273,7 +299,7 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
         siteId: DEFAULT_CMS_SITE_ID,
         pageId: data.pageId,
         payload: validated.page,
-        publishedLocales: data.publishedLocales as Locale[],
+        publishedLocales,
         createdBy: session.username,
         expectedDraftRevision: data.expectedDraftRevision ?? null,
       });
@@ -287,6 +313,7 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
           eventId: result.eventId,
           draftRevisionNumber: result.draftRevisionNumber,
         },
+        localeStates: validated.page.localeStates ?? null,
       });
     } catch (error) {
       await notifyCmsPublishFailed(actorUserId, data.pageId, error);

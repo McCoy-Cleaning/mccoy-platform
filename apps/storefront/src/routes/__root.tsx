@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -7,6 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { CmsUiLocaleProvider } from "@mccoy/cms-renderer";
 
 // Side-effect import so Start can discover CSS for Early Hints.
 // Do not use `?url` + head link when relying on Start-managed stylesheet assets.
@@ -14,6 +16,7 @@ import "../styles.css";
 import { I18nProvider, resolveInitialUiLang } from "@/lib/i18n";
 import logoUrl from "@/assets/logo-mccoy.png";
 import { PublishedCmsProvider } from "@/lib/cms/published-provider";
+import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
 import { DeferredCmsEditShell } from "@/components/site/DeferredCmsEditShell";
 import {
   readIndexingEnv,
@@ -140,7 +143,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
           "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
           "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
-          "header{background:rgba(20,26,40,.92)}",
+          // Scope to the fixed site nav only — bare `header{}` also painted CMS section intros.
+          'header[data-site-header]{background:rgba(20,26,40,.92)}',
         ].join(""),
       },
     ],
@@ -219,7 +223,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
               'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
               "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
               "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
-              "header{background:rgba(20,26,40,.92)}",
+              'header[data-site-header]{background:rgba(20,26,40,.92)}',
             ].join(""),
           }}
         />
@@ -239,15 +243,22 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function CmsUiLocaleBridge({ children }: { children: ReactNode }) {
+  const locale = useActiveCmsLocale();
+  return <CmsUiLocaleProvider locale={locale}>{children}</CmsUiLocaleProvider>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <PublishedCmsProvider>
-        <DeferredCmsEditShell>
-          <Outlet />
-        </DeferredCmsEditShell>
+        <CmsUiLocaleBridge>
+          <DeferredCmsEditShell>
+            <Outlet />
+          </DeferredCmsEditShell>
+        </CmsUiLocaleBridge>
       </PublishedCmsProvider>
     </QueryClientProvider>
   );

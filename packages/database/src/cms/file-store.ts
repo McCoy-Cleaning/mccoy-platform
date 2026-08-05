@@ -312,6 +312,37 @@ function buildPublish(
 
   const payload = ensurePageLocaleFields(input.payload);
 
+  // Keep payload localeStates aligned with publishedLocales so resolvePublishedCmsPage
+  // (which reads the revision payload) cannot disagree with cms_page_locale_states.
+  if (input.publishedLocales.includes("en")) {
+    payload.localeStates = {
+      ...(payload.localeStates ?? {
+        nl: { publicationState: "published", freshness: "current" },
+      }),
+      nl: payload.localeStates?.nl ?? { publicationState: "published", freshness: "current" },
+      en: { publicationState: "published", freshness: "current" },
+    };
+  } else {
+    // NL-only publish must not demote a live EN locale when the editor payload still
+    // carries draft/missing (stale admin state after Publiceer EN without local sync).
+    const existingEn = store.localeStates.find(
+      (r) => r.pageId === input.pageId && r.locale === "en" && r.siteId === siteId,
+    );
+    if (existingEn?.publicationState === "published") {
+      const prev = payload.localeStates?.en;
+      payload.localeStates = {
+        ...(payload.localeStates ?? {
+          nl: { publicationState: "published", freshness: "current" },
+        }),
+        nl: payload.localeStates?.nl ?? { publicationState: "published", freshness: "current" },
+        en: {
+          publicationState: "published",
+          freshness: prev?.freshness === "stale" ? "stale" : (existingEn.freshness ?? "current"),
+        },
+      };
+    }
+  }
+
   for (const locale of input.publishedLocales) {
     const pathValue =
       locale === "en"
@@ -770,11 +801,8 @@ export function createFileCmsStore(options: FileCmsStoreOptions = {}): CmsStore 
             ...ensurePageLocaleFields(draftSource),
             localeStates: {
               nl: { publicationState: "published", freshness: "current" },
-              en: draftSource.localeStates?.en ??
-                page.localeStates?.en ?? {
-                  publicationState: "missing",
-                  freshness: "unknown",
-                },
+              // First seed is NL-only; EN stays missing until explicit Publiceer EN.
+              en: { publicationState: "missing", freshness: "unknown" },
             },
           };
           if (!store.pages.some((p) => p.id === withStates.id && p.siteId === id)) {

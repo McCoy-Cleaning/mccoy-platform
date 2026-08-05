@@ -5,46 +5,17 @@ import type { SiteNavigationContent } from "./navigation";
 import type { Localized, LocaleState } from "./locale";
 import type { CmsPageLocaleContent, PageTranslationMetaMap } from "./seo";
 import type { CmsRedirect, LocalizedPagePath } from "./paths";
+import type { Block } from "./block-model";
+import type { BlockType } from "./block-types";
+import type { BuiltinRouteKey, CmsLink } from "./cms-link-model";
+import type { TranslationFieldMetadata } from "./translation-field";
+
+export type { Block } from "./block-model";
+export type { BlockType } from "./block-types";
+export type { BuiltinRouteKey, CmsLink } from "./cms-link-model";
 
 /** Schema v6: localized page meta + publication/freshness. Public SEO runtime is Phase C. */
 export const CMS_SCHEMA_VERSION = 6 as const;
-
-export type BlockType =
-  | "hero"
-  | "richText"
-  | "centered"
-  | "textImage"
-  | "columns"
-  | "benefits"
-  | "quote"
-  | "gallery"
-  | "video"
-  | "beforeAfter"
-  | "carousel"
-  | "steps"
-  | "comparisonTable"
-  | "featureGrid"
-  | "spacer"
-  | "teamGrid"
-  | "teamProfile"
-  | "values"
-  | "timeline"
-  | "roadmap"
-  | "plans"
-  | "cta"
-  | "newsletter"
-  | "contactForm"
-  | "announcement"
-  | "popup"
-  | "portfolio"
-  | "jobs"
-  | "latestPosts"
-  | "partnersMarquee"
-  | "statsCounters"
-  | "contactInfoCards"
-  | "quoteRequestForm"
-  | "legalArticles"
-  | "offers";
 
 export type BlockCategory =
   | "Hero & intro"
@@ -55,33 +26,6 @@ export type BlockCategory =
   | "Conversion"
   | "Showcase"
   | "Recruitment";
-
-export type BuiltinRouteKey =
-  | "home"
-  | "services"
-  | "products"
-  | "about"
-  | "contact"
-  | "vacatures"
-  | "offerte"
-  | "privacy"
-  | "terms";
-
-export type CmsLink =
-  | { type: "none" }
-  | { type: "internal"; pageId: string; openInNewTab?: boolean }
-  | { type: "internal_route"; route: BuiltinRouteKey; openInNewTab?: boolean }
-  | { type: "external"; url: string; openInNewTab?: boolean }
-  | { type: "email"; email: string; subject?: string }
-  | { type: "phone"; phone: string };
-
-export interface Block {
-  id: string;
-  type: BlockType;
-  data: Record<string, unknown>;
-  /** Canonical data shape version for this block type after edit/republish. */
-  dataVersion?: number;
-}
 
 type PageBase = {
   id: string;
@@ -118,6 +62,11 @@ type PageBase = {
    * Used to skip re-translation when Dutch is unchanged, and to detect stale EN.
    */
   enFieldDraftSources?: Record<string, string>;
+  /**
+   * Per-field EN translation status (manual / machine / intentional_blank) + source hash.
+   * Optional MVP metadata persisted with the CMS JSON page payload.
+   */
+  enFieldDraftMeta?: Record<string, TranslationFieldMetadata>;
   inNav: boolean;
   /** CMS block payloads referenced by layout (and seed content for custom pages). */
   blocks: Block[];

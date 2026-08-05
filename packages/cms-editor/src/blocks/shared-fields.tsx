@@ -11,57 +11,12 @@ import {
 } from "@mccoy/cms-schema";
 import { StructuredLinkField, PAGE_DESTINATION_LINK_KINDS } from "./StructuredLinkField";
 import { EnDraftFor } from "./en-draft-fields";
-import { getBlockEditorDefinition } from "./blockEditorRegistry";
+import { getPopupContentEditor } from "./popup-editor-bridge";
 import { PopupContentTypeChooser } from "./PopupContentTypePicker";
 import type { CmsImagePickerProps } from "../image-picker-props";
+import { EmptyHint, Field, Section, inputClass, selectClass } from "./field-chrome";
 
-export const inputClass =
-  "w-full rounded-xl border border-white/15 bg-black/40 px-4 py-2.5 text-[15px] text-white outline-none placeholder:text-white/35 focus-visible:ring-2 focus-visible:ring-sky-400/50";
-
-export const selectClass = `${inputClass} cursor-pointer`;
-
-export function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  const id = React.useId();
-  const control = React.isValidElement(children)
-    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
-    : children;
-  return (
-    <div className="block space-y-1.5">
-      <label htmlFor={id} className="text-[13px] font-medium text-white/65">
-        {label}
-      </label>
-      {control}
-      {hint ? <span className="block text-xs text-white/40">{hint}</span> : null}
-    </div>
-  );
-}
-
-export function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h4 className="text-[13px] font-semibold uppercase tracking-wider text-white/55">{title}</h4>
-      {children}
-    </section>
-  );
-}
-
-export function EmptyHint({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-xl border border-dashed border-white/15 px-4 py-4 text-[13px] leading-relaxed text-white/50">{children}</p>;
-}
+export { EmptyHint, Field, Section, inputClass, selectClass };
 
 /** Typed internal/external link — delegates to shared StructuredLinkField. */
 export function BlockLinkField({
@@ -137,11 +92,6 @@ function defaultPopupContent(type: PopupContentBlockType = "richText"): NonNulla
 
 /** True while editing content that lives inside a button popup (disables nested popup action). */
 const InsideButtonPopupContext = React.createContext(false);
-
-/** Resolve after modules load — registry imports editors that import this file. */
-function getPopupContentEditor(type: PopupContentBlockType) {
-  return getBlockEditorDefinition(type)?.Editor ?? null;
-}
 
 export function CmsButtonEditor({
   label,
@@ -549,7 +499,7 @@ export function BlockImageField({
                       selected ? "border-sky-400 ring-2 ring-sky-400/50" : "border-white/10 hover:border-white/35"
                     }`}
                   >
-                    <img src={mediaSrc(src)} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <img src={mediaSrc(src)} alt="" className="h-full w-full object-contain p-1" loading="lazy" />
                   </button>
                 );
               })}

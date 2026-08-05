@@ -33,7 +33,8 @@ describe("products composite split", () => {
       heading: "Geurproducten met een premium sanitaire beleving.",
       intro: "Intro tekst",
     });
-    expect(migrated["products.main"]?.body).toBeFalsy();
+    // Legacy upgrade fills the default webshop notice into Extra sectietekst.
+    expect(migrated["products.main"]?.body).toContain("webshop");
     expect(migrated["products.info"]?.cards).toHaveLength(1);
     expect(migrated["products.info"]?.cards[0]?.id).toBe("prod_hygiene");
     expect(migrated["products.info"]?.heading).toBeTruthy();
@@ -119,7 +120,8 @@ describe("products composite split", () => {
     expect(migrated["products.main"]?.heading).toContain("Geurproducten");
     expect(migrated["products.main"]?.intro).toContain("McCoy Products");
     expect(migrated["products.main"]?.intro).toContain("contactformulier");
-    expect(migrated["products.main"]?.body).toBeFalsy();
+    // Short legacy intro upgrade also restores the default webshop notice body.
+    expect(migrated["products.main"]?.body).toContain("webshop");
   });
 
   it("rewrites legacy contact body into webshop notice", () => {

@@ -315,7 +315,7 @@ export function VacaturesApplicationSection() {
                 <img
                   src={media.image.src}
                   alt={media.image.decorative ? "" : media.image.alt || mediaEyebrow}
-                  className="aspect-video w-full object-cover"
+                  className="aspect-video w-full bg-black/35 object-contain object-center"
                 />
               ) : (
                 <div className="flex aspect-video items-center justify-center bg-background/80 text-sm text-white/40">

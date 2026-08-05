@@ -337,7 +337,7 @@ export function InspectTextField({
           <textarea
             className={cn(inputClass, "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
             value={enDraftValue}
-            placeholder="Engelse vertaling (handmatig — AI overschrijft dit niet)"
+            placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
             onChange={(e) => ai!.setEnDraft(fieldPath, e.target.value)}
             aria-label={`${label}: Engelse vertaling (handmatig)`}
           />
@@ -855,9 +855,13 @@ export function ManualEnDraftField({
 }) {
   const ai = useCmsAiAssist();
   if (!ai) return null;
+  // EN editor must show only the overlay draft — never NL as a controlled value.
   const value = ai.getEnDraft(fieldPath);
+  const onEnChange = (next: string) => {
+    ai.setEnDraft(fieldPath, next);
+  };
   return (
-    <label className="block space-y-1">
+    <label className="block space-y-1" data-cms-en-draft-path={fieldPath}>
       <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-sky-300/55">
         {label ? `EN · ${label}` : "EN · handmatig"}
       </span>
@@ -865,16 +869,16 @@ export function ManualEnDraftField({
         <textarea
           className={cn(inputClass, "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
           value={value}
-          placeholder="Engelse vertaling (handmatig — AI overschrijft dit niet)"
-          onChange={(e) => ai.setEnDraft(fieldPath, e.target.value)}
+          placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
+          onChange={(e) => onEnChange(e.target.value)}
           aria-label={label ? `${label}: Engelse vertaling` : "Engelse vertaling (handmatig)"}
         />
       ) : (
         <input
           className={cn(inputClass, "border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
           value={value}
-          placeholder="Engelse vertaling (handmatig — AI overschrijft dit niet)"
-          onChange={(e) => ai.setEnDraft(fieldPath, e.target.value)}
+          placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
+          onChange={(e) => onEnChange(e.target.value)}
           aria-label={label ? `${label}: Engelse vertaling` : "Engelse vertaling (handmatig)"}
         />
       )}

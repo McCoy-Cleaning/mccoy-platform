@@ -351,6 +351,105 @@ export type GalleryBlockData = {
   columns?: GalleryColumns;
 };
 
+/** Canonical Dutch copy for the products “Ons werk” text+image gallery. */
+export const GALLERY_WORK_SERVICES_COPY = {
+  eyebrow: "Ons werk",
+  title: "Alles voor een professioneel schone werkomgeving",
+  body: "Van sanitaire voorzieningen en hygiënepapier tot professionele reinigingsmiddelen. McCoy combineert betrouwbare producten, praktisch advies en persoonlijke service in één complete oplossing.",
+  items: [
+    {
+      title: "Sanitaire dispensers",
+      body: "Functionele dispensers voor een verzorgde, hygiënische en professioneel ingerichte sanitaire ruimte.",
+    },
+    {
+      title: "Hygiënepapier",
+      body: "Een compleet assortiment toiletpapier, handdoekrollen en vouwhanddoekjes voor iedere werkomgeving.",
+    },
+    {
+      title: "Professionele reinigingsmiddelen",
+      body: "Doeltreffende producten voor de dagelijkse reiniging van interieurs, vloeren en sanitaire ruimtes.",
+    },
+  ],
+} as const;
+
+const LEGACY_GALLERY_ITEM_KEYS: Record<string, number> = {
+  dispenser: 0,
+  dispensers: 0,
+  "sanitaire dispensers": 0,
+  "hygiene papier": 1,
+  "hygiëne papier": 1,
+  "hygiënepapier": 1,
+  "hygiene paper": 1,
+  schoonmaakmiddelen: 2,
+  reinigingsmiddelen: 2,
+  "professionele reinigingsmiddelen": 2,
+  "cleaning products": 2,
+};
+
+function normalizeGalleryItemKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * One-time migration for the outdated NL Producten gallery seed.
+ * Must not run on EN overlays or editor-customized copy — normalize() runs on every
+ * public render, so rewriting here previously forced Dutch factory text onto /en.
+ */
+export function upgradeTextAndImageGalleryCopy(data: {
+  title: string;
+  body?: string;
+  images: GalleryImageItem[];
+  contentMode: GalleryContentMode;
+}): { title: string; body?: string; images: GalleryImageItem[] } {
+  if (data.contentMode !== "textAndImage") {
+    return { title: data.title, body: data.body, images: data.images };
+  }
+
+  const titleTrim = data.title.trim();
+  const bodyText = data.body?.trim() ?? "";
+  // Strict NL seed only — never treat EN titles ("A look at what we do") as migrate targets.
+  const isOutdatedNlSeed =
+    titleTrim === "Een blik op wat wij doen" &&
+    (!bodyText ||
+      bodyText.includes("Schoonmaak op het hoogste niveau") ||
+      bodyText.includes("Cleaning at the highest level"));
+
+  if (!isOutdatedNlSeed) {
+    return { title: data.title, body: data.body, images: data.images };
+  }
+
+  const title = GALLERY_WORK_SERVICES_COPY.title;
+  const body = GALLERY_WORK_SERVICES_COPY.body;
+
+  const images = data.images.map((img, index) => {
+    const key = normalizeGalleryItemKey(img.title ?? "");
+    const captionKey = normalizeGalleryItemKey(img.caption ?? "");
+    const mappedFromTitle =
+      key && Object.prototype.hasOwnProperty.call(LEGACY_GALLERY_ITEM_KEYS, key)
+        ? LEGACY_GALLERY_ITEM_KEYS[key]
+        : undefined;
+    const mappedFromCaption =
+      captionKey && Object.prototype.hasOwnProperty.call(LEGACY_GALLERY_ITEM_KEYS, captionKey)
+        ? LEGACY_GALLERY_ITEM_KEYS[captionKey]
+        : undefined;
+    const mappedIndex =
+      mappedFromTitle ??
+      mappedFromCaption ??
+      (data.images.length === 3 && index < 3 ? index : undefined);
+    if (mappedIndex == null) return img;
+    const canonical = GALLERY_WORK_SERVICES_COPY.items[mappedIndex];
+    if (!canonical) return img;
+    return {
+      ...img,
+      title: canonical.title,
+      body: canonical.body,
+      caption: undefined,
+    };
+  });
+
+  return { title, body, images };
+}
+
 /** Span classes for the featured mosaic grid (`auto-rows-[220px]` × 4 cols). */
 export const galleryShapeConfig = {
   /** Same footprint as classic “Reguliere schoonmaak”: 2×2. */
@@ -733,9 +832,9 @@ export const catalogDefinitions = {
       columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
     }),
     createDefault: (): GalleryBlockData => ({
-      title: "Een blik op wat wij doen",
-      eyebrow: "Ons werk",
-      body: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
+      title: GALLERY_WORK_SERVICES_COPY.title,
+      eyebrow: GALLERY_WORK_SERVICES_COPY.eyebrow,
+      body: GALLERY_WORK_SERVICES_COPY.body,
       images: [],
       layout: "featured",
       contentMode: "imagesOnly",
@@ -773,13 +872,20 @@ export const catalogDefinitions = {
         layoutRaw === "masonry" || layoutRaw === "featured" || layoutRaw === "grid"
           ? layoutRaw
           : "grid";
-      return {
+      const contentMode = normalizeGalleryContentMode(rec.contentMode);
+      const upgraded = upgradeTextAndImageGalleryCopy({
         title: str(rec, "title", "Galerij"),
-        eyebrow: str(rec, "eyebrow") || undefined,
         body: str(rec, "body") || undefined,
         images,
+        contentMode,
+      });
+      return {
+        title: upgraded.title,
+        eyebrow: str(rec, "eyebrow") || undefined,
+        body: upgraded.body,
+        images: upgraded.images,
         layout,
-        contentMode: normalizeGalleryContentMode(rec.contentMode),
+        contentMode,
         textPlacement: normalizeGalleryTextPlacement(rec.textPlacement),
         columns: normalizeGalleryColumns(rec.columns),
       };

@@ -7,6 +7,7 @@ import {
   type CmsAiTranslateRequest,
 } from "@mccoy/cms-editor";
 import { cms, useEditablePage } from "@/lib/cms/store";
+import { canonicalizeEnFieldDraftPath, lookupEnFieldDraft } from "@mccoy/cms-schema";
 import {
   generateDutchCopy,
   generateSectionCopy,
@@ -58,16 +59,31 @@ export function AdminCmsContentAiProvider({
   }, []);
 
   const api = React.useMemo<CmsAiAssistApi>(() => {
-    const drafts = page?.enFieldDrafts ?? {};
     return {
       configured,
       statusMessage,
-      getEnDraft: (path) => drafts[path] ?? "",
+      getEnDraft: (path) => {
+        // Always read the live store page — never a closed-over snapshot — so
+        // clear → getEnDraft in the same tick cannot resurrect a stale EN draft.
+        const live = cms.getEditablePage(pageId) ?? page;
+        if (!live) return "";
+        return lookupEnFieldDraft(live, path);
+      },
       setEnDraft: (path, value) => {
-        cms.setEnFieldDrafts(pageId, { [path]: value });
+        const live = cms.getEditablePage(pageId) ?? page;
+        const key = live ? canonicalizeEnFieldDraftPath(live, path) : path;
+        cms.setEnFieldDrafts(pageId, { [key]: value });
       },
       setEnDrafts: (patch) => {
-        cms.setEnFieldDrafts(pageId, patch);
+        if (!page) {
+          cms.setEnFieldDrafts(pageId, patch);
+          return;
+        }
+        const canonical: Record<string, string> = {};
+        for (const [path, value] of Object.entries(patch)) {
+          canonical[canonicalizeEnFieldDraftPath(page, path)] = value;
+        }
+        cms.setEnFieldDrafts(pageId, canonical);
       },
       generateDutch: async (input: CmsAiGenerateRequest) => {
         try {
@@ -144,7 +160,7 @@ export function AdminCmsContentAiProvider({
         }
       },
     };
-  }, [configured, statusMessage, page?.enFieldDrafts, pageId]);
+  }, [configured, statusMessage, page, pageId]);
 
   return <CmsAiAssistProvider value={api}>{children}</CmsAiAssistProvider>;
 }

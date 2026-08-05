@@ -57,8 +57,8 @@ const translations = {
     },
     work: {
       kicker: "Ons werk",
-      title: "Een blik op wat wij doen",
-      sub: "Schoonmaak op het hoogste niveau voor bedrijven, horeca en specialistische projecten in Twente.",
+      title: "Alles voor een professioneel schone werkomgeving",
+      sub: "Van sanitaire voorzieningen en hygiënepapier tot professionele reinigingsmiddelen. McCoy combineert betrouwbare producten, praktisch advies en persoonlijke service in één complete oplossing.",
       items: [
         {
           title: "Reguliere schoonmaak",
@@ -309,8 +309,8 @@ const translations = {
     },
     work: {
       kicker: "Our work",
-      title: "A glimpse of what we do",
-      sub: "Cleaning at the highest level for businesses, hospitality and specialist projects across Twente.",
+      title: "Everything for a professionally clean workplace",
+      sub: "From sanitary fittings and hygiene paper to professional cleaning agents. McCoy combines reliable products, practical advice and personal service in one complete solution.",
       items: [
         {
           title: "Regular cleaning",

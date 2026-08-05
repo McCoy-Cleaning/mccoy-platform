@@ -1,4 +1,16 @@
-import type { LegalArticle, LegalMainContent } from "./content";
+/** Shared shape for privacy / terms pages — header + ordered text blocks. */
+export type LegalArticle = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+export type LegalMainContent = {
+  eyebrow?: string;
+  heading: string;
+  updatedLabel?: string;
+  articles: LegalArticle[];
+};
 
 /** Seed copy migrated from the former static `/privacy` page. */
 export function defaultPrivacyMainContent(): LegalMainContent {

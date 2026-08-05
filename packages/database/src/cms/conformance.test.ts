@@ -46,3 +46,25 @@ describe("crawler/sitemap conformance fixtures", () => {
     });
   });
 });
+
+describe("public path aliases", () => {
+  it("redirects /en/producten and /en/jobs to canonical EN paths", async () => {
+    const { resolvePublicCmsRequest } = await import("./resolve");
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+
+    const producten = await resolvePublicCmsRequest({ pathname: "/en/producten", store });
+    expect(producten).toEqual({
+      kind: "redirect",
+      statusCode: 301,
+      toPath: "/en/products",
+    });
+
+    const jobs = await resolvePublicCmsRequest({ pathname: "/en/jobs", store });
+    expect(jobs).toEqual({
+      kind: "redirect",
+      statusCode: 301,
+      toPath: "/en/vacatures",
+    });
+  });
+});

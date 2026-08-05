@@ -1,6 +1,7 @@
 /**
  * Collect NL copy paths and plan EN draft sync for Opslaan.
- * Nested paths use dotted segments (e.g. `columns.0.title`) compatible with
+ * Nested paths use dotted segments with stable item ids when present
+ * (e.g. `columns.col_1.title`, falling back to `columns.0.title`) compatible with
  * {@link applyEnFieldDraftsToPage} / {@link setValueAtDotPath}.
  */
 
@@ -40,6 +41,19 @@ const NON_TRANSLATABLE_FIELD_KEYS = new Set([
   "hidden",
   "reverse",
   "values",
+  // Layout / presentation enums — translating these breaks storefront chrome
+  // (e.g. productsAssortment → "Product Assortment" drops ProductsPresentation).
+  "presentation",
+  "contentMode",
+  "textPlacement",
+  "shape",
+  "columns",
+  "action",
+  "size",
+  "surfaceMode",
+  "widthMode",
+  "headerMode",
+  "contentAlign",
 ]);
 
 export function isTranslatableNlFieldKey(key: string): boolean {
@@ -66,26 +80,69 @@ function looksLikeMediaObject(value: Record<string, unknown>): boolean {
   return typeof value.src === "string" || typeof value.poster === "string";
 }
 
+export type TranslatablePathCollection = {
+  /** Canonical dotted paths (stable item ids when present). */
+  fields: Record<string, string>;
+  /** Alternate path → canonical relative path (index / colon forms). */
+  aliases: Record<string, string>;
+};
+
+function registerPathAliases(
+  canonicalParts: string[],
+  indexAliasParts: string[] | null,
+  aliases: Record<string, string>,
+): void {
+  const canonical = canonicalParts.join(".");
+  const colonForm = canonicalParts.join(":");
+  if (colonForm !== canonical) aliases[colonForm] = canonical;
+  if (indexAliasParts) {
+    const indexForm = indexAliasParts.join(".");
+    if (indexForm !== canonical) aliases[indexForm] = canonical;
+    const indexColon = indexAliasParts.join(":");
+    if (indexColon !== canonical) aliases[indexColon] = canonical;
+  }
+}
+
 /**
  * Walk a JSON-like value and collect string leaves keyed by dotted path relative
- * to the walk root (e.g. `columns.0.title`).
+ * to the walk root (e.g. `columns.col_1.title` when items have ids).
+ * Also records index- and colon-form aliases for draft remapping.
  */
-export function collectTranslatableStringPaths(
+export function collectTranslatableStringPathsDetailed(
   value: unknown,
   baseParts: string[] = [],
-  out: Record<string, string> = {},
-): Record<string, string> {
+  indexAliasParts: string[] | null = null,
+  out: TranslatablePathCollection = { fields: {}, aliases: {} },
+): TranslatablePathCollection {
   if (typeof value === "string") {
     if (baseParts.length === 0) return out;
     const named = lastNamedSegment(baseParts);
     if (!isTranslatableNlFieldKey(named)) return out;
-    out[baseParts.join(".")] = value;
+    const key = baseParts.join(".");
+    out.fields[key] = value;
+    registerPathAliases(baseParts, indexAliasParts, out.aliases);
     return out;
   }
 
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
-      collectTranslatableStringPaths(item, [...baseParts, String(index)], out);
+      const indexSeg = String(index);
+      // Prefer stable item ids over array indexes so reorders do not detach EN drafts.
+      const stableId =
+        item != null &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        typeof (item as Record<string, unknown>).id === "string" &&
+        String((item as Record<string, unknown>).id).trim()
+          ? String((item as Record<string, unknown>).id).trim()
+          : indexSeg;
+      const nextIndexAlias = [...(indexAliasParts ?? baseParts), indexSeg];
+      collectTranslatableStringPathsDetailed(
+        item,
+        [...baseParts, stableId],
+        stableId === indexSeg ? null : nextIndexAlias,
+        out,
+      );
     });
     return out;
   }
@@ -94,10 +151,20 @@ export function collectTranslatableStringPaths(
 
   if (looksLikeMediaObject(value)) {
     if (typeof value.alt === "string") {
-      collectTranslatableStringPaths(value.alt, [...baseParts, "alt"], out);
+      collectTranslatableStringPathsDetailed(
+        value.alt,
+        [...baseParts, "alt"],
+        indexAliasParts ? [...indexAliasParts, "alt"] : null,
+        out,
+      );
     }
     if (typeof value.caption === "string") {
-      collectTranslatableStringPaths(value.caption, [...baseParts, "caption"], out);
+      collectTranslatableStringPathsDetailed(
+        value.caption,
+        [...baseParts, "caption"],
+        indexAliasParts ? [...indexAliasParts, "caption"] : null,
+        out,
+      );
     }
     return out;
   }
@@ -106,40 +173,198 @@ export function collectTranslatableStringPaths(
     if (key === "id" || key === "type" || key === "kind") continue;
     if (key === "link" && isPlainObject(child)) {
       if (typeof child.label === "string") {
-        collectTranslatableStringPaths(child.label, [...baseParts, "link", "label"], out);
+        collectTranslatableStringPathsDetailed(
+          child.label,
+          [...baseParts, "link", "label"],
+          indexAliasParts ? [...indexAliasParts, "link", "label"] : null,
+          out,
+        );
       }
       continue;
     }
-    collectTranslatableStringPaths(child, [...baseParts, key], out);
+    collectTranslatableStringPathsDetailed(
+      child,
+      [...baseParts, key],
+      indexAliasParts ? [...indexAliasParts, key] : null,
+      out,
+    );
   }
   return out;
 }
 
-/** Full `enFieldDraftPath` → current NL string (may be empty). */
-export function collectPageNlFieldDraftMap(page: CmsPage): Record<string, string> {
-  const out: Record<string, string> = {};
+/**
+ * Walk a JSON-like value and collect string leaves keyed by dotted path relative
+ * to the walk root (e.g. `columns.col_1.title` when items have ids).
+ */
+export function collectTranslatableStringPaths(
+  value: unknown,
+  baseParts: string[] = [],
+  out: Record<string, string> = {},
+): Record<string, string> {
+  const detailed = collectTranslatableStringPathsDetailed(value, baseParts);
+  Object.assign(out, detailed.fields);
+  return out;
+}
 
-  out[enFieldDraftPath("page", "meta", "title")] = page.title ?? "";
-  out[enFieldDraftPath("page", "meta", "description")] = page.description ?? "";
+function scopePath(
+  scope: "section" | "block" | "page",
+  id: string,
+  relative: string,
+): string {
+  return enFieldDraftPath(scope, id, relative);
+}
+
+/** Full `enFieldDraftPath` → current NL string (may be empty), plus path aliases. */
+export function collectPageNlFieldDraftCollection(page: CmsPage): {
+  fields: Record<string, string>;
+  /** Full draft path alias → canonical full path. */
+  aliases: Record<string, string>;
+} {
+  const fields: Record<string, string> = {};
+  const aliases: Record<string, string> = {};
+
+  fields[enFieldDraftPath("page", "meta", "title")] = page.title ?? "";
+  fields[enFieldDraftPath("page", "meta", "description")] = page.description ?? "";
+
+  const absorb = (
+    scope: "section" | "block",
+    id: string,
+    detailed: TranslatablePathCollection,
+  ) => {
+    for (const [rel, value] of Object.entries(detailed.fields)) {
+      fields[scopePath(scope, id, rel)] = value;
+    }
+    for (const [aliasRel, canonicalRel] of Object.entries(detailed.aliases)) {
+      aliases[scopePath(scope, id, aliasRel)] = scopePath(scope, id, canonicalRel);
+    }
+  };
 
   if (page.kind === "builtin" && page.sectionContent) {
     for (const [sectionKey, content] of Object.entries(page.sectionContent)) {
       if (content == null) continue;
-      const relative = collectTranslatableStringPaths(content);
-      for (const [rel, value] of Object.entries(relative)) {
-        out[enFieldDraftPath("section", sectionKey, rel)] = value;
-      }
+      absorb("section", sectionKey, collectTranslatableStringPathsDetailed(content));
     }
   }
 
   for (const block of page.blocks ?? []) {
-    const relative = collectTranslatableStringPaths(block.data ?? {});
-    for (const [rel, value] of Object.entries(relative)) {
-      out[enFieldDraftPath("block", block.id, rel)] = value;
+    absorb("block", block.id, collectTranslatableStringPathsDetailed(block.data ?? {}));
+  }
+
+  return { fields, aliases };
+}
+
+/** Full `enFieldDraftPath` → current NL string (may be empty). */
+export function collectPageNlFieldDraftMap(page: CmsPage): Record<string, string> {
+  return collectPageNlFieldDraftCollection(page).fields;
+}
+
+/**
+ * Remap legacy index / colon draft keys onto canonical stable-id dotted paths.
+ * Does not invent translations — only moves existing values onto discovery keys.
+ */
+export function remapEnFieldDraftsToCanonicalPaths(page: CmsPage): {
+  enFieldDrafts: Record<string, string>;
+  enFieldDraftSources: Record<string, string>;
+  enFieldDraftMeta?: NonNullable<CmsPage["enFieldDraftMeta"]>;
+  remapped: number;
+} {
+  const { fields, aliases } = collectPageNlFieldDraftCollection(page);
+  const live = new Set(Object.keys(fields));
+  const draftsIn = page.enFieldDrafts ?? {};
+  const sourcesIn = page.enFieldDraftSources ?? {};
+  const metaIn = page.enFieldDraftMeta ?? {};
+
+  const enFieldDrafts: Record<string, string> = {};
+  const enFieldDraftSources: Record<string, string> = {};
+  const enFieldDraftMeta: NonNullable<CmsPage["enFieldDraftMeta"]> = {};
+  let remapped = 0;
+
+  const resolveCanonical = (path: string): string | null => {
+    if (live.has(path)) return path;
+    const viaAlias = aliases[path];
+    if (viaAlias && live.has(viaAlias)) return viaAlias;
+    return null;
+  };
+
+  for (const [path, value] of Object.entries(draftsIn)) {
+    const canonical = resolveCanonical(path);
+    if (!canonical) continue;
+    // Never resurrect EN text for fields the editor cleared / blanked.
+    const clearedStatus =
+      metaIn[canonical]?.status ?? metaIn[path]?.status;
+    if (clearedStatus === "override_removed" || clearedStatus === "intentional_blank") {
+      if (path !== canonical) remapped += 1;
+      continue;
+    }
+    if (path !== canonical) remapped += 1;
+    // Prefer value already on the canonical key when both exist.
+    if (enFieldDrafts[canonical] == null || path === canonical) {
+      enFieldDrafts[canonical] = value;
     }
   }
 
-  return out;
+  for (const [path, value] of Object.entries(sourcesIn)) {
+    const canonical = resolveCanonical(path);
+    if (!canonical) continue;
+    if (enFieldDraftSources[canonical] == null || path === canonical) {
+      enFieldDraftSources[canonical] = value;
+    }
+  }
+
+  for (const [path, value] of Object.entries(metaIn)) {
+    const canonical = resolveCanonical(path);
+    if (!canonical) continue;
+    if (enFieldDraftMeta[canonical] == null || path === canonical) {
+      enFieldDraftMeta[canonical] = value;
+    }
+  }
+
+  return {
+    enFieldDrafts,
+    enFieldDraftSources,
+    enFieldDraftMeta:
+      Object.keys(enFieldDraftMeta).length > 0 ? enFieldDraftMeta : undefined,
+    remapped,
+  };
+}
+
+/** Resolve a draft path (index/colon/alias) onto the canonical discovery path when known. */
+export function canonicalizeEnFieldDraftPath(page: CmsPage, path: string): string {
+  const { fields, aliases } = collectPageNlFieldDraftCollection(page);
+  if (Object.prototype.hasOwnProperty.call(fields, path)) return path;
+  const viaAlias = aliases[path];
+  if (viaAlias) return viaAlias;
+  return path;
+}
+
+/** Read an EN draft, resolving index/colon aliases onto stable-id keys. */
+export function lookupEnFieldDraft(page: CmsPage, path: string): string {
+  const drafts = page.enFieldDrafts ?? {};
+  const meta = page.enFieldDraftMeta ?? {};
+  const { aliases } = collectPageNlFieldDraftCollection(page);
+  const canonical = canonicalizeEnFieldDraftPath(page, path);
+  // Collect every alias of this field (index ↔ stable-id ↔ colon).
+  const related = new Set<string>([path, canonical]);
+  for (const [alias, canon] of Object.entries(aliases)) {
+    if (canon === canonical || alias === canonical || canon === path || alias === path) {
+      related.add(alias);
+      related.add(canon);
+    }
+  }
+  // Cleared / intentional blank on ANY related key wins over ghost drafts.
+  for (const key of related) {
+    const status = meta[key]?.status;
+    if (status === "override_removed" || status === "intentional_blank") {
+      return "";
+    }
+  }
+  const exact = drafts[canonical] ?? drafts[path];
+  if (exact != null && exact !== "") return exact;
+  for (const key of related) {
+    const via = drafts[key];
+    if (via != null && via !== "") return via;
+  }
+  return exact ?? "";
 }
 
 export type EnFieldDraftSyncPlan = {
@@ -166,26 +391,86 @@ export function isNlFieldChangedSinceBaseline(
   return baseline !== currentNl.trim();
 }
 
+/** EN draft is missing or still identical to Dutch (not a real translation). */
+export function isMissingOrUntranslatedEn(nl: string, en: string | undefined): boolean {
+  const enTrim = en?.trim() ?? "";
+  if (!enTrim) return true;
+  return enTrim === nl.trim();
+}
+
+/**
+ * Per-field EN overlay validity for Opslaan / translate-missing.
+ *
+ * Lightweight rules only (no ML): emptiness, whitespace, EN===NL (`source_echo`),
+ * and meta. Distinct non-empty EN that differs from NL is treated as `valid_en`
+ * even if the text is still Dutch — that limitation is intentional.
+ */
+export type EnOverlayValidity =
+  | "missing"
+  | "blank"
+  | "override_removed"
+  | "source_echo"
+  | "intentional_blank"
+  | "manually_translated"
+  | "valid_en";
+
+export function classifyEnOverlayValidity(input: {
+  nl: string;
+  en?: string;
+  status?: string;
+}): EnOverlayValidity {
+  const nl = input.nl.trim();
+  const enTrim = input.en?.trim() ?? "";
+  const status = input.status;
+
+  // Editor-owned slots — never auto-fill, even when blank or NL-echo.
+  if (status === "intentional_blank") return "intentional_blank";
+  if (status === "manually_translated") return "manually_translated";
+
+  // Empty / NL-echo with cleared-override meta → needs EN (stuck pages included).
+  if (status === "override_removed" && (!enTrim || enTrim === nl)) {
+    return "override_removed";
+  }
+
+  if (!enTrim) {
+    return input.en === undefined ? "missing" : "blank";
+  }
+  if (enTrim === nl) return "source_echo";
+  return "valid_en";
+}
+
+/** True when Opslaan / translate-missing should queue NL→EN for this validity. */
+export function enOverlayNeedsTranslation(validity: EnOverlayValidity): boolean {
+  return (
+    validity === "missing" ||
+    validity === "blank" ||
+    validity === "override_removed" ||
+    validity === "source_echo"
+  );
+}
+
 /**
  * Plan EN draft updates from current NL fields.
  * - Deleted / empty NL → drop EN draft
- * - Existing non-empty EN (manual or prior AI) → keep; never send to Groq
- * - NL present with no EN → queue for translation only when NL changed vs baseline
- *   (when `baselineNlFields` is omitted, all missing-EN paths are queued — legacy)
+ * - Existing EN that differs from NL → keep (manual/AI wins)
+ * - intentional_blank → never auto-fill
+ * - empty/echo `override_removed` → queue (repairs stuck clears; Opslaan refills)
+ * - NL present with missing EN, or EN identical to NL → queue for NL→EN
  */
 export function planEnFieldDraftSync(input: {
   nlFields: Record<string, string>;
   existingDrafts?: Record<string, string>;
   existingSources?: Record<string, string>;
-  /**
-   * NL snapshot from the last saved/published page (before this save's edits).
-   * When set, only paths whose NL text actually changed are sent to the AI —
-   * unchanged missing-EN fields are left alone (no whole-page retranslate).
-   */
+  /** Per-path meta — intentional_blank / manually_translated skip; empty override_removed queues. */
+  existingMeta?: Record<string, { status?: string } | undefined>;
+  /** @deprecated Kept for call-site compat. */
   baselineNlFields?: Record<string, string>;
+  /** @deprecated Kept for call-site compat. */
+  baselineEnDrafts?: Record<string, string>;
 }): EnFieldDraftSyncPlan {
   const existingDrafts = input.existingDrafts ?? {};
   const existingSources = input.existingSources ?? {};
+  const existingMeta = input.existingMeta ?? {};
   const retainedDrafts: Record<string, string> = {};
   const retainedSources: Record<string, string> = {};
   const toTranslate: Record<string, string> = {};
@@ -202,17 +487,30 @@ export function planEnFieldDraftSync(input: {
       if (existingDrafts[path]) prunedPaths.push(path);
       continue;
     }
-    const prevEn = existingDrafts[path]?.trim() ?? "";
-    // Hand-written or previously saved EN always wins — Groq must not overwrite it.
-    if (prevEn) {
-      retainedDrafts[path] = prevEn;
-      retainedSources[path] = existingSources[path] ?? nl;
+    const status = existingMeta[path]?.status;
+    const hasDraftKey = Object.prototype.hasOwnProperty.call(existingDrafts, path);
+    const prevEn = existingDrafts[path];
+    const validity = classifyEnOverlayValidity({
+      nl,
+      en: hasDraftKey ? prevEn : undefined,
+      status,
+    });
+
+    if (validity === "intentional_blank") {
       continue;
     }
-    if (!isNlFieldChangedSinceBaseline(path, nl, input.baselineNlFields)) {
+    if (validity === "valid_en" || validity === "manually_translated") {
+      const enTrim = prevEn?.trim() ?? "";
+      if (enTrim) {
+        retainedDrafts[path] = enTrim;
+        retainedSources[path] = existingSources[path] ?? nl;
+      }
       continue;
     }
-    toTranslate[path] = nl;
+    // missing | blank | override_removed | source_echo → Opslaan auto-fill.
+    if (enOverlayNeedsTranslation(validity)) {
+      toTranslate[path] = nl;
+    }
   }
 
   return { retainedDrafts, retainedSources, toTranslate, prunedPaths };
@@ -240,7 +538,8 @@ export function applyTranslatedEnFields(input: {
   const enFieldDraftSources = { ...input.retainedSources };
   for (const [path, nl] of Object.entries(input.toTranslate)) {
     const en = input.translated[path]?.trim();
-    if (!en) continue;
+    // Reject no-op "translations" that leave Dutch in the EN slot.
+    if (!en || isMissingOrUntranslatedEn(nl, en)) continue;
     enFieldDrafts[path] = en;
     enFieldDraftSources[path] = nl;
   }

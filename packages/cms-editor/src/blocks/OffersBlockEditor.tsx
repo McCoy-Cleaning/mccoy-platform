@@ -1,8 +1,10 @@
 import * as React from "react";
 import {
   createOfferItem,
+  normalizeOffersLayout,
   type OffersBlockData,
   type OfferItem,
+  type OffersLayout,
 } from "@mccoy/cms-schema";
 import { EnDraftFor, NlEnField, blockEnPath } from "./en-draft-fields";
 import { ObjectListEditor } from "./ObjectListEditor";
@@ -14,6 +16,54 @@ type Props = {
   onChange: (next: OffersBlockData) => void;
   blockId?: string;
 } & CmsImagePickerProps;
+
+const LAYOUT_OPTIONS: Array<{ id: OffersLayout; label: string; hint: string }> = [
+  {
+    id: "rows",
+    label: "Brede rijen",
+    hint: "Grote redactionele kaarten met foto naast de tekst",
+  },
+  {
+    id: "cards",
+    label: "Rasterkaarten",
+    hint: "Compacte kaarten in een raster van 2–3 kolommen",
+  },
+];
+
+function LayoutChoice({
+  value,
+  onChange,
+}: {
+  value: OffersLayout;
+  onChange: (next: OffersLayout) => void;
+}) {
+  return (
+    <Field label="Lay-out" hint="Bepaalt hoe de aanbiedingen op de pagina worden getoond.">
+      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Lay-out aanbiedingen">
+        {LAYOUT_OPTIONS.map((opt) => {
+          const selected = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt.id)}
+              className={
+                selected
+                  ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-4 py-3 text-left"
+                  : "rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left hover:border-white/25"
+              }
+            >
+              <span className="block text-sm font-semibold text-white">{opt.label}</span>
+              <span className="mt-1 block text-xs leading-snug text-white/45">{opt.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Field>
+  );
+}
 
 function PriceField({
   label,
@@ -46,12 +96,17 @@ function PriceField({
 }
 
 export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: Props) {
+  const layout = normalizeOffersLayout(value.layout);
   return (
     <div className="space-y-6">
       <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] leading-relaxed text-white/55">
         Promotionele aanbiedingen voor op de site. Prijzen zijn weergaveprijzen uit de CMS (geen
         checkout of btw-berekening).
       </p>
+
+      <Section title="Weergave">
+        <LayoutChoice value={layout} onChange={(next) => onChange({ ...value, layout: next })} />
+      </Section>
 
       <Section title="Kop">
         <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
@@ -97,7 +152,7 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
                   onChange={(e) => actions.update({ ...item, title: e.target.value })}
                 />
               </Field>
-              <EnDraftFor fieldPath={blockEnPath(blockId, `offers.${index}.title`)} label="Titel" />
+              <EnDraftFor fieldPath={blockEnPath(blockId, `offers.${item.id}.title`)} label="Titel" />
               <Field label="Badge (optioneel)">
                 <input
                   className={inputClass}
@@ -108,7 +163,7 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
                   }
                 />
               </Field>
-              <EnDraftFor fieldPath={blockEnPath(blockId, `offers.${index}.badge`)} label="Badge" />
+              <EnDraftFor fieldPath={blockEnPath(blockId, `offers.${item.id}.badge`)} label="Badge" />
               <Field label="Beschrijving">
                 <textarea
                   className={`${inputClass} min-h-[4rem]`}
@@ -119,7 +174,7 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
                 />
               </Field>
               <EnDraftFor
-                fieldPath={blockEnPath(blockId, `offers.${index}.description`)}
+                fieldPath={blockEnPath(blockId, `offers.${item.id}.description`)}
                 label="Beschrijving"
                 multiline
               />
@@ -127,7 +182,7 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
                 label="Afbeelding"
                 value={item.image}
                 preferTags={["cms", "product", "offer"]}
-                enAltPath={blockEnPath(blockId, `offers.${index}.image.alt`)}
+                enAltPath={blockEnPath(blockId, `offers.${item.id}.image.alt`)}
                 {...imageProps}
                 onChange={(image) => actions.update({ ...item, image: image ?? undefined })}
               />

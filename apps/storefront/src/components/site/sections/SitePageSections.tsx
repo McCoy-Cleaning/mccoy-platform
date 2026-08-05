@@ -142,7 +142,7 @@ export function Services() {
                 className="group relative transition hover:border-primary/40"
               >
               <article>
-                <div className="relative h-44 overflow-hidden">
+                <div className="relative h-44 overflow-hidden bg-black/35">
                   <img
                     src={card.imageSrc}
                     alt={card.title}
@@ -151,7 +151,7 @@ export function Services() {
                     loading="lazy"
                     decoding="async"
                     sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.04]"
+                    className="h-full w-full object-contain transition-transform duration-500 motion-safe:group-hover:scale-[1.04]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
                   <div className="absolute left-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/40">
@@ -208,11 +208,11 @@ export function Services() {
                       onClick={(e) => e.stopPropagation()}
                       className="service-modal-panel fixed z-[101] grid max-w-5xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-3xl border border-primary/30 bg-card shadow-[0_40px_120px_-20px_rgba(63,182,242,0.5)] sm:rounded-[2rem] md:grid-cols-2 md:grid-rows-1"
                     >
-                      <div className="relative h-40 shrink-0 overflow-hidden sm:h-64 md:h-auto">
+                      <div className="relative h-40 shrink-0 overflow-hidden bg-black/35 sm:h-64 md:h-auto">
                         <img
                           src={card.imageSrc}
                           alt={card.title}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent md:bg-gradient-to-r" />
                         <div className="absolute left-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-2xl shadow-primary/50 sm:left-6 sm:top-6 sm:h-14 sm:w-14">
@@ -539,18 +539,12 @@ export function ProductsMain() {
   const introFallback = isEn
     ? "An important part of McCoy Cleaning is McCoy Products, our wholesale division. In our range you will find: hygiene paper, professional soaps, cleaning agents for hospitality, and equipment and hardware for cleaning.\n\nTo obtain our products, you can call or contact us via the contact form; we will be happy to help you."
     : productsDef.intro;
-  // Empty CMS intro must stay empty — do not rehydrate factory/fallback copy.
-  const intro =
-    content.intro == null || content.intro === ""
-      ? ""
-      : cmsTextOrFallback(content.intro, introFallback, productsDef.intro);
+  // Empty CMS copy falls through to locale/static fallbacks via cmsTextOrFallback.
+  const intro = cmsTextOrFallback(content.intro, introFallback, productsDef.intro);
   const noticeFallback = isEn
     ? "We are currently busy behind the scenes with the online webshop! Coming soon."
     : productsDef.body ?? "";
-  const notice =
-    content.body == null || content.body === ""
-      ? ""
-      : cmsTextOrFallback(content.body, noticeFallback, productsDef.body);
+  const notice = cmsTextOrFallback(content.body, noticeFallback, productsDef.body);
   const image = content.image ?? productsDef.image;
 
   return (
@@ -572,28 +566,19 @@ export function ProductsInfo() {
   const content = useTypedSectionContent("page_products", "products.info");
   const productsInfoDef = defaultSectionContent("products.info") as import("@mccoy/cms-schema").ProductsInfoContent;
   const isEn = lang === "en";
-  const eyebrow =
-    content.eyebrow == null || content.eyebrow === ""
-      ? ""
-      : cmsTextOrFallback(
-          content.eyebrow,
-          isEn ? "Our range" : (productsInfoDef.eyebrow ?? ""),
-          productsInfoDef.eyebrow ?? "",
-        );
-  const heading =
-    content.heading == null || content.heading === ""
-      ? ""
-      : cmsTextOrFallback(content.heading, t.products.title, productsInfoDef.heading);
-  const intro =
-    content.intro == null || content.intro === ""
-      ? ""
-      : cmsTextOrFallback(
-          content.intro,
-          isEn
-            ? "Hygiene paper, professional soaps, cleaning agents and hardware for a fresh, presentable environment."
-            : (productsInfoDef.intro ?? ""),
-          productsInfoDef.intro ?? "",
-        );
+  const eyebrow = cmsTextOrFallback(
+    content.eyebrow,
+    isEn ? "Our range" : (productsInfoDef.eyebrow ?? ""),
+    productsInfoDef.eyebrow ?? "",
+  );
+  const heading = cmsTextOrFallback(content.heading, t.products.title, productsInfoDef.heading);
+  const intro = cmsTextOrFallback(
+    content.intro,
+    isEn
+      ? "Hygiene paper, professional soaps, cleaning agents and hardware for a fresh, presentable environment."
+      : (productsInfoDef.intro ?? ""),
+    productsInfoDef.intro ?? "",
+  );
 
   const cardEn: Record<string, { title: string; body: string }> = {
     prod_hygiene: {

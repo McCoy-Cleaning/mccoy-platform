@@ -47,3 +47,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cursor Guardian runtime state
+.cursor/guardian/.state/
+.cursor/guardian/policy/mcp-policy.local.json

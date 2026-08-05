@@ -1,5 +1,6 @@
 import {
   buildCmsHeadFromSnapshot,
+  canonicalizePublicIdentityPath,
   getPublishedLocaleAlternates,
   normalizeCmsPath,
   resolveEnglishPathAccess,
@@ -38,7 +39,8 @@ export async function resolvePublicCmsRequest(input: {
   const siteRecord = await store.getSite(siteId);
   const site: SiteUrlConfig = { origin: siteRecord.origin };
 
-  let locale: Locale = stripLocalePrefix(input.pathname).locale;
+  const stripped = stripLocalePrefix(input.pathname);
+  let locale: Locale = stripped.locale;
   if (
     input.authenticatedPreview &&
     (input.previewLocale === "nl" || input.previewLocale === "en")
@@ -46,8 +48,14 @@ export async function resolvePublicCmsRequest(input: {
     locale = input.previewLocale;
   }
 
-  const { path: identityPath } = stripLocalePrefix(input.pathname);
-  const publicPath = normalizeCmsPath(locale, input.pathname);
+  const identityPath = canonicalizePublicIdentityPath(stripped.path);
+  const requestedPublicPath = normalizeCmsPath(locale, input.pathname);
+  const publicPath = normalizeCmsPath(locale, identityPath);
+
+  // Alias slug under /en (or NL) → permanent redirect to the canonical public path.
+  if (requestedPublicPath !== publicPath) {
+    return { kind: "redirect", statusCode: 301, toPath: publicPath };
+  }
 
   const redirects = await store.listActiveRedirects(siteId);
   const cmsRedirects: CmsRedirect[] = redirects.map((r) => ({

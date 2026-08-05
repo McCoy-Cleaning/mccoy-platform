@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs",
+        "failClosed": true
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs",
+        "failClosed": true
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs",
+        "failClosed": true
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/guardian/guardian-hook.mjs"
+      }
+    ]
+  }
+}

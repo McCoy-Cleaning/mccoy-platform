@@ -749,7 +749,7 @@ export function PrototypeImageField({
                   <img
                     src={thumbSrc}
                     alt=""
-                    className="h-full w-full object-cover transition group-hover:scale-[1.04]"
+                    className="h-full w-full object-contain p-1 transition group-hover:scale-[1.04]"
                     loading="lazy"
                   />
                   {selected ? (

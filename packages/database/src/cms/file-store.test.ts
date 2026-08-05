@@ -65,6 +65,197 @@ describe("file cms store publish + resolve", () => {
     expect(outbox[0]!.payload.pageId).toBe("page_home");
   });
 
+  it("publishes EN with enFieldDrafts and applies overlays on /en", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    const home = await store.getActivePublishedRevision("page_home");
+    expect(home).not.toBeNull();
+    const site = await store.getSite();
+    const page = home!.payload;
+    const withEn = {
+      ...page,
+      sectionContent: {
+        ...(page.kind === "builtin" ? page.sectionContent : {}),
+        "home.hero": {
+          heading: "NL hero",
+          body: "NL body",
+        },
+      },
+      enFieldDrafts: {
+        "section:home.hero:heading": "EN hero from drafts",
+        "page:meta:title": "EN Home",
+        "page:meta:description": "EN desc",
+      },
+      paths: { nl: "/", en: "/" },
+      localeContent: {
+        ...page.localeContent!,
+        en: {
+          navigationLabel: "Home",
+          pageTitle: "EN Home",
+          seo: { title: "EN Home", description: "EN desc" },
+        },
+      },
+      localeStates: {
+        nl: { publicationState: "published" as const, freshness: "current" as const },
+        en: { publicationState: "published" as const, freshness: "current" as const },
+      },
+    };
+    await store.publishPage({
+      siteId: site.id,
+      pageId: "page_home",
+      payload: withEn as typeof page,
+      publishedLocales: ["nl", "en"],
+    });
+
+    const en = await resolvePublicCmsRequest({ pathname: "/en", store });
+    expect(en.kind).toBe("snapshot");
+    if (en.kind !== "snapshot") return;
+    expect(en.snapshot.page.enFieldDrafts?.["section:home.hero:heading"]).toBe(
+      "EN hero from drafts",
+    );
+    const hero =
+      en.snapshot.page.kind === "builtin"
+        ? en.snapshot.page.sectionContent["home.hero"]
+        : undefined;
+    expect(hero).toMatchObject({ heading: "EN hero from drafts", body: "NL body" });
+  });
+
+  it("first EN publish with drafts (Opslaan path) serves /en overlays", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    const home = await store.getActivePublishedRevision("page_home");
+    const site = await store.getSite();
+    const page = home!.payload;
+
+    // NL-only baseline (EN draft / missing) — mirrors first Opslaan before EN go-live.
+    await store.publishPage({
+      siteId: site.id,
+      pageId: "page_home",
+      payload: {
+        ...page,
+        localeStates: {
+          nl: { publicationState: "published" as const, freshness: "current" as const },
+          en: { publicationState: "draft" as const, freshness: "unknown" as const },
+        },
+      } as typeof page,
+      publishedLocales: ["nl"],
+    });
+
+    const pending = await resolvePublicCmsRequest({ pathname: "/en", store });
+    expect(pending.kind).toBe("redirect");
+
+    // Opslaan with EN drafts → publishedLocales includes en (decideOpslaanPublishedLocales).
+    await store.publishPage({
+      siteId: site.id,
+      pageId: "page_home",
+      payload: {
+        ...page,
+        sectionContent: {
+          ...(page.kind === "builtin" ? page.sectionContent : {}),
+          "home.hero": {
+            heading: "NL hero",
+            body: "NL body",
+          },
+        },
+        enFieldDrafts: {
+          "section:home.hero:heading": "EN hero from Opslaan",
+          "section:home.hero:body": "Anything is possible with English copy",
+          "page:meta:title": "EN Home",
+          "page:meta:description": "EN desc",
+        },
+        localeContent: {
+          ...page.localeContent!,
+          en: {
+            navigationLabel: "Home",
+            pageTitle: "EN Home",
+            seo: { title: "EN Home", description: "EN desc" },
+          },
+        },
+        localeStates: {
+          nl: { publicationState: "published" as const, freshness: "current" as const },
+          en: { publicationState: "published" as const, freshness: "current" as const },
+        },
+      } as typeof page,
+      publishedLocales: ["nl", "en"],
+    });
+
+    const en = await resolvePublicCmsRequest({ pathname: "/en", store });
+    expect(en.kind).toBe("snapshot");
+    if (en.kind !== "snapshot") return;
+    expect(en.snapshot.page.localeStates?.en?.publicationState).toBe("published");
+    expect(en.snapshot.page.enFieldDrafts?.["section:home.hero:body"]).toBe(
+      "Anything is possible with English copy",
+    );
+    const hero =
+      en.snapshot.page.kind === "builtin"
+        ? en.snapshot.page.sectionContent["home.hero"]
+        : undefined;
+    expect(hero).toMatchObject({
+      heading: "EN hero from Opslaan",
+      body: "Anything is possible with English copy",
+    });
+  });
+
+  it("NL-only Opslaan does not demote an already-published EN locale", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    const home = await store.getActivePublishedRevision("page_home");
+    const site = await store.getSite();
+    const page = home!.payload;
+    await store.publishPage({
+      siteId: site.id,
+      pageId: "page_home",
+      payload: {
+        ...page,
+        enFieldDrafts: { "section:home.hero:heading": "EN hero" },
+        localeContent: {
+          ...page.localeContent!,
+          en: {
+            navigationLabel: "Home",
+            pageTitle: "EN Home",
+            seo: { title: "EN Home", description: "EN desc" },
+          },
+        },
+        localeStates: {
+          nl: { publicationState: "published" as const, freshness: "current" as const },
+          en: { publicationState: "published" as const, freshness: "current" as const },
+        },
+      } as typeof page,
+      publishedLocales: ["nl", "en"],
+    });
+
+    // Simulate stale editor payload that still says EN is draft (failed local sync).
+    await store.publishPage({
+      siteId: site.id,
+      pageId: "page_home",
+      payload: {
+        ...page,
+        enFieldDrafts: { "section:home.hero:heading": "EN hero refreshed" },
+        localeContent: {
+          ...page.localeContent!,
+          en: {
+            navigationLabel: "Home",
+            pageTitle: "EN Home",
+            seo: { title: "EN Home", description: "EN desc" },
+          },
+        },
+        localeStates: {
+          nl: { publicationState: "published" as const, freshness: "current" as const },
+          en: { publicationState: "draft" as const, freshness: "unknown" as const },
+        },
+      } as typeof page,
+      publishedLocales: ["nl"],
+    });
+
+    const en = await resolvePublicCmsRequest({ pathname: "/en", store });
+    expect(en.kind).toBe("snapshot");
+    if (en.kind !== "snapshot") return;
+    expect(en.snapshot.page.localeStates?.en?.publicationState).toBe("published");
+    expect(en.snapshot.page.enFieldDrafts?.["section:home.hero:heading"]).toBe(
+      "EN hero refreshed",
+    );
+  });
+
   it("rejects stale draft saves", async () => {
     const store = createFileCmsStore({ memoryOnly: true });
     await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());

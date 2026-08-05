@@ -110,12 +110,8 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
       <ProductsIntroView
         eyebrow={cmsTextOrFallback(rawEyebrow, t.products.kicker, def.eyebrow)}
         heading={cmsTextOrFallback(rawTitle, headingFallback, def.title)}
-        intro={
-          rawBody === "" ? "" : cmsTextOrFallback(rawBody, introFallback, def.body)
-        }
-        notice={
-          rawNotice === "" ? "" : cmsTextOrFallback(rawNotice, noticeFallback, def.notice)
-        }
+        intro={cmsTextOrFallback(rawBody, introFallback, def.body)}
+        notice={cmsTextOrFallback(rawNotice, noticeFallback, def.notice)}
         image={(d.image as CmsImage | undefined) ?? null}
         ctaLabel={t.products.cta}
         isEn={isEn}
@@ -162,19 +158,9 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
 
     return (
       <ProductsAssortmentView
-        eyebrow={
-          rawEyebrow === ""
-            ? ""
-            : cmsTextOrFallback(rawEyebrow, eyebrowFallback, def.eyebrow)
-        }
-        heading={
-          rawTitle === ""
-            ? ""
-            : cmsTextOrFallback(rawTitle, t.products.title, def.title)
-        }
-        intro={
-          rawIntro === "" ? "" : cmsTextOrFallback(rawIntro, introFallback, def.intro)
-        }
+        eyebrow={cmsTextOrFallback(rawEyebrow, eyebrowFallback, def.eyebrow)}
+        heading={cmsTextOrFallback(rawTitle, t.products.title, def.title)}
+        intro={cmsTextOrFallback(rawIntro, introFallback, def.intro)}
         cards={cards}
       />
     );

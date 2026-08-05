@@ -36,7 +36,10 @@ export function Navbar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]">
+      <header
+        data-site-header=""
+        className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]"
+      >
         <div
           className={cn(SECTION_PAGE_RAIL, "flex items-center justify-between gap-3")}
           style={{ minHeight: Math.max(80, logoHeightPx + 24) }}
