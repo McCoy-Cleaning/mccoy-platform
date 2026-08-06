@@ -5,9 +5,6 @@ import { cmsLinkSchema, linkFromLegacyHref, parseCmsLink } from "../links";
 import type { BlockType, CmsLink } from "../types";
 import type { CmsBlockDataDefinition } from "./definition";
 import { normalizeCmsImage } from "./image-normalize";
-import { plansDefinition } from "./plans";
-import { roadmapDefinition } from "./roadmap";
-import { jobsDefinition } from "./jobs";
 import {
   createFormFieldItem,
   DEFAULT_CONTACT_FORM_FIELDS,
@@ -22,15 +19,7 @@ import {
   textListItemSchema,
   type TextListItem,
 } from "./text-list";
-import { timelineDefinition } from "./timeline";
-import {
-  contactInfoCardsDefinition,
-  legalArticlesDefinition,
-  partnersMarqueeDefinition,
-  quoteRequestFormDefinition,
-  statsCountersDefinition,
-} from "./new-sections";
-import { offersDefinition } from "./offers";
+import { newSectionsCatalogSlice, specialisedCatalogSlice } from "./catalog-slices";
 
 export type {
   JobsBlockData,
@@ -1395,7 +1384,7 @@ export const catalogDefinitions = {
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
   }),
-  jobs: jobsDefinition,
+  ...specialisedCatalogSlice,
   latestPosts: def({
     type: "latestPosts",
     label: "Uitgelichte artikelen",
@@ -1433,15 +1422,7 @@ export const catalogDefinitions = {
     },
     capabilities: { duplicable: true, removable: true, publishable: true },
   }),
-  roadmap: roadmapDefinition,
-  timeline: timelineDefinition,
-  plans: plansDefinition,
-  partnersMarquee: partnersMarqueeDefinition,
-  statsCounters: statsCountersDefinition,
-  contactInfoCards: contactInfoCardsDefinition,
-  quoteRequestForm: quoteRequestFormDefinition,
-  legalArticles: legalArticlesDefinition,
-  offers: offersDefinition,
+  ...newSectionsCatalogSlice,
 } as const satisfies Record<BlockType, CmsBlockDataDefinition>;
 
 export type CatalogDefinitions = typeof catalogDefinitions;
