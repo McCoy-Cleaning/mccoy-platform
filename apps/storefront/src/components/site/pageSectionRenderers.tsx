@@ -1,6 +1,12 @@
 import type { PageSectionRenderers } from "./PageLayoutRenderer";
 import { homeSectionRenderers } from "./homeSectionRenderers";
-import { About, Services, ProductsMain, ProductsInfo } from "./sections/SitePageSections";
+import {
+  About,
+  ServicesMain,
+  ServicesCards,
+  ProductsMain,
+  ProductsInfo,
+} from "./sections/SitePageSections";
 import { ContactMainChrome, VacaturesMainChrome, OfferteMainChrome } from "./FormPageChrome";
 import { ContactFormSection, ContactInfoSection, OfferteInfoSection } from "./sections/ContactSections";
 import { OfferteFormSection } from "./sections/OfferteSections";
@@ -14,7 +20,8 @@ export const pageSectionRenderers: PageSectionRenderers = {
     "about.main": About,
   },
   services: {
-    "services.main": Services,
+    "services.main": ServicesMain,
+    "services.cards": ServicesCards,
   },
   products: {
     "products.main": ProductsMain,

@@ -76,38 +76,60 @@ const serviceImages = [
   serviceGlass,
 ];
 
-export function Services() {
+function useLocalizedServiceCards() {
   const { t } = useI18n();
   const content = useTypedSectionContent("page_services", "services.main");
   const cardsContent = useTypedSectionContent("page_services", "services.cards");
-  const [open, setOpen] = useState<number | null>(null);
   const localized = localizedServicesCopy(content, cardsContent, t);
-  const eyebrow = localized.eyebrow;
-  const heading = localized.heading;
-  const intro = localized.intro;
   const cards = localized.cards.map((card, i) => {
-        const i18nItem = t.work.items[i];
-        const usedFallback = isCmsPlaceholderSrc(card.image.src);
-        const imageSrc = usedFallback
-          ? serviceImages[i] || wRegular
-          : card.image.src;
-        const link = card.link;
-        const ctaLabel = link
-          ? link.type === "internal_route" && link.route === "offerte"
-            ? t.services.quoteCta
-            : t.services.contactCta
-          : undefined;
-        return {
-          id: card.id,
-          title: card.title,
-          desc: card.description,
-          full: i18nItem?.full ?? (card.description ? [card.description] : []),
-          imageSrc,
-          link,
-          ctaLabel,
-          Icon: serviceIcons[i] ?? Wind,
-        };
-      });
+    const i18nItem = t.work.items[i];
+    const usedFallback = isCmsPlaceholderSrc(card.image.src);
+    const imageSrc = usedFallback ? serviceImages[i] || wRegular : card.image.src;
+    const link = card.link;
+    const ctaLabel = link
+      ? link.type === "internal_route" && link.route === "offerte"
+        ? t.services.quoteCta
+        : t.services.contactCta
+      : undefined;
+    return {
+      id: card.id,
+      title: card.title,
+      desc: card.description,
+      full: i18nItem?.full ?? (card.description ? [card.description] : []),
+      imageSrc,
+      link,
+      ctaLabel,
+      Icon: serviceIcons[i] ?? Wind,
+    };
+  });
+  return { t, localized, cards };
+}
+
+/** Services intro chrome — cards live on `services.cards`. */
+export function ServicesMain() {
+  const { localized } = useLocalizedServiceCards();
+  const { eyebrow, heading, intro } = localized;
+  return (
+    <section id="services" className="relative isolate overflow-hidden py-20 sm:py-24">
+      <SectionAmbient />
+      <div className={cn("relative", SECTION_PAGE_RAIL)}>
+        <CompositePartSelectChrome sectionKey="services.main" part="header" label="Intro">
+          <div className="max-w-2xl">
+            <SectionEyebrow>{eyebrow}</SectionEyebrow>
+            <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">{heading}</h1>
+            {intro ? <p className="mt-4 whitespace-pre-line text-muted-foreground">{intro}</p> : null}
+          </div>
+        </CompositePartSelectChrome>
+      </div>
+    </section>
+  );
+}
+
+/** Service cards grid + detail modal (fixed section `services.cards`). */
+export function ServicesCards() {
+  const { t, localized, cards } = useLocalizedServiceCards();
+  const eyebrow = localized.eyebrow;
+  const [open, setOpen] = useState<number | null>(null);
 
   useEffect(() => {
     if (open === null) return;
@@ -120,20 +142,12 @@ export function Services() {
       document.documentElement.style.overflow = prevHtml;
     };
   }, [open]);
-  return (
-    <section id="services" className="relative isolate overflow-hidden py-20 sm:py-24">
-      <SectionAmbient />
-      <div className={cn("relative", SECTION_PAGE_RAIL)}>
-        <CompositePartSelectChrome sectionKey="services.main" part="header" label="Intro">
-        <div className="max-w-2xl">
-          <SectionEyebrow>{eyebrow}</SectionEyebrow>
-          <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">{heading}</h1>
-          {intro ? <p className="mt-4 whitespace-pre-line text-muted-foreground">{intro}</p> : null}
-        </div>
-        </CompositePartSelectChrome>
 
-        <CompositePartSelectChrome sectionKey="services.main" part="cards" label="Dienstkaarten">
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  return (
+    <section id="services-cards" className="relative isolate overflow-hidden pb-20 sm:pb-24">
+      <div className={cn("relative", SECTION_PAGE_RAIL)}>
+        <CompositePartSelectChrome sectionKey="services.cards" part="cards" label="Dienstkaarten">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card, i) => {
             const Icon = card.Icon;
             return (
@@ -290,6 +304,16 @@ export function Services() {
           document.body,
         )}
     </section>
+  );
+}
+
+/** @deprecated Prefer ServicesMain + ServicesCards (services.cards split). */
+export function Services() {
+  return (
+    <>
+      <ServicesMain />
+      <ServicesCards />
+    </>
   );
 }
 
