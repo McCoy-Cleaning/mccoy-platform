@@ -500,6 +500,35 @@ Admin-local `EmptyState` / `ErrorState` / `InlineLoader` + `AdminFormField` (`.a
 
 **Status:** Complete. `packages/cms-editor/src/index.tsx` collapsed to a thin re-export barrel; fixed-section inspectors, image/link fields, selection APIs, and inspector chrome live in sibling modules.
 
+**Checkpoint commit (structural):** `9c7bb0470bc7d4e73bd9b5e817ead77e6b729c48` — *Extract cms-editor fixed inspectors into sibling modules (Stage 4 structural).*
+
+**Closeout docs commit:** recorded after this section’s follow-up / localisation matrix (separate small commit).
+
+### Locale E2E (`test:e2e:locale`) classification
+
+| Item | Value |
+|------|-------|
+| **Primary classification** | **Fixture defect** — `savePage` asserts ephemeral `"Opgeslagen"` toast |
+| **Secondary** | Race / eventual consistency (toast can dismiss before poll matches) |
+| **Not** | Stage 4 product regression (no toast/save logic in structural commit) |
+| Run1 | `.data/locale-e2e-run1.log` — 4 passed / 1 failed (`cms-locale-en-publish` → `savePage` @ `e2e/helpers/cms.ts` ~332) |
+| Run2 | `.data/locale-e2e-run2.log` — **4 passed / 1 failed** (identical `savePage` timeout; Live + disabled publish buttons in snapshot) |
+| Snapshot evidence | Badge **Live**; **"Opslaan & publiceren" disabled**; **"Verwerpen" disabled** (published toolbar) while toast poll timed out |
+| Tracked follow-up | [`docs/testing/locale-e2e-savepage-follow-up.md`](../testing/locale-e2e-savepage-follow-up.md) — **open**, not blocking Stage 5 |
+
+### Localisation unit coverage matrix (deterministic)
+
+| Requirement | Covered? | Primary evidence (file → describe / it) |
+|-------------|:--------:|----------------------------------------|
+| Stable NL/EN field paths | Yes | `packages/cms-schema/src/en-field-drafts.test.ts` → `enFieldDraftPath` / `builds and parses stable paths`; `en-field-sync.test.ts` → `collectTranslatableStringPaths`, `gallery / offers / steps path coverage`; `packages/cms-editor/src/blocks/en-draft-fields.test.tsx` → `blockEnPath` / `builds block field draft paths` |
+| Raw EN value preservation | Yes | `translation-field.test.ts` → `preserves trailing spaces while typing…`; `typing EN after clear marks manually_translated and retains the draft`; `en-field-sync.test.ts` → `retains valid distinct EN and never auto-fills intentional_blank / manual` |
+| Whitespace-only blank detection | Yes | `translation-field.test.ts` → `falls back to NL when EN is whitespace only`; `classifyTranslationField` / `treats EN identical to NL as blank/untranslated`; `translation-coverage.test.ts` → `treats blank draft as blank (not translated)` |
+| Fallback eligibility | Yes | `translation-field.test.ts` → `resolveLocalizedField — blank EN must not suppress NL` (missing/null/empty/whitespace/intentional_blank/stale); `cms-text-fallback.test.ts` → `cmsTextOrFallback` suite; `localizeCmsPageForLocale — blank draft regression` |
+| Manual EN preservation | Yes | `en-field-sync.test.ts` → `planEnFieldDraftSync` / `queues new NL, retains any existing EN (manual wins), prunes deleted`; `retains valid distinct EN…`; `translation-coverage.test.ts` → `selects missing/blank/override_removed and skips intentional_blank + manual` |
+| Inspector callback / path parity | Yes | `packages/cms-editor/src/blocks/en-draft-fields.test.tsx` → `manual EN draft controls in editors` / `partners / stats / workGallery fixed inspectors expose EN`; Stage 4 edit kept inspector imports on sibling paths |
+
+Honest gap: no single matrix test named “inspector callback/path parity” end-to-end across every fixed inspector; coverage is via `en-draft-fields` + Stage 4 barrel import paths, not a dedicated parity harness for all inspectors.
+
 ### Line counts
 
 | Surface | Before | After |
@@ -541,7 +570,8 @@ Admin-local `EmptyState` / `ErrorState` / `InlineLoader` + `AdminFormField` (`.a
 | `npm run build -w @mccoy/admin` | **0** | Pass |
 | `npm run build -w @mccoy/storefront` | **0** | Pass |
 | `npm run test:e2e:forms` | **0** | **4 passed** |
-| `npm run test:e2e:locale` | **1** | **4 passed / 1 failed** — `cms-locale-en-publish` `savePage` timeout (admin logs: Missing `SUPABASE_URL`, `Server function info not found`). Public locale smokes green. Not caused by barrel split. |
+| `npm run test:e2e:locale` (run1) | **1** | **4 passed / 1 failed** — `cms-locale-en-publish` `savePage` timeout waiting for `"Opgeslagen"`; snapshot shows **Live** + publish/discard **disabled**. Classified fixture defect (+ race secondary). Log: `.data/locale-e2e-run1.log`. |
+| `npm run test:e2e:locale` (run2) | **1** | **4 passed / 1 failed** — same `savePage` / `"Opgeslagen"` timeout; retry1 snapshot again **Live** + **"Opslaan & publiceren" [disabled]** + **"Verwerpen" [disabled]**. Log: `.data/locale-e2e-run2.log`. Confirms flaky fixture, not Stage 4 product regression. |
 | `npm run test:e2e:coverage` | **0** | **8 passed** (after E2E helper `Zoek…` placeholder regex fix in `e2e/helpers/cms.ts`) |
 
 ### Preserved invariants

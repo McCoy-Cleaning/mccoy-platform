@@ -174,6 +174,8 @@ Extracted Aanvragen into `apps/admin/src/features/inquiries/`. Thin route is com
 
 Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97** lines; was **3102**).
 
+**Checkpoint commit (structural):** `9c7bb0470bc7d4e73bd9b5e817ead77e6b729c48` — *Extract cms-editor fixed inspectors into sibling modules (Stage 4 structural).*
+
 | Concern | Owner |
 |---------|-------|
 | Public API | `src/index.tsx` (re-exports only) |
@@ -186,7 +188,11 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Preserved invariants:** public export names; `storefront ↛ cms-editor`; `cms-editor ↛ apps/admin`; sibling imports only (no `./index`); ai-assist ↛ inspectors; no Aanvragen / RegisteredBlockView / catalog / admin store / storefront changes.
 
-**Recommended Stage 5:** Registry decomposition (catalog / editor / view modules; shrink `RegisteredBlockView`).
+**Locale E2E closeout:** `test:e2e:locale` failure on `savePage` / `"Opgeslagen"` classified as **fixture defect** (secondary: race). Durable UI already shows published state (Live + disabled Opslaan). Tracked: [`docs/testing/locale-e2e-savepage-follow-up.md`](../testing/locale-e2e-savepage-follow-up.md). Not a Stage 4 product regression; does not block Stage 5.
+
+**Localisation unit coverage:** see audit § Stage 4 “Localisation unit coverage matrix” (`translation-field`, `en-field-drafts`, `en-field-sync`, `translation-coverage`, `cms-text-fallback`, `en-draft-fields`).
+
+**Recommended Stage 5:** Registry decomposition (catalog / editor / view modules; shrink `RegisteredBlockView`). First family: extract one coherent registered view (e.g. plans) following steps/jobs/offers pattern.
 
 ### Stage 2 default (historical detail)
 
