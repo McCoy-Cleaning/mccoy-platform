@@ -587,6 +587,21 @@ Honest gap: no single matrix test named “inspector callback/path parity” end
 
 Registry decomposition — continue extracting catalog / editor / view modules; shrink `RegisteredBlockView` switch.
 
+### Stage 5 checkpoint — plans family
+
+**Status:** First registry family complete (plans → `PlansSectionView`). Stage 5 overall remains **in progress**.
+
+**Checkpoint commit:** *(filled after commit)* — *Extract plans block into registered PlansSectionView (Stage 5).*
+
+| Item | Detail |
+|------|--------|
+| View extracted | `packages/cms-renderer/src/blocks/PlansSectionView.tsx` |
+| Registry | `blockViewRegistry.plans` |
+| Switch arm | `RegisteredBlockView` `case "plans"` → registry dispatch only |
+| Parity tests | `PlansSectionView.test.tsx` (RegisteredBlockView markup ≡ direct view) |
+| Public entry | Still `RegisteredBlockView` (admin + storefront `BlockView`) |
+| Out of scope | Image-fill / object-cover restores; other registry families |
+
 ---
 
 ## Stage 3 closeout (complete — 2026-08-06)

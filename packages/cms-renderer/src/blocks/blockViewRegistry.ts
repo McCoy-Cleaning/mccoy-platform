@@ -2,6 +2,7 @@ import type { BlockType } from "@mccoy/cms-schema";
 import type { ComponentType } from "react";
 import { JobsSectionView, type JobsSectionViewProps } from "./JobsSectionView";
 import { OffersSectionView, type OffersSectionViewProps } from "./OffersSectionView";
+import { PlansSectionView, type PlansSectionViewProps } from "./PlansSectionView";
 import { StepsSectionView, type StepsSectionViewProps } from "./StepsSectionView";
 
 /**
@@ -13,7 +14,13 @@ export const blockViewRegistry: Partial<
 > = {
   jobs: JobsSectionView as unknown as ComponentType<Record<string, unknown>>,
   offers: OffersSectionView as unknown as ComponentType<Record<string, unknown>>,
+  plans: PlansSectionView as unknown as ComponentType<Record<string, unknown>>,
   steps: StepsSectionView as unknown as ComponentType<Record<string, unknown>>,
 };
 
-export type { JobsSectionViewProps, OffersSectionViewProps, StepsSectionViewProps };
+export type {
+  JobsSectionViewProps,
+  OffersSectionViewProps,
+  PlansSectionViewProps,
+  StepsSectionViewProps,
+};

@@ -29,6 +29,8 @@ export { JobsSectionView } from "./blocks/JobsSectionView";
 export type { JobsSectionViewProps, JobsRenderMode } from "./blocks/JobsSectionView";
 export { OffersSectionView } from "./blocks/OffersSectionView";
 export type { OffersSectionViewProps } from "./blocks/OffersSectionView";
+export { PlansSectionView } from "./blocks/PlansSectionView";
+export type { PlansSectionViewProps } from "./blocks/PlansSectionView";
 export { CmsUiLocaleProvider, useCmsUiLocale } from "./uiLocale";
 export { offerUiCopy } from "./offerUiCopy";
 export type { OfferUiCopy } from "./offerUiCopy";
