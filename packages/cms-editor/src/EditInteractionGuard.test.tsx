@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { EditInteractionGuard } from "./index";
+import { EditInteractionGuard } from "./EditInteractionGuard";
 
 let mounted: { container: HTMLDivElement; root: Root } | null = null;
 

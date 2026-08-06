@@ -136,7 +136,7 @@ McCoy already uses **registry + dedicated module** patterns. Continue that inste
 | **1** | Audit + architecture | This pair of docs; baseline recorded | `docs/refactoring/*` |
 | **2** | Admin async UX + dialogs | **Complete (2026-08-06).** Empty/Error/InlineLoader; FormField token; remove all cms-editor AI `window.confirm` via structured `CmsConfirmationRequest` | admin primitives, inquiries UX, `ai-assist.tsx`, `AdminCmsContentAiProvider` |
 | **3** | Aanvragen feature extraction | **Complete (2026-08-06).** Extracted into `apps/admin/src/features/inquiries/`; thin route composition only | `apps/admin/src/features/inquiries/*`, thin `admin.inquiries.tsx` (6 lines) |
-| **4** | **cms-editor barrel / inspector split** | Move inspectors/helpers out of `cms-editor/src/index.tsx`; barrel re-exports only | `packages/cms-editor` |
+| **4** | cms-editor barrel / inspector split | **Complete (2026-08-06).** Inspectors/helpers out of barrel; `index.tsx` re-exports only (**97** lines; was **3102**) | `packages/cms-editor` |
 | **5** | Registry decomposition | Continue extracting catalog / editor / view modules; shrink `RegisteredBlockView` switch | cms-schema, cms-editor, cms-renderer |
 | **6** | Admin CMS store modularization | Split persistence / layout mutations / publish / EN planning | `apps/admin/src/lib/cms/store.ts` |
 | **7** | Storefront composition cleanup | Clarify section routers vs renderer; no admin chrome leakage | `SitePageSections`, home sections |
@@ -170,7 +170,23 @@ Extracted Aanvragen into `apps/admin/src/features/inquiries/`. Thin route is com
 
 **Preserved invariants:** mailbox APIs, Graph/IMAP, read-on-open, reply recipients, delete semantics, pins (`@/lib/requests/inquiry-pins`), Dutch copy, selection toolbar, bulk delete, `FORM_INBOX_SHOW_ALL` banner, no UniversalMailbox abstractions. Selected inquiry = `selectedId` + authoritative detail query.
 
-**Recommended Stage 4 (not started):** cms-editor barrel / inspector split (`packages/cms-editor/src/index.tsx`).
+### Stage 4 (complete — 2026-08-06)
+
+Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97** lines; was **3102**).
+
+| Concern | Owner |
+|---------|-------|
+| Public API | `src/index.tsx` (re-exports only) |
+| Selection | `selection.ts` (`CmsSelection`, `buildSectionMutation`) |
+| Edit/preview guards + section frame | `EditInteractionGuard.tsx`, `SectionSelectFrame.tsx` |
+| Image / typed link fields | `PrototypeImageField.tsx` |
+| Card lists | `CardListEditor.tsx` + `list-helpers.tsx` |
+| Fixed-inspector chrome | `inspector-chrome.tsx` (not `blocks/field-chrome` — style diverge) |
+| Fixed-section inspectors + dispatcher | `inspectors/*` (`SelectedSectionInspector` last) |
+
+**Preserved invariants:** public export names; `storefront ↛ cms-editor`; `cms-editor ↛ apps/admin`; sibling imports only (no `./index`); ai-assist ↛ inspectors; no Aanvragen / RegisteredBlockView / catalog / admin store / storefront changes.
+
+**Recommended Stage 5:** Registry decomposition (catalog / editor / view modules; shrink `RegisteredBlockView`).
 
 ### Stage 2 default (historical detail)
 

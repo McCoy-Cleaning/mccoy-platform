@@ -270,7 +270,7 @@ export async function addCmsSection(page: Page, templateName: string) {
   await page.getByRole("button", { name: "Sectie toevoegen" }).first().click();
   await expect(page.getByRole("heading", { name: "Kies een sectie" })).toBeVisible();
   await page.getByRole("button", { name: "Alle", exact: true }).click();
-  await page.getByPlaceholder("Zoek...").fill(templateName);
+  await page.getByPlaceholder(/Zoek/).fill(templateName);
   const type = TEMPLATE_TYPE[templateName];
   if (type) {
     await page.locator(`[data-cms-template="${type}"]`).first().click();

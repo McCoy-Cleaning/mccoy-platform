@@ -16,11 +16,9 @@ import {
 } from "../ai-assist";
 import { RegisteredBlockEditor } from "./RegisteredBlockEditor";
 import { blockEnPath } from "./en-draft-fields";
-import {
-  PartnersInspector,
-  StatsInspector,
-  WorkGalleryInspector,
-} from "../index";
+import { PartnersInspector } from "../inspectors/PartnersInspector";
+import { StatsInspector } from "../inspectors/StatsInspector";
+import { WorkGalleryInspector } from "../inspectors/WorkGalleryInspector";
 
 let mounted: { container: HTMLDivElement; root: Root } | null = null;
 

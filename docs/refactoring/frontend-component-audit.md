@@ -58,14 +58,14 @@ Line counts are **non-blank/comment-inclusive physical lines** measured 2026-08-
 
 Disposition values: `split-required | extract-helpers | extract-feature | registry-decomposition | large-but-cohesive | leave-unchanged`.
 
-### 1. `packages/cms-editor/src/index.tsx` (~2996)
+### 1. `packages/cms-editor/src/index.tsx` (**97** lines after Stage 4; was ~3102)
 
 | | |
 |--|--|
-| **Primary responsibility** | Barrel + large authoring surface: fixed-section inspectors, image upload helpers, re-exports of block editors / AI assist / registries, and many inline inspector field UIs. |
-| **Imports** | `@mccoy/cms-schema` (types, ids, image helpers, link schemas), `@mccoy/cms-renderer` (`HomeHeroView`, `FormPageChromeView` for preview chrome), `@mccoy/ui` (`cn`), internal `./blocks/*`, `./ai-assist`, upload/compress helpers. |
+| **Primary responsibility** | Thin public barrel: re-exports only (block editors, AI assist, inspectors, image helpers, selection APIs). |
+| **Bodies live in** | `EditInteractionGuard.tsx`, `SectionSelectFrame.tsx`, `selection.ts`, `PrototypeImageField.tsx`, `CardListEditor.tsx`, `inspector-chrome.tsx`, `list-helpers.tsx`, `inspectors/*`. |
 | **Who imports it** | Admin CMS: `AdminCmsContentAiProvider`, `PageEditor`, `BuiltinLayoutEditor` (selected exports), and any admin path that pulls `@mccoy/cms-editor`. Storefront must **not** import this package (enforced by cms-schema contract tests). |
-| **Disposition** | `split-required` |
+| **Disposition** | `split-required` — **done in Stage 4** |
 | **Why** | Mixes public package API, fixed-section editors, and low-level field chrome in one file. Block editors already live under `./blocks/`; remaining inspectors and helpers should follow that pattern so the barrel only re-exports. |
 
 ### 2. `apps/admin/src/lib/cms/store.ts` (~1534; prior est. ~1600)
@@ -491,8 +491,71 @@ Admin-local `EmptyState` / `ErrorState` / `InlineLoader` + `AdminFormField` (`.a
 | Stage | Theme |
 |------:|-------|
 | **3** | **Complete** — Aanvragen feature extraction (`apps/admin/src/features/inquiries/`) — thin route |
-| **4** | **cms-editor barrel / inspector split** |
+| **4** | **Complete** — cms-editor barrel / inspector split — thin re-export barrel |
 | **5+** | Registry / store / storefront / skills / optional `@mccoy/ui` promotion (see architecture doc) |
+
+---
+
+## Stage 4 closeout (complete — 2026-08-06)
+
+**Status:** Complete. `packages/cms-editor/src/index.tsx` collapsed to a thin re-export barrel; fixed-section inspectors, image/link fields, selection APIs, and inspector chrome live in sibling modules.
+
+### Line counts
+
+| Surface | Before | After |
+|---------|-------:|------:|
+| `packages/cms-editor/src/index.tsx` | **3102** | **97** |
+
+### Files created
+
+| Path | Responsibility |
+|------|----------------|
+| `EditInteractionGuard.tsx` | Edit/preview interaction capture guards |
+| `SectionSelectFrame.tsx` | Fixed-section selection chrome |
+| `selection.ts` | `CmsSelection` + `buildSectionMutation` |
+| `PrototypeImageField.tsx` | Image picker + `TypedLinkField` |
+| `CardListEditor.tsx` | Shared service/product card list editor |
+| `inspector-chrome.tsx` | Fixed-inspector Field/input/select/button classes (kept local — styles differ from `blocks/field-chrome`) |
+| `list-helpers.tsx` | `updateCardAt` / `removeById` / `RemoveIconButton` |
+| `placeholder-image.ts` / `inspector-types.ts` | Shared placeholder + `ImagePickerProps` alias |
+| `inspectors/*.tsx` | HomeHero, FormChrome, ContactInfo, ContactForm, AboutMain, ServicesMain, ProductsMain, ProductsInfo, Partners, Stats, WorkGallery, LegalMain, BlockDataInspector, SelectedSectionInspector |
+
+### Tests
+
+| Add / edit | Purpose |
+|------------|---------|
+| Add `src/stage4-barrel-split.test.ts` | Export compatibility, admin-boundary, barrel body-free, cycle heuristic, ai-assist ↛ inspectors |
+| Edit `EditInteractionGuard.test.tsx` | Import from `./EditInteractionGuard` (not barrel) |
+| Edit `blocks/en-draft-fields.test.tsx` | Import inspectors from sibling paths |
+
+### Command results (Stage 4 verification)
+
+| Command | Exit | Result |
+|---------|-----:|--------|
+| `npm run typecheck` | **0** | Pass (all workspaces incl. cms-editor, admin, storefront) |
+| `npm run lint` | **0** | Pass (root lint alias → cms-renderer typecheck) |
+| `npm run test:contract` | **0** | 52 files / **511** tests |
+| `npm run test:ci` | **0** | 11 files / **113** tests |
+| `npm run test -w @mccoy/cms-editor` | **0** | 12 files / **61** tests (incl. Stage 4 barrel suite) |
+| `npm run test -w @mccoy/admin` | **0** | 10 files / **59** tests |
+| `npm run build -w @mccoy/admin` | **0** | Pass |
+| `npm run build -w @mccoy/storefront` | **0** | Pass |
+| `npm run test:e2e:forms` | **0** | **4 passed** |
+| `npm run test:e2e:locale` | **1** | **4 passed / 1 failed** — `cms-locale-en-publish` `savePage` timeout (admin logs: Missing `SUPABASE_URL`, `Server function info not found`). Public locale smokes green. Not caused by barrel split. |
+| `npm run test:e2e:coverage` | **0** | **8 passed** (after E2E helper `Zoek…` placeholder regex fix in `e2e/helpers/cms.ts`) |
+
+### Preserved invariants
+
+- Public `@mccoy/cms-editor` export names unchanged
+- `storefront ↛ cms-editor`; `cms-editor ↛ apps/admin`; `renderer ↛ cms-editor`
+- Internal modules use concrete sibling imports (never `./index` / `@mccoy/cms-editor`)
+- ai-assist does not import inspectors
+- No Aanvragen / RegisteredBlockView / blockViewRegistry / schema catalog / admin CMS store / storefront edits
+- No behaviour or visual changes intended (mechanical move)
+
+### Recommended Stage 5
+
+Registry decomposition — continue extracting catalog / editor / view modules; shrink `RegisteredBlockView` switch.
 
 ---
 
@@ -604,6 +667,6 @@ Aanvragen product behaviour is **frozen**. Stage 3 is structural only — no red
 - Selected inquiry = `selectedId` + authoritative `getAdminFormInboxMessage` detail
 - Dutch copy, pins, selection toolbar, bulk delete, attachments, conversation thread, `FORM_INBOX_SHOW_ALL` banner preserved
 
-### Recommended Stage 4
+### Follow-on
 
-cms-editor barrel / inspector split — move inspectors/helpers out of `packages/cms-editor/src/index.tsx`; barrel re-exports only.
+Stage 4 (cms-editor barrel / inspector split) is **complete** — see Stage 4 closeout above. Recommended next: Stage 5 registry decomposition.

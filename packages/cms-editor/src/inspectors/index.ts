@@ -1,0 +1,14 @@
+export { HomeHeroInspector } from "./HomeHeroInspector";
+export { FormChromeInspector } from "./FormChromeInspector";
+export { ContactInfoInspector } from "./ContactInfoInspector";
+export { ContactFormInspector } from "./ContactFormInspector";
+export { AboutMainInspector } from "./AboutMainInspector";
+export { ServicesMainInspector } from "./ServicesMainInspector";
+export { ProductsMainInspector } from "./ProductsMainInspector";
+export { ProductsInfoInspector } from "./ProductsInfoInspector";
+export { PartnersInspector } from "./PartnersInspector";
+export { StatsInspector } from "./StatsInspector";
+export { WorkGalleryInspector } from "./WorkGalleryInspector";
+export { BlockDataInspector } from "./BlockDataInspector";
+export { LegalMainInspector } from "./LegalMainInspector";
+export { SelectedSectionInspector } from "./SelectedSectionInspector";
