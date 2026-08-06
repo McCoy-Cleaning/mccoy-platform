@@ -1,41 +1,9 @@
 {
-  "generatedAt": "2026-08-06T19:59:38.349Z",
+  "generatedAt": "2026-08-06T21:31:55.333Z",
   "blockTypeCount": 35,
-  "registeredViewCount": 4,
+  "registeredViewCount": 35,
   "editorRegisteredCount": 35,
-  "missingRendererRegistry": [
-    "hero",
-    "richText",
-    "centered",
-    "textImage",
-    "columns",
-    "benefits",
-    "quote",
-    "gallery",
-    "video",
-    "beforeAfter",
-    "carousel",
-    "comparisonTable",
-    "featureGrid",
-    "spacer",
-    "teamGrid",
-    "teamProfile",
-    "values",
-    "timeline",
-    "roadmap",
-    "cta",
-    "newsletter",
-    "contactForm",
-    "announcement",
-    "popup",
-    "portfolio",
-    "latestPosts",
-    "partnersMarquee",
-    "statsCounters",
-    "contactInfoCards",
-    "quoteRequestForm",
-    "legalArticles"
-  ],
+  "missingRendererRegistry": [],
   "missingEditor": [],
   "rows": [
     {
@@ -50,9 +18,9 @@
       "validator": "catalogDefinitions[hero].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/HeroBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"hero\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -60,6 +28,7 @@
       "translatableFieldCoverage": "EN drafts via fieldPath conventions (cms-schema translation-*)",
       "currentTests": [
         "packages/cms-renderer/src/blocks/visual-regression.test.tsx",
+        "packages/cms-renderer/src/blocks/xss-text-nodes.test.tsx",
         "packages/cms-schema/src/blocks/popup-content-options.test.ts",
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-schema/src/blocks/validate.test.ts",
@@ -67,7 +36,7 @@
         "packages/cms-editor/src/blocks/en-draft-fields.test.tsx",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "richText",
@@ -81,9 +50,9 @@
       "validator": "catalogDefinitions[richText].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/TitleBodyCtaBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"richText\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -91,11 +60,12 @@
       "translatableFieldCoverage": "EN drafts via fieldPath conventions (cms-schema translation-*)",
       "currentTests": [
         "packages/cms-renderer/src/blocks/CmsButtonView.test.tsx",
+        "packages/cms-renderer/src/blocks/xss-text-nodes.test.tsx",
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts",
         "packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "centered",
@@ -109,9 +79,9 @@
       "validator": "catalogDefinitions[centered].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/TitleBodyCtaBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"centered\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -122,7 +92,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "textImage",
@@ -136,9 +106,9 @@
       "validator": "catalogDefinitions[textImage].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/TextImageBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"textImage\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×2",
         "storefront/templates ×2"
@@ -149,7 +119,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "columns",
@@ -163,9 +133,9 @@
       "validator": "catalogDefinitions[columns].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"columns\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -177,7 +147,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/en-draft-fields.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "benefits",
@@ -191,9 +161,9 @@
       "validator": "catalogDefinitions[benefits].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"benefits\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -203,7 +173,7 @@
         "packages/cms-schema/src/blocks/popup-content-options.test.ts",
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "quote",
@@ -217,9 +187,9 @@
       "validator": "catalogDefinitions[quote].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MiscBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"quote\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -230,7 +200,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/en-draft-fields.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "gallery",
@@ -244,9 +214,9 @@
       "validator": "catalogDefinitions[gallery].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/GalleryBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"gallery\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -262,7 +232,7 @@
         "packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "video",
@@ -276,9 +246,9 @@
       "validator": "catalogDefinitions[video].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MediaBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"video\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -290,7 +260,7 @@
         "packages/cms-schema/src/blocks/validate.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "beforeAfter",
@@ -304,9 +274,9 @@
       "validator": "catalogDefinitions[beforeAfter].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MediaBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"beforeAfter\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -317,7 +287,7 @@
         "packages/cms-schema/src/blocks/validate.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "carousel",
@@ -331,9 +301,9 @@
       "validator": "catalogDefinitions[carousel].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/GalleryBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"carousel\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -342,7 +312,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "steps",
@@ -358,7 +328,7 @@
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/StepsSectionView.tsx",
       "rendererRegistered": true,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"steps\"",
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -383,9 +353,9 @@
       "validator": "catalogDefinitions[comparisonTable].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"comparisonTable\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -394,7 +364,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "featureGrid",
@@ -408,9 +378,9 @@
       "validator": "catalogDefinitions[featureGrid].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/FeatureGridBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"featureGrid\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×2",
         "storefront/templates ×2"
@@ -420,7 +390,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "spacer",
@@ -434,9 +404,9 @@
       "validator": "catalogDefinitions[spacer].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MiscBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"spacer\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -447,7 +417,7 @@
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts",
         "packages/cms-editor/src/blocks/en-draft-fields.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "teamGrid",
@@ -461,9 +431,9 @@
       "validator": "catalogDefinitions[teamGrid].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/TeamJobsBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"teamGrid\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -473,7 +443,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "teamProfile",
@@ -487,9 +457,9 @@
       "validator": "catalogDefinitions[teamProfile].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MiscBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"teamProfile\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -498,7 +468,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "values",
@@ -512,9 +482,9 @@
       "validator": "catalogDefinitions[values].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"values\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -524,7 +494,7 @@
         "packages/cms-schema/src/blocks/form-fields.test.ts",
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "timeline",
@@ -538,9 +508,9 @@
       "validator": "catalogDefinitions[timeline].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"timeline\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -549,7 +519,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "roadmap",
@@ -563,9 +533,9 @@
       "validator": "catalogDefinitions[roadmap].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/RoadmapBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"roadmap\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -578,7 +548,7 @@
         "packages/cms-schema/src/blocks/validate.test.ts",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "plans",
@@ -594,7 +564,7 @@
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/PlansSectionView.tsx",
       "rendererRegistered": true,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"plans\"",
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -624,9 +594,9 @@
       "validator": "catalogDefinitions[cta].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/CtaBlockEditor.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"cta\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -640,7 +610,7 @@
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts",
         "packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "newsletter",
@@ -655,8 +625,8 @@
       "editorModule": "packages/cms-editor/src/blocks/ConversionBlockEditors.tsx",
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/ConversionSectionViews.tsx",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"newsletter\"",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -670,7 +640,7 @@
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts",
         "packages/cms-editor/src/blocks/en-draft-fields.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "contactForm",
@@ -685,8 +655,8 @@
       "editorModule": "packages/cms-editor/src/blocks/ConversionBlockEditors.tsx",
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/ConversionSectionViews.tsx",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"contactForm\"",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -699,7 +669,7 @@
         "packages/cms-schema/src/blocks/validate.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "announcement",
@@ -713,9 +683,9 @@
       "validator": "catalogDefinitions[announcement].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/MiscBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"announcement\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -725,7 +695,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-editor/src/blocks/blockEditorRegistry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "popup",
@@ -740,8 +710,8 @@
       "editorModule": "packages/cms-editor/src/blocks/ConversionBlockEditors.tsx",
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/ConversionSectionViews.tsx",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"popup\"",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -757,7 +727,7 @@
         "packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx",
         "packages/cms-editor/src/blocks/SectionTypeThumbnail.test.tsx"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "portfolio",
@@ -771,9 +741,9 @@
       "validator": "catalogDefinitions[portfolio].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"portfolio\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -782,7 +752,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "jobs",
@@ -798,7 +768,7 @@
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/JobsSectionView.tsx",
       "rendererRegistered": true,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"jobs\"",
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -824,9 +794,9 @@
       "validator": "catalogDefinitions[latestPosts].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/StructureBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"latestPosts\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -836,7 +806,7 @@
         "packages/cms-schema/src/blocks/registry.test.ts",
         "packages/cms-schema/src/blocks/validate.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "partnersMarquee",
@@ -850,9 +820,9 @@
       "validator": "catalogDefinitions[partnersMarquee].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"partnersMarquee\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -861,7 +831,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "statsCounters",
@@ -875,9 +845,9 @@
       "validator": "catalogDefinitions[statsCounters].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"statsCounters\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -886,7 +856,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "contactInfoCards",
@@ -900,9 +870,9 @@
       "validator": "catalogDefinitions[contactInfoCards].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"contactInfoCards\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -911,7 +881,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "quoteRequestForm",
@@ -925,9 +895,9 @@
       "validator": "catalogDefinitions[quoteRequestForm].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"quoteRequestForm\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -936,7 +906,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "legalArticles",
@@ -950,9 +920,9 @@
       "validator": "catalogDefinitions[legalArticles].validateForPublish (via registry)",
       "editorModule": "packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx",
       "editorRegistered": true,
-      "rendererModule": "RegisteredBlockView.tsx (inline switch)",
-      "rendererRegistered": false,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"legalArticles\"",
+      "rendererModule": "blockViewRegistry (family module)",
+      "rendererRegistered": true,
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"
@@ -961,7 +931,7 @@
       "currentTests": [
         "packages/cms-schema/src/blocks/registry.test.ts"
       ],
-      "status": "switch-fallback"
+      "status": "complete"
     },
     {
       "type": "offers",
@@ -977,7 +947,7 @@
       "editorRegistered": true,
       "rendererModule": "packages/cms-renderer/src/blocks/OffersSectionView.tsx",
       "rendererRegistered": true,
-      "inlineSwitchLocation": "RegisteredBlockView.tsx case \"offers\"",
+      "inlineSwitchLocation": null,
       "templateEntries": [
         "admin/templates ×1",
         "storefront/templates ×1"

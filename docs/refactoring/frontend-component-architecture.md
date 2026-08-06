@@ -114,9 +114,10 @@ McCoy already uses **registry + dedicated module** patterns. Continue that inste
 
 ### View registry (`packages/cms-renderer/.../blockViewRegistry.ts`)
 
-- Dedicated views for complex blocks (`jobs`, `offers`, `steps`, `plans`); `RegisteredBlockView` prefers registry then falls back to switch.
-- Evolution rule: when touching a switch arm in `RegisteredBlockView.tsx`, extract a view module and register it; keep **one** markup path for preview and storefront.
-- Stage 5 first-family checkpoint: `plans` → `PlansSectionView` (see audit § Stage 5 checkpoint — plans family).
+- **Stage 5 complete:** every publishable `BlockType` is registered; `RegisteredBlockView` is orchestration-only (parse → lookup → explicit fallback).
+- Family view modules: `BasicContentSectionViews`, `StructuralSectionViews`, `MediaSocialSectionViews`, `InformationLegalSectionViews`, conversion views, plus preserved `Plans/Jobs/Offers/StepsSectionView`.
+- Editor registry composed from `editor-registry/*` family modules.
+- Closeout: [`stage5-registry-closeout.md`](./stage5-registry-closeout.md). Inventory: [`stage5-registry-inventory.md`](./stage5-registry-inventory.md).
 
 ### Fixed sections vs blocks
 
@@ -138,7 +139,7 @@ McCoy already uses **registry + dedicated module** patterns. Continue that inste
 | **2** | Admin async UX + dialogs | **Complete (2026-08-06).** Empty/Error/InlineLoader; FormField token; remove all cms-editor AI `window.confirm` via structured `CmsConfirmationRequest` | admin primitives, inquiries UX, `ai-assist.tsx`, `AdminCmsContentAiProvider` |
 | **3** | Aanvragen feature extraction | **Complete (2026-08-06).** Extracted into `apps/admin/src/features/inquiries/`; thin route composition only | `apps/admin/src/features/inquiries/*`, thin `admin.inquiries.tsx` (6 lines) |
 | **4** | cms-editor barrel / inspector split | **Complete (2026-08-06).** Inspectors/helpers out of barrel; `index.tsx` re-exports only (**97** lines; was **3102**) | `packages/cms-editor` |
-| **5** | Registry decomposition | **In progress.** First family: `plans` → `PlansSectionView` registered; continue remaining families | cms-schema, cms-editor, cms-renderer |
+| **5** | Registry decomposition | **Complete (2026-08-06).** All 35 types registered; orchestration-only `RegisteredBlockView` | cms-schema, cms-editor, cms-renderer |
 | **6** | Admin CMS store modularization | Split persistence / layout mutations / publish / EN planning | `apps/admin/src/lib/cms/store.ts` |
 | **7** | Storefront composition cleanup | Clarify section routers vs renderer; no admin chrome leakage | `SitePageSections`, home sections |
 | **8** | Cursor skills + optional `@mccoy/ui` promotion | Report-only skills under `.cursor/skills/`; promote only proven cross-app primitives | `.cursor/skills/*`, `packages/ui` |
@@ -193,7 +194,7 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Localisation unit coverage:** see audit § Stage 4 “Localisation unit coverage matrix” (`translation-field`, `en-field-drafts`, `en-field-sync`, `translation-coverage`, `cms-text-fallback`, `en-draft-fields`).
 
-**Stage 5 (in progress):** First family complete — `plans` → `PlansSectionView` + `blockViewRegistry.plans`. See audit § Stage 5 checkpoint — plans family. Remaining families still pending; do not start Stage 6.
+**Stage 5 (complete — 2026-08-06):** All 35 publishable types registered; `RegisteredBlockView` orchestration-only. See [`stage5-registry-closeout.md`](./stage5-registry-closeout.md). Do not start Stage 6 until prioritised.
 
 ### Stage 2 default (historical detail)
 

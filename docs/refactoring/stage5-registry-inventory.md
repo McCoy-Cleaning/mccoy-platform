@@ -1,7 +1,7 @@
 # Stage 5 — CMS registry inventory
 
-**Status:** Authoritative baseline (pre-family completion)
-**Generated:** 2026-08-06T19:59:38.349Z
+**Status:** Complete (all publishable types registered)
+**Generated:** 2026-08-06T21:31:55.333Z
 **Source of truth:** `BlockType` union in `packages/cms-schema/src/block-types.ts`, catalogs, editor/renderer registries, templates, tests.
 
 ## Summary
@@ -10,8 +10,8 @@
 |--------|------:|
 | BlockType count | 35 |
 | Editor registered | 35 / 35 |
-| Renderer registered (blockViewRegistry) | 4 / 35 |
-| Missing renderer registry | 31 |
+| Renderer registered (blockViewRegistry) | 35 / 35 |
+| Missing renderer registry | 0 |
 | Missing editor | 0 |
 
 ### Already registered (preserve)
@@ -29,41 +29,41 @@
 
 | type | family | publishable | selectable | editorReg | rendererReg | status | schema | editor | renderer | switch |
 |------|--------|:-----------:|:----------:|:---------:|:-----------:|--------|--------|--------|----------|--------|
-| hero | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | HeroBlockEditor.tsx | inline | Y |
-| richText | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | TitleBodyCtaBlockEditor.tsx | inline | Y |
-| centered | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | TitleBodyCtaBlockEditor.tsx | inline | Y |
-| textImage | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | TextImageBlockEditor.tsx | inline | Y |
-| columns | B-structural | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| benefits | B-structural | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| quote | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MiscBlockEditors.tsx | inline | Y |
-| gallery | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | GalleryBlockEditor.tsx | inline | Y |
-| video | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MediaBlockEditors.tsx | inline | Y |
-| beforeAfter | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MediaBlockEditors.tsx | inline | Y |
-| carousel | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | GalleryBlockEditor.tsx | inline | Y |
-| steps | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | StepsSectionView.tsx | Y |
-| comparisonTable | B-structural | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| featureGrid | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | FeatureGridBlockEditor.tsx | inline | Y |
-| spacer | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MiscBlockEditors.tsx | inline | Y |
-| teamGrid | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | TeamJobsBlockEditor.tsx | inline | Y |
-| teamProfile | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MiscBlockEditors.tsx | inline | Y |
-| values | B-structural | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| timeline | B-structural | Y | Y | Y | N | switch-fallback | blocks/timeline.ts | StructureBlockEditors.tsx | inline | Y |
-| roadmap | B-structural | Y | Y | Y | N | switch-fallback | blocks/roadmap.ts | RoadmapBlockEditor.tsx | inline | Y |
-| plans | F-specialised | Y | Y | Y | Y | complete | blocks/plans.ts | PlansBlockEditor.tsx | PlansSectionView.tsx | Y |
-| cta | A-basic-content | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | CtaBlockEditor.tsx | inline | Y |
-| newsletter | E-conversion-forms | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | Y |
-| contactForm | E-conversion-forms | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | Y |
-| announcement | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | MiscBlockEditors.tsx | inline | Y |
-| popup | E-conversion-forms | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | Y |
-| portfolio | B-structural | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| jobs | F-specialised | Y | Y | Y | Y | complete | blocks/jobs.ts | TeamJobsBlockEditor.tsx | JobsSectionView.tsx | Y |
-| latestPosts | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/catalog.ts | StructureBlockEditors.tsx | inline | Y |
-| partnersMarquee | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | inline | Y |
-| statsCounters | C-media-social-proof | Y | Y | Y | N | switch-fallback | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | inline | Y |
-| contactInfoCards | D-information-legal | Y | Y | Y | N | switch-fallback | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | inline | Y |
-| quoteRequestForm | E-conversion-forms | Y | Y | Y | N | switch-fallback | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | inline | Y |
-| legalArticles | D-information-legal | Y | Y | Y | N | switch-fallback | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | inline | Y |
-| offers | F-specialised | Y | Y | Y | Y | complete | blocks/offers.ts | OffersBlockEditor.tsx | OffersSectionView.tsx | Y |
+| hero | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | HeroBlockEditor.tsx | blockViewRegistry (family module) | N |
+| richText | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | TitleBodyCtaBlockEditor.tsx | blockViewRegistry (family module) | N |
+| centered | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | TitleBodyCtaBlockEditor.tsx | blockViewRegistry (family module) | N |
+| textImage | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | TextImageBlockEditor.tsx | blockViewRegistry (family module) | N |
+| columns | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| benefits | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| quote | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MiscBlockEditors.tsx | blockViewRegistry (family module) | N |
+| gallery | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | GalleryBlockEditor.tsx | blockViewRegistry (family module) | N |
+| video | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MediaBlockEditors.tsx | blockViewRegistry (family module) | N |
+| beforeAfter | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MediaBlockEditors.tsx | blockViewRegistry (family module) | N |
+| carousel | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | GalleryBlockEditor.tsx | blockViewRegistry (family module) | N |
+| steps | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | StepsSectionView.tsx | N |
+| comparisonTable | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| featureGrid | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | FeatureGridBlockEditor.tsx | blockViewRegistry (family module) | N |
+| spacer | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MiscBlockEditors.tsx | blockViewRegistry (family module) | N |
+| teamGrid | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | TeamJobsBlockEditor.tsx | blockViewRegistry (family module) | N |
+| teamProfile | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MiscBlockEditors.tsx | blockViewRegistry (family module) | N |
+| values | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| timeline | B-structural | Y | Y | Y | Y | complete | blocks/timeline.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| roadmap | B-structural | Y | Y | Y | Y | complete | blocks/roadmap.ts | RoadmapBlockEditor.tsx | blockViewRegistry (family module) | N |
+| plans | F-specialised | Y | Y | Y | Y | complete | blocks/plans.ts | PlansBlockEditor.tsx | PlansSectionView.tsx | N |
+| cta | A-basic-content | Y | Y | Y | Y | complete | blocks/catalog.ts | CtaBlockEditor.tsx | blockViewRegistry (family module) | N |
+| newsletter | E-conversion-forms | Y | Y | Y | Y | complete | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | N |
+| contactForm | E-conversion-forms | Y | Y | Y | Y | complete | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | N |
+| announcement | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | MiscBlockEditors.tsx | blockViewRegistry (family module) | N |
+| popup | E-conversion-forms | Y | Y | Y | Y | complete | blocks/catalog.ts | ConversionBlockEditors.tsx | ConversionSectionViews.tsx | N |
+| portfolio | B-structural | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| jobs | F-specialised | Y | Y | Y | Y | complete | blocks/jobs.ts | TeamJobsBlockEditor.tsx | JobsSectionView.tsx | N |
+| latestPosts | C-media-social-proof | Y | Y | Y | Y | complete | blocks/catalog.ts | StructureBlockEditors.tsx | blockViewRegistry (family module) | N |
+| partnersMarquee | C-media-social-proof | Y | Y | Y | Y | complete | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | blockViewRegistry (family module) | N |
+| statsCounters | C-media-social-proof | Y | Y | Y | Y | complete | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | blockViewRegistry (family module) | N |
+| contactInfoCards | D-information-legal | Y | Y | Y | Y | complete | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | blockViewRegistry (family module) | N |
+| quoteRequestForm | E-conversion-forms | Y | Y | Y | Y | complete | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | blockViewRegistry (family module) | N |
+| legalArticles | D-information-legal | Y | Y | Y | Y | complete | blocks/new-sections.ts | NewSectionsBlockEditors.tsx | blockViewRegistry (family module) | N |
+| offers | F-specialised | Y | Y | Y | Y | complete | blocks/offers.ts | OffersBlockEditor.tsx | OffersSectionView.tsx | N |
 
 ## Per-type detail
 
@@ -77,12 +77,12 @@
 - **normalizer:** catalogDefinitions[hero].normalize
 - **validator:** catalogDefinitions[hero].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/HeroBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "hero"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
-- **currentTests:** `packages/cms-renderer/src/blocks/visual-regression.test.tsx`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **currentTests:** `packages/cms-renderer/src/blocks/visual-regression.test.tsx`, `packages/cms-renderer/src/blocks/xss-text-nodes.test.tsx`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
+- **status:** `complete`
 
 ### `richText`
 
@@ -94,12 +94,12 @@
 - **normalizer:** catalogDefinitions[richText].normalize
 - **validator:** catalogDefinitions[richText].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/TitleBodyCtaBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "richText"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
-- **currentTests:** `packages/cms-renderer/src/blocks/CmsButtonView.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx`
-- **status:** `switch-fallback`
+- **currentTests:** `packages/cms-renderer/src/blocks/CmsButtonView.test.tsx`, `packages/cms-renderer/src/blocks/xss-text-nodes.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx`
+- **status:** `complete`
 
 ### `centered`
 
@@ -111,12 +111,12 @@
 - **normalizer:** catalogDefinitions[centered].normalize
 - **validator:** catalogDefinitions[centered].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/TitleBodyCtaBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "centered"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/gallery-text-image.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `textImage`
 
@@ -128,12 +128,12 @@
 - **normalizer:** catalogDefinitions[textImage].normalize
 - **validator:** catalogDefinitions[textImage].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/TextImageBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "textImage"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×2, storefront/templates ×2
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/visual-regression.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `columns`
 
@@ -145,12 +145,12 @@
 - **normalizer:** catalogDefinitions[columns].normalize
 - **validator:** catalogDefinitions[columns].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "columns"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/gallery-text-image.test.tsx`, `packages/cms-schema/src/blocks/gallery.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `benefits`
 
@@ -162,12 +162,12 @@
 - **normalizer:** catalogDefinitions[benefits].normalize
 - **validator:** catalogDefinitions[benefits].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "benefits"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `quote`
 
@@ -179,12 +179,12 @@
 - **normalizer:** catalogDefinitions[quote].normalize
 - **validator:** catalogDefinitions[quote].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MiscBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "quote"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/quote.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `gallery`
 
@@ -196,12 +196,12 @@
 - **normalizer:** catalogDefinitions[gallery].normalize
 - **validator:** catalogDefinitions[gallery].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/GalleryBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "gallery"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/gallery-text-image.test.tsx`, `packages/cms-schema/src/blocks/gallery.test.ts`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`, `packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `video`
 
@@ -213,12 +213,12 @@
 - **normalizer:** catalogDefinitions[video].normalize
 - **validator:** catalogDefinitions[video].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MediaBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "video"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `beforeAfter`
 
@@ -230,12 +230,12 @@
 - **normalizer:** catalogDefinitions[beforeAfter].normalize
 - **validator:** catalogDefinitions[beforeAfter].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MediaBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "beforeAfter"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `carousel`
 
@@ -247,12 +247,12 @@
 - **normalizer:** catalogDefinitions[carousel].normalize
 - **validator:** catalogDefinitions[carousel].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/GalleryBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "carousel"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `steps`
 
@@ -265,7 +265,7 @@
 - **validator:** catalogDefinitions[steps].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
 - **rendererModule:** `packages/cms-renderer/src/blocks/StepsSectionView.tsx` (registered=true)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "steps"
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/StepsSectionView.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/steps.test.ts`
@@ -281,12 +281,12 @@
 - **normalizer:** catalogDefinitions[comparisonTable].normalize
 - **validator:** catalogDefinitions[comparisonTable].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "comparisonTable"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `featureGrid`
 
@@ -298,12 +298,12 @@
 - **normalizer:** catalogDefinitions[featureGrid].normalize
 - **validator:** catalogDefinitions[featureGrid].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/FeatureGridBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "featureGrid"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×2, storefront/templates ×2
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `spacer`
 
@@ -315,12 +315,12 @@
 - **normalizer:** catalogDefinitions[spacer].normalize
 - **validator:** catalogDefinitions[spacer].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MiscBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "spacer"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `teamGrid`
 
@@ -332,12 +332,12 @@
 - **normalizer:** catalogDefinitions[teamGrid].normalize
 - **validator:** catalogDefinitions[teamGrid].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/TeamJobsBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "teamGrid"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `teamProfile`
 
@@ -349,12 +349,12 @@
 - **normalizer:** catalogDefinitions[teamProfile].normalize
 - **validator:** catalogDefinitions[teamProfile].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MiscBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "teamProfile"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `values`
 
@@ -366,12 +366,12 @@
 - **normalizer:** catalogDefinitions[values].normalize
 - **validator:** catalogDefinitions[values].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "values"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/form-fields.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `timeline`
 
@@ -383,12 +383,12 @@
 - **normalizer:** catalogDefinitions[timeline].normalize
 - **validator:** catalogDefinitions[timeline].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "timeline"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `roadmap`
 
@@ -400,12 +400,12 @@
 - **normalizer:** catalogDefinitions[roadmap].normalize
 - **validator:** catalogDefinitions[roadmap].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/RoadmapBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "roadmap"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/visual-regression.test.tsx`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/roadmap.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `plans`
 
@@ -418,7 +418,7 @@
 - **validator:** catalogDefinitions[plans].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/PlansBlockEditor.tsx` (registered=true)
 - **rendererModule:** `packages/cms-renderer/src/blocks/PlansSectionView.tsx` (registered=true)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "plans"
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/plans-a11y.test.tsx`, `packages/cms-renderer/src/blocks/PlansSectionView.test.tsx`, `packages/cms-renderer/src/blocks/visual-regression.test.tsx`, `packages/cms-schema/src/blocks/plans.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`, `packages/cms-editor/src/blocks/PlansBlockEditor.a11y.test.tsx`
@@ -434,12 +434,12 @@
 - **normalizer:** catalogDefinitions[cta].normalize
 - **validator:** catalogDefinitions[cta].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/CtaBlockEditor.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "cta"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/plans.test.ts`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `newsletter`
 
@@ -451,12 +451,12 @@
 - **normalizer:** catalogDefinitions[newsletter].normalize
 - **validator:** catalogDefinitions[newsletter].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/ConversionBlockEditors.tsx` (registered=true)
-- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "newsletter"
+- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/RegisteredBlockView.smoke.test.tsx`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/en-draft-fields.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `contactForm`
 
@@ -468,12 +468,12 @@
 - **normalizer:** catalogDefinitions[contactForm].normalize
 - **validator:** catalogDefinitions[contactForm].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/ConversionBlockEditors.tsx` (registered=true)
-- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "contactForm"
+- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/RegisteredBlockView.smoke.test.tsx`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `announcement`
 
@@ -485,12 +485,12 @@
 - **normalizer:** catalogDefinitions[announcement].normalize
 - **validator:** catalogDefinitions[announcement].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/MiscBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "announcement"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `popup`
 
@@ -502,12 +502,12 @@
 - **normalizer:** catalogDefinitions[popup].normalize
 - **validator:** catalogDefinitions[popup].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/ConversionBlockEditors.tsx` (registered=true)
-- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "popup"
+- **rendererModule:** `packages/cms-renderer/src/blocks/ConversionSectionViews.tsx` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/CmsButtonView.test.tsx`, `packages/cms-renderer/src/blocks/RegisteredBlockView.smoke.test.tsx`, `packages/cms-schema/src/blocks/popup-content-options.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`, `packages/cms-editor/src/blocks/blockEditorRegistry.test.ts`, `packages/cms-editor/src/blocks/PopupContentTypePicker.test.tsx`, `packages/cms-editor/src/blocks/SectionTypeThumbnail.test.tsx`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `portfolio`
 
@@ -519,12 +519,12 @@
 - **normalizer:** catalogDefinitions[portfolio].normalize
 - **validator:** catalogDefinitions[portfolio].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "portfolio"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `jobs`
 
@@ -537,7 +537,7 @@
 - **validator:** catalogDefinitions[jobs].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/TeamJobsBlockEditor.tsx` (registered=true)
 - **rendererModule:** `packages/cms-renderer/src/blocks/JobsSectionView.tsx` (registered=true)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "jobs"
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/jobs.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/vacancy-application.test.ts`, `packages/cms-editor/src/blocks/RegisteredBlockEditor.custom.test.tsx`
@@ -553,12 +553,12 @@
 - **normalizer:** catalogDefinitions[latestPosts].normalize
 - **validator:** catalogDefinitions[latestPosts].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/StructureBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "latestPosts"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `partnersMarquee`
 
@@ -570,12 +570,12 @@
 - **normalizer:** catalogDefinitions[partnersMarquee].normalize
 - **validator:** catalogDefinitions[partnersMarquee].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "partnersMarquee"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `statsCounters`
 
@@ -587,12 +587,12 @@
 - **normalizer:** catalogDefinitions[statsCounters].normalize
 - **validator:** catalogDefinitions[statsCounters].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "statsCounters"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `contactInfoCards`
 
@@ -604,12 +604,12 @@
 - **normalizer:** catalogDefinitions[contactInfoCards].normalize
 - **validator:** catalogDefinitions[contactInfoCards].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "contactInfoCards"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `quoteRequestForm`
 
@@ -621,12 +621,12 @@
 - **normalizer:** catalogDefinitions[quoteRequestForm].normalize
 - **validator:** catalogDefinitions[quoteRequestForm].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "quoteRequestForm"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `legalArticles`
 
@@ -638,12 +638,12 @@
 - **normalizer:** catalogDefinitions[legalArticles].normalize
 - **validator:** catalogDefinitions[legalArticles].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/NewSectionsBlockEditors.tsx` (registered=true)
-- **rendererModule:** `RegisteredBlockView.tsx (inline switch)` (registered=false)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "legalArticles"
+- **rendererModule:** `blockViewRegistry (family module)` (registered=true)
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-schema/src/blocks/registry.test.ts`
-- **status:** `switch-fallback`
+- **status:** `complete`
 
 ### `offers`
 
@@ -656,7 +656,7 @@
 - **validator:** catalogDefinitions[offers].validateForPublish (via registry)
 - **editorModule:** `packages/cms-editor/src/blocks/OffersBlockEditor.tsx` (registered=true)
 - **rendererModule:** `packages/cms-renderer/src/blocks/OffersSectionView.tsx` (registered=true)
-- **inlineSwitchLocation:** RegisteredBlockView.tsx case "offers"
+- **inlineSwitchLocation:** null
 - **templateEntries:** admin/templates ×1, storefront/templates ×1
 - **translatableFieldCoverage:** EN drafts via fieldPath conventions (cms-schema translation-*)
 - **currentTests:** `packages/cms-renderer/src/blocks/OffersSectionView.test.tsx`, `packages/cms-schema/src/blocks/offers.test.ts`, `packages/cms-schema/src/blocks/registry.test.ts`, `packages/cms-schema/src/blocks/validate.test.ts`

@@ -583,13 +583,24 @@ Honest gap: no single matrix test named “inspector callback/path parity” end
 - No Aanvragen / RegisteredBlockView / blockViewRegistry / schema catalog / admin CMS store / storefront edits
 - No behaviour or visual changes intended (mechanical move)
 
-### Recommended Stage 5
+### Stage 5 closeout (complete — 2026-08-06)
 
-Registry decomposition — continue extracting catalog / editor / view modules; shrink `RegisteredBlockView` switch.
+**Status:** Complete. All publishable `BlockType`s render through `blockViewRegistry`; `RegisteredBlockView` is orchestration-only. Stage 6 not started.
 
-### Stage 5 checkpoint — plans family
+**Docs:** [`stage5-registry-inventory.md`](./stage5-registry-inventory.md), [`stage5-registry-closeout.md`](./stage5-registry-closeout.md).
 
-**Status:** First registry family complete (plans → `PlansSectionView`). Stage 5 overall remains **in progress**.
+**Preserved checkpoint:** `d1b3c12` — plans → `PlansSectionView` (not squashed).
+
+| Metric | Before | After |
+|--------|-------:|------:|
+| Renderer registry | 4 | **35 / 35** |
+| Editor registry | 35 | **35 / 35** (family modules) |
+| `RegisteredBlockView` lines | ~1214 | **~74** |
+| Publishable switch arms | many | **0** |
+
+**Locale E2E:** identical tracked `savePage` / `"Opgeslagen"` fixture flake; public-locale green after `services.cards` renderer. See [`docs/testing/locale-e2e-savepage-follow-up.md`](../testing/locale-e2e-savepage-follow-up.md).
+
+### Stage 5 checkpoint — plans family (historical)
 
 **Checkpoint commit:** `d1b3c1264cd2dffded52910b8c46e8e3205cd01b` — *Extract plans block into registered PlansSectionView (Stage 5).*
 
@@ -597,10 +608,7 @@ Registry decomposition — continue extracting catalog / editor / view modules; 
 |------|--------|
 | View extracted | `packages/cms-renderer/src/blocks/PlansSectionView.tsx` |
 | Registry | `blockViewRegistry.plans` |
-| Switch arm | `RegisteredBlockView` `case "plans"` → registry dispatch only |
-| Parity tests | `PlansSectionView.test.tsx` (RegisteredBlockView markup ≡ direct view) |
-| Public entry | Still `RegisteredBlockView` (admin + storefront `BlockView`) |
-| Out of scope | Image-fill / object-cover restores; other registry families |
+| Outcome | Preserved through full Stage 5 completion |
 
 ---
 

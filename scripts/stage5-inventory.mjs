@@ -21,7 +21,19 @@ const rbv = readFileSync(
 const registeredViews = [...registrySrc.matchAll(/^\s*([a-zA-Z]+):\s/gm)]
   .map((m) => m[1])
   .filter((t) => types.includes(t));
-const editorKeys = [...editorSrc.matchAll(/^\s*([a-zA-Z]+):\s*def\(/gm)].map((m) => m[1]);
+// Editor registry may be a monolith (`key: def(`) or Stage 5 family modules.
+let editorKeys = [...editorSrc.matchAll(/^\s*([a-zA-Z]+):\s*def\(/gm)].map((m) => m[1]);
+if (editorKeys.length === 0) {
+  const familyDir = join(root, "packages/cms-editor/src/blocks/editor-registry");
+  if (existsSync(familyDir)) {
+    for (const f of readdirSync(familyDir)) {
+      if (!f.endsWith(".ts") || f === "def.ts") continue;
+      const body = readFileSync(join(familyDir, f), "utf8");
+      editorKeys.push(...[...body.matchAll(/^\s*([a-zA-Z]+):\s*def\(/gm)].map((m) => m[1]));
+    }
+  }
+}
+editorKeys = [...new Set(editorKeys)].filter((t) => types.includes(t));
 const switchCases = [...rbv.matchAll(/case\s+"([a-zA-Z]+)"/g)].map((m) => m[1]);
 
 function collectTemplateTypes(path) {
@@ -179,7 +191,9 @@ const rows = types.map((type) => {
     validator: `catalogDefinitions[${type}].validateForPublish (via registry)`,
     editorModule: editorModuleHints[type] ?? null,
     editorRegistered: inEditor,
-    rendererModule: rendererModule[type] ?? (hasSwitch ? "RegisteredBlockView.tsx (inline switch)" : null),
+    rendererModule:
+      rendererModule[type] ??
+      (inRegistry ? "blockViewRegistry (family module)" : hasSwitch ? "RegisteredBlockView.tsx (inline switch)" : null),
     rendererRegistered: inRegistry,
     inlineSwitchLocation: hasSwitch ? `RegisteredBlockView.tsx case "${type}"` : null,
     templateEntries: [

@@ -4,7 +4,11 @@ const data = JSON.parse(readFileSync("scripts/stage5-inventory.json", "utf8"));
 const lines = [];
 lines.push("# Stage 5 — CMS registry inventory");
 lines.push("");
-lines.push("**Status:** Authoritative baseline (pre-family completion)");
+lines.push(
+  data.missingRendererRegistry.length === 0 && data.missingEditor.length === 0
+    ? "**Status:** Complete (all publishable types registered)"
+    : "**Status:** In progress — gaps remain",
+);
 lines.push(`**Generated:** ${data.generatedAt}`);
 lines.push(
   "**Source of truth:** `BlockType` union in `packages/cms-schema/src/block-types.ts`, catalogs, editor/renderer registries, templates, tests.",
