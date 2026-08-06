@@ -131,6 +131,7 @@ export {
   collectShallowStringFields,
   defaultMaxCharsForField,
   isTranslatableFieldKey,
+  requestCmsOverwriteConfirm,
   useCmsAiAssist,
   type CmsAiAssistApi,
   type CmsAiGenerateRequest,
@@ -140,6 +141,7 @@ export {
   type CmsAiTone,
   type CmsAiTranslateRequest,
   type CmsAiTranslateResponse,
+  type CmsConfirmationRequest,
 } from "./ai-assist";
 import {
   InspectTextField,

@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AdminFormField, adminInputClassName } from "@/components/admin/AdminFormField";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -64,19 +65,18 @@ export function ConfirmationDialog({
           <AlertDialogDescription className="whitespace-pre-wrap">{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {requireText ? (
-          <div className="space-y-2">
-            <label htmlFor={inputId} className="text-base font-medium">
-              Typ <span className="font-mono">{requireText}</span> om te bevestigen
-            </label>
+          <AdminFormField
+            id={inputId}
+            label={`Typ ${requireText} om te bevestigen`}
+          >
             <input
-              id={inputId}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               disabled={pending}
               autoComplete="off"
-              className="flex min-h-12 w-full rounded-xl border border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn(adminInputClassName, "min-h-12")}
             />
-          </div>
+          </AdminFormField>
         ) : null}
         {error ? (
           <p role="alert" className="text-sm text-destructive">

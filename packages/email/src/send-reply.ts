@@ -1,7 +1,9 @@
 import { readServerEnv } from "@mccoy/security";
 
 import { shouldAttemptGraphMail } from "./form-inbox-provider";
-import { sendGraphAdminReply } from "./graph-mail";
+import { isGraphMailConfigured } from "./graph-config";
+import { sendGraphAdminReply, type GraphSendReplyResult } from "./graph-mail";
+import { decodeInboxMessageId } from "./inbox-message-id";
 import { defaultTransactionalFrom, isSmtpConfigured, sendSmtpMail } from "./smtp";
 import { escapeHtml } from "./templates";
 
@@ -52,6 +54,20 @@ function buildReplyHtml(options: {
   return { html, text: options.body };
 }
 
+export type SendAdminReplyEmailResult =
+  | {
+      ok: true;
+      messageId?: string;
+      resendId?: string;
+      graphMessageId?: string;
+      internetMessageId?: string;
+      conversationId?: string;
+      sentAt?: string;
+      identityPending?: boolean;
+      usedGraphReply: boolean;
+    }
+  | { ok: false; error: string };
+
 export async function sendAdminReplyEmail(options: {
   to: string;
   subject: string;
@@ -61,13 +77,14 @@ export async function sendAdminReplyEmail(options: {
   inReplyTo?: string;
   /** Graph/IMAP inbox message id (`graph:…` or `imap:…`) for Graph reply threading. */
   inboxMessageId?: string;
-}): Promise<{ ok: true; messageId?: string; resendId?: string } | { ok: false; error: string }> {
+}): Promise<SendAdminReplyEmailResult> {
   // Playwright / local E2E: do not call Graph or SMTP; treat reply as accepted.
   if (process.env.MCCOY_E2E === "1") {
     return {
       ok: true,
       messageId: `e2e-reply-${Date.now()}`,
       resendId: `e2e-reply-${Date.now()}`,
+      usedGraphReply: false,
     };
   }
 
@@ -103,22 +120,37 @@ export async function sendAdminReplyEmail(options: {
     intendedTo,
   });
 
-  // Never use Graph /messages/{id}/reply for Aanvragen. Form notifications are
-  // From GRAPH_MAILBOX, so native reply would deliver to our own mailbox — not
-  // the website visitor. Compose sendMail with an explicit `to` instead.
-  // inboxMessageId is retained for API compatibility / future threading helpers.
+  let inReplyToGraphId: string | undefined;
+  if (options.inboxMessageId) {
+    try {
+      const decoded = decodeInboxMessageId(options.inboxMessageId);
+      if (decoded.provider === "graph") {
+        inReplyToGraphId = decoded.graphId;
+      }
+    } catch {
+      inReplyToGraphId = undefined;
+    }
+  }
+
+  // When we have a Graph parent message, use createReply so conversationId /
+  // In-Reply-To stay intact. Override toRecipients to the website visitor
+  // (form notifications are From our mailbox — bare /reply would loop to us).
+  // Form *notifications* (new submissions) still use sendMail without a parent id.
 
   if (shouldAttemptGraphMail()) {
-    const sent = await sendGraphAdminReply({
+    const sent: GraphSendReplyResult = await sendGraphAdminReply({
       to: deliverTo,
       subject: subjectForSend,
       html,
       text,
       replyTo,
-      // Mirror SMTP BCC so the outbound reply appears in Aanvragen → Gesprek.
-      ...(bccInbox && bccInbox.toLowerCase() !== deliverTo.toLowerCase()
+      // BCC only when not using Graph reply (reply stays in the conversation).
+      ...(!inReplyToGraphId &&
+      bccInbox &&
+      bccInbox.toLowerCase() !== deliverTo.toLowerCase()
         ? { bcc: bccInbox }
         : {}),
+      inReplyToGraphId,
       inReplyToInternetMessageId: options.inReplyTo,
       headers: {
         ...(options.requestNumber
@@ -130,7 +162,11 @@ export async function sendAdminReplyEmail(options: {
       },
     });
     if (!sent.ok) {
-      // Fall back to SMTP when Graph send fails but SMTP is available
+      // Microsoft 365: SMTP AUTH is typically blocked (535). Do not mask the
+      // Graph error with a useless SMTP fallback when Graph is configured.
+      if (isGraphMailConfigured()) {
+        return sent;
+      }
       if (!isSmtpConfigured()) {
         return sent;
       }
@@ -138,8 +174,14 @@ export async function sendAdminReplyEmail(options: {
     } else {
       return {
         ok: true,
-        messageId: sent.messageId,
-        resendId: sent.messageId,
+        messageId: sent.internetMessageId ?? sent.messageId,
+        resendId: sent.internetMessageId ?? sent.messageId,
+        graphMessageId: sent.graphMessageId,
+        internetMessageId: sent.internetMessageId,
+        conversationId: sent.conversationId,
+        sentAt: sent.sentAt,
+        identityPending: sent.identityPending,
+        usedGraphReply: Boolean(inReplyToGraphId),
       };
     }
   }
@@ -172,5 +214,7 @@ export async function sendAdminReplyEmail(options: {
     messageId: sent.messageId,
     /** @deprecated legacy JSON field name — same as messageId */
     resendId: sent.messageId,
+    internetMessageId: sent.messageId,
+    usedGraphReply: false,
   };
 }

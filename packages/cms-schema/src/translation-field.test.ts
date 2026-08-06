@@ -353,6 +353,27 @@ describe("applyEnFieldDraftEditorPatch — clear EN must stick through sync", ()
     expect(plan.retainedDrafts[path]).toBe("Custom English");
     expect(plan.toTranslate).toEqual({});
   });
+
+  it("preserves trailing spaces while typing so Space works in controlled EN fields", () => {
+    const path = "block:block_f8h28wuh:introduction";
+    const nl = "Word onderdeel van een vast inhuis team van";
+    const withSpace = applyEnFieldDraftEditorPatch({
+      drafts: { [path]: "Become part of a permanent in-house team" },
+      patch: { [path]: "Become part of a permanent in-house team " },
+      nlFields: { [path]: nl },
+    });
+    expect(withSpace.enFieldDrafts[path]).toBe("Become part of a permanent in-house team ");
+    expect(withSpace.enFieldDraftMeta[path]?.status).toBe("manually_translated");
+
+    const nextWord = applyEnFieldDraftEditorPatch({
+      drafts: withSpace.enFieldDrafts,
+      sources: withSpace.enFieldDraftSources,
+      meta: withSpace.enFieldDraftMeta,
+      patch: { [path]: "Become part of a permanent in-house team of" },
+      nlFields: { [path]: nl },
+    });
+    expect(nextWord.enFieldDrafts[path]).toBe("Become part of a permanent in-house team of");
+  });
 });
 
 describe("localizeCmsPageForLocale — blank draft regression", () => {

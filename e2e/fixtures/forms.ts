@@ -116,9 +116,10 @@ export async function expectAanvraagListed(
     }
   }
 
-  const search = page.getByLabel(/Zoek e-mails/i);
+  const search = page.getByLabel(/Zoek aanvragen/i);
   await expect(search).toBeVisible();
   await search.fill(marker);
+  await page.getByRole("button", { name: /^Zoeken$/i }).click();
 
   await expect(page.getByText(marker, { exact: false }).first()).toBeVisible({
     timeout: 30_000,

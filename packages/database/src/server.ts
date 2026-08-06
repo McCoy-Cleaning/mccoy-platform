@@ -24,11 +24,19 @@ export {
   supabaseWebsiteRequestsStore,
   loadActivePublishedFormScopeKeys,
   reconcileOrphanWebsiteRequestScopes,
+  upsertWebsiteRequestMailMessage,
+  listWebsiteRequestMailMessages,
+  listKnownMailIdentitiesForMailbox,
+  listHiddenWebsiteRequestNumbers,
+  findWebsiteRequestIdByGraphMessageId,
+  findWebsiteRequestIdByNumber,
   type WebsiteRequestRow,
   type WebsiteRequestReplyRow,
+  type WebsiteRequestMailMessageInput,
+  type WebsiteRequestMailMessageRow,
+  type UpsertMailMessageResult,
   type ReconcileOrphanScopesResult,
 } from "./website-requests";
-
 export {
   createSupabasePublishableClient,
   createSupabaseServiceClient,

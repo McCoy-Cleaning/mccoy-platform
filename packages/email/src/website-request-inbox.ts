@@ -32,6 +32,11 @@ import {
 } from "./inbox-message-id";
 import type { ParsedFormField } from "./parse-form-fields";
 import { escapeHtml } from "./templates";
+import {
+  dedupeInquiryThreadItems,
+  normaliseThreadMessageBody,
+  outboundMailDuplicatesStaffReply,
+} from "./inquiry-thread-dedupe";
 
 export { mergeMailboxAndWebsiteRequestSummaries };
 
@@ -90,7 +95,21 @@ export function websiteRequestSummaryToInboxSummary(
 /** @deprecated alias — prefer websiteRequestSummaryToInboxSummary */
 export const websiteRequestToSummary = websiteRequestSummaryToInboxSummary;
 
-function websiteRequestToMessage(request: WebsiteRequest): FormInboxMessage {
+function websiteRequestToMessage(
+  request: WebsiteRequest,
+  mailMessages: Array<{
+    id: string;
+    direction: "inbound" | "outbound";
+    provider?: string;
+    sender_address: string | null;
+    recipient_addresses: string[] | null;
+    subject: string | null;
+    body_text: string | null;
+    occurred_at: string;
+    internet_message_id: string | null;
+    graph_message_id: string | null;
+  }> = [],
+): FormInboxMessage {
   const summary = websiteRequestSummaryToInboxSummary(request);
   const fields = fieldsToParsed(request.fields);
   const textBody = [
@@ -126,6 +145,39 @@ function websiteRequestToMessage(request: WebsiteRequest): FormInboxMessage {
     attachments: [],
   }));
 
+  const fromMail: FormInboxThreadItem[] = [];
+  mailMessages.forEach((row, index) => {
+    // Form-notification identity rows must not appear as "Klant" in Gesprek —
+    // structured fields already render above the thread.
+    if (row.provider === "website_form") return;
+
+    const isOutbound = row.direction === "outbound";
+    if (isOutbound && outboundMailDuplicatesStaffReply(row, request.replies)) {
+      return;
+    }
+    fromMail.push({
+      id: `${summary.id}:mail:${row.id}`,
+      uid: summary.uid + 1000 + index,
+      direction: isOutbound ? "admin" : "customer",
+      from: row.sender_address || (isOutbound ? "McCoy" : summary.from),
+      to: (row.recipient_addresses ?? []).join(", ") || (isOutbound ? summary.from : summary.to),
+      date: row.occurred_at,
+      subject: row.subject || `Re: ${request.subject}`,
+      textBody: normaliseThreadMessageBody(
+        row.body_text || "",
+        isOutbound ? "outbound" : "inbound",
+      ),
+      messageId: row.internet_message_id,
+      attachments: [],
+    });
+  });
+
+  const thread = dedupeInquiryThreadItems(
+    [root, ...replies, ...fromMail].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    ),
+  );
+
   return {
     ...summary,
     textBody,
@@ -137,7 +189,7 @@ function websiteRequestToMessage(request: WebsiteRequest): FormInboxMessage {
     messageId: root.messageId,
     fields,
     attachments: attachmentMeta(request),
-    thread: [root, ...replies],
+    thread,
   };
 }
 
@@ -186,7 +238,39 @@ export async function getWebsiteRequestFormInboxMessage(
   if (decoded.provider !== "request" && decoded.provider !== "e2e") return null;
   const request = await getWebsiteRequest(decoded.requestId);
   if (!request || !isActiveRequestStatus(request.status)) return null;
-  const message = websiteRequestToMessage(request);
+
+  // Pull Graph conversation into mail_messages so applicant replies appear in Gesprek.
+  // List-time ingest alone misses replies that arrive while the detail panel is open.
+  try {
+    const { syncWebsiteRequestGraphThread } = await import("./sync-request-graph-thread");
+    await syncWebsiteRequestGraphThread(decoded.requestId);
+  } catch (error) {
+    console.error("[website-request-inbox] graph thread sync failed", {
+      requestId: decoded.requestId,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
+  let mailMessages: Array<{
+    id: string;
+    direction: "inbound" | "outbound";
+    provider: string;
+    sender_address: string | null;
+    recipient_addresses: string[] | null;
+    subject: string | null;
+    body_text: string | null;
+    occurred_at: string;
+    internet_message_id: string | null;
+    graph_message_id: string | null;
+  }> = [];
+  try {
+    const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
+    mailMessages = await listWebsiteRequestMailMessages(decoded.requestId);
+  } catch {
+    mailMessages = [];
+  }
+
+  const message = websiteRequestToMessage(request, mailMessages);
   const { withActivePublishedScopeCleared } = await import("./apply-active-form-scopes");
   return withActivePublishedScopeCleared(message);
 }
@@ -213,5 +297,110 @@ export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<
   if (!request) {
     throw new FormInboxError("Bericht niet gevonden.");
   }
-  await setWebsiteRequestStatus(request.id, "closed");
+
+  const updated = await setWebsiteRequestStatus(request.id, "closed");
+  if (!updated) {
+    throw new FormInboxError("Aanvraag kon niet worden gesloten.");
+  }
+
+  // Best-effort: remove known Graph copies so Vernieuwen cannot resurrect a
+  // graph: row for the same WR- number.
+  try {
+    const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
+    const { shouldAttemptGraphMail } = await import("./form-inbox-provider");
+    const { deleteGraphFormInboxMessage } = await import("./graph-mail");
+    const { getGraphMailConfig } = await import("./graph-config");
+
+    if (!shouldAttemptGraphMail()) return;
+    const config = getGraphMailConfig();
+    if (!config) return;
+
+    const mailRows = await listWebsiteRequestMailMessages(request.id);
+    const seen = new Set<string>();
+    for (const row of mailRows) {
+      const graphId = row.graph_message_id?.trim();
+      if (!graphId || seen.has(graphId)) continue;
+      seen.add(graphId);
+      const mailbox = (row.mailbox || config.mailbox).trim() || config.mailbox;
+      try {
+        await deleteGraphFormInboxMessage(graphId, mailbox);
+      } catch (error) {
+        console.warn("[website-request-inbox] Graph copy delete failed", {
+          requestId: request.id,
+          message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+        });
+      }
+    }
+  } catch (error) {
+    console.warn("[website-request-inbox] Graph cleanup after close failed", {
+      requestId: request.id,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+}
+
+/**
+ * Close the website request correlated with a Graph mailbox message so Aanvragen
+ * list suppress hides the WR even if the mailbox move fails.
+ * @returns true when an active request was closed
+ */
+export async function closeWebsiteRequestForGraphMessage(
+  graphId: string,
+  mailbox?: string,
+): Promise<boolean> {
+  try {
+    const {
+      findWebsiteRequestIdByGraphMessageId,
+      findWebsiteRequestIdByNumber,
+      getWebsiteRequest,
+      setWebsiteRequestStatus,
+    } = await import("@mccoy/database/server");
+
+    let requestId = await findWebsiteRequestIdByGraphMessageId(graphId);
+
+    if (!requestId) {
+      try {
+        const { peekGraphMessageRequestNumber } = await import("./graph-mail");
+        const number = await peekGraphMessageRequestNumber(graphId, mailbox);
+        if (number) {
+          requestId = await findWebsiteRequestIdByNumber(number);
+        }
+      } catch {
+        // Best-effort only — mailbox delete may still proceed.
+      }
+    }
+
+    if (!requestId) return false;
+
+    const request = await getWebsiteRequest(requestId);
+    if (!request) return false;
+    if (request.status === "closed" || request.status === "spam") return true;
+
+    const updated = await setWebsiteRequestStatus(requestId, "closed");
+    return Boolean(updated);
+  } catch (error) {
+    console.warn("[website-request-inbox] close for Graph message failed", {
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+    return false;
+  }
+}
+
+/** Close an active website request by WR- number (IMAP / Graph subject match). */
+export async function closeWebsiteRequestByNumber(requestNumber: string): Promise<void> {
+  const number = requestNumber.trim();
+  if (!number) return;
+  try {
+    const { findWebsiteRequestIdByNumber, getWebsiteRequest, setWebsiteRequestStatus } =
+      await import("@mccoy/database/server");
+    const requestId = await findWebsiteRequestIdByNumber(number);
+    if (!requestId) return;
+    const request = await getWebsiteRequest(requestId);
+    if (!request || request.status === "closed" || request.status === "spam") return;
+    await setWebsiteRequestStatus(requestId, "closed");
+  } catch (error) {
+    console.warn("[website-request-inbox] close by number failed", {
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
 }

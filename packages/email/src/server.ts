@@ -11,7 +11,15 @@ export {
   getSmtpConfig,
 } from "./smtp";
 export { FormSubmitError, sendWebsiteFormEmail } from "./send-form";
-export { sendAdminReplyEmail } from "./send-reply";
+export { sendAdminReplyEmail, type SendAdminReplyEmailResult } from "./send-reply";
+export {
+  correlateInboundGraphMessage,
+  normaliseInternetMessageId,
+  parseReferencesHeader,
+  type CorrelateInboundResult,
+  type InboundMailCandidate,
+  type KnownInquiryMailIdentity,
+} from "./inquiry-thread-correlation";
 export {
   buildStaffInviteEmail,
   buildStaffInviteSupabaseAuthTemplate,
@@ -68,6 +76,7 @@ export {
   encodeGraphMessageId,
   encodeImapMessageId,
   deleteFormInboxMessage,
+  bulkDeleteFormInboxMessages,
   getFormInboxAttachment,
   getFormInboxMessage,
   getFormInboxThread,
@@ -85,11 +94,28 @@ export {
   classifyGraphThreadDirection,
   formKindFromInternetHeaders,
   hasMcCoyFormMarkerHeaders,
+  isMcCoyWebsiteFormNotificationBySender,
   isMcCoyWebsiteFormNotificationGraph,
   isReplyOrForwardSubject,
   looksLikeFormCandidate,
   showAllGraphInboxMessages,
+  type GraphSendReplyResult,
+  type GraphInboxSyncCandidate,
 } from "./graph-mail";
+export { syncGraphInboxAfterList } from "./graph-inbox-sync";
+export {
+  syncWebsiteRequestGraphThread,
+  type SyncWebsiteRequestGraphThreadResult,
+} from "./sync-request-graph-thread";
+export {
+  dedupeInquiryThreadItems,
+  extractSimpleReplyBody,
+  stripQuotedReplyBody,
+  normaliseThreadMessageBody,
+  isTemplatedWrapOf,
+  looksLikeMcCoyAdminEmailTemplate,
+  outboundMailDuplicatesStaffReply,
+} from "./inquiry-thread-dedupe";
 export {
   formInboxConfigHelpMessage,
   getFormInboxProviderMode,
@@ -101,6 +127,17 @@ export {
 export { clearGraphAccessTokenCache } from "./graph-auth";
 export { INBOX_MESSAGE_ID_PATTERN } from "./inbox-message-id";
 export { bulkDeleteFailureMessage, type InboxBulkDeleteFailure } from "./inbox-delete-errors";
+export {
+  bulkDeleteGraphMessages,
+  GRAPH_BATCH_SIZE,
+  type GraphBulkDeleteItemResult,
+  type GraphBulkDeleteResult,
+} from "./graph-bulk-delete";
+export type {
+  FormInboxBulkDeleteResult,
+  FormInboxDeleteItemResult,
+} from "./form-inbox";
+export type { InboxLoadMetrics } from "./graph-mail";
 /** Re-export pure helpers so server consumers can import one entry when needed. */
 export { buildFormEmail, escapeHtml } from "./templates";
 export {

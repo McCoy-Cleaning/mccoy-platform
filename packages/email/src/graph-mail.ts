@@ -27,6 +27,16 @@ import {
   encodeGraphMessageId,
   graphIdToSyntheticUid,
 } from "./inbox-message-id";
+import { isReplyOrForwardSubject } from "./form-mail-subject";
+import type { GraphInboxSyncCandidate } from "./graph-inbox-sync-types";
+import {
+  buildConversationReceivedFilter,
+  buildConversationSentFilter,
+} from "./graph-odata-filters";
+import { buildGraphReplyDraftPatch } from "./graph-reply-draft";
+import { extractSimpleReplyBody, dedupeInquiryThreadItems, stripQuotedReplyBody } from "./inquiry-thread-dedupe";
+
+export type { GraphInboxSyncCandidate } from "./graph-inbox-sync-types";
 import {
   normalizeFormFieldLabel,
   parseFormFieldsFromHtml,
@@ -36,6 +46,8 @@ import {
 } from "./parse-form-fields";
 import { escapeHtml } from "./templates";
 
+export { isReplyOrForwardSubject } from "./form-mail-subject";
+
 const DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 80;
 const MAX_THREAD_MESSAGES = 12;
@@ -43,6 +55,13 @@ const MAX_ATTACHMENT_BYTES = 3.5 * 1024 * 1024;
 const MAX_ATTACHMENTS = 8;
 const LIST_PAGE_SIZE = 50;
 const LIST_MAX_PAGES = 4;
+
+export type InboxLoadMetrics = {
+  graphRequestCount: number;
+  returnedItemCount: number;
+  listDurationMs: number;
+  detailRequestCount: number;
+};
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
@@ -65,10 +84,12 @@ type GraphMessage = {
   subject?: string | null;
   bodyPreview?: string | null;
   receivedDateTime?: string | null;
+  sentDateTime?: string | null;
   isRead?: boolean;
   hasAttachments?: boolean;
   internetMessageId?: string | null;
   conversationId?: string | null;
+  conversationIndex?: string | null;
   from?: GraphRecipient | null;
   replyTo?: GraphRecipient[] | null;
   toRecipients?: GraphRecipient[] | null;
@@ -150,9 +171,24 @@ function readInternetHeader(
   return null;
 }
 
-/** True for reply/forward subjects — those are conversation mail, not form submissions. */
-export function isReplyOrForwardSubject(subject: string | null | undefined): boolean {
-  return /^(re|fw|fwd)\s*:/i.test((subject ?? "").trim());
+/**
+ * Sender/display-name markers for McCoy form notifications.
+ * Does not treat quoted body footers as proof — applicants quote those in replies.
+ */
+export function isMcCoyWebsiteFormNotificationBySender(input: {
+  fromName: string;
+  fromAddress: string;
+}): boolean {
+  const fromName = input.fromName.toLowerCase();
+  const fromAddr = input.fromAddress.toLowerCase();
+  const senders = configuredSenderAddresses();
+  const configuredName = configuredFromDisplayName().toLowerCase();
+
+  if (fromName.includes("mccoy website")) return true;
+  if (configuredName && fromName.includes(configuredName)) return true;
+  if (fromAddr && senders.includes(fromAddr)) return true;
+  if (fromAddr.endsWith("@resend.dev") && fromName.includes("mccoy")) return true;
+  return false;
 }
 
 /**
@@ -225,7 +261,8 @@ function stripHtmlToText(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<\/tr>/gi, "\n")
-    .replace(/<\/(div|h[1-6]|li)>/gi, "\n")
+    .replace(/<\/(div|h[1-6]|li|blockquote)>/gi, "\n")
+    .replace(/<(blockquote)\b[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -233,6 +270,27 @@ function stripHtmlToText(html: string): string {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&#65279;/gi, "")
+    .replace(/&#xfeff;/gi, "")
+    .replace(/&#(\d+);/g, (_, digits: string) => {
+      const code = Number(digits);
+      if (!Number.isFinite(code) || code <= 0) return "";
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return "";
+      }
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
+      const code = Number.parseInt(hex, 16);
+      if (!Number.isFinite(code) || code <= 0) return "";
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return "";
+      }
+    })
+    .replace(/\uFEFF/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
@@ -301,17 +359,8 @@ export function isMcCoyWebsiteFormNotificationGraph(input: {
   text: string;
   html: string;
 }): boolean {
-  const fromName = input.fromName.toLowerCase();
-  const fromAddr = input.fromAddress.toLowerCase();
-  const senders = configuredSenderAddresses();
-  const configuredName = configuredFromDisplayName().toLowerCase();
-
-  if (fromName.includes("mccoy website")) return true;
-  if (configuredName && fromName.includes(configuredName)) return true;
-  if (fromAddr && senders.includes(fromAddr)) return true;
-  if (fromAddr.endsWith("@resend.dev") && fromName.includes("mccoy")) return true;
+  if (isMcCoyWebsiteFormNotificationBySender(input)) return true;
   if (hasMcCoyFormFooter(input.text, input.html)) return true;
-
   return false;
 }
 
@@ -394,7 +443,8 @@ function formMessageSnippet(
 /**
  * One form submit can appear twice in Graph when saveToSentItems duplicated a
  * self-addressed notification (Inbox + Sent Items). Keep a single list row per
- * McCoy request number when present.
+ * McCoy request number when present. Prefer the original form notification over
+ * a later reply that incorrectly shared the WR- number.
  */
 export function dedupeFormInboxSummaries(
   items: FormInboxMessageSummary[],
@@ -411,6 +461,12 @@ export function dedupeFormInboxSummaries(
     const existing = byNumber.get(number);
     if (!existing) {
       byNumber.set(number, item);
+      continue;
+    }
+    const existingReply = isReplyOrForwardSubject(existing.subject);
+    const itemReply = isReplyOrForwardSubject(item.subject);
+    if (existingReply !== itemReply) {
+      byNumber.set(number, existingReply ? item : existing);
       continue;
     }
     const keepExisting =
@@ -444,6 +500,7 @@ async function graphFetch<T>(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
+        Prefer: 'IdType="ImmutableId"',
         ...(rest.headers ?? {}),
       },
       signal: rest.signal ?? AbortSignal.timeout(25_000),
@@ -475,10 +532,16 @@ async function graphFetch<T>(
         : undefined;
     const code = errObj?.code || `http_${response.status}`;
     const detail = (errObj?.message || "").slice(0, 220);
-    console.error("[graph-mail] API error", {
-      status: response.status,
-      code,
-    });
+    // InefficientFilter is an expected Graph limitation for some conversation
+    // queries; callers fall back to a recent-mail scan. Keep logs quiet.
+    if (code === "InefficientFilter") {
+      console.warn("[graph-mail] InefficientFilter", { status: response.status });
+    } else {
+      console.error("[graph-mail] API error", {
+        status: response.status,
+        code,
+      });
+    }
     throw new FormInboxError(
       formatGraphApiError({
         status: response.status,
@@ -531,7 +594,8 @@ function mapAttachments(list: GraphAttachment[] | undefined): FormInboxAttachmen
 
 /**
  * List-path filter: keep only website form notifications (headers, or
- * form subject + sender/footer). Replies/forwards are excluded.
+ * form subject + McCoy sender). Replies/forwards are excluded.
+ * Quoted form footers in bodyPreview must not create new Aanvragen rows.
  * Exported for unit tests.
  */
 export function looksLikeFormCandidate(msg: {
@@ -546,11 +610,10 @@ export function looksLikeFormCandidate(msg: {
   if (!classifyFormEmailSubject(subject)) return false;
   const fromName = recipientName(msg.from);
   const fromAddr = recipientAddress(msg.from) || "";
-  return isMcCoyWebsiteFormNotificationGraph({
+  // Sender only — never body footer (applicant replies quote the form footer).
+  return isMcCoyWebsiteFormNotificationBySender({
     fromName,
     fromAddress: fromAddr,
-    text: msg.bodyPreview || "",
-    html: "",
   });
 }
 
@@ -590,13 +653,11 @@ function toSummary(
     const headerMarksForm = hasMcCoyFormMarkerHeaders(msg.internetMessageHeaders);
     if (isReplyOrForwardSubject(subject) && !headerMarksForm) return null;
 
-    const senderOrFooter = isMcCoyWebsiteFormNotificationGraph({
+    const senderOk = isMcCoyWebsiteFormNotificationBySender({
       fromName,
       fromAddress: fromAddr,
-      text: text || msg.bodyPreview || "",
-      html,
     });
-    const isForm = headerMarksForm || senderOrFooter;
+    const isForm = headerMarksForm || senderOk;
     if (!isForm) return null;
   }
 
@@ -646,7 +707,7 @@ export function classifyGraphThreadDirection(input: {
 }): FormInboxThreadItem["direction"] {
   const from = (input.fromAddress || "").toLowerCase();
   const subject = input.subject.trim();
-  const isReplySubject = /^(re|fw|fwd)\s*:/i.test(subject);
+  const isReplySubject = isReplyOrForwardSubject(subject);
   const hasFormFooter =
     /verstuurd via het mccoy websiteformulier/i.test(input.text) ||
     /sent from the mccoy website form/i.test(input.text);
@@ -678,22 +739,28 @@ function toThreadItem(
   const fromAddr = recipientAddress(msg.from);
   const fromName = msg.from?.emailAddress?.name?.trim() || "";
   const subject = (msg.subject || "").trim() || "(geen onderwerp)";
+  const direction = classifyGraphThreadDirection({
+    fromAddress: fromAddr,
+    fromName,
+    subject,
+    text,
+    inboxUser: mailbox,
+    submitter,
+  });
   return {
     id: encodeGraphMessageId(msg.id, mailbox),
     uid: graphIdToSyntheticUid(msg.id),
-    direction: classifyGraphThreadDirection({
-      fromAddress: fromAddr,
-      fromName,
-      subject,
-      text,
-      inboxUser: mailbox,
-      submitter,
-    }),
+    direction,
     from: formatRecipient(msg.from) || "(onbekend)",
     to: formatRecipients(msg.toRecipients) || mailbox,
     date: msg.receivedDateTime || new Date().toISOString(),
     subject,
-    textBody: text,
+    textBody:
+      direction === "admin"
+        ? extractSimpleReplyBody(text)
+        : direction === "customer"
+          ? stripQuotedReplyBody(text)
+          : text,
     messageId: msg.internetMessageId ?? null,
     attachments: [],
   };
@@ -702,7 +769,8 @@ function toThreadItem(
 async function listRecentMessages(
   config: GraphMailConfig,
   accessToken: string,
-): Promise<GraphMessage[]> {
+  options?: { stopWhen?: (accumulated: GraphMessage[]) => boolean },
+): Promise<{ messages: GraphMessage[]; pageCount: number }> {
   const select = [
     "id",
     "subject",
@@ -724,16 +792,19 @@ async function listRecentMessages(
     `&$top=${LIST_PAGE_SIZE}`;
 
   const all: GraphMessage[] = [];
+  let pageCount = 0;
   for (let page = 0; page < LIST_MAX_PAGES; page++) {
     const data = await graphFetch<GraphListResponse<GraphMessage>>(url, {
       accessToken,
     });
+    pageCount += 1;
     const batch = data.value ?? [];
     all.push(...batch);
+    if (options?.stopWhen?.(all)) break;
     if (!data["@odata.nextLink"] || batch.length === 0) break;
     url = data["@odata.nextLink"];
   }
-  return all;
+  return { messages: all, pageCount };
 }
 
 export async function listGraphFormInboxMessages(options?: {
@@ -741,20 +812,52 @@ export async function listGraphFormInboxMessages(options?: {
   scopeKey?: string | "all";
   q?: string;
   limit?: number;
-}): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
+}): Promise<{
+  items: FormInboxMessageSummary[];
+  facets: InboxFacets;
+  metrics?: InboxLoadMetrics;
+  /** Raw page candidates for thread-identity sync (caller owns side effects). */
+  syncCandidates?: GraphInboxSyncCandidate[];
+}> {
   const config = getGraphMailConfig();
   if (!config) {
     throw new FormInboxError("Microsoft Graph is niet geconfigureerd.");
   }
 
+  const started = Date.now();
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
   const accessToken = await getGraphAccessToken(config);
-  const recent = await listRecentMessages(config, accessToken);
+  const showAll = showAllGraphInboxMessages();
+
+  const { messages: recent, pageCount } = await listRecentMessages(config, accessToken, {
+    stopWhen: (accumulated) => {
+      if (showAll) return accumulated.length >= limit;
+      let formCount = 0;
+      for (const msg of accumulated) {
+        if (looksLikeFormCandidate(msg)) formCount += 1;
+        if (formCount >= limit) return true;
+      }
+      return false;
+    },
+  });
 
   const windowMessages: FormInboxMessageSummary[] = [];
-  const showAll = showAllGraphInboxMessages();
+  const syncCandidates: GraphInboxSyncCandidate[] = [];
   for (const msg of recent) {
-    if (!showAll && !looksLikeFormCandidate(msg)) continue;
+    if (!msg.id) continue;
+    const formCandidate = looksLikeFormCandidate(msg);
+    syncCandidates.push({
+      id: msg.id,
+      subject: msg.subject,
+      bodyPreview: msg.bodyPreview,
+      receivedDateTime: msg.receivedDateTime,
+      isRead: msg.isRead,
+      internetMessageId: msg.internetMessageId,
+      conversationId: msg.conversationId,
+      fromAddress: recipientAddress(msg.from),
+      isFormCandidate: formCandidate,
+    });
+    if (!showAll && !formCandidate) continue;
     const summary = toSummary(msg, config.mailbox);
     if (!summary) continue;
     windowMessages.push(summary);
@@ -768,7 +871,91 @@ export async function listGraphFormInboxMessages(options?: {
     scopeKey: options?.scopeKey,
     q: options?.q,
   });
-  return { items: filtered.slice(0, limit), facets };
+  const items = filtered.slice(0, limit);
+  return {
+    items,
+    facets,
+    metrics: {
+      graphRequestCount: pageCount,
+      returnedItemCount: items.length,
+      listDurationMs: Date.now() - started,
+      detailRequestCount: 0,
+    },
+    syncCandidates,
+  };
+}
+
+/**
+ * Confirm a Graph message may be deleted without fetching the HTML/text body.
+ */
+export async function assertGraphFormInboxMessageDeletable(
+  graphId: string,
+  mailbox?: string,
+): Promise<void> {
+  const config = getGraphMailConfig();
+  if (!config) {
+    throw new FormInboxError("Microsoft Graph is niet geconfigureerd.");
+  }
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  const select = [
+    "id",
+    "subject",
+    "bodyPreview",
+    "from",
+    "internetMessageId",
+    "conversationId",
+  ].join(",");
+
+  let msg: GraphMessage;
+  try {
+    msg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=${encodeURIComponent(select)}`,
+      ),
+      { accessToken },
+    );
+  } catch (error) {
+    if (error instanceof FormInboxError && /404|not found|niet gevonden/i.test(error.message)) {
+      throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+    }
+    throw error;
+  }
+
+  if (!msg?.id) {
+    throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+  }
+  if (!showAllGraphInboxMessages() && !looksLikeFormCandidate(msg)) {
+    throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+  }
+}
+
+/**
+ * Lightweight subject/preview read to correlate a Graph message with a WR- number
+ * during Aanvragen delete (no body fetch).
+ */
+export async function peekGraphMessageRequestNumber(
+  graphId: string,
+  mailbox?: string,
+): Promise<string | null> {
+  const config = getGraphMailConfig();
+  if (!config) return null;
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  const select = "id,subject,bodyPreview";
+  try {
+    const msg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=${encodeURIComponent(select)}`,
+      ),
+      { accessToken },
+    );
+    return extractRequestNumber(msg.subject || "", msg.bodyPreview || "") || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getGraphFormInboxMessage(
@@ -869,6 +1056,273 @@ export async function getGraphFormInboxMessage(
   };
 }
 
+/** Lightweight Graph message used when syncing a website-request conversation. */
+export type GraphConversationSyncMessage = {
+  id: string;
+  subject: string | null;
+  bodyPreview: string | null;
+  receivedDateTime: string | null;
+  isRead: boolean;
+  internetMessageId: string | null;
+  conversationId: string | null;
+  fromAddress: string | null;
+  fromName: string;
+  toAddresses: string[];
+  textBody: string;
+};
+
+function toConversationSyncMessage(msg: GraphMessage): GraphConversationSyncMessage | null {
+  if (!msg.id) return null;
+  const { text } = bodyPlainFromGraph(msg);
+  return {
+    id: msg.id,
+    subject: msg.subject ?? null,
+    bodyPreview: msg.bodyPreview ?? null,
+    receivedDateTime: msg.receivedDateTime ?? null,
+    isRead: msg.isRead !== false,
+    internetMessageId: msg.internetMessageId ?? null,
+    conversationId: msg.conversationId ?? null,
+    fromAddress: recipientAddress(msg.from),
+    fromName: msg.from?.emailAddress?.name?.trim() || "",
+    toAddresses: (msg.toRecipients ?? [])
+      .map((r) => recipientAddress(r))
+      .filter((addr): addr is string => Boolean(addr)),
+    textBody: text,
+  };
+}
+
+/**
+ * List messages in a Graph conversation (Inbox + Sent Items via /messages).
+ * Used by request-detail sync so applicant replies appear on `req:` Aanvragen.
+ *
+ * Strategy (Graph InefficientFilter is common on conversationId filters):
+ * 1. $filter only (no $orderby) — sort client-side
+ * 2. $filter + $orderby with correct property order
+ * 3. Scan recent mailbox messages and keep matching conversationId
+ */
+export async function listGraphConversationSyncMessages(options: {
+  conversationId: string;
+  mailbox?: string;
+  top?: number;
+}): Promise<GraphConversationSyncMessage[]> {
+  const config = getGraphMailConfig();
+  if (!config) {
+    throw new FormInboxError("Microsoft Graph is niet geconfigureerd.");
+  }
+  const box = options.mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  const conversationId = options.conversationId.trim();
+  if (!conversationId) return [];
+
+  const filter = buildConversationReceivedFilter(conversationId);
+  const top = Math.min(Math.max(options.top ?? MAX_THREAD_MESSAGES, 1), 40);
+  const select =
+    "id,subject,from,toRecipients,replyTo,receivedDateTime,internetMessageId,conversationId,body,bodyPreview,isRead";
+
+  const mapList = (value: GraphMessage[] | undefined): GraphConversationSyncMessage[] =>
+    (value ?? [])
+      .map((msg) => toConversationSyncMessage(msg))
+      .filter((msg): msg is GraphConversationSyncMessage => Boolean(msg))
+      .sort(
+        (a, b) =>
+          new Date(a.receivedDateTime || 0).getTime() -
+          new Date(b.receivedDateTime || 0).getTime(),
+      );
+
+  // 1) Filter without $orderby — avoids most InefficientFilter cases.
+  try {
+    const data = await graphFetch<GraphListResponse<GraphMessage>>(
+      usersPath(
+        box,
+        `/messages?$filter=${encodeURIComponent(filter)}` +
+          `&$select=${encodeURIComponent(select)}` +
+          `&$top=${top}`,
+      ),
+      { accessToken },
+    );
+    const mapped = mapList(data.value);
+    if (mapped.length > 0) return mapped;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/InefficientFilter|ErrorInvalidArgument/i.test(message)) throw error;
+  }
+
+  // 2) Filter + orderby with Graph-required property order.
+  try {
+    const data = await graphFetch<GraphListResponse<GraphMessage>>(
+      usersPath(
+        box,
+        `/messages?$filter=${encodeURIComponent(filter)}` +
+          `&$select=${encodeURIComponent(select)}` +
+          `&$orderby=${encodeURIComponent("receivedDateTime asc")}` +
+          `&$top=${top}`,
+      ),
+      { accessToken },
+    );
+    const mapped = mapList(data.value);
+    if (mapped.length > 0) return mapped;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/InefficientFilter|ErrorInvalidArgument/i.test(message)) throw error;
+    console.warn(
+      "[graph-mail] conversation filter rejected; falling back to recent scan",
+      message.slice(0, 120),
+    );
+  }
+
+  // 3) Client-side match against recent mailbox messages (always works).
+  return listRecentGraphSyncMessages({
+    mailbox: box,
+    maxMessages: Math.max(top * 4, 80),
+  }).then((recent) =>
+    recent
+      .filter((msg) => msg.conversationId === conversationId)
+      .slice(-top),
+  );
+}
+
+/**
+ * Recent mailbox messages for Aanvraag detail sync fallbacks.
+ * Uses bodyPreview as text when full body is not selected (fast path).
+ */
+export async function listRecentGraphSyncMessages(options?: {
+  mailbox?: string;
+  maxMessages?: number;
+}): Promise<GraphConversationSyncMessage[]> {
+  const config = getGraphMailConfig();
+  if (!config) {
+    throw new FormInboxError("Microsoft Graph is niet geconfigureerd.");
+  }
+  const box = options?.mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  const maxMessages = Math.min(Math.max(options?.maxMessages ?? 100, 20), 200);
+
+  const { messages } = await listRecentMessages(config, accessToken, {
+    stopWhen: (accumulated) => accumulated.length >= maxMessages,
+  });
+
+  return messages
+    .slice(0, maxMessages)
+    .map((msg) => {
+      if (!msg.id) return null;
+      return {
+        id: msg.id,
+        subject: msg.subject ?? null,
+        bodyPreview: msg.bodyPreview ?? null,
+        receivedDateTime: msg.receivedDateTime ?? null,
+        isRead: msg.isRead !== false,
+        internetMessageId: msg.internetMessageId ?? null,
+        conversationId: msg.conversationId ?? null,
+        fromAddress: recipientAddress(msg.from),
+        fromName: msg.from?.emailAddress?.name?.trim() || "",
+        toAddresses: (msg.toRecipients ?? [])
+          .map((r) => recipientAddress(r))
+          .filter((addr): addr is string => Boolean(addr)),
+        textBody: (msg.bodyPreview || "").trim(),
+      } satisfies GraphConversationSyncMessage;
+    })
+    .filter((msg): msg is GraphConversationSyncMessage => Boolean(msg));
+}
+
+/** Resolve conversation / RFC ids for a known Graph message. */
+export async function getGraphMessageSyncMeta(
+  graphId: string,
+  mailbox?: string,
+): Promise<{
+  id: string;
+  conversationId: string | null;
+  internetMessageId: string | null;
+} | null> {
+  const config = getGraphMailConfig();
+  if (!config) return null;
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  try {
+    const msg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=${encodeURIComponent(
+          "id,conversationId,internetMessageId",
+        )}`,
+      ),
+      { accessToken },
+    );
+    if (!msg.id) return null;
+    return {
+      id: msg.id,
+      conversationId: msg.conversationId ?? null,
+      internetMessageId: msg.internetMessageId ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Full plain-text body for an inbound reply (avoids bodyPreview quoting artefacts). */
+export async function getGraphMessagePlainBody(
+  graphId: string,
+  mailbox?: string,
+): Promise<string | null> {
+  const config = getGraphMailConfig();
+  if (!config) return null;
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  try {
+    const msg = await graphFetch<GraphMessage>(
+      usersPath(
+        box,
+        `/messages/${encodeURIComponent(graphId)}?$select=${encodeURIComponent(
+          "id,body,bodyPreview",
+        )}`,
+      ),
+      { accessToken },
+    );
+    if (!msg.id) return null;
+    const { text } = bodyPlainFromGraph(msg);
+    return text || (msg.bodyPreview || "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Find a mailbox message by RFC Message-ID (Sent Items / Inbox). */
+export async function findGraphMessageByInternetMessageId(
+  internetMessageId: string,
+  mailbox?: string,
+): Promise<{
+  id: string;
+  conversationId: string | null;
+  internetMessageId: string | null;
+} | null> {
+  const config = getGraphMailConfig();
+  if (!config) return null;
+  const box = mailbox || config.mailbox;
+  const normalised = internetMessageId.trim();
+  if (!normalised) return null;
+  const accessToken = await getGraphAccessToken(config);
+  const filter = `internetMessageId eq '${normalised.replace(/'/g, "''")}'`;
+  try {
+    const data = await graphFetch<GraphListResponse<GraphMessage>>(
+      usersPath(
+        box,
+        `/messages?$filter=${encodeURIComponent(filter)}` +
+          `&$select=${encodeURIComponent("id,conversationId,internetMessageId")}` +
+          `&$top=1`,
+      ),
+      { accessToken },
+    );
+    const hit = data.value?.[0];
+    if (!hit?.id) return null;
+    return {
+      id: hit.id,
+      conversationId: hit.conversationId ?? null,
+      internetMessageId: hit.internetMessageId ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getGraphFormInboxThread(
   graphId: string,
   mailbox?: string,
@@ -921,54 +1375,56 @@ export async function getGraphFormInboxThread(
     return single ? [single] : [];
   }
 
-  // Graph rejects bare conversationId filters with InefficientFilter (400).
-  // A receivedDateTime lower bound makes the filter usable; on failure fall back
-  // to the single root message so reply UI still works.
-  const filter =
-    `conversationId eq '${conversationId.replace(/'/g, "''")}'` +
-    ` and receivedDateTime ge 1970-01-01T00:00:00Z`;
+  const synced = await listGraphConversationSyncMessages({
+    conversationId,
+    mailbox: box,
+  });
 
-  let messages: GraphMessage[] = [];
-  try {
-    const data = await graphFetch<GraphListResponse<GraphMessage>>(
-      usersPath(
-        box,
-        `/messages?$filter=${encodeURIComponent(filter)}` +
-          `&$select=${encodeURIComponent(
-            "id,subject,from,toRecipients,replyTo,receivedDateTime,internetMessageId,body,bodyPreview",
-          )}` +
-          `&$orderby=${encodeURIComponent("receivedDateTime asc")}` +
-          `&$top=${MAX_THREAD_MESSAGES}`,
-      ),
-      { accessToken },
-    );
-    messages = data.value ?? [];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/InefficientFilter|ErrorInvalidArgument/i.test(message)) {
-      console.warn(
-        "[graph-mail] conversation filter rejected; using single-message thread",
-        message.slice(0, 160),
-      );
-      const single = toThreadItem(root, box, submitter);
-      return single ? [single] : [];
-    }
-    throw error;
-  }
-
-  const thread: FormInboxThreadItem[] = [];
-  for (const msg of messages) {
-    const item = toThreadItem(msg, box, submitter);
-    if (item) thread.push(item);
-  }
+  const thread: FormInboxThreadItem[] = synced.map((msg) => {
+    const subject = (msg.subject || "").trim() || "(geen onderwerp)";
+    const direction = classifyGraphThreadDirection({
+      fromAddress: msg.fromAddress,
+      fromName: msg.fromName,
+      subject,
+      text: msg.textBody,
+      inboxUser: box,
+      submitter,
+    });
+    return {
+      id: encodeGraphMessageId(msg.id, box),
+      uid: graphIdToSyntheticUid(msg.id),
+      direction,
+      from: msg.fromAddress
+        ? msg.fromName
+          ? `${msg.fromName} <${msg.fromAddress}>`
+          : msg.fromAddress
+        : "(onbekend)",
+      to: msg.toAddresses.join(", ") || box,
+      date: msg.receivedDateTime || new Date().toISOString(),
+      subject,
+      textBody:
+        direction === "admin"
+          ? extractSimpleReplyBody(msg.textBody)
+          : direction === "customer"
+            ? stripQuotedReplyBody(msg.textBody)
+            : msg.textBody,
+      messageId: msg.internetMessageId,
+      attachments: [],
+    };
+  });
 
   if (!thread.some((t) => t.id === encodeGraphMessageId(graphId, box))) {
     const rootItem = toThreadItem(root, box, submitter);
     if (rootItem) thread.unshift(rootItem);
   }
 
+  if (thread.length === 0) {
+    const single = toThreadItem(root, box, submitter);
+    return single ? [single] : [];
+  }
+
   thread.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  return thread.slice(-MAX_THREAD_MESSAGES);
+  return dedupeInquiryThreadItems(thread).slice(-MAX_THREAD_MESSAGES);
 }
 
 export async function getGraphFormInboxAttachment(
@@ -1091,6 +1547,100 @@ export type GraphSendAttachment = {
   isInline?: boolean;
 };
 
+export type GraphSendReplyResult =
+  | {
+      ok: true;
+      /** RFC Message-ID when resolved from Sent Items / draft. */
+      messageId?: string;
+      graphMessageId?: string;
+      internetMessageId?: string;
+      conversationId?: string;
+      conversationIndex?: string;
+      sentAt?: string;
+      identityPending?: boolean;
+    }
+  | { ok: false; error: string };
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Resolve the Sent Items copy after a reply/send. Graph is eventually consistent.
+ */
+async function resolveSentReplyIdentity(options: {
+  accessToken: string;
+  mailbox: string;
+  conversationId: string | null | undefined;
+  toAddress: string;
+  subject: string;
+}): Promise<{
+  graphMessageId?: string;
+  internetMessageId?: string;
+  conversationId?: string;
+  conversationIndex?: string;
+  sentAt?: string;
+} | null> {
+  const to = options.toAddress.trim().toLowerCase();
+  const select =
+    "id,internetMessageId,conversationId,conversationIndex,sentDateTime,subject,toRecipients";
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) await sleepMs(400 * 2 ** (attempt - 1));
+
+    let url: string;
+    if (options.conversationId) {
+      // sentDateTime must lead $filter when it is used in $orderby.
+      const filter = buildConversationSentFilter(
+        options.conversationId,
+        new Date(Date.now() - 15 * 60_000).toISOString(),
+      );
+      url =
+        usersPath(options.mailbox, "/mailFolders/sentitems/messages") +
+        `?$filter=${encodeURIComponent(filter)}` +
+        `&$select=${encodeURIComponent(select)}` +
+        `&$orderby=${encodeURIComponent("sentDateTime desc")}` +
+        `&$top=5`;
+    } else {
+      url =
+        usersPath(options.mailbox, "/mailFolders/sentitems/messages") +
+        `?$select=${encodeURIComponent(select)}` +
+        `&$orderby=${encodeURIComponent("sentDateTime desc")}` +
+        `&$top=8`;
+    }
+
+    try {
+      const data = await graphFetch<GraphListResponse<GraphMessage>>(url, {
+        accessToken: options.accessToken,
+      });
+      const candidates = data.value ?? [];
+      const hit =
+        candidates.find((msg) =>
+          (msg.toRecipients ?? []).some(
+            (r) => recipientAddress(r)?.toLowerCase() === to,
+          ),
+        ) ??
+        candidates.find((msg) =>
+          (msg.subject || "").toLowerCase().includes(
+            options.subject.replace(/^re:\s*/i, "").trim().toLowerCase().slice(0, 40),
+          ),
+        ) ??
+        candidates[0];
+      if (!hit?.id) continue;
+      return {
+        graphMessageId: hit.id,
+        internetMessageId: hit.internetMessageId ?? undefined,
+        conversationId: hit.conversationId ?? options.conversationId ?? undefined,
+        conversationIndex: hit.conversationIndex ?? undefined,
+        sentAt: hit.sentDateTime ?? hit.receivedDateTime ?? new Date().toISOString(),
+      };
+    } catch {
+      /* retry */
+    }
+  }
+  return null;
+}
+
 export async function sendGraphAdminReply(options: {
   to: string;
   subject: string;
@@ -1099,6 +1649,7 @@ export async function sendGraphAdminReply(options: {
   replyTo?: string;
   /** BCC so Aanvragen can show the outbound reply in the conversation list. */
   bcc?: string | string[];
+  /** When set, uses createReply → patch recipients/body → send (preserves Graph thread). */
   inReplyToGraphId?: string;
   inReplyToInternetMessageId?: string;
   /** Custom x-* internet headers (Graph only allows extension headers). */
@@ -1106,7 +1657,7 @@ export async function sendGraphAdminReply(options: {
   attachments?: GraphSendAttachment[];
   /** Default true — staff replies. Form notifications pass false to avoid Sent Items dupes. */
   saveToSentItems?: boolean;
-}): Promise<{ ok: true; messageId?: string } | { ok: false; error: string }> {
+}): Promise<GraphSendReplyResult> {
   const config = getGraphMailConfig();
   if (!config) {
     return { ok: false, error: "Microsoft Graph is niet geconfigureerd." };
@@ -1141,53 +1692,142 @@ export async function sendGraphAdminReply(options: {
       .map((addr) => addr.trim().toLowerCase())
       .filter((addr) => addr.length > 0 && addr !== options.to.trim().toLowerCase());
 
+    const replyDraftPatch = buildGraphReplyDraftPatch({
+      html: options.html,
+      to: options.to,
+      replyTo: options.replyTo,
+      bcc: bccList,
+    });
+
     const messageBase = {
       subject: options.subject,
-      body: {
-        contentType: "HTML" as const,
-        content: options.html,
-      },
-      toRecipients: [
-        {
-          emailAddress: { address: options.to },
-        },
-      ],
-      ...(bccList.length > 0
-        ? {
-            bccRecipients: bccList.map((address) => ({
-              emailAddress: { address },
-            })),
-          }
-        : {}),
-      ...(options.replyTo
-        ? {
-            replyTo: [
-              {
-                emailAddress: { address: options.replyTo },
-              },
-            ],
-          }
-        : {}),
-      ...(internetMessageHeaders.length > 0 ? { internetMessageHeaders } : {}),
+      ...replyDraftPatch,
       ...(fileAttachments.length > 0 ? { attachments: fileAttachments } : {}),
     };
 
     if (options.inReplyToGraphId) {
-      await graphFetch(
-        usersPath(
-          config.mailbox,
-          `/messages/${encodeURIComponent(options.inReplyToGraphId)}/reply`,
-        ),
-        {
-          method: "POST",
+      // Prefer createReply so Graph keeps conversationId / In-Reply-To.
+      // Override toRecipients to the website visitor (form notifications are From our mailbox).
+      // Never PATCH internetMessageHeaders — Graph returns ErrorInvalidPropertySet.
+      let draft: GraphMessage;
+      try {
+        draft = await graphFetch<GraphMessage>(
+          usersPath(
+            config.mailbox,
+            `/messages/${encodeURIComponent(options.inReplyToGraphId)}/createReply`,
+          ),
+          {
+            method: "POST",
+            accessToken,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          },
+        );
+      } catch (createReplyError) {
+        // Parent may be deleted / immutable-id stale — fall through to sendMail.
+        console.warn(
+          "[graph-mail] createReply failed; using sendMail",
+          createReplyError instanceof Error
+            ? createReplyError.message.slice(0, 160)
+            : "unknown",
+        );
+        draft = { id: undefined };
+      }
+
+      if (!draft?.id) {
+        // Fallback: /reply with message override, then sendMail if that also fails.
+        try {
+          await graphFetch(
+            usersPath(
+              config.mailbox,
+              `/messages/${encodeURIComponent(options.inReplyToGraphId)}/reply`,
+            ),
+            {
+              method: "POST",
+              accessToken,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: replyDraftPatch }),
+            },
+          );
+          const resolved = await resolveSentReplyIdentity({
+            accessToken,
+            mailbox: config.mailbox,
+            conversationId: draft?.conversationId ?? null,
+            toAddress: options.to,
+            subject: options.subject,
+          });
+          return {
+            ok: true,
+            messageId: resolved?.internetMessageId ?? options.inReplyToInternetMessageId,
+            graphMessageId: resolved?.graphMessageId,
+            internetMessageId: resolved?.internetMessageId,
+            conversationId: resolved?.conversationId,
+            sentAt: resolved?.sentAt,
+            identityPending: !resolved?.internetMessageId,
+          };
+        } catch (replyError) {
+          console.warn(
+            "[graph-mail] /reply failed; using sendMail",
+            replyError instanceof Error ? replyError.message.slice(0, 160) : "unknown",
+          );
+          // fall through to sendMail below
+        }
+      } else {
+        await graphFetch(
+          usersPath(config.mailbox, `/messages/${encodeURIComponent(draft.id)}`),
+          {
+            method: "PATCH",
+            accessToken,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(replyDraftPatch),
+          },
+        );
+
+        if (fileAttachments.length > 0) {
+          for (const attachment of fileAttachments) {
+            await graphFetch(
+              usersPath(
+                config.mailbox,
+                `/messages/${encodeURIComponent(draft.id)}/attachments`,
+              ),
+              {
+                method: "POST",
+                accessToken,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(attachment),
+              },
+            );
+          }
+        }
+
+        await graphFetch(
+          usersPath(config.mailbox, `/messages/${encodeURIComponent(draft.id)}/send`),
+          {
+            method: "POST",
+            accessToken,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          },
+        );
+
+        const resolved = await resolveSentReplyIdentity({
           accessToken,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: messageBase,
-          }),
-        },
-      );
-      return { ok: true, messageId: options.inReplyToInternetMessageId };
+          mailbox: config.mailbox,
+          conversationId: draft.conversationId ?? null,
+          toAddress: options.to,
+          subject: options.subject,
+        });
+
+        return {
+          ok: true,
+          messageId: resolved?.internetMessageId ?? options.inReplyToInternetMessageId,
+          graphMessageId: resolved?.graphMessageId,
+          internetMessageId: resolved?.internetMessageId,
+          conversationId: resolved?.conversationId ?? draft.conversationId ?? undefined,
+          sentAt: resolved?.sentAt ?? new Date().toISOString(),
+          identityPending: !resolved?.graphMessageId,
+        };
+      }
     }
 
     await graphFetch(usersPath(config.mailbox, "/sendMail"), {
@@ -1195,12 +1835,36 @@ export async function sendGraphAdminReply(options: {
       accessToken,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: messageBase,
+        message: {
+          ...messageBase,
+          ...(internetMessageHeaders.length > 0 ? { internetMessageHeaders } : {}),
+        },
         saveToSentItems: options.saveToSentItems !== false,
       }),
     });
 
-    return { ok: true };
+    // Persist Sent Items identity so applicant replies can be correlated later.
+    // Without this, standalone sendMail leaves conversationId unknown on the inquiry.
+    const resolved =
+      options.saveToSentItems === false
+        ? null
+        : await resolveSentReplyIdentity({
+            accessToken,
+            mailbox: config.mailbox,
+            conversationId: null,
+            toAddress: options.to,
+            subject: options.subject,
+          });
+
+    return {
+      ok: true,
+      messageId: resolved?.internetMessageId,
+      graphMessageId: resolved?.graphMessageId,
+      internetMessageId: resolved?.internetMessageId,
+      conversationId: resolved?.conversationId,
+      sentAt: resolved?.sentAt ?? new Date().toISOString(),
+      identityPending: Boolean(options.saveToSentItems !== false && !resolved?.graphMessageId),
+    };
   } catch (error) {
     const message =
       error instanceof FormInboxError

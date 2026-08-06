@@ -6,6 +6,7 @@ import {
   getWebsiteRequest,
   hasSupabaseServiceConfig,
   isNotificationOutboxUnavailableMessage,
+  listWebsiteRequestMailMessages,
   listWebsiteRequests,
   markAllNotificationsRead,
   NotificationOutboxUnavailableError,
@@ -13,20 +14,28 @@ import {
   processNotificationOutbox,
   requireAdminSession,
   setWebsiteRequestStatus,
+  upsertWebsiteRequestMailMessage,
 } from "@mccoy/database/server";
 import {
   FormInboxConfigError,
   FormInboxError,
   formInboxConfigHelpMessage,
   deleteFormInboxMessage,
+  bulkDeleteFormInboxMessages,
   bulkDeleteFailureMessage,
+  decodeInboxMessageId,
+  encodeGraphMessageId,
   getFormInboxAttachment,
   getFormInboxMessage,
   getFormInboxThread,
   isFormInboxConfigured,
   listFormInboxMessages,
+  getGraphMailConfig,
   sendAdminReplyEmail,
   shouldAttemptGraphMail,
+  dedupeInquiryThreadItems,
+  extractSimpleReplyBody,
+  isTemplatedWrapOf,
 } from "@mccoy/email/server";
 import { AdminAuthError, assertInboxFetchRateLimit, assertReplyRateLimit } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
@@ -60,14 +69,23 @@ async function mergePersistedRepliesIntoThread(
     const request = await getWebsiteRequest(summary.id);
     if (!request?.replies.length) return thread;
 
-    const existingBodies = new Set(
-      thread
-        .filter((item) => item.direction === "admin")
-        .map((item) => item.textBody.trim().toLowerCase()),
+    const normalisedThread = thread.map((item) =>
+      item.direction === "admin"
+        ? { ...item, textBody: extractSimpleReplyBody(item.textBody) }
+        : item,
     );
 
     const extras = request.replies
-      .filter((reply) => !existingBodies.has(reply.body.trim().toLowerCase()))
+      .filter((reply) => {
+        const simple = reply.body.trim().toLowerCase();
+        return !normalisedThread.some(
+          (item) =>
+            item.direction === "admin" &&
+            (item.textBody.trim().toLowerCase() === simple ||
+              isTemplatedWrapOf(reply.body, item.textBody) ||
+              isTemplatedWrapOf(item.textBody, reply.body)),
+        );
+      })
       .map((reply, index) => ({
         id: `persisted-reply:${request.id}:${reply.id}`,
         uid: 900_000 + index,
@@ -81,10 +99,10 @@ async function mergePersistedRepliesIntoThread(
         attachments: [],
       }));
 
-    if (extras.length === 0) return thread;
-
-    return [...thread, ...extras].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    return dedupeInquiryThreadItems(
+      [...normalisedThread, ...extras].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      ),
     );
   } catch {
     return thread;
@@ -474,11 +492,23 @@ export const getAdminFormInboxThread = createServerFn({ method: "POST" })
         };
       }
 
-      const [thread, message] = await Promise.all([
-        getFormInboxThread(data.id),
-        getFormInboxMessage(data.id),
-      ]);
-      const merged = await mergePersistedRepliesIntoThread(thread, message?.requestNumber ?? null);
+      // Load message first so request-backed Graph sync runs once. Parallel
+      // message+thread loads raced and could overwrite Gesprek without the
+      // applicant reply that sync just appended.
+      const message = await getFormInboxMessage(data.id);
+      let thread = message?.thread ?? [];
+      try {
+        const decoded = decodeInboxMessageId(data.id);
+        if (decoded.provider !== "request" && decoded.provider !== "e2e") {
+          thread = await getFormInboxThread(data.id);
+        }
+      } catch {
+        thread = message?.thread ?? (await getFormInboxThread(data.id));
+      }
+      const merged = await mergePersistedRepliesIntoThread(
+        thread,
+        message?.requestNumber ?? null,
+      );
       return { ok: true as const, thread: merged };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
@@ -557,21 +587,40 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         ? message.subject
         : `Re: ${message.subject}`;
 
+      // Prefer Graph createReply against the latest inbound / root Graph message.
+      let inboxMessageIdForReply = data.id;
+      try {
+        const decoded = decodeInboxMessageId(data.id);
+        if (decoded.provider === "request" || decoded.provider === "e2e") {
+          const mailRows = await listWebsiteRequestMailMessages(decoded.requestId);
+          const parent =
+            [...mailRows].reverse().find((row) => row.direction === "inbound" && row.graph_message_id) ??
+            mailRows.find((row) => row.graph_message_id);
+          if (parent?.graph_message_id) {
+            inboxMessageIdForReply = encodeGraphMessageId(
+              parent.graph_message_id,
+              parent.mailbox || "info@mccoy.nl",
+            );
+          }
+        }
+      } catch {
+        /* keep original id */
+      }
+
       const sent = await sendAdminReplyEmail({
         to: message.submitterEmail,
         subject,
         body: data.body,
         requestNumber,
         inReplyTo: message.messageId ?? undefined,
-        inboxMessageId: data.id,
+        inboxMessageId: inboxMessageIdForReply,
       });
 
       if (!sent.ok) {
         return { ok: false as const, error: sent.error, code: "provider" as const };
       }
 
-      // Persist so Gesprek shows the reply even when mailbox threading lags
-      // (Graph sendMail often starts a new conversationId).
+      // Persist staff reply + Graph/RFC identity on the website request inquiry.
       if (message.requestNumber) {
         try {
           const matches = await listWebsiteRequests({ q: message.requestNumber });
@@ -581,13 +630,36 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
               match.id,
               {
                 body: data.body,
-                sentAt: new Date().toISOString(),
+                sentAt: sent.sentAt ?? new Date().toISOString(),
                 sentBy: session.username,
                 toEmail: message.submitterEmail,
-                resendId: sent.resendId ?? sent.messageId,
+                resendId: sent.internetMessageId ?? sent.resendId ?? sent.messageId,
               },
               "replied",
             );
+            const graphMailbox =
+              getGraphMailConfig()?.mailbox ||
+              process.env.GRAPH_MAILBOX ||
+              process.env.FORM_TO_EMAIL ||
+              "";
+            await upsertWebsiteRequestMailMessage({
+              requestId: match.id,
+              direction: "outbound",
+              provider: sent.usedGraphReply || sent.graphMessageId
+                ? "microsoft_graph"
+                : "smtp",
+              mailbox: graphMailbox,
+              graphMessageId: sent.graphMessageId ?? null,
+              internetMessageId: sent.internetMessageId ?? sent.messageId ?? null,
+              conversationId: sent.conversationId ?? null,
+              inReplyTo: message.messageId ?? null,
+              senderAddress: graphMailbox || null,
+              recipientAddresses: [message.submitterEmail],
+              subject,
+              bodyText: data.body,
+              occurredAt: sent.sentAt ?? new Date().toISOString(),
+              isRead: true,
+            });
           }
         } catch (persistError) {
           console.error("[admin-requests] failed to persist inbox reply", {
@@ -604,6 +676,11 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         ok: true as const,
         toEmail: message.submitterEmail,
         resendId: sent.resendId,
+        graphMessageId: sent.graphMessageId,
+        internetMessageId: sent.internetMessageId,
+        conversationId: sent.conversationId,
+        usedGraphReply: sent.usedGraphReply,
+        identityPending: sent.identityPending ?? false,
       };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
@@ -652,54 +729,68 @@ export const bulkDeleteAdminFormInboxMessages = createServerFn({ method: "POST" 
           ok: false as const,
           error: formInboxConfigHelpMessage(),
           code: "config" as const,
+          requestedCount: data.ids.length,
           deletedCount: 0,
+          alreadyAbsentCount: 0,
+          failedCount: data.ids.length,
           deletedIds: [] as string[],
-          failures: [] as { id: string; error: string }[],
+          failures: data.ids.map((id) => ({ id, error: formInboxConfigHelpMessage() })),
+          results: data.ids.map((messageId) => ({
+            messageId,
+            status: "failed" as const,
+            errorCode: "config",
+          })),
         };
       }
 
-      const deletedIds: string[] = [];
-      const failures: { id: string; error: string }[] = [];
+      const bulk = await bulkDeleteFormInboxMessages(data.ids);
+      const deletedIds = bulk.results
+        .filter((r) => r.status === "deleted" || r.status === "already_absent")
+        .map((r) => r.messageId);
+      const failures = bulk.results
+        .filter((r) => r.status === "failed")
+        .map((r) => ({ id: r.messageId, error: r.error ?? "Verwijderen mislukt." }));
 
-      for (const id of data.ids) {
-        try {
-          await deleteFormInboxMessage(id);
-          deletedIds.push(id);
-        } catch (error) {
-          if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
-            failures.push({ id, error: error.message });
-            break;
-          }
-          try {
-            const mapped = inboxErrorResult(error);
-            failures.push({ id, error: mapped.error });
-          } catch {
-            failures.push({ id, error: "Verwijderen mislukt." });
-          }
-        }
-      }
+      console.info("[admin-requests] bulk delete", {
+        operation: "bulkDeleteAdminFormInboxMessages",
+        requestedCount: bulk.requestedCount,
+        deletedCount: bulk.deletedCount,
+        alreadyAbsentCount: bulk.alreadyAbsentCount,
+        failedCount: bulk.failedCount,
+        chunkCount: bulk.metrics?.chunkCount,
+        graphRequestCount: bulk.metrics?.graphRequestCount,
+        durationMs: bulk.metrics?.durationMs,
+      });
 
-      const deletedCount = deletedIds.length;
-      if (deletedCount === 0) {
+      if (bulk.deletedCount + bulk.alreadyAbsentCount === 0) {
         return {
           ok: false as const,
           error: bulkDeleteFailureMessage(0, failures),
-          code: failures.some((f) => f.error.includes("Te veel"))
-            ? ("rate_limit" as const)
-            : ("provider" as const),
+          code: "provider" as const,
+          requestedCount: bulk.requestedCount,
           deletedCount: 0,
-          deletedIds,
+          alreadyAbsentCount: 0,
+          failedCount: bulk.failedCount,
+          deletedIds: [] as string[],
           failures,
+          results: bulk.results,
         };
       }
 
       return {
         ok: true as const,
-        deletedCount,
+        requestedCount: bulk.requestedCount,
+        deletedCount: bulk.deletedCount + bulk.alreadyAbsentCount,
+        alreadyAbsentCount: bulk.alreadyAbsentCount,
+        failedCount: bulk.failedCount,
         deletedIds,
         failures,
+        results: bulk.results,
         ...(failures.length > 0
-          ? { partial: true as const, error: bulkDeleteFailureMessage(deletedCount, failures) }
+          ? {
+              partial: true as const,
+              error: bulkDeleteFailureMessage(bulk.deletedCount + bulk.alreadyAbsentCount, failures),
+            }
           : {}),
       };
     } catch (error) {
@@ -708,9 +799,17 @@ export const bulkDeleteAdminFormInboxMessages = createServerFn({ method: "POST" 
           ok: false as const,
           error: error.message,
           code: "rate_limit" as const,
+          requestedCount: data.ids.length,
           deletedCount: 0,
+          alreadyAbsentCount: 0,
+          failedCount: data.ids.length,
           deletedIds: [] as string[],
-          failures: [] as { id: string; error: string }[],
+          failures: data.ids.map((id) => ({ id, error: error.message })),
+          results: data.ids.map((messageId) => ({
+            messageId,
+            status: "failed" as const,
+            errorCode: "rate_limit",
+          })),
         };
       }
       const mapped = inboxErrorResult(error);
@@ -719,9 +818,17 @@ export const bulkDeleteAdminFormInboxMessages = createServerFn({ method: "POST" 
           ok: false as const,
           error: mapped.error,
           code: "code" in mapped ? mapped.code : ("provider" as const),
+          requestedCount: data.ids.length,
           deletedCount: 0,
+          alreadyAbsentCount: 0,
+          failedCount: data.ids.length,
           deletedIds: [] as string[],
-          failures: [] as { id: string; error: string }[],
+          failures: data.ids.map((id) => ({ id, error: mapped.error })),
+          results: data.ids.map((messageId) => ({
+            messageId,
+            status: "failed" as const,
+            errorCode: "provider",
+          })),
         };
       }
       throw error;

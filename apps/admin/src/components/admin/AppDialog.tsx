@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AdminFormField, adminInputClassName } from "@/components/admin/AdminFormField";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -114,24 +115,15 @@ export function FormDialog({
         </>
       }
     >
-      <div className="space-y-2">
-        <label htmlFor={inputId} className="text-base font-medium text-foreground">
-          {label}
-        </label>
+      <AdminFormField id={inputId} label={label} error={error ?? undefined}>
         <input
-          id={inputId}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           disabled={pending}
-          className="flex min-h-12 w-full rounded-xl border border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(adminInputClassName, "min-h-12")}
         />
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </AdminFormField>
     </AppDialog>
   );
 }

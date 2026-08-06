@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/notifications.functions";
 import { emitPlatformEvent } from "@/lib/platform-events";
 import { getAdminBrowserSupabase } from "@/lib/supabase-browser";
+import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
 
 import { ensurePlatformToastBridge } from "./toast-bridge";
 import type { AdminNotificationItem, NotificationServiceState } from "./types";
@@ -247,7 +248,15 @@ class AdminNotificationService {
         (item) => !previousIds.has(item.recipientId) && !item.readAt && !item.dismissedAt,
       );
       for (const item of newlyArrived.slice(0, MAX_TOASTED_PER_REFRESH)) {
-        emitPlatformEvent({ type: "notification-received", notificationId: item.notificationId });
+        emitPlatformEvent({
+          type: "notification-received",
+          notificationId: item.notificationId,
+          notificationType: item.type,
+          category: item.category,
+        });
+        if (item.category === "requests") {
+          refreshAdminRequestsUnreadBadge();
+        }
         if (typeof document !== "undefined" && document.hidden) {
           this.maybeShowBrowserNotification(item);
         } else {

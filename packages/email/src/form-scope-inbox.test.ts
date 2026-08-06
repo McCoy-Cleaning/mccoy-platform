@@ -221,7 +221,8 @@ describe("mergeMailboxAndWebsiteRequestSummaries", () => {
     expect(merged).toHaveLength(2);
     const wr1 = merged.find((m) => m.requestNumber === "WR-1");
     const wr2 = merged.find((m) => m.requestNumber === "WR-2");
-    expect(wr1?.id).toBe("graph:1");
+    // Prefer request-backed id so the list row is the stable inquiry, not a Graph item.
+    expect(wr1?.id).toBe("req:1");
     expect(wr1?.scopeKey).toBe("test");
     expect(wr2?.id).toBe("req:2");
   });
@@ -253,6 +254,43 @@ describe("mergeMailboxAndWebsiteRequestSummaries", () => {
     expect(cleared[0]?.scopeKey).toBeNull();
     expect(cleared[0]?.scopeLabel).toBeNull();
     expect(cleared[0]?.kind).toBe("inquiry");
+  });
+
+  it("suppresses mailbox and request rows for closed/spam WR numbers", () => {
+    const merged = mergeMailboxAndWebsiteRequestSummaries(
+      [
+        msg({
+          id: "graph:1",
+          kind: "inquiry",
+          requestNumber: "WR-CLOSED",
+          scopeKey: "test",
+        }),
+        msg({
+          id: "graph:2",
+          kind: "inquiry",
+          requestNumber: "WR-OPEN",
+          scopeKey: "test",
+        }),
+      ],
+      [
+        msg({
+          id: "req:closed",
+          kind: "inquiry",
+          requestNumber: "WR-CLOSED",
+          scopeKey: "test",
+        }),
+        msg({
+          id: "req:open",
+          kind: "inquiry",
+          requestNumber: "WR-OPEN",
+          scopeKey: "test",
+        }),
+      ],
+      { hiddenRequestNumbers: new Set(["WR-CLOSED"]) },
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.requestNumber).toBe("WR-OPEN");
+    expect(merged[0]?.id).toBe("req:open");
   });
 });
 

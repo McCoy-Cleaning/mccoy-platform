@@ -54,6 +54,7 @@ function mockAi(drafts: Record<string, string> = {}): CmsAiAssistApi {
         else store[k] = v;
       }
     },
+    confirmOverwrite: async () => false,
   };
 }
 
@@ -107,11 +108,22 @@ describe("manual EN draft controls in editors", () => {
     const stats = defaultSectionContent("home.stats") as StatsContent;
     const gallery = defaultSectionContent("home.workGallery") as WorkGalleryContent;
 
+    const expandAiPanel = (container: HTMLDivElement) => {
+      const toggle = Array.from(container.querySelectorAll("button")).find((b) =>
+        b.textContent?.includes("Uitklappen"),
+      );
+      expect(toggle).toBeTruthy();
+      act(() => {
+        toggle!.click();
+      });
+    };
+
     const p = mount(
       <CmsAiAssistProvider value={mockAi()}>
         <PartnersInspector content={partners} onPatch={vi.fn()} />
       </CmsAiAssistProvider>,
     );
+    expandAiPanel(p);
     expect(p.textContent).toMatch(/Engelse vertaling|EN ·/);
 
     act(() => mounted!.root.unmount());
@@ -123,6 +135,7 @@ describe("manual EN draft controls in editors", () => {
         <StatsInspector content={stats} onPatch={vi.fn()} />
       </CmsAiAssistProvider>,
     );
+    expandAiPanel(s);
     expect(s.textContent).toMatch(/Engelse vertaling|EN ·/);
 
     act(() => mounted!.root.unmount());
@@ -134,6 +147,7 @@ describe("manual EN draft controls in editors", () => {
         <WorkGalleryInspector content={gallery} onPatch={vi.fn()} />
       </CmsAiAssistProvider>,
     );
+    expandAiPanel(g);
     expect(g.textContent).toMatch(/Engelse vertaling|EN ·/);
   });
 });

@@ -48,6 +48,14 @@ export type CmsAiGenerateSectionResponse =
   | { ok: true; nl: Record<string, string>; en: Record<string, string>; warnings: string[] }
   | { ok: false; error: string };
 
+export type CmsConfirmationRequest = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone?: "default" | "warning" | "destructive";
+};
+
 export type CmsAiAssistApi = {
   configured: boolean | null;
   statusMessage?: string;
@@ -57,6 +65,12 @@ export type CmsAiAssistApi = {
   getEnDraft: (path: string) => string;
   setEnDraft: (path: string, value: string) => void;
   setEnDrafts: (patch: Record<string, string>) => void;
+  /**
+   * Confirm before overwriting existing EN drafts.
+   * Fail closed: missing handler, thrown errors, Escape, and cancel must abort.
+   * Never use window.confirm.
+   */
+  confirmOverwrite: (request: CmsConfirmationRequest) => Promise<boolean>;
 };
 
 const CmsAiAssistContext = React.createContext<CmsAiAssistApi | null>(null);
@@ -73,6 +87,24 @@ export function CmsAiAssistProvider({
 
 export function useCmsAiAssist(): CmsAiAssistApi | null {
   return React.useContext(CmsAiAssistContext);
+}
+
+/**
+ * Fail-closed overwrite confirmation. Missing API support, thrown errors,
+ * Escape, and cancellation all abort without touching CMS content.
+ * Never falls back to window.confirm.
+ */
+export async function requestCmsOverwriteConfirm(
+  ai: CmsAiAssistApi | null | undefined,
+  request: CmsConfirmationRequest,
+): Promise<boolean> {
+  const confirm = ai?.confirmOverwrite;
+  if (typeof confirm !== "function") return false;
+  try {
+    return Boolean(await confirm(request));
+  } catch {
+    return false;
+  }
 }
 
 const inputClass =
@@ -245,13 +277,18 @@ export function InspectTextField({
     setPreview({ kind: "idle" });
   };
 
-  const applyEn = () => {
+  const applyEn = async () => {
     if (preview.kind !== "preview-en" || !ai || !fieldPath) return;
     const existing = ai.getEnDraft(fieldPath);
     if (existing.trim() && existing.trim() !== preview.text.trim()) {
-      const ok = window.confirm(
-        "Er staat al een Engelse concepttekst. Overschrijven met de nieuwe vertaling?",
-      );
+      const ok = await requestCmsOverwriteConfirm(ai, {
+        title: "Engelse concepttekst overschrijven?",
+        description:
+          "Er staat al een Engelse concepttekst. Overschrijven met de nieuwe vertaling?",
+        confirmLabel: "Overschrijven",
+        cancelLabel: "Annuleren",
+        tone: "warning",
+      });
       if (!ok) return;
     }
     const enText = shouldSyncParagraphStructure(value, preview.text)
@@ -374,7 +411,9 @@ export function InspectTextField({
             <button
               type="button"
               className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              onClick={preview.kind === "preview-nl" ? applyNl : applyEn}
+              onClick={() =>
+                void (preview.kind === "preview-nl" ? applyNl() : applyEn())
+              }
             >
               Toepassen
             </button>
@@ -483,16 +522,20 @@ export function SectionAiToolbar({
     });
   };
 
-  const applySection = () => {
+  const applySection = async () => {
     if (state.kind !== "preview-section" || !onApplyDutch) return;
     const existingEn = Object.keys(state.en).filter((key) => {
       const path = `${pathPrefix}:${key}`;
       return Boolean(ai.getEnDraft(path).trim());
     });
     if (existingEn.length > 0) {
-      const ok = window.confirm(
-        `${existingEn.length} veld(en) hebben al een EN-concept. Overschrijven met de nieuwe vertaling?`,
-      );
+      const ok = await requestCmsOverwriteConfirm(ai, {
+        title: "EN-concepten overschrijven?",
+        description: `${existingEn.length} veld(en) hebben al een EN-concept. Overschrijven met de nieuwe vertaling?`,
+        confirmLabel: "Overschrijven",
+        cancelLabel: "Annuleren",
+        tone: "warning",
+      });
       if (!ok) return;
     }
     onApplyDutch(state.nl);
@@ -521,16 +564,20 @@ export function SectionAiToolbar({
     setState({ kind: "preview-translate", fields: result.fields, warnings: result.warnings });
   };
 
-  const applyTranslate = () => {
+  const applyTranslate = async () => {
     if (state.kind !== "preview-translate") return;
     const existing = translateEntries.filter(([key]) => {
       const path = `${pathPrefix}:${key}`;
       return Boolean(ai.getEnDraft(path).trim());
     });
     if (existing.length > 0) {
-      const ok = window.confirm(
-        `${existing.length} veld(en) hebben al een EN-concept. Overschrijven met deze batchvertaling?`,
-      );
+      const ok = await requestCmsOverwriteConfirm(ai, {
+        title: "EN-concepten overschrijven?",
+        description: `${existing.length} veld(en) hebben al een EN-concept. Overschrijven met deze batchvertaling?`,
+        confirmLabel: "Overschrijven",
+        cancelLabel: "Annuleren",
+        tone: "warning",
+      });
       if (!ok) return;
     }
     const patch: Record<string, string> = {};
@@ -713,7 +760,7 @@ export function SectionAiToolbar({
             <button
               type="button"
               className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400"
-              onClick={applySection}
+              onClick={() => void applySection()}
             >
               Toepassen
             </button>
@@ -812,7 +859,7 @@ export function SectionAiToolbar({
                 <button
                   type="button"
                   className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400"
-                  onClick={applyTranslate}
+                  onClick={() => void applyTranslate()}
                 >
                   Toepassen
                 </button>

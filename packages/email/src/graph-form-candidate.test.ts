@@ -44,6 +44,30 @@ describe("website form inbox filtering", () => {
     ).toBe(false);
   });
 
+  it("rejects Dutch/German Outlook reply prefixes (AW/WG) as form candidates", () => {
+    expect(isReplyOrForwardSubject("AW: Algemene aanvraag — Anna (WR-2026-00001)")).toBe(true);
+    expect(isReplyOrForwardSubject("WG: Algemene aanvraag — Anna")).toBe(true);
+    expect(
+      looksLikeFormCandidate({
+        subject: "AW: Algemene aanvraag — Anna (WR-2026-00001)",
+        bodyPreview:
+          "Dank u.\n\n> Verstuurd via het McCoy websiteformulier\n> Algemene aanvraag",
+        from: { emailAddress: { name: "Anna", address: "anna@example.com" } },
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat an applicant reply with a quoted form footer as a new form", () => {
+    expect(
+      looksLikeFormCandidate({
+        subject: "Algemene aanvraag — Anna (WR-2026-00001)",
+        bodyPreview:
+          "Hier mijn antwoord.\n\nVerstuurd via het McCoy websiteformulier",
+        from: { emailAddress: { name: "Anna", address: "anna@example.com" } },
+      }),
+    ).toBe(false);
+  });
+
   it("keeps original form subjects from the configured sender", () => {
     expect(
       looksLikeFormCandidate({

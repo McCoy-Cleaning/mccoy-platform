@@ -262,7 +262,8 @@ export function relatedEnFieldDraftKeys(
  *   `override_removed` (NL fallback until Opslaan / translate-missing refills)
  * - blank when every alias draft is already empty (including stuck
  *   `override_removed`) → delete meta so the field is `missing` again
- * - non-blank → keep draft, pin NL source, mark `manually_translated`
+ * - non-blank → keep draft (raw editor value, including trailing spaces while typing),
+ *   pin NL source, mark `manually_translated`. Trim is only used to detect blank.
  *
  * When `aliases` is provided (alias → canonical), clears/writes also purge sibling
  * index/colon keys so ghost EN drafts cannot snap the editor value back.
@@ -339,7 +340,9 @@ export function applyEnFieldDraftEditorPatch(input: {
           delete enFieldDraftMeta[path];
         }
       }
-      enFieldDrafts[canonical] = trimmed;
+      // Preserve raw editor value (incl. trailing spaces) so Space while typing works
+      // in controlled EN textareas. Blank detection still uses trim above.
+      enFieldDrafts[canonical] = value;
       const nl = (nlFields[canonical] ?? nlFields[key])?.trim();
       if (nl) enFieldDraftSources[canonical] = nl;
       else delete enFieldDraftSources[canonical];

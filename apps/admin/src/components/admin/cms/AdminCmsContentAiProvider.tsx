@@ -5,6 +5,7 @@ import {
   type CmsAiGenerateRequest,
   type CmsAiGenerateSectionRequest,
   type CmsAiTranslateRequest,
+  type CmsConfirmationRequest,
 } from "@mccoy/cms-editor";
 import { cms, useEditablePage } from "@/lib/cms/store";
 import { canonicalizeEnFieldDraftPath, lookupEnFieldDraft } from "@mccoy/cms-schema";
@@ -14,6 +15,7 @@ import {
   getContentAiStatus,
   translateNlToEn,
 } from "@/lib/api/content-ai.functions";
+import { appConfirm } from "@/lib/app-dialogs";
 
 /**
  * Wires admin server functions + CMS enFieldDrafts into cms-editor AI controls.
@@ -157,6 +159,19 @@ export function AdminCmsContentAiProvider({
             ok: false as const,
             error: "Netwerkfout bij sectie-generatie. Probeer opnieuw.",
           };
+        }
+      },
+      confirmOverwrite: async (request: CmsConfirmationRequest) => {
+        try {
+          return await appConfirm({
+            title: request.title,
+            description: request.description,
+            confirmLabel: request.confirmLabel,
+            cancelLabel: request.cancelLabel,
+            tone: request.tone,
+          });
+        } catch {
+          return false;
         }
       },
     };

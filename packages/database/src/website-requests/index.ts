@@ -20,6 +20,20 @@ import { supabaseWebsiteRequestsStore } from "./supabase-store";
 
 export { supabaseWebsiteRequestsStore } from "./supabase-store";
 export type { WebsiteRequestRow, WebsiteRequestReplyRow } from "./types";
+export {
+  upsertWebsiteRequestMailMessage,
+  listWebsiteRequestMailMessages,
+  listKnownMailIdentitiesForMailbox,
+  type WebsiteRequestMailMessageInput,
+  type WebsiteRequestMailMessageRow,
+  type UpsertMailMessageResult,
+} from "./mail-messages";
+
+export {
+  listHiddenWebsiteRequestNumbers,
+  findWebsiteRequestIdByGraphMessageId,
+  findWebsiteRequestIdByNumber,
+} from "./delete-lookup";
 
 export function getWebsiteRequestsStore(): WebsiteRequestsStore {
   return hasSupabaseServiceConfig() ? supabaseWebsiteRequestsStore : jsonWebsiteRequestsStore;

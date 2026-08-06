@@ -32,7 +32,9 @@ import {
   getGraphFormInboxThread,
   isReplyOrForwardSubject,
   listGraphFormInboxMessages,
+  assertGraphFormInboxMessageDeletable,
 } from "./graph-mail";
+import { bulkDeleteGraphMessages } from "./graph-bulk-delete";
 import {
   decodeInboxMessageId,
   encodeImapMessageId,
@@ -1206,7 +1208,22 @@ async function listMailboxFormInboxMessages(options?: {
 }): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   if (shouldAttemptGraphMail()) {
     try {
-      return await listGraphFormInboxMessages(options);
+      const listed = await listGraphFormInboxMessages(options);
+      if (listed.syncCandidates && listed.syncCandidates.length > 0) {
+        try {
+          const { syncGraphInboxAfterList } = await import("./graph-inbox-sync");
+          const { getGraphMailConfig } = await import("./graph-config");
+          await syncGraphInboxAfterList({
+            candidates: listed.syncCandidates,
+            mailbox: getGraphMailConfig()?.mailbox,
+          });
+        } catch (error) {
+          console.error("[form-inbox] Graph inbox sync failed", {
+            message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+          });
+        }
+      }
+      return { items: listed.items, facets: listed.facets };
     } catch (error) {
       const imapConfig =
         shouldFallbackFromGraph() && shouldAllowImapInbox() ? getInboxConfig() : null;
@@ -1300,6 +1317,7 @@ export async function listFormInboxMessages(options?: {
 
   const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
   const { mergeMailboxAndWebsiteRequestSummaries } = await import("./enrich-inbox-scopes");
+  const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
 
   let requestItems: FormInboxMessageSummary[] = [];
   try {
@@ -1314,7 +1332,19 @@ export async function listFormInboxMessages(options?: {
     });
   }
 
-  const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems);
+  // Closed/spam inquiries must not reappear via leftover Graph/IMAP form copies.
+  let hiddenRequestNumbers = new Set<string>();
+  try {
+    hiddenRequestNumbers = new Set(await listHiddenWebsiteRequestNumbers());
+  } catch (error) {
+    console.error("[form-inbox] closed-request suppress list failed", {
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
+  const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems, {
+    hiddenRequestNumbers,
+  });
   const { withActivePublishedScopesCleared } = await import("./apply-active-form-scopes");
   const scoped = await withActivePublishedScopesCleared(merged);
   const facets = buildInboxFacets(scoped);
@@ -1606,12 +1636,32 @@ export async function deleteFormInboxMessage(id: string): Promise<void> {
         "Dit bericht komt van Microsoft Graph, maar Graph is uitgeschakeld (FORM_INBOX_PROVIDER=imap). Vernieuw de Aanvragen-lijst.",
       );
     }
-    // Confirm it is a form notification before deleting from the mailbox.
-    const message = await getGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
-    if (!message) {
-      throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
+    const { closeWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
+    // Close matching website request first so list suppress hides the WR even if
+    // the mailbox move fails (permissions / already deleted).
+    const requestClosed = await closeWebsiteRequestForGraphMessage(
+      decoded.graphId,
+      decoded.mailbox,
+    );
+
+    try {
+      await assertGraphFormInboxMessageDeletable(decoded.graphId, decoded.mailbox);
+      await deleteGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Already gone from mailbox — request close above is enough for Aanvragen.
+      if (/niet gevonden|not found|404|ErrorItemNotFound/i.test(message)) {
+        return;
+      }
+      // Request closed → Aanvragen list will suppress; treat as success for UI.
+      if (requestClosed) {
+        console.warn("[form-inbox] Graph mailbox delete failed after request close", {
+          message: message.slice(0, 160),
+        });
+        return;
+      }
+      throw error;
     }
-    await deleteGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
     return;
   }
 
@@ -1637,9 +1687,178 @@ export async function deleteFormInboxMessage(id: string): Promise<void> {
       if (!summary) {
         throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
       }
+      if (summary.requestNumber) {
+        const { closeWebsiteRequestByNumber } = await import("./website-request-inbox");
+        await closeWebsiteRequestByNumber(summary.requestNumber);
+      }
       await client.messageDelete(String(uid), { uid: true });
     } finally {
       lock.release();
     }
   });
+}
+
+export type FormInboxDeleteItemResult = {
+  messageId: string;
+  status: "deleted" | "already_absent" | "failed";
+  statusCode?: number;
+  retryable?: boolean;
+  errorCode?: string;
+  error?: string;
+};
+
+export type FormInboxBulkDeleteResult = {
+  requestedCount: number;
+  results: FormInboxDeleteItemResult[];
+  deletedCount: number;
+  alreadyAbsentCount: number;
+  failedCount: number;
+  metrics?: {
+    graphRequestCount: number;
+    chunkCount: number;
+    durationMs: number;
+  };
+};
+
+/**
+ * Bulk-delete Aanvragen messages with a per-ID result for every unique id.
+ * Graph IDs use JSON $batch (chunks of 20). IMAP / website-request IDs stay sequential.
+ * Does not re-fetch full message bodies before Graph deletes (IDs are admin-session sourced).
+ */
+export async function bulkDeleteFormInboxMessages(
+  ids: string[],
+): Promise<FormInboxBulkDeleteResult> {
+  const uniqueIds = [...new Set(ids.filter((id) => typeof id === "string" && id.trim()))];
+  const results = new Map<string, FormInboxDeleteItemResult>();
+
+  const graphTargets: Array<{ messageId: string; graphId: string; mailbox: string }> = [];
+  const sequential: string[] = [];
+
+  for (const id of uniqueIds) {
+    try {
+      const decoded = decodeInboxMessageId(id);
+      if (decoded.provider === "graph") {
+        graphTargets.push({
+          messageId: id,
+          graphId: decoded.graphId,
+          mailbox: decoded.mailbox,
+        });
+      } else {
+        sequential.push(id);
+      }
+    } catch (error) {
+      results.set(id, {
+        messageId: id,
+        status: "failed",
+        errorCode: "invalid_id",
+        error: error instanceof Error ? error.message : "Ongeldig bericht-id.",
+      });
+    }
+  }
+
+  let metrics: FormInboxBulkDeleteResult["metrics"];
+
+  if (graphTargets.length > 0) {
+    if (!shouldAttemptGraphMail()) {
+      for (const t of graphTargets) {
+        results.set(t.messageId, {
+          messageId: t.messageId,
+          status: "failed",
+          errorCode: "graph_disabled",
+          error:
+            "Dit bericht komt van Microsoft Graph, maar Graph is uitgeschakeld (FORM_INBOX_PROVIDER=imap).",
+        });
+      }
+    } else {
+      const { closeWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
+      // Close correlated website requests before Graph $batch so Aanvragen
+      // suppress works even when a mailbox move fails.
+      const closedByMessageId = new Map<string, boolean>();
+      await Promise.all(
+        graphTargets.map(async (t) => {
+          const closed = await closeWebsiteRequestForGraphMessage(t.graphId, t.mailbox);
+          closedByMessageId.set(t.messageId, closed);
+        }),
+      );
+
+      const byMailbox = new Map<string, typeof graphTargets>();
+      for (const t of graphTargets) {
+        const key = t.mailbox || "";
+        const list = byMailbox.get(key) ?? [];
+        list.push(t);
+        byMailbox.set(key, list);
+      }
+
+      let graphRequestCount = 0;
+      let chunkCount = 0;
+      let durationMs = 0;
+
+      for (const [mailbox, targets] of byMailbox) {
+        const batch = await bulkDeleteGraphMessages({
+          mailbox,
+          targets: targets.map((t) => ({ messageId: t.messageId, graphId: t.graphId })),
+        });
+        graphRequestCount += batch.graphRequestCount;
+        chunkCount += batch.chunkCount;
+        durationMs += batch.durationMs;
+        for (const r of batch.results) {
+          let status = r.status;
+          if (status === "failed" && closedByMessageId.get(r.messageId)) {
+            // Website request already closed — Aanvragen suppress is authoritative.
+            status = "deleted";
+          }
+          results.set(r.messageId, {
+            messageId: r.messageId,
+            status,
+            statusCode: r.statusCode,
+            retryable: status === "failed" ? r.retryable : undefined,
+            errorCode: status === "failed" ? r.errorCode : undefined,
+            error:
+              status === "failed"
+                ? r.errorCode === "http_403"
+                  ? "Geen rechten om dit bericht te verwijderen."
+                  : "Verwijderen via Microsoft Graph mislukt."
+                : undefined,
+          });
+        }
+      }
+
+      metrics = { graphRequestCount, chunkCount, durationMs };
+    }
+  }
+
+  for (const id of sequential) {
+    try {
+      await deleteFormInboxMessage(id);
+      results.set(id, { messageId: id, status: "deleted" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Verwijderen mislukt.";
+      const absent = /niet gevonden|not found|404/i.test(message);
+      results.set(id, {
+        messageId: id,
+        status: absent ? "already_absent" : "failed",
+        error: absent ? undefined : message,
+        errorCode: absent ? "not_found" : "delete_failed",
+      });
+    }
+  }
+
+  const ordered = uniqueIds.map(
+    (id) =>
+      results.get(id) ?? {
+        messageId: id,
+        status: "failed" as const,
+        errorCode: "missing_result",
+        error: "Geen resultaat ontvangen.",
+      },
+  );
+
+  return {
+    requestedCount: uniqueIds.length,
+    results: ordered,
+    deletedCount: ordered.filter((r) => r.status === "deleted").length,
+    alreadyAbsentCount: ordered.filter((r) => r.status === "already_absent").length,
+    failedCount: ordered.filter((r) => r.status === "failed").length,
+    metrics,
+  };
 }
