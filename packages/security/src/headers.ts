@@ -62,8 +62,8 @@ export function buildContentSecurityPolicy(
     "script-src 'self' 'unsafe-inline'",
     "connect-src 'self' https: wss:",
     "form-action 'self'",
-    // YouTube / Vimeo embeds used by CMS video blocks
-    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com",
+    // CMS video embeds: YouTube, Vimeo, Facebook plugins (see resolveSafeVideoEmbed)
+    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.facebook.com https://web.facebook.com https://www.fb.com",
     "media-src 'self' blob: https:",
   ].join("; ");
 }

@@ -24,6 +24,18 @@ describe("security headers", () => {
     expect(headers["Content-Security-Policy"]).toContain("http://localhost:5174");
   });
 
+  it("allows CMS video iframe hosts including Facebook plugins", () => {
+    const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+    expect(csp).toMatch(/frame-src\s+'self'/);
+    expect(csp).toContain("https://www.youtube-nocookie.com");
+    expect(csp).toContain("https://player.vimeo.com");
+    expect(csp).toContain("https://www.facebook.com");
+    expect(csp).toContain("https://web.facebook.com");
+    expect(csp).toContain("https://www.fb.com");
+    // Admin CSP must not open frame-src for third-party embeds
+    expect(buildContentSecurityPolicy("admin")).not.toContain("frame-src");
+  });
+
   it("applies headers onto an existing Response", () => {
     const secured = applySecurityHeaders(
       new Response("ok", { headers: { "content-type": "text/plain" } }),
