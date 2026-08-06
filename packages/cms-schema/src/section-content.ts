@@ -6,6 +6,7 @@ import {
   migrateLegacyWorkGalleryContent,
   migrateEmptyPartnersContent,
   migrateOriginalServicesImages,
+  migrateServiceCardsCta,
   parseSectionContent,
   type CmsImage,
   type HomeHeroContent,
@@ -312,7 +313,9 @@ export function ensureBuiltinSectionContent(
         next = migrateEmptyPartnersContent(parsed as PartnersContent) as typeof parsed;
       }
       if (key === "services.cards") {
-        next = migrateOriginalServicesImages(parsed as ServicesCardsContent) as typeof parsed;
+        next = migrateServiceCardsCta(
+          migrateOriginalServicesImages(parsed as ServicesCardsContent),
+        ) as typeof parsed;
       }
       if (key === "vacatures.application") {
         const main = out["vacatures.main"] as VacaturesMainContent | undefined;
@@ -338,7 +341,9 @@ export function ensureBuiltinSectionContent(
       def = migrateLegacyWorkGalleryContent(def as WorkGalleryContent);
     }
     if (key === "services.cards") {
-      def = migrateOriginalServicesImages(def as ServicesCardsContent);
+      def = migrateServiceCardsCta(
+        migrateOriginalServicesImages(def as ServicesCardsContent),
+      );
     }
     if (key === "vacatures.application") {
       const main = out["vacatures.main"] as VacaturesMainContent | undefined;

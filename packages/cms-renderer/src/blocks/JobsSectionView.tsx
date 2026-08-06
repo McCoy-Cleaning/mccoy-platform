@@ -8,7 +8,6 @@ import {
   linkTarget,
   normalizeJobs,
   resolveCmsLinkHref,
-  resolveVacancyPublicSlug,
   type JobsBlockData,
   type VacancyItem,
 } from "@mccoy/cms-schema";
@@ -41,7 +40,6 @@ function VacancyCard({
   const [open, setOpen] = React.useState(false);
   const linkPages = pages.map((p) => ({ id: p.id, slug: p.slug, title: p.title ?? p.slug }));
   const href = resolveCmsLinkHref(vacancy.applicationLink, linkPages);
-  const detailHref = `/vacatures/${resolveVacancyPublicSlug(vacancy)}`;
   const rate = formatHourlyRateNl(vacancy.hourlyRate);
   const hours = formatHoursPerWeekNl(vacancy.hoursPerWeek);
   const meta = [
@@ -53,6 +51,7 @@ function VacancyCard({
     .join(" · ");
   const linkHint = describeCmsLink(vacancy.applicationLink, linkPages);
 
+  // Geen link → no clickable apply chrome (detail page remains available via listing slug routes).
   const applyControl =
     href && vacancy.applicationLink.type !== "none" ? (
       mode === "preview" ? (
@@ -74,22 +73,7 @@ function VacancyCard({
           {vacancy.buttonLabel || "Solliciteer"}
         </a>
       )
-    ) : mode === "preview" ? (
-      <button
-        type="button"
-        className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white"
-        onClick={(e) => e.preventDefault()}
-      >
-        Bekijk vacature
-      </button>
-    ) : (
-      <a
-        href={detailHref}
-        className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10"
-      >
-        Bekijk vacature
-      </a>
-    );
+    ) : null;
 
   const details =
     vacancy.fullDescription ||
@@ -182,7 +166,7 @@ function VacancyCard({
       variant={layout === "cards" ? "elevated" : "outlined"}
       className={
         layout === "cards"
-          ? "flex h-full flex-col p-5"
+          ? "flex flex-col p-5"
           : "flex flex-wrap items-start justify-between gap-4 p-4"
       }
     >
@@ -312,7 +296,7 @@ export function JobsSectionView({
           ))}
         </ul>
       ) : (
-        <div className={`${SECTION_GRID} sm:grid-cols-2`}>
+        <div className={`${SECTION_GRID} items-start sm:grid-cols-2`}>
           {vacancies.map((v) => (
             <VacancyCard key={v.id} vacancy={v} pages={pages} mode={mode} layout="cards" />
           ))}

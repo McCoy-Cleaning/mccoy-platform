@@ -169,27 +169,39 @@ const image = d.image as CmsImage | undefined;
 
 export function FeatureGridSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
   const type = "featureGrid" as BlockType;
-const features = (d.features as Array<{ id: string; icon?: string; title: string; body: string }>) ?? [];
-      return (
-        <SectionShell blockType={type}>
-          <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-          {features.length === 0 ? (
-            <p className="text-sm text-white/55">Nog geen kenmerken.</p>
-          ) : (
-            <div className={cn(SECTION_GRID, "sm:grid-cols-2")}>
-              {features.map((f) => (
-                <SectionSurface key={f.id} variant="outlined" className="p-5 sm:p-6">
-                  {f.icon ? (
-                    <span className="mb-2 block text-xs uppercase tracking-wider text-primary/80" aria-hidden>
-                      {f.icon}
-                    </span>
-                  ) : null}
-                  <h3 className="font-semibold text-foreground break-words">{f.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground break-words">{f.body}</p>
-                </SectionSurface>
-              ))}
-            </div>
-          )}
-        </SectionShell>
-      );
+  const features =
+    (d.features as Array<{
+      id: string;
+      icon?: string;
+      title: string;
+      body: string;
+      cta?: CmsButton;
+    }>) ?? [];
+  return (
+    <SectionShell blockType={type}>
+      <SectionTitle>{String(d.title ?? "")}</SectionTitle>
+      {features.length === 0 ? (
+        <p className="text-sm text-white/55">Nog geen kenmerken.</p>
+      ) : (
+        <div className={cn(SECTION_GRID, "sm:grid-cols-2")}>
+          {features.map((f) => (
+            <SectionSurface key={f.id} variant="outlined" className="flex h-full flex-col p-5 sm:p-6">
+              {f.icon ? (
+                <span className="mb-2 block text-xs uppercase tracking-wider text-primary/80" aria-hidden>
+                  {f.icon}
+                </span>
+              ) : null}
+              <h3 className="font-semibold text-foreground break-words">{f.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground break-words">{f.body}</p>
+              <OptionalCta
+                cta={f.cta}
+                pages={pages}
+                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
+              />
+            </SectionSurface>
+          ))}
+        </div>
+      )}
+    </SectionShell>
+  );
 }

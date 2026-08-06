@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/index.tsx",
+    "./src/blocks/RegisteredBlockView.tsx"
+  ],
   "exports": {
     ".": "./src/index.tsx",
     "./section-layout": "./src/sectionLayout.ts",

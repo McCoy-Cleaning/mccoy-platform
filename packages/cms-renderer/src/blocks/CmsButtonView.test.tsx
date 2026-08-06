@@ -1,7 +1,7 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CmsButtonView } from "./primitives";
+import { CmsButtonView } from "./CmsButtonView";
 
 describe("CmsButtonView", () => {
   it("renders an anchor for page links", () => {

@@ -2,7 +2,7 @@ import * as React from "react";
 import type { CmsImage, StepItem, StepsBlockData } from "@mccoy/cms-schema";
 import { SectionShell } from "../SectionShell";
 import { SectionHeader, SectionIndex } from "../sectionChromeUi";
-import { CmsImageView } from "./primitives";
+import { CmsImageView } from "./CmsImageView";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");

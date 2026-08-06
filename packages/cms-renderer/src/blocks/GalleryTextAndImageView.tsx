@@ -59,43 +59,53 @@ function gridColumnsClass(columns: GalleryColumns): string {
 }
 
 /**
- * Portrait service photo: tall 3:4 frame filled edge-to-edge (`object-cover`).
- * Chrome (ring / radius / hover) only — image crop and fit stay fixed.
+ * Tall media plane: edge-to-edge cover, index chip, depth overlays.
  */
 function ServicePhoto({
   image,
+  index,
   className,
 }: {
   image: CmsImage;
+  index: number;
   className?: string;
 }) {
   return (
     <div
       data-cms-media-fit="portrait-cover"
       className={cn(
-        "relative aspect-[3/4] w-full overflow-hidden rounded-2xl",
-        "bg-white/[0.03] ring-1 ring-inset ring-white/12",
-        "transition-[box-shadow,ring-color] duration-500",
-        "group-hover:ring-white/22 group-hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.65)]",
-        "motion-reduce:transition-none motion-reduce:group-hover:shadow-none",
+        "relative aspect-[3/4] w-full shrink-0 overflow-hidden",
+        "bg-[#0a1220]",
         className,
       )}
     >
       <CmsImageView
         image={image}
-        className="absolute inset-0 h-full w-full object-cover object-center transition duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        className="absolute inset-0 h-full w-full object-cover object-center transition duration-700 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
       />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a1220]/via-[#0a1220]/35 via-35% to-transparent"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-80"
+        aria-hidden
+      />
+      <div
+        className="absolute left-4 top-4 z-[1] flex h-11 w-11 items-center justify-center rounded-full border border-primary/45 bg-[#0a1220]/75 font-display text-sm font-semibold tabular-nums tracking-[0.08em] text-primary shadow-[0_12px_32px_-12px_rgba(63,182,242,0.75)] backdrop-blur-md sm:left-5 sm:top-5 sm:h-12 sm:w-12 sm:text-[0.9375rem]"
+        aria-hidden
+      >
+        {formatIndex(index)}
+      </div>
     </div>
   );
 }
 
 function ServiceCopy({
   fields,
-  index,
   textFirst,
 }: {
   fields: CopyFields;
-  index: number;
   textFirst: boolean;
 }) {
   const { title, caption, body } = fields;
@@ -103,29 +113,34 @@ function ServiceCopy({
 
   return (
     <div
+      data-cms-gallery-copy="service"
       className={cn(
-        "min-w-0 text-left",
-        textFirst ? "mb-4 sm:mb-5" : "mt-5 sm:mt-6",
+        "relative flex min-h-0 min-w-0 flex-1 flex-col px-5 pb-6 pt-5 text-left sm:px-6 sm:pb-7 sm:pt-6",
+        textFirst ? "order-first border-b border-white/10" : null,
       )}
     >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span
-          className="text-[0.8125rem] font-semibold tabular-nums tracking-[0.08em] text-primary"
-          aria-hidden
-        >
-          {formatIndex(index)}
-        </span>
-        {caption ? (
-          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-white/48">
-            {caption}
-          </p>
-        ) : null}
-      </div>
+      {caption ? (
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-primary/75">
+          {caption}
+        </p>
+      ) : null}
 
       {title ? (
-        <h3 className="mt-3 font-display text-xl font-semibold leading-[1.15] tracking-[-0.028em] text-[#f2f4f7] break-words sm:text-[1.4rem] sm:leading-[1.12]">
+        <h3
+          className={cn(
+            "font-display min-h-[2.75em] text-[1.05rem] font-semibold uppercase leading-[1.2] tracking-[0.08em] text-primary break-words sm:min-h-[2.6em] sm:text-[1.125rem] sm:tracking-[0.1em]",
+            caption ? "mt-2" : null,
+          )}
+        >
           {title}
         </h3>
+      ) : null}
+
+      {(title || caption) && body ? (
+        <div
+          className="mt-3.5 h-px w-10 bg-gradient-to-r from-primary/80 to-transparent sm:mt-4"
+          aria-hidden
+        />
       ) : null}
 
       {body ? (
@@ -133,16 +148,20 @@ function ServiceCopy({
           className={cn(
             "whitespace-pre-wrap break-words",
             bodyOnly
-              ? "mt-2.5 font-display text-lg font-semibold leading-[1.2] tracking-[-0.02em] text-[#f2f4f7]"
+              ? "min-h-[3.2em] font-display text-lg font-semibold leading-[1.25] tracking-[-0.02em] text-[#f2f4f7]"
               : cn(
-                  "mt-3 text-sm leading-[1.7] text-white/58 sm:text-[0.9375rem] sm:leading-[1.72]",
-                  !title && !caption ? "mt-2" : undefined,
+                  "mt-3.5 min-h-[5.25rem] text-sm leading-[1.7] text-white/68 line-clamp-4 sm:mt-4 sm:min-h-[5.5rem] sm:text-[0.9375rem] sm:leading-[1.72]",
+                  !title && !caption ? "mt-0" : undefined,
                 ),
           )}
         >
           {body}
         </p>
       ) : null}
+
+      <div className="mt-auto pt-5" aria-hidden>
+        <span className="block h-px w-full bg-gradient-to-r from-primary/35 via-white/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+      </div>
     </div>
   );
 }
@@ -158,16 +177,28 @@ function ServiceColumn({
 }) {
   const fields = readCopy(item);
   const copy = fields ? (
-    <ServiceCopy fields={fields} index={index} textFirst={textFirst} />
+    <ServiceCopy fields={fields} textFirst={textFirst} />
   ) : null;
 
   return (
     <article
       data-cms-gallery-item="service"
-      className="group flex h-full min-w-0 flex-col"
+      data-cms-gallery-tile="premium"
+      className={cn(
+        "group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.75rem]",
+        "border border-white/[0.1] bg-gradient-to-b from-white/[0.07] via-white/[0.03] to-[#0a1220]/80",
+        "shadow-[0_24px_60px_-40px_rgba(0,0,0,0.9)]",
+        "transition-[transform,box-shadow,border-color] duration-500 ease-out",
+        "hover:-translate-y-1 hover:border-primary/35 hover:shadow-[0_36px_72px_-36px_rgba(63,182,242,0.35)]",
+        "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+      )}
     >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-70"
+        aria-hidden
+      />
       {textFirst ? copy : null}
-      <ServicePhoto image={item.image} />
+      <ServicePhoto image={item.image} index={index} />
       {!textFirst ? copy : null}
     </article>
   );
@@ -188,14 +219,14 @@ function RowCopy({
   return (
     <div className={cn("min-w-0 flex flex-col justify-center text-left", className)}>
       {caption ? (
-        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-white/48">
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-primary/80">
           {caption}
         </p>
       ) : null}
       {title ? (
         <h3
           className={cn(
-            "font-display max-w-[16ch] text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-[#f2f4f7] break-words sm:text-4xl lg:text-[2.65rem] lg:leading-[1.02]",
+            "font-display max-w-[18ch] text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-[#f2f4f7] break-words sm:text-4xl lg:text-[2.65rem] lg:leading-[1.02]",
             caption ? "mt-3.5" : undefined,
           )}
         >
@@ -209,7 +240,7 @@ function RowCopy({
             bodyOnly
               ? "font-display max-w-[18ch] text-2xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#f2f4f7] sm:text-3xl"
               : cn(
-                  "max-w-md text-base leading-relaxed text-white/60 sm:text-[1.0625rem] sm:leading-[1.7]",
+                  "max-w-md text-base leading-relaxed text-white/64 sm:text-[1.0625rem] sm:leading-[1.7]",
                   hasLead ? "mt-5 sm:mt-6" : undefined,
                 ),
           )}
@@ -222,8 +253,7 @@ function RowCopy({
 }
 
 /**
- * Text+image gallery on the page background:
- * equal portrait columns with edge-to-edge photos (3:4 cover, no text panel).
+ * Text+image gallery: premium equal tiles (media + copy) with edge-to-edge cover photos.
  */
 export function GalleryTextAndImageView({
   title,
@@ -253,13 +283,12 @@ export function GalleryTextAndImageView({
             data-cms-gallery-media="rows"
             className="space-y-16 sm:space-y-20 lg:space-y-24"
           >
-            {items.map((item) => {
+            {items.map((item, index) => {
               const fields = readCopy(item);
               const media = (
-                <ServicePhoto
-                  image={item.image}
-                  className="mx-auto w-full max-w-xs md:mx-0 md:max-w-sm"
-                />
+                <div className="mx-auto w-full max-w-xs overflow-hidden rounded-[1.75rem] border border-white/10 md:mx-0 md:max-w-sm">
+                  <ServicePhoto image={item.image} index={index} />
+                </div>
               );
               const copy = fields ? (
                 <RowCopy fields={fields} className="py-2 md:py-4" />
@@ -293,7 +322,7 @@ export function GalleryTextAndImageView({
           <div
             data-cms-gallery-media="services"
             className={cn(
-              "grid items-start gap-x-6 gap-y-12 sm:gap-x-8 sm:gap-y-14 lg:gap-x-10 lg:gap-y-16",
+              "grid items-stretch gap-x-5 gap-y-8 sm:gap-x-6 sm:gap-y-10 lg:gap-x-8 lg:gap-y-12",
               gridColumnsClass(columns),
             )}
           >

@@ -15,6 +15,11 @@ function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+/**
+ * Popup body uses the block view registered on the popup bridge by the
+ * package entry / orchestrator side-effect. This module must never import
+ * the orchestrator or registry — that closes a circular dependency.
+ */
 function ButtonPopupDialog({
   button,
   pages,

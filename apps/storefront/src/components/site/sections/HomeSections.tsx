@@ -15,6 +15,7 @@ import { useHomeHeroContent } from "@/lib/cms/use-section-content";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
 import { localizedHeroCopy } from "@/lib/cms-i18n";
+import { isCmsButtonInteractive } from "@mccoy/cms-schema";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 
 /** Public optimized hero — avoid bundling the ~430KB JPEG into the home chunk. */
@@ -195,7 +196,7 @@ export function Hero() {
           </p>
 
           <div className="mt-9 flex flex-wrap gap-3">
-            {content.primaryCta ? (
+            {content.primaryCta && isCmsButtonInteractive(content.primaryCta) ? (
               <CmsLinkAnchor
                 link={content.primaryCta.link}
                 fallbackHref="/offerte"
@@ -215,7 +216,7 @@ export function Hero() {
                 />
               </CmsLinkAnchor>
             ) : null}
-            {content.secondaryCta ? (
+            {content.secondaryCta && isCmsButtonInteractive(content.secondaryCta) ? (
               <CmsLinkAnchor
                 link={content.secondaryCta.link}
                 fallbackHref="/services"

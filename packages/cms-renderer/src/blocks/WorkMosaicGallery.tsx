@@ -5,7 +5,7 @@ import {
   type CmsImage,
   type GalleryImageShape,
 } from "@mccoy/cms-schema";
-import { CmsImageView } from "./primitives";
+import { CmsImageView } from "./CmsImageView";
 import { SECTION_PAGE_RAIL } from "../sectionLayout";
 
 function cn(...parts: Array<string | false | null | undefined>) {

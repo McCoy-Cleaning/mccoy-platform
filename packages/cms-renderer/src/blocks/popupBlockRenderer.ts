@@ -20,3 +20,8 @@ export function registerPopupBlockView(view: PopupBlockView): void {
 export function getPopupBlockView(): PopupBlockView | null {
   return popupBlockView;
 }
+
+/** Clears the bridge — for unit tests that assert re-registration on load. */
+export function clearPopupBlockView(): void {
+  popupBlockView = null;
+}

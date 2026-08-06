@@ -54,7 +54,7 @@ export type {
   PopupContentExcludedBlockType,
 } from "./button";
 import type { CmsButton } from "./button";
-import { cmsButtonSchema } from "./button";
+import { cmsButtonSchema, resolveLegacyLinkAsCmsButton } from "./button";
 
 export type IdItem = { id: string };
 
@@ -74,11 +74,27 @@ export type GalleryItem = IdItem & {
   /** Featured mosaic tile shape — omit to keep classic Ons-werk spans. */
   shape?: "wide" | "square" | "tall";
 };
+/**
+ * Default knoptekst for the **contact** CTA on dienstkaarten (not “Lees meer”).
+ * “Lees meer” is a fixed storefront control that opens the detail modal.
+ */
+export const DEFAULT_SERVICE_CARD_CTA_LABEL = "Neem contact op";
+/** Default knoptekst when the contact CTA targets the offerte route. */
+export const DEFAULT_SERVICE_CARD_QUOTE_CTA_LABEL = "Offerte aanvragen";
+/** Stolen label from the bad migration that replaced the Lees meer modal opener. */
+export const STOLEN_SERVICE_CARD_LEES_MEER_LABEL = "Lees meer";
+
 export type ServiceCard = IdItem & {
   title: string;
   description: string;
   image: CmsImage;
+  /** @deprecated Prefer `cta`. Kept for normalize of older drafts. */
   link?: CmsLink;
+  /**
+   * Contact / secondary CTA (label + geen link / pagina / extern / popup).
+   * Does not replace the fixed “Lees meer” detail-modal opener.
+   */
+  cta?: CmsButton;
 };
 export type ProductCard = IdItem & {
   title: string;
@@ -240,6 +256,31 @@ export type PageSectionContent = Partial<{
   [K in FixedSectionKey]: SectionContentMap[K];
 }>;
 
+export function defaultServiceCardCtaLabel(route: "contact" | "offerte"): string {
+  return route === "offerte"
+    ? DEFAULT_SERVICE_CARD_QUOTE_CTA_LABEL
+    : DEFAULT_SERVICE_CARD_CTA_LABEL;
+}
+
+function serviceCardCta(route: "contact" | "offerte", label?: string): CmsButton {
+  return {
+    label: label ?? defaultServiceCardCtaLabel(route),
+    action: "link",
+    link: { type: "internal_route", route },
+  };
+}
+
+function serviceCardCtaLabelForLink(link: CmsLink | undefined): string {
+  if (link?.type === "internal_route" && link.route === "offerte") {
+    return DEFAULT_SERVICE_CARD_QUOTE_CTA_LABEL;
+  }
+  return DEFAULT_SERVICE_CARD_CTA_LABEL;
+}
+
+function isStolenLeesMeerCtaLabel(label: string | undefined): boolean {
+  return (label ?? "").trim().toLowerCase() === STOLEN_SERVICE_CARD_LEES_MEER_LABEL.toLowerCase();
+}
+
 function defaultServiceCards(): ServiceCard[] {
   return [
     {
@@ -248,7 +289,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "Een schone werkomgeving is belangrijk voor zowel medewerkers als bezoekers. Bij McCoy Cleaning verzorgen wij professionele reguliere schoonmaak voor bedrijven, kantoren, winkels, praktijken en bedrijfspanden in en rondom Twente.",
       image: localImage("/images/cms/work-regular-sander.png", "Reguliere schoonmaak"),
-      link: { type: "internal_route", route: "contact" },
+      cta: serviceCardCta("contact"),
     },
     {
       id: "svc_horeca",
@@ -256,7 +297,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "In de horeca draait alles om beleving, uitstraling en hygiëne. Wij verzorgen professionele horeca schoonmaak voor restaurants, cafés, hotels en lunchrooms in en rondom Twente.",
       image: localImage("/images/cms/work-horeca.jpg", "Horeca schoonmaak"),
-      link: { type: "internal_route", route: "contact" },
+      cta: serviceCardCta("contact"),
     },
     {
       id: "svc_oplevering",
@@ -264,7 +305,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "Na een verbouwing of renovatie blijft vaak veel stof en bouwafval achter. McCoy Cleaning verzorgt professionele opleveringsschoonmaak voor woningen, kantoren, winkels en bedrijfspanden in en rondom Twente.",
       image: localImage("/images/cms/work-oplevering-hal.png", "Opleveringsschoonmaak"),
-      link: { type: "internal_route", route: "contact" },
+      cta: serviceCardCta("contact"),
     },
     {
       id: "svc_floor",
@@ -272,7 +313,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "Vloeren bepalen voor een groot deel de uitstraling van een ruimte. Met professioneel vloeronderhoud van McCoy Cleaning blijven jouw vloeren schoon, verzorgd en langer in topconditie.",
       image: localImage("/images/cms/work-floor-scrubber.jpg", "Vloeronderhoud"),
-      link: { type: "internal_route", route: "contact" },
+      cta: serviceCardCta("contact"),
     },
     {
       id: "svc_furniture",
@@ -280,7 +321,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "Stoffen meubels, leren banken en stoelen verdienen specialistische zorg. Met professionele extractie en pH-neutrale producten reinigen wij grondig zonder de vezels te beschadigen.",
       image: localImage("/images/cms/work-furniture-bank.jpg", "Meubelreiniging"),
-      link: { type: "internal_route", route: "offerte" },
+      cta: serviceCardCta("offerte"),
     },
     {
       id: "svc_glass",
@@ -288,7 +329,7 @@ function defaultServiceCards(): ServiceCard[] {
       description:
         "De buitenkant van een pand bepaalt de eerste indruk. Schone ramen, een verzorgde gevel en een nette entree dragen direct bij aan een professionele en betrouwbare uitstraling.",
       image: localImage("/images/cms/work-glass-van.jpg", "Glasbewassing & Buitenreiniging"),
-      link: { type: "internal_route", route: "offerte" },
+      cta: serviceCardCta("offerte"),
     },
   ];
 }
@@ -375,6 +416,7 @@ const serviceCardSchema = z.object({
   description: z.string(),
   image: cmsImageSchema,
   link: cmsLinkSchema.optional(),
+  cta: cmsButtonSchema.optional(),
 });
 
 const productCardSchema = z.object({
@@ -1059,6 +1101,52 @@ export function migrateOriginalServicesImages(content: ServicesCardsContent): Se
     }
     changed = true;
     return { ...card, image: remapCmsImageSrc(card.image, target) };
+  });
+  return changed ? { ...content, cards } : content;
+}
+
+/**
+ * Lift legacy `ServiceCard.link` into contact `cta`.
+ * “Lees meer” stays a fixed storefront detail-modal opener — never the CTA label.
+ * Cards that only have the stolen “Lees meer” CTA keep their destination and get
+ * a contact/offerte knoptekst; cards with neither get geen-link (contact hidden).
+ */
+export function migrateServiceCardsCta(content: ServicesCardsContent): ServicesCardsContent {
+  let changed = false;
+  const cards = content.cards.map((card) => {
+    const legacyDefault = serviceCardCtaLabelForLink(card.link);
+    let fromLegacy = resolveLegacyLinkAsCmsButton(card.cta, card.link, legacyDefault);
+
+    if (fromLegacy && isStolenLeesMeerCtaLabel(fromLegacy.label)) {
+      const repairedLabel = serviceCardCtaLabelForLink(fromLegacy.link);
+      if (fromLegacy.label !== repairedLabel) {
+        fromLegacy = { ...fromLegacy, label: repairedLabel };
+      }
+    }
+
+    if (fromLegacy) {
+      const sameCta =
+        card.cta &&
+        card.cta.label === fromLegacy.label &&
+        card.cta.action === fromLegacy.action &&
+        JSON.stringify(card.cta.link) === JSON.stringify(fromLegacy.link) &&
+        JSON.stringify(card.cta.popup) === JSON.stringify(fromLegacy.popup);
+      if (sameCta && !card.link) return card;
+      changed = true;
+      const { link: _legacy, ...rest } = card;
+      return { ...rest, cta: fromLegacy };
+    }
+    if (card.cta) return card;
+    changed = true;
+    const { link: _legacy, ...rest } = card;
+    return {
+      ...rest,
+      cta: {
+        label: DEFAULT_SERVICE_CARD_CTA_LABEL,
+        action: "link" as const,
+        link: { type: "none" as const },
+      },
+    };
   });
   return changed ? { ...content, cards } : content;
 }

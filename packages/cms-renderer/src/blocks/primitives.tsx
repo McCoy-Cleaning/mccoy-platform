@@ -1,8 +1,6 @@
 /**
- * Shared CMS primitives. Image and button live in dedicated modules so
- * RegisteredBlockView / galleries do not form an import cycle through a
- * dynamic import of RegisteredBlockView.
+ * Image primitive re-exports only. Keep the button in its own module so
+ * registry section views importing this barrel cannot close an import cycle.
  */
 export type { LinkResolverPages } from "./CmsImageView";
 export { CmsImageView } from "./CmsImageView";
-export { CmsButtonView } from "./CmsButtonView";

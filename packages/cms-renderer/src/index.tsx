@@ -6,7 +6,8 @@ import {
 } from "@mccoy/cms-schema";
 // Ensure popup CTA rendering is registered whenever the package entry loads.
 import "./blocks/RegisteredBlockView";
-import { CmsButtonView, CmsImageView, type LinkResolverPages } from "./blocks/primitives";
+import { CmsImageView, type LinkResolverPages } from "./blocks/primitives";
+import { CmsButtonView } from "./blocks/CmsButtonView";
 
 export type { LinkResolverPages };
 export { CmsImageView, CmsButtonView };
