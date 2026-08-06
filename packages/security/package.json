@@ -8,6 +8,7 @@
     "./host": "./src/host.ts",
     "./env": "./src/env.ts",
     "./indexing": "./src/indexing.ts",
+    "./headers": "./src/headers.ts",
     "./load-monorepo-env": "./src/load-monorepo-env.server.ts"
   },
   "scripts": {

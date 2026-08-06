@@ -448,7 +448,7 @@ function loadFromDisk(): CmsPersistedState {
     const parsed = JSON.parse(raw) as unknown;
     const result = migrateAndValidate(parsed);
     if (!result.ok) {
-      console.error("CMS load failed:", result.reason);
+      if (import.meta.env.DEV) console.error("CMS load failed:", result.reason);
       const fallback = publishedServerState ?? initial();
       fallback.corruptPayload = result.corruptPayload;
       return fallback;
@@ -460,13 +460,13 @@ function loadFromDisk(): CmsPersistedState {
       try {
         window.localStorage.setItem(KEY, JSON.stringify(persistable(next)));
       } catch (e) {
-        console.error("CMS nav self-heal persist failed:", e);
+        if (import.meta.env.DEV) console.error("CMS nav self-heal persist failed:", e);
       }
     }
     editBridgePurgeDone = true;
     return next;
   } catch (e) {
-    console.error("CMS read error:", e);
+    if (import.meta.env.DEV) console.error("CMS read error:", e);
     return publishedServerState ?? initial();
   }
 }
@@ -485,7 +485,7 @@ function read(): CmsPersistedState {
       try {
         window.localStorage.setItem(KEY, JSON.stringify(persistable(state)));
       } catch (e) {
-        console.error("CMS nav self-heal persist failed:", e);
+        if (import.meta.env.DEV) console.error("CMS nav self-heal persist failed:", e);
       }
       window.dispatchEvent(new Event(EVENT));
     }
@@ -524,7 +524,7 @@ function write(state: CmsPersistedState): boolean {
       window.localStorage.setItem(KEY, JSON.stringify(persistable(memoryState)));
       persisted = true;
     } catch (e) {
-      console.error("CMS write failed (localStorage quota?):", e);
+      if (import.meta.env.DEV) console.error("CMS write failed (localStorage quota?):", e);
     }
   }
   if (typeof window !== "undefined") {
@@ -975,7 +975,7 @@ export function ensurePublishedChromeBroadcastListener(): void {
         pages: event.data.pages,
         removePageIds: event.data.removePageIds,
       });
-      if (!result.ok) {
+      if (!result.ok && import.meta.env.DEV) {
         console.warn("CMS published chrome broadcast rejected:", result.reason);
       }
     };

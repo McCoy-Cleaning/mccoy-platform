@@ -61,33 +61,53 @@ const ChartContainer = React.forwardRef<
 });
 ChartContainer.displayName = "Chart";
 
+/** Allow only safe CSS color tokens (hex / rgb(a) / hsl(a) / var(--token)). */
+function safeCssColor(value: string): string | null {
+  const v = value.trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
+  if (/^var\(--[a-zA-Z0-9_-]+\)$/.test(v)) return v;
+  if (/^rgba?\(\s*[\d.%\s,/]+\)$/.test(v)) return v;
+  if (/^hsla?\(\s*[\d.%\s,/]+\)$/.test(v)) return v;
+  return null;
+}
+
+function safeCssIdent(value: string): string | null {
+  const v = value.trim();
+  return /^[a-zA-Z_][\w-]*$/.test(v) ? v : null;
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(([, config]) => config.theme || config.color);
+  const safeId = safeCssIdent(id);
 
-  if (!colorConfig.length) {
+  if (!colorConfig.length || !safeId) {
     return null;
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+  // Build from allowlisted tokens only — never interpolate raw config strings.
+  const cssText = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const lines = colorConfig
+        .map(([key, itemConfig]) => {
+          const safeKey = safeCssIdent(key);
+          if (!safeKey) return null;
+          const raw =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+          if (!raw) return null;
+          const color = safeCssColor(raw);
+          return color ? `  --color-${safeKey}: ${color};` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (!lines) return null;
+      return `${prefix} [data-chart=${safeId}] {\n${lines}\n}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  if (!cssText) return null;
+
+  return <style>{cssText}</style>;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;

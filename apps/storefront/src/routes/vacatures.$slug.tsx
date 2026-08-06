@@ -85,6 +85,21 @@ function VacatureDetailPageBody() {
   }, [page, slug]);
 
   if (!vacancy) {
+    // #region agent log
+    fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
+      body: JSON.stringify({
+        sessionId: "8f1793",
+        runId: "pre-fix",
+        hypothesisId: "D",
+        location: "vacatures.$slug.tsx:VacatureDetailPageBody",
+        message: "throw notFound during render (missing vacancy)",
+        data: { slug, pageKind: page?.kind ?? null },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     throw notFound();
   }
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   GALLERY_IMAGE_SIZES,
+  HERO_IMAGE_PRELOAD_MEDIA,
   HERO_IMAGE_SIZES,
   heroWebpSrcSet,
+  homeHeroPreloadLink,
   isLocalPublicImageSrc,
   localCmsPhotoWebpSrcSet,
   localWebpSibling,
@@ -39,5 +41,18 @@ describe("image-delivery", () => {
     expect(isLocalPublicImageSrc("/images/cms/hero-cleaning.jpg")).toBe(true);
     expect(HERO_IMAGE_SIZES).toContain("28rem");
     expect(GALLERY_IMAGE_SIZES).toContain("100vw");
+  });
+
+  it("builds a desktop-only hero preload link for home head", () => {
+    const link = homeHeroPreloadLink("/images/cms/hero-cleaning.jpg");
+    expect(link.rel).toBe("preload");
+    expect(link.as).toBe("image");
+    expect(link.type).toBe("image/webp");
+    expect(link.href).toBe("/images/cms/hero-cleaning-640.webp");
+    expect(link.imageSrcSet).toContain("640w");
+    expect(link.imageSizes).toBe(HERO_IMAGE_SIZES);
+    expect(link.fetchPriority).toBe("high");
+    expect(link.media).toBe(HERO_IMAGE_PRELOAD_MEDIA);
+    expect(link.media).toContain("1024px");
   });
 });

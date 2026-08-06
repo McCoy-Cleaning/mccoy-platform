@@ -166,14 +166,22 @@ function fallbackSnapshotOrNotFound(pathname: string): LoadPublishedPageResult {
 /**
  * Short-lived SSR cache keyed by site configVersion.
  * Admin publish (separate Node process) bumps configVersion on the shared store;
- * without that key, a 10s pathname-only cache kept serving pre-publish snapshots.
+ * without that key, a pathname-only cache kept serving pre-publish snapshots.
+ *
+ * Warm instances reuse memory hits without another Supabase/file round-trip —
+ * important for document TTFB / Speed Index on Vercel after cold start.
  */
-const SNAPSHOT_CACHE_TTL_MS = 10_000;
+const SNAPSHOT_CACHE_TTL_MS = 30_000;
+/** Avoid getSite() on every request when the snapshot cache is warm. */
+const SITE_META_TTL_MS = 10_000;
 const snapshotCache = new Map<
   string,
   { expiresAt: number; configVersion: number; result: LoadPublishedPageResult }
 >();
 let lastSeenConfigVersion: number | null = null;
+let siteMetaCache: { expiresAt: number; configVersion: number; store: CmsStore } | null = null;
+/** Skip repeated seedBuiltinsIfEmpty after the first successful seed in this process. */
+let builtinsSeeded = false;
 
 function cacheKey(pathname: string, configVersion: number): string {
   return `${configVersion}::${pathname}`;
@@ -210,6 +218,23 @@ function writeSnapshotCache(
   }
 }
 
+async function getConfigVersion(store: CmsStore): Promise<number> {
+  if (
+    siteMetaCache &&
+    siteMetaCache.store === store &&
+    Date.now() < siteMetaCache.expiresAt
+  ) {
+    return siteMetaCache.configVersion;
+  }
+  const site = await store.getSite();
+  siteMetaCache = {
+    expiresAt: Date.now() + SITE_META_TTL_MS,
+    configVersion: site.configVersion,
+    store,
+  };
+  return site.configVersion;
+}
+
 function toLoadedSnapshot(
   result: Extract<Awaited<ReturnType<typeof resolvePublicCmsRequest>>, { kind: "snapshot" }>,
 ): Extract<LoadPublishedPageResult, { kind: "snapshot" }> {
@@ -244,13 +269,16 @@ async function resolveFromFileStoreFallback(
 
 async function ensureStoreReady(): Promise<CmsStore> {
   let store = resolveStore();
+  if (builtinsSeeded) return store;
   try {
     await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    builtinsSeeded = true;
     return store;
   } catch (error) {
     notePrimaryStoreFailure(error);
     store = getFileCmsStore();
     await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    builtinsSeeded = true;
     return store;
   }
 }
@@ -267,8 +295,7 @@ export async function loadPublishedPageSnapshot(
 ): Promise<LoadPublishedPageResult> {
   try {
     const store = await ensureStoreReady();
-    const site = await store.getSite();
-    const configVersion = site.configVersion;
+    const configVersion = await getConfigVersion(store);
 
     const cached = readSnapshotCache(pathname, configVersion);
     if (cached) return cached;
@@ -295,6 +322,23 @@ export async function loadPublishedPageSnapshot(
     if (seedOrMissing.kind !== "not_found") {
       writeSnapshotCache(pathname, configVersion, seedOrMissing);
     }
+    // #region agent log
+    if (seedOrMissing.kind === "not_found") {
+      fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
+        body: JSON.stringify({
+          sessionId: "8f1793",
+          runId: "pre-fix",
+          hypothesisId: "E",
+          location: "load-published-page.server.ts:loadPublishedPageSnapshot",
+          message: "CMS resolve returned not_found",
+          data: { pathname, configVersion, primaryKind: result.kind },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
     return seedOrMissing;
   } catch (error) {
     notePrimaryStoreFailure(error);

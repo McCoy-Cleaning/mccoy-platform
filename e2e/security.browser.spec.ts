@@ -16,4 +16,23 @@ test.describe("Security (browser-observable)", () => {
     const html = await page.content();
     expect(html).not.toMatch(/service_role|SUPABASE_SECRET|CLIENT_SECRET/i);
   });
+
+  test("storefront sends baseline security headers", async ({ request }) => {
+    const res = await request.get(`${STOREFRONT_ORIGIN}/`);
+    expect(res.headers()["x-content-type-options"]?.toLowerCase()).toBe("nosniff");
+    expect(res.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    const csp = res.headers()["content-security-policy"] ?? "";
+    expect(csp).toMatch(/object-src\s+'none'/);
+    expect(csp).toMatch(/frame-ancestors/);
+    // Storefront must remain embeddable by admin CMS preview (not DENY).
+    expect(res.headers()["x-frame-options"]).toBeFalsy();
+  });
+
+  test("admin sends clickjacking denial headers", async ({ request }) => {
+    const res = await request.get(`${ADMIN_ORIGIN}/admin/login`);
+    expect(res.headers()["x-content-type-options"]?.toLowerCase()).toBe("nosniff");
+    expect(res.headers()["x-frame-options"]?.toUpperCase()).toBe("DENY");
+    const csp = res.headers()["content-security-policy"] ?? "";
+    expect(csp).toMatch(/frame-ancestors\s+'none'/);
+  });
 });

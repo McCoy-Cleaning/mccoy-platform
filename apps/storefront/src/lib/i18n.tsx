@@ -10,6 +10,7 @@ import {
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestHeader, getRequestUrl } from "@tanstack/react-start/server";
 import {
+  resolveClientHydrationUiLang,
   resolveUiLangFromHints,
   UI_LOCALE_COOKIE,
   type Locale,
@@ -548,8 +549,8 @@ function persistLocalePreference(lang: Lang): void {
 
 /**
  * SSR: URL → cookie → Accept-Language → nl (via request headers).
- * Client CSR: URL → cookie → localStorage → nl.
- * Hydration reuses the SSR useState seed — never flip from storage after paint.
+ * Client hydration: trust `<html lang>` from SSR so catalog/CMS text matches.
+ * Client fallback (no html lang): URL → cookie → localStorage → nl.
  *
  * Uses createIsomorphicFn so `@tanstack/react-start/server` stays out of the
  * client graph (no CommonJS `require` — ESM SSR has no `require`).
@@ -570,10 +571,10 @@ export const resolveInitialUiLang = createIsomorphicFn()
     } catch {
       stored = null;
     }
-    return resolveUiLangFromHints({
+    return resolveClientHydrationUiLang({
+      documentLang: document.documentElement.lang,
       pathname: window.location.pathname,
       cookieHeader: document.cookie,
-      acceptLanguage: null,
       fallbackLocale: stored,
     });
   });
@@ -581,8 +582,7 @@ export const resolveInitialUiLang = createIsomorphicFn()
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => resolveInitialUiLang());
 
-  // Write-through cookie + localStorage. Never flip lang after paint — SSR already
-  // resolved URL / cookie / Accept-Language (legacy localStorage migrates via head script).
+  // Write-through cookie + localStorage so the next document request matches this paint.
   useEffect(() => {
     persistLocalePreference(lang);
   }, [lang]);

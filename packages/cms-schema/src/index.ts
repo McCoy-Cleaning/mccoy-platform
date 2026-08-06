@@ -39,6 +39,7 @@ export * from "./cms-text-fallback";
 export * from "./paragraph-structure";
 export * from "./edit-protocol";
 export * from "./edit-origins";
+export * from "./trusted-message";
 export * from "./sync-protocol";
 export * from "./compress-image";
 export * from "./remove-logo-background";

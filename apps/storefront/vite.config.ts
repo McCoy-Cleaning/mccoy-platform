@@ -85,6 +85,15 @@ export default defineConfig(({ command, mode }) => {
       cssTarget: ["chrome111", "firefox115", "safari16"],
       modulePreload: {
         polyfill: false,
+        // Keep homepage modulepreload to the critical graph. Below-fold home
+        // sections, Footer, MobileMenu, BlockView, and CMS edit stay on-demand.
+        resolveDependencies: (_filename, deps) =>
+          deps.filter(
+            (dep) =>
+              !/(HomeWorkGallery|HomeStats|PartnersSlider|Footer|MobileMenu|BlockView|cms-edit-stack|RegisteredBlockView)/.test(
+                dep,
+              ),
+          ),
       },
       cssCodeSplit: true,
       // Do not force Motion into a shared manual chunk — that pulled React.lazy /

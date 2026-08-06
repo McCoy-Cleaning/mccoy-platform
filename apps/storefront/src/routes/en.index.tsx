@@ -6,6 +6,7 @@ import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
+import { homeHeroPreloadLink } from "@/lib/image-delivery";
 
 const Footer = lazy(() =>
   import("@/components/site/Footer").then((m) => ({ default: m.Footer })),
@@ -29,7 +30,16 @@ export const Route = createFileRoute("/en/")({
   },
   head: ({ loaderData }) => {
     if (!loaderData?.head) return { meta: [{ name: "robots", content: "noindex" }] };
-    return tanstackHeadFromCms(loaderData.head);
+    const base = tanstackHeadFromCms(loaderData.head);
+    const page = loaderData.snapshot.page;
+    const heroSrc =
+      (page.kind === "builtin"
+        ? (page.sectionContent?.["home.hero"] as { image?: { src?: string } } | undefined)?.image?.src
+        : undefined) ?? "/images/cms/hero-cleaning.jpg";
+    return {
+      ...base,
+      links: [...(base.links ?? []), homeHeroPreloadLink(heroSrc)],
+    };
   },
   component: EnglishHome,
 });

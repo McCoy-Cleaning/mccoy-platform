@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   CMS_EDIT_CHANNEL,
+  addTrustedMessageListener,
   canApplyPatch,
   createSessionId,
   ensureBuiltinSectionContent,
@@ -117,6 +118,8 @@ export function useCmsEditParentBridge(
 
   React.useEffect(() => {
     const onMessage = (event: MessageEvent) => {
+      const iframeWin = iframeRef.current?.contentWindow;
+
       if (e2eHooksEnabled()) {
         const w = window as Window & {
           __cmsE2EParent?: {
@@ -131,7 +134,6 @@ export function useCmsEditParentBridge(
             lastReject?: { mutationId: string; reason: string; currentRevision: number };
           };
         };
-        const iframeWin = iframeRef.current?.contentWindow ?? null;
         const data = event.data as { type?: string } | null;
         w.__cmsE2EParent = {
           sessionId: sessionIdRef.current,
@@ -146,8 +148,6 @@ export function useCmsEditParentBridge(
         };
       }
 
-      if (event.origin !== storefrontOrigin) return;
-      const iframeWin = iframeRef.current?.contentWindow;
       if (!iframeWin || event.source !== iframeWin) {
         if (e2eHooksEnabled()) {
           const w = window as Window & {
@@ -283,8 +283,7 @@ export function useCmsEditParentBridge(
       }
     };
 
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    return addTrustedMessageListener(storefrontOrigin, onMessage);
   }, [pageId, storefrontOrigin, iframeRef, pushDraft, applyMutation]);
 
   React.useEffect(() => {

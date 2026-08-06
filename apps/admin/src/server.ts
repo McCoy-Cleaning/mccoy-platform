@@ -1,4 +1,5 @@
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
+import { applySecurityHeaders } from "@mccoy/security/headers";
 import "./lib/error-capture";
 import "./lib/api/register-server-fns";
 
@@ -47,13 +48,17 @@ export default {
       ensureMonorepoEnvLoaded();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return applySecurityHeaders(normalized, { app: "admin" });
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return applySecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+        { app: "admin" },
+      );
     }
   },
 };

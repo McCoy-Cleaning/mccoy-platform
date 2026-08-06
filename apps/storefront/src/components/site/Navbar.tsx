@@ -38,13 +38,13 @@ export function Navbar() {
     <>
       <header
         data-site-header=""
-        className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)]"
+        className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-background/92 shadow-[0_10px_30px_-24px_rgba(63,182,242,0.45)] md:bg-background/85 md:backdrop-blur-xl"
       >
         <div
           className={cn(SECTION_PAGE_RAIL, "flex items-center justify-between gap-3")}
           style={{ minHeight: Math.max(80, logoHeightPx + 24) }}
         >
-          <Link to="/" preload="render" className="flex items-center gap-2">
+          <Link to="/" preload="intent" className="flex items-center gap-2">
             {logoSrc ? (
               <picture>
                 {logoWebp ? <source type="image/webp" srcSet={logoWebp} /> : null}
@@ -143,7 +143,7 @@ function NavLinkItem({
   return (
     <Link
       to={to}
-      preload="render"
+      preload="intent"
       activeOptions={{ exact }}
       className="group relative rounded-full px-4 py-2 text-[13px] font-medium uppercase tracking-[0.1em] text-white/65 transition hover:text-white lg:px-5"
     >

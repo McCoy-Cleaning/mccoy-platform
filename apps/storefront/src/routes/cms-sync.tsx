@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import {
   CMS_SYNC_CHANNEL,
+  addTrustedMessageListener,
   broadcastPublishedChrome,
   parseSyncPublishedChrome,
   resolveAdminParentOrigins,
@@ -41,7 +42,6 @@ function CmsSyncFrame() {
     };
 
     const onMessage = (event: MessageEvent) => {
-      if (!allowedParents.includes(event.origin)) return;
       const chrome = parseSyncPublishedChrome(event.data);
       if (!chrome) {
         if (
@@ -75,13 +75,13 @@ function CmsSyncFrame() {
       reply({ channel: CMS_SYNC_CHANNEL, type: "sync-ack", ok: true }, event.origin);
     };
 
-    window.addEventListener("message", onMessage);
+    const unsubscribe = addTrustedMessageListener(allowedParents, onMessage);
 
     for (const origin of allowedParents) {
       reply({ channel: CMS_SYNC_CHANNEL, type: "sync-ready" }, origin);
     }
 
-    return () => window.removeEventListener("message", onMessage);
+    return unsubscribe;
   }, []);
 
   return (

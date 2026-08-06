@@ -1,13 +1,16 @@
 import * as React from "react";
-import { getPublishedCmsBundle } from "@/lib/api/cms-published.functions";
 import {
   ensurePublishedChromeBroadcastListener,
   hydratePublishedCmsState,
 } from "@/lib/cms/store";
 import type { CmsPage } from "@mccoy/cms-schema";
+import { clientDevError } from "@/lib/client-log";
 
 async function loadPublishedBundle(): Promise<CmsPage[] | null> {
   try {
+    // Dynamic import keeps server-fn stubs off the homepage critical chunk;
+    // this only runs after idle / first paint.
+    const { getPublishedCmsBundle } = await import("@/lib/api/cms-published.functions");
     const bundle = await getPublishedCmsBundle();
     if (!bundle.ok) return null;
     const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
@@ -16,7 +19,7 @@ async function loadPublishedBundle(): Promise<CmsPage[] | null> {
     hydratePublishedCmsState({ pages });
     return pages;
   } catch (error) {
-    console.error("[cms] failed to load published bundle", error);
+    clientDevError("[cms] failed to load published bundle", error);
     return null;
   }
 }

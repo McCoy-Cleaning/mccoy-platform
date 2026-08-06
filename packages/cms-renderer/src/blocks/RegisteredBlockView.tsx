@@ -22,36 +22,33 @@ export function RegisteredBlockView({
 }: RegisteredBlockViewProps) {
   const parsed = parseBlockData(block.type, block.data);
   if (!parsed.ok) {
+    // Public storefront stays quiet; admin canvas keeps diagnostics.
+    if (!adminMode) return null;
     console.error("[cms-renderer] invalid block", {
       type: block.type,
       id: block.id,
       error: parsed.error,
     });
-    if (adminMode) {
-      return (
-        <div
-          className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-100"
-          role="alert"
-        >
-          Ongeldige sectie ({block.type}): {parsed.error}
-        </div>
-      );
-    }
-    return null;
+    return (
+      <div
+        className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-100"
+        role="alert"
+      >
+        Ongeldige sectie ({block.type}): {parsed.error}
+      </div>
+    );
   }
 
   const type = block.type as BlockType;
   const View = blockViewRegistry[type];
   if (!View) {
+    if (!adminMode) return null;
     console.error("[cms-renderer] missing registry view", type);
-    if (adminMode) {
-      return (
-        <div className="rounded-xl border border-amber-400/40 p-4 text-amber-100" role="alert">
-          Geen renderer voor {type}
-        </div>
-      );
-    }
-    return null;
+    return (
+      <div className="rounded-xl border border-amber-400/40 p-4 text-amber-100" role="alert">
+        Geen renderer voor {type}
+      </div>
+    );
   }
 
   const mode = adminMode ? "preview" : "storefront";

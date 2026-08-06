@@ -166,9 +166,47 @@ export function supabaseLogoSrc(
 }
 
 export const HERO_IMAGE_SIZES = "(min-width: 1024px) 28rem, min(92vw, 28rem)";
+/**
+ * Hero sits beside copy only from `lg` up. On mobile the H1 is the LCP element —
+ * preloading the photo competes with CSS/JS on Slow 4G and hurts Speed Index.
+ */
+export const HERO_IMAGE_PRELOAD_MEDIA = "(min-width: 1024px)";
 export const PARTNER_LOGO_SIZES = "(min-width: 640px) 12rem, 10rem";
 /** Wider page rail (max ~96rem) — keep mosaic tiles from requesting oversized originals. */
 export const GALLERY_IMAGE_SIZES =
   "(min-width: 1536px) 480px, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw";
 export const NAV_LOGO_WIDTH = 480;
 export const NAV_LOGO_HEIGHT = 320;
+
+export type HomeHeroPreloadLink = {
+  rel: "preload";
+  as: "image";
+  type: "image/webp";
+  href: string;
+  imageSrcSet: string;
+  imageSizes: string;
+  fetchPriority: "high";
+  media: string;
+};
+
+/** Desktop-only hero image preload for `/` and `/en` head links. */
+export function homeHeroPreloadLink(heroSrc: string): HomeHeroPreloadLink {
+  const remote = supabasePhotoSrcSets(heroSrc, [640, 960, 1280]);
+  const webpSrcSet =
+    remote?.webpSrcSet ??
+    heroWebpSrcSet(heroSrc) ??
+    "/images/cms/hero-cleaning-640.webp 640w, /images/cms/hero-cleaning-960.webp 960w, /images/cms/hero-cleaning-1280.webp 1280w";
+  const preloadHref = remote
+    ? supabaseTransformedUrl(heroSrc, { width: 640, quality: 72, format: "webp" })
+    : "/images/cms/hero-cleaning-640.webp";
+  return {
+    rel: "preload",
+    as: "image",
+    type: "image/webp",
+    href: preloadHref,
+    imageSrcSet: webpSrcSet,
+    imageSizes: HERO_IMAGE_SIZES,
+    fetchPriority: "high",
+    media: HERO_IMAGE_PRELOAD_MEDIA,
+  };
+}

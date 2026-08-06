@@ -107,6 +107,29 @@ export function resolveUiLangFromHints(input: {
 }
 
 /**
+ * Client first-paint locale for hydration.
+ *
+ * Prefer `<html lang>` written by SSR (cookie / Accept-Language / URL). Re-resolving
+ * from cookie + localStorage alone omits Accept-Language and can paint NL over EN
+ * HTML (React #418 text mismatches, including empty vs non-empty CMS accents).
+ */
+export function resolveClientHydrationUiLang(input: {
+  documentLang: string | null | undefined;
+  pathname: string;
+  cookieHeader?: string | null;
+  fallbackLocale?: Locale | null;
+}): Locale {
+  const fromDom = parseLocaleToken(input.documentLang);
+  if (fromDom) return fromDom;
+  return resolveUiLangFromHints({
+    pathname: input.pathname,
+    cookieHeader: input.cookieHeader,
+    acceptLanguage: null,
+    fallbackLocale: input.fallbackLocale,
+  });
+}
+
+/**
  * When CMS heading already ends with the accent word (common when EN drafts
  * store a full sentence while `headingAccent` still falls back to the catalog),
  * keep a single accent span and strip the duplicate from the plain heading.

@@ -3,6 +3,7 @@ import type { BuiltinPageKey, BuiltinCmsPage, CmsPage, FixedSectionKey, LayoutIt
 import { resolveLayoutItemContentAlign, suppressedProductsFixedKeys } from "@mccoy/cms-schema";
 import { ContentAlignProvider } from "@mccoy/cms-renderer/content-align";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
+import { clientDevError } from "@/lib/client-log";
 import { cn } from "@/lib/utils";
 
 /** Custom layout blocks (and Motion) stay off fixed-section routes like `/`. */
@@ -35,10 +36,15 @@ export class SafeSectionBoundary extends React.Component<SafeSectionBoundaryProp
   }
 
   componentDidCatch(error: Error) {
-    console.error("[cms-layout] section render failed", {
+    const detail = {
       sectionKey: this.props.sectionKey,
       message: error.message,
-    });
+    };
+    if (this.props.mode === "public") {
+      clientDevError("[cms-layout] section render failed", detail);
+    } else {
+      console.error("[cms-layout] section render failed", detail);
+    }
   }
 
   render() {
@@ -327,7 +333,11 @@ function LayoutItemView({
     if (respectHidden && item.hidden) return null;
     const Comp = registry[item.key];
     if (!Comp) {
-      console.error("[cms-layout] missing fixed section renderer", { key: item.key });
+      if (mode === "public") {
+        clientDevError("[cms-layout] missing fixed section renderer", { key: item.key });
+      } else {
+        console.error("[cms-layout] missing fixed section renderer", { key: item.key });
+      }
       if (mode === "public") return null;
       return (
         <div role="alert" className="mx-auto my-4 max-w-3xl rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -360,7 +370,11 @@ function LayoutItemView({
 
   const block = blockById.get(item.blockId);
   if (!block) {
-    console.error("[cms-layout] missing block payload", { blockId: item.blockId });
+    if (mode === "public") {
+      clientDevError("[cms-layout] missing block payload", { blockId: item.blockId });
+    } else {
+      console.error("[cms-layout] missing block payload", { blockId: item.blockId });
+    }
     if (mode === "public") return null;
     return (
       <div role="alert" className="mx-auto my-4 max-w-3xl rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">

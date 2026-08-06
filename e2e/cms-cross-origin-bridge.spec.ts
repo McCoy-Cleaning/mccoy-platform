@@ -36,10 +36,11 @@ async function capturedMessages(page: import("@playwright/test").Page): Promise<
 
 test.describe("Cross-origin iframe bridge", () => {
   test("handshake, origin/source gates, selection, revisions, reconnect", async ({ page }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript(({ storefrontOrigin }) => {
       const w = window as Window & { __cmsParentMsgs?: CapturedMsg[] };
       w.__cmsParentMsgs = [];
       window.addEventListener("message", (event) => {
+        if (event.origin !== storefrontOrigin) return;
         const edit = document.querySelector('iframe[title="edit"]') as HTMLIFrameElement | null;
         w.__cmsParentMsgs!.push({
           origin: event.origin,
@@ -47,7 +48,7 @@ test.describe("Cross-origin iframe bridge", () => {
           data: event.data as CapturedMsg["data"],
         });
       });
-    });
+    }, { storefrontOrigin: STOREFRONT_ORIGIN });
 
     await page.goto(`/admin/website/${PAGES.home}`);
     await expect(page.locator('iframe[title="edit"]')).toBeVisible({ timeout: 60_000 });
@@ -281,14 +282,19 @@ test.describe("Cross-origin iframe bridge", () => {
       .evaluate(
         async ({ channel, pageId, adminOrigin }) => {
           return await new Promise<"rejected" | "ignored">((resolve) => {
-            const onMsg = (event: MessageEvent) => {
-              const data = event.data as { type?: string; sessionId?: string };
-              if (data?.type === "cms-mutation-rejected" && data.sessionId === "sess_wrong") {
-                window.removeEventListener("message", onMsg);
-                resolve("rejected");
-              }
-            };
-            window.addEventListener("message", onMsg);
+            const ac = new AbortController();
+            window.addEventListener(
+              "message",
+              (event) => {
+                if (event.origin !== adminOrigin) return;
+                const data = event.data as { type?: string; sessionId?: string };
+                if (data?.type === "cms-mutation-rejected" && data.sessionId === "sess_wrong") {
+                  ac.abort();
+                  resolve("rejected");
+                }
+              },
+              { signal: ac.signal },
+            );
             window.parent.postMessage(
               {
                 channel,
@@ -306,7 +312,7 @@ test.describe("Cross-origin iframe bridge", () => {
               adminOrigin,
             );
             window.setTimeout(() => {
-              window.removeEventListener("message", onMsg);
+              ac.abort();
               resolve("ignored");
             }, 2_500);
           });
@@ -352,20 +358,24 @@ test.describe("Cross-origin iframe bridge", () => {
       .locator("body")
       .evaluate(async ({ adminOrigin, pageId }) => {
         const revisions: number[] = [];
-        const onMsg = (event: MessageEvent) => {
-          if (event.origin !== adminOrigin) return;
-          if (event.source !== window.parent) return;
-          const data = event.data as { type?: string; pageId?: string; revision?: number };
-          if (data?.type === "cms-edit-draft" && data.pageId === pageId && typeof data.revision === "number") {
-            revisions.push(data.revision);
-          }
-        };
-        window.addEventListener("message", onMsg);
+        const ac = new AbortController();
+        window.addEventListener(
+          "message",
+          (event) => {
+            if (event.origin !== adminOrigin) return;
+            if (event.source !== window.parent) return;
+            const data = event.data as { type?: string; pageId?: string; revision?: number };
+            if (data?.type === "cms-edit-draft" && data.pageId === pageId && typeof data.revision === "number") {
+              revisions.push(data.revision);
+            }
+          },
+          { signal: ac.signal },
+        );
         // Trigger a parent-side draft push by selecting hero again (bridge syncs selection + may bump).
         const hero = document.querySelector('[data-cms-select="home.hero"]');
         if (hero instanceof HTMLElement) hero.click();
         await new Promise((r) => setTimeout(r, 500));
-        window.removeEventListener("message", onMsg);
+        ac.abort();
         return revisions;
       }, { adminOrigin: ADMIN_ORIGIN, pageId: PAGES.home });
 

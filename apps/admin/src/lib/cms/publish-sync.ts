@@ -1,5 +1,6 @@
 import {
   CMS_SYNC_CHANNEL,
+  addTrustedMessageListener,
   broadcastPublishedChrome,
   isCmsSyncChildMessage,
   type CmsPage,
@@ -39,16 +40,16 @@ export function pushPublishedChromeToStorefront(payload: PublishedChromePush): v
   iframe.src = `${origin}/cms-sync`;
 
   let settled = false;
+  let unsubscribe: (() => void) | undefined;
   const cleanup = () => {
     if (settled) return;
     settled = true;
     window.clearTimeout(timeoutId);
-    window.removeEventListener("message", onMessage);
+    unsubscribe?.();
     iframe.remove();
   };
 
   const onMessage = (event: MessageEvent) => {
-    if (event.origin !== origin) return;
     if (event.source !== iframe.contentWindow) return;
     if (!isCmsSyncChildMessage(event.data)) return;
 
@@ -88,7 +89,7 @@ export function pushPublishedChromeToStorefront(payload: PublishedChromePush): v
     cleanup();
   }, SYNC_TIMEOUT_MS);
 
-  window.addEventListener("message", onMessage);
+  unsubscribe = addTrustedMessageListener(origin, onMessage);
   document.body.appendChild(iframe);
 }
 

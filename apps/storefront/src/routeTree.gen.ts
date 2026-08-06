@@ -9,96 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VacaturesRouteImport } from './routes/vacatures'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ServicesRouteImport } from './routes/services'
-import { Route as SchoonmaakbedrijfHengeloRouteImport } from './routes/schoonmaakbedrijf-hengelo'
-import { Route as SchoonmaakbedrijfEnschedeRouteImport } from './routes/schoonmaakbedrijf-enschede'
-import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as ProductsRouteImport } from './routes/products'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as OfferteRouteImport } from './routes/offerte'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CmsSyncRouteImport } from './routes/cms-sync'
-import { Route as CmsPreviewRouteImport } from './routes/cms-preview'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as CustomSlugRouteImport } from './routes/$customSlug'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CustomSlugRouteImport } from './routes/$customSlug'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as CmsPreviewRouteImport } from './routes/cms-preview'
+import { Route as CmsSyncRouteImport } from './routes/cms-sync'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as OfferteRouteImport } from './routes/offerte'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProductsRouteImport } from './routes/products'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as SchoonmaakbedrijfEnschedeRouteImport } from './routes/schoonmaakbedrijf-enschede'
+import { Route as SchoonmaakbedrijfHengeloRouteImport } from './routes/schoonmaakbedrijf-hengelo'
+import { Route as ServicesRouteImport } from './routes/services'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as VacaturesRouteImport } from './routes/vacatures'
 import { Route as EnIndexRouteImport } from './routes/en.index'
-import { Route as VacaturesSlugRouteImport } from './routes/vacatures.$slug'
 import { Route as EnSplatRouteImport } from './routes/en.$'
+import { Route as VacaturesSlugRouteImport } from './routes/vacatures.$slug'
 
-const VacaturesRoute = VacaturesRouteImport.update({
-  id: '/vacatures',
-  path: '/vacatures',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServicesRoute = ServicesRouteImport.update({
-  id: '/services',
-  path: '/services',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SchoonmaakbedrijfHengeloRoute =
-  SchoonmaakbedrijfHengeloRouteImport.update({
-    id: '/schoonmaakbedrijf-hengelo',
-    path: '/schoonmaakbedrijf-hengelo',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const SchoonmaakbedrijfEnschedeRoute =
-  SchoonmaakbedrijfEnschedeRouteImport.update({
-    id: '/schoonmaakbedrijf-enschede',
-    path: '/schoonmaakbedrijf-enschede',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
-  id: '/robots.txt',
-  path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductsRoute = ProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OfferteRoute = OfferteRouteImport.update({
-  id: '/offerte',
-  path: '/offerte',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CmsSyncRoute = CmsSyncRouteImport.update({
-  id: '/cms-sync',
-  path: '/cms-sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CmsPreviewRoute = CmsPreviewRouteImport.update({
-  id: '/cms-preview',
-  path: '/cms-preview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomSlugRoute = CustomSlugRouteImport.update({
@@ -106,9 +39,76 @@ const CustomSlugRoute = CustomSlugRouteImport.update({
   path: '/$customSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CmsPreviewRoute = CmsPreviewRouteImport.update({
+  id: '/cms-preview',
+  path: '/cms-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CmsSyncRoute = CmsSyncRouteImport.update({
+  id: '/cms-sync',
+  path: '/cms-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfferteRoute = OfferteRouteImport.update({
+  id: '/offerte',
+  path: '/offerte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductsRoute = ProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchoonmaakbedrijfEnschedeRoute =
+  SchoonmaakbedrijfEnschedeRouteImport.update({
+    id: '/schoonmaakbedrijf-enschede',
+    path: '/schoonmaakbedrijf-enschede',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SchoonmaakbedrijfHengeloRoute =
+  SchoonmaakbedrijfHengeloRouteImport.update({
+    id: '/schoonmaakbedrijf-hengelo',
+    path: '/schoonmaakbedrijf-hengelo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ServicesRoute = ServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VacaturesRoute = VacaturesRouteImport.update({
+  id: '/vacatures',
+  path: '/vacatures',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EnIndexRoute = EnIndexRouteImport.update({
@@ -116,15 +116,15 @@ const EnIndexRoute = EnIndexRouteImport.update({
   path: '/en/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VacaturesSlugRoute = VacaturesSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => VacaturesRoute,
-} as any)
 const EnSplatRoute = EnSplatRouteImport.update({
   id: '/en/$',
   path: '/en/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const VacaturesSlugRoute = VacaturesSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => VacaturesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -280,102 +280,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vacatures': {
-      id: '/vacatures'
-      path: '/vacatures'
-      fullPath: '/vacatures'
-      preLoaderRoute: typeof VacaturesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/services': {
-      id: '/services'
-      path: '/services'
-      fullPath: '/services'
-      preLoaderRoute: typeof ServicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/schoonmaakbedrijf-hengelo': {
-      id: '/schoonmaakbedrijf-hengelo'
-      path: '/schoonmaakbedrijf-hengelo'
-      fullPath: '/schoonmaakbedrijf-hengelo'
-      preLoaderRoute: typeof SchoonmaakbedrijfHengeloRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/schoonmaakbedrijf-enschede': {
-      id: '/schoonmaakbedrijf-enschede'
-      path: '/schoonmaakbedrijf-enschede'
-      fullPath: '/schoonmaakbedrijf-enschede'
-      preLoaderRoute: typeof SchoonmaakbedrijfEnschedeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/robots.txt': {
-      id: '/robots.txt'
-      path: '/robots.txt'
-      fullPath: '/robots.txt'
-      preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/products': {
-      id: '/products'
-      path: '/products'
-      fullPath: '/products'
-      preLoaderRoute: typeof ProductsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/offerte': {
-      id: '/offerte'
-      path: '/offerte'
-      fullPath: '/offerte'
-      preLoaderRoute: typeof OfferteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cms-sync': {
-      id: '/cms-sync'
-      path: '/cms-sync'
-      fullPath: '/cms-sync'
-      preLoaderRoute: typeof CmsSyncRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cms-preview': {
-      id: '/cms-preview'
-      path: '/cms-preview'
-      fullPath: '/cms-preview'
-      preLoaderRoute: typeof CmsPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$customSlug': {
@@ -385,11 +294,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cms-preview': {
+      id: '/cms-preview'
+      path: '/cms-preview'
+      fullPath: '/cms-preview'
+      preLoaderRoute: typeof CmsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cms-sync': {
+      id: '/cms-sync'
+      path: '/cms-sync'
+      fullPath: '/cms-sync'
+      preLoaderRoute: typeof CmsSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offerte': {
+      id: '/offerte'
+      path: '/offerte'
+      fullPath: '/offerte'
+      preLoaderRoute: typeof OfferteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products': {
+      id: '/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schoonmaakbedrijf-enschede': {
+      id: '/schoonmaakbedrijf-enschede'
+      path: '/schoonmaakbedrijf-enschede'
+      fullPath: '/schoonmaakbedrijf-enschede'
+      preLoaderRoute: typeof SchoonmaakbedrijfEnschedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schoonmaakbedrijf-hengelo': {
+      id: '/schoonmaakbedrijf-hengelo'
+      path: '/schoonmaakbedrijf-hengelo'
+      fullPath: '/schoonmaakbedrijf-hengelo'
+      preLoaderRoute: typeof SchoonmaakbedrijfHengeloRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/services': {
+      id: '/services'
+      path: '/services'
+      fullPath: '/services'
+      preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vacatures': {
+      id: '/vacatures'
+      path: '/vacatures'
+      fullPath: '/vacatures'
+      preLoaderRoute: typeof VacaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/en/': {
@@ -399,19 +399,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EnIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vacatures/$slug': {
-      id: '/vacatures/$slug'
-      path: '/$slug'
-      fullPath: '/vacatures/$slug'
-      preLoaderRoute: typeof VacaturesSlugRouteImport
-      parentRoute: typeof VacaturesRoute
-    }
     '/en/$': {
       id: '/en/$'
       path: '/en/$'
       fullPath: '/en/$'
       preLoaderRoute: typeof EnSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/vacatures/$slug': {
+      id: '/vacatures/$slug'
+      path: '/$slug'
+      fullPath: '/vacatures/$slug'
+      preLoaderRoute: typeof VacaturesSlugRouteImport
+      parentRoute: typeof VacaturesRoute
     }
   }
 }

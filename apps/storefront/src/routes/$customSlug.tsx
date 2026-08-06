@@ -79,6 +79,27 @@ function CustomSlugPage() {
   const page = useCmsPageForView(editPageId ?? published?.id ?? "__none__") ?? (isEdit ? undefined : published ?? undefined);
 
   if (!page && !isEdit) {
+    // #region agent log
+    fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
+      body: JSON.stringify({
+        sessionId: "8f1793",
+        runId: "pre-fix",
+        hypothesisId: "D",
+        location: "$customSlug.tsx:CustomSlugPage",
+        message: "throw notFound during render",
+        data: {
+          slug,
+          hydrated: loaderData.hydrated,
+          customPageCount: loaderData.customPageCount,
+          matchedSlug: loaderData.matchedSlug,
+          loaderHadPage: !!loaderData.page,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     throw notFound();
   }
 

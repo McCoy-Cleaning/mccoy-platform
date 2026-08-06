@@ -45,6 +45,9 @@ Production-oriented wins already in the storefront shell:
 - Inline dark critical CSS before the main stylesheet
 - Deferred CMS edit stack + idle published-bundle hydrate
 - Lazy below-fold home sections / Footer; Motion chunked off the home fixed-section path
+- Nav link preload on intent (not render) so `/` does not fan out CMS loaders
+- Desktop-only hero image preload; mobile prioritizes H1 LCP bandwidth
+- In-process CMS snapshot / site-meta cache to cut warm-document TTFB
 
 Vite dev serves unminified source maps and large transformed modules, so “Minify JS”, “Enormous network payloads”, and unused-JS estimates are mostly **dev noise**. Prefer opportunities that also apply to the preview/production bundle (images, fonts, LCP preload, code-splitting).
 

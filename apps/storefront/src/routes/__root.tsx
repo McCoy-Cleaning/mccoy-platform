@@ -24,6 +24,16 @@ import {
 } from "@mccoy/security/indexing";
 import { UI_LOCALE_COOKIE } from "@mccoy/cms-schema";
 
+/** Trusted static critical CSS — never feed CMS/user strings into this. */
+const STOREFRONT_CRITICAL_CSS = [
+  "html{color-scheme:dark}",
+  "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
+  'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
+  "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
+  '#home h1{font-family:Archivo,"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}',
+  "header[data-site-header]{background:rgba(20,26,40,.92)}",
+].join("");
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -47,7 +57,7 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  if (import.meta.env.DEV) console.error(error);
   const router = useRouter();
 
   return (
@@ -135,24 +145,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         crossOrigin: "anonymous",
       },
     ],
-    styles: [
-      {
-        children: [
-          "html{color-scheme:dark}",
-          "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
-          'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
-          "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
-          "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
-          // Scope to the fixed site nav only — bare `header{}` also painted CMS section intros.
-          'header[data-site-header]{background:rgba(20,26,40,.92)}',
-        ].join(""),
-      },
-    ],
+    // Critical dark/hero CSS lives only in RootShell (before HeadContent) so we
+    // do not duplicate ~400B of inline CSS in the document head.
     scripts: [
       {
-        // Migrate legacy localStorage → cookie, then reload once so SSR HTML
-        // matches preference (avoids NL→EN filmstrip on the first post-deploy visit).
-        children: `(function(){try{var k=${JSON.stringify(UI_LOCALE_COOKIE)};if(document.cookie.split(";").some(function(c){return c.trim().indexOf(k+"=")===0;}))return;var s=localStorage.getItem(k);if(s!=="nl"&&s!=="en")return;document.cookie=k+"="+s+"; Path=/; Max-Age=31536000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"");if(s!=="en")return;if(sessionStorage.getItem("mccoy-lang-migrated")==="1")return;sessionStorage.setItem("mccoy-lang-migrated","1");location.reload();}catch(e){}})();`,
+        // No cookie yet: promote legacy localStorage (reload if it differs from
+        // SSR <html lang>), else persist SSR Accept-Language decision into cookie.
+        children: `(function(){try{var k=${JSON.stringify(UI_LOCALE_COOKIE)};var html=document.documentElement.lang;if(html!=="nl"&&html!=="en")html="";if(document.cookie.split(";").some(function(c){return c.trim().indexOf(k+"=")===0;}))return;var secure=location.protocol==="https:"?"; Secure":"";var s=null;try{s=localStorage.getItem(k);}catch(e){}if(s==="nl"||s==="en"){document.cookie=k+"="+s+"; Path=/; Max-Age=31536000; SameSite=Lax"+secure;if(html&&s!==html){if(sessionStorage.getItem("mccoy-lang-migrated")==="1")return;sessionStorage.setItem("mccoy-lang-migrated","1");location.reload();}return;}if(html){document.cookie=k+"="+html+"; Path=/; Max-Age=31536000; SameSite=Lax"+secure;}}catch(e){}})();`,
       },
       {
         type: "application/ld+json",
@@ -208,25 +207,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
-  // SSR seeds lang from cookie / Accept-Language; client may differ until the
-  // I18nProvider effect syncs documentElement.lang (suppress mismatch warning).
+  // SSR: cookie / Accept-Language / URL. Client hydration reads the same value
+  // from this attribute via resolveClientHydrationUiLang (see i18n.tsx).
+  // suppressHydrationWarning: browser extensions may alter <html> attributes.
   const htmlLang = resolveInitialUiLang();
   return (
     <html lang={htmlLang} translate="no" className="notranslate" suppressHydrationWarning>
       <head>
-        {/* Dark shell + hero LCP text before the main Tailwind stylesheet arrives. */}
-        <style
-          dangerouslySetInnerHTML={{
-            __html: [
-              "html{color-scheme:dark}",
-              "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
-              'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
-              "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
-              "#home h1{font-family:Archivo,\"Helvetica Neue\",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}",
-              'header[data-site-header]{background:rgba(20,26,40,.92)}',
-            ].join(""),
-          }}
-        />
+        {/*
+          Trusted static critical CSS only (no user/CMS input).
+          Text child avoids dangerouslySetInnerHTML while preserving LCP shell styles.
+        */}
+        <style>{STOREFRONT_CRITICAL_CSS}</style>
         <HeadContent />
       </head>
       <body

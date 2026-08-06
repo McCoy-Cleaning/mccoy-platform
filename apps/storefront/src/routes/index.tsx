@@ -7,12 +7,7 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
-import {
-  HERO_IMAGE_SIZES,
-  heroWebpSrcSet,
-  supabasePhotoSrcSets,
-  supabaseTransformedUrl,
-} from "@/lib/image-delivery";
+import { homeHeroPreloadLink } from "@/lib/image-delivery";
 
 /** Footer is below the fold — keep lucide social icons off the LCP/TBT path. */
 const Footer = lazy(() =>
@@ -47,28 +42,9 @@ export const Route = createFileRoute("/")({
       (page.kind === "builtin"
         ? (page.sectionContent?.["home.hero"] as { image?: { src?: string } } | undefined)?.image?.src
         : undefined) ?? "/images/cms/hero-cleaning.jpg";
-    const remote = supabasePhotoSrcSets(heroSrc, [640, 960, 1280]);
-    const webpSrcSet =
-      remote?.webpSrcSet ??
-      heroWebpSrcSet(heroSrc) ??
-      "/images/cms/hero-cleaning-640.webp 640w, /images/cms/hero-cleaning-960.webp 960w, /images/cms/hero-cleaning-1280.webp 1280w";
-    const preloadHref = remote
-      ? supabaseTransformedUrl(heroSrc, { width: 640, quality: 72, format: "webp" })
-      : "/images/cms/hero-cleaning-640.webp";
     return {
       ...base,
-      links: [
-        ...(base.links ?? []),
-        {
-          rel: "preload",
-          as: "image",
-          type: "image/webp",
-          href: preloadHref,
-          imageSrcSet: webpSrcSet,
-          imageSizes: HERO_IMAGE_SIZES,
-          fetchPriority: "high",
-        },
-      ],
+      links: [...(base.links ?? []), homeHeroPreloadLink(heroSrc)],
     };
   },
   component: Index,

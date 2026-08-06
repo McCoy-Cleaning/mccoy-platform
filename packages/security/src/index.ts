@@ -20,6 +20,14 @@ export {
 } from "./indexing";
 
 export {
+  applySecurityHeaders,
+  buildContentSecurityPolicy,
+  buildSecurityHeaders,
+  type SecurityHeaderApp,
+  type SecurityHeaderOptions,
+} from "./headers";
+
+export {
   assertRateLimit,
   isHoneypotTriggered,
   RateLimitError,

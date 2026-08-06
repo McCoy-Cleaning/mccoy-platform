@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import {
   CMS_PREVIEW_CHANNEL,
+  addTrustedMessageListener,
   isPreviewParentMessage,
   localizeCmsPageForLocale,
   resolveAdminParentOrigins,
@@ -56,7 +57,6 @@ function CmsPreviewFrame() {
     });
 
     const onMessage = (event: MessageEvent) => {
-      if (!allowedParents.includes(event.origin)) return;
       if (!isPreviewParentMessage(event.data)) return;
       if (event.data.type === "preview-clear") {
         setSnapshot(null);
@@ -68,7 +68,7 @@ function CmsPreviewFrame() {
       setError(null);
     };
 
-    window.addEventListener("message", onMessage);
+    const unsubscribe = addTrustedMessageListener(allowedParents, onMessage);
 
     for (const origin of allowedParents) {
       try {
@@ -81,7 +81,7 @@ function CmsPreviewFrame() {
       }
     }
 
-    return () => window.removeEventListener("message", onMessage);
+    return unsubscribe;
   }, [pageId]);
 
   if (error) {

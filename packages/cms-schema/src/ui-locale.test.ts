@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   preferredLocaleFromAcceptLanguage,
   preferredLocaleFromCookie,
+  resolveClientHydrationUiLang,
   resolveHeroHeadingParts,
   resolveUiLangFromHints,
   resolveUiLocale,
@@ -110,6 +111,30 @@ describe("resolveUiLangFromHints", () => {
         cookieHeader: `${UI_LOCALE_COOKIE}=nl`,
         acceptLanguage: "nl",
         fallbackLocale: "nl",
+      }),
+    ).toBe("en");
+  });
+});
+
+describe("resolveClientHydrationUiLang", () => {
+  it("trusts SSR html lang over localStorage fallback", () => {
+    expect(
+      resolveClientHydrationUiLang({
+        documentLang: "en",
+        pathname: "/",
+        cookieHeader: "",
+        fallbackLocale: "nl",
+      }),
+    ).toBe("en");
+  });
+
+  it("falls back to hints when html lang is missing", () => {
+    expect(
+      resolveClientHydrationUiLang({
+        documentLang: "",
+        pathname: "/",
+        cookieHeader: "",
+        fallbackLocale: "en",
       }),
     ).toBe("en");
   });

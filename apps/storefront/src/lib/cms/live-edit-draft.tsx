@@ -1,6 +1,7 @@
 ﻿import * as React from "react";
 import {
   CMS_EDIT_CHANNEL,
+  addTrustedMessageListener,
   createSessionId,
   createMutationId,
   parseCmsEditMessage,
@@ -142,7 +143,6 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
     const allowed = parentOrigins();
 
     const onMessage = (event: MessageEvent) => {
-      if (!allowed.includes(event.origin)) return;
       if (window.parent !== window && event.source !== window.parent) return;
 
       const msg = parseCmsEditMessage(event.data);
@@ -201,7 +201,7 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
       }
     };
 
-    window.addEventListener("message", onMessage);
+    const unsubscribe = addTrustedMessageListener(allowed, onMessage);
 
     postToParents({
       type: "cms-edit-ready",
@@ -209,7 +209,7 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
       pageId,
     });
 
-    return () => window.removeEventListener("message", onMessage);
+    return unsubscribe;
   }, [isEdit, pageId, postToParents]);
 
   const api = React.useMemo<LiveEditApi>(

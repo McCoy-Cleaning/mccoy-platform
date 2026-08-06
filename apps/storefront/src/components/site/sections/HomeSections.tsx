@@ -104,14 +104,15 @@ export function Hero() {
   const patchHero = (patch: Record<string, unknown>) =>
     sendMutation({ kind: "section", sectionKey: "home.hero", patch });
 
+  // SSR + mobile (`softMotion`): H1 is LCP — don't contend for Slow-4G bandwidth.
+  // Desktop: eager + high priority; head also media-preloads at lg+.
   const heroImgProps = {
     width: 640,
     height: 480,
     sizes: HERO_IMAGE_SIZES,
-    // Sync decode for LCP — async can defer the largest paint.
-    decoding: "sync" as const,
-    fetchPriority: "high" as const,
-    loading: "eager" as const,
+    decoding: "async" as const,
+    fetchPriority: (softMotion ? "low" : "high") as "low" | "high",
+    loading: (softMotion ? "lazy" : "eager") as "lazy" | "eager",
     // Fit the whole visual inside the 4:3 card — admin uploads must never crop-zoom.
     className: "aspect-[4/3] h-auto w-full bg-black/35 object-contain object-center",
     onError: () => setImageSrc(HERO_PUBLIC_WEBP_640),
