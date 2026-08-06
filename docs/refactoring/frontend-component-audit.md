@@ -591,7 +591,7 @@ Registry decomposition — continue extracting catalog / editor / view modules; 
 
 **Status:** First registry family complete (plans → `PlansSectionView`). Stage 5 overall remains **in progress**.
 
-**Checkpoint commit:** *(filled after commit)* — *Extract plans block into registered PlansSectionView (Stage 5).*
+**Checkpoint commit:** `d1b3c1264cd2dffded52910b8c46e8e3205cd01b` — *Extract plans block into registered PlansSectionView (Stage 5).*
 
 | Item | Detail |
 |------|--------|
