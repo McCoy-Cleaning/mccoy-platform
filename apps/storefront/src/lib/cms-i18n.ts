@@ -7,6 +7,7 @@ import {
   type ContactInfoContent,
   type FormPageChromeContent,
   type HomeHeroContent,
+  type ServicesCardsContent,
   type ServicesMainContent,
   type StatsContent,
   type WorkGalleryContent,
@@ -101,16 +102,21 @@ export function localizedStatsCopy(content: StatsContent, t: I18nDict) {
   };
 }
 
-export function localizedServicesCopy(content: ServicesMainContent, t: I18nDict) {
+export function localizedServicesCopy(
+  content: ServicesMainContent,
+  cardsContent: ServicesCardsContent,
+  t: I18nDict,
+) {
   const def = defaultSectionContent("services.main") as ServicesMainContent;
+  const defCards = defaultSectionContent("services.cards") as ServicesCardsContent;
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, t.services.kicker, def.eyebrow),
     heading: cmsTextOrFallback(content.heading, t.services.title, def.heading),
     // No bilingual catalog for intro — keep CMS value (may stay NL until bilingual CMS).
     intro: content.intro,
-    cards: content.cards.map((card, i) => {
+    cards: cardsContent.cards.map((card, i) => {
       const i18nItem = t.work.items[i];
-      const defCard = def.cards[i];
+      const defCard = defCards.cards[i];
       return {
         ...card,
         title: cmsTextOrFallback(card.title, i18nItem?.title ?? card.title, defCard?.title),

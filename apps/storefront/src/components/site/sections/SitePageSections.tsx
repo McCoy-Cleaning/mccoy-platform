@@ -79,8 +79,9 @@ const serviceImages = [
 export function Services() {
   const { t } = useI18n();
   const content = useTypedSectionContent("page_services", "services.main");
+  const cardsContent = useTypedSectionContent("page_services", "services.cards");
   const [open, setOpen] = useState<number | null>(null);
-  const localized = localizedServicesCopy(content, t);
+  const localized = localizedServicesCopy(content, cardsContent, t);
   const eyebrow = localized.eyebrow;
   const heading = localized.heading;
   const intro = localized.intro;
