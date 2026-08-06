@@ -17,6 +17,7 @@ export * from "./resolve";
 export * from "./preview-protocol";
 export * from "./migrate";
 export * from "./draft";
+export * from "./editor-session";
 export * from "./preview-status";
 export * from "./sections";
 export * from "./composite-sections";

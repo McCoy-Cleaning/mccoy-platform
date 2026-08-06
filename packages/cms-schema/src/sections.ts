@@ -27,6 +27,7 @@ export type FixedSectionKey =
   | "home.workGallery"
   | "about.main"
   | "services.main"
+  | "services.cards"
   | "products.main"
   | "products.info"
   | "contact.main"
@@ -56,7 +57,7 @@ export type FixedSectionDefinition = {
 export const FIXED_SECTIONS_BY_PAGE: Record<BuiltinPageKey, readonly FixedSectionKey[]> = {
   home: ["home.hero", "home.partners", "home.stats", "home.workGallery"],
   about: ["about.main"],
-  services: ["services.main"],
+  services: ["services.main", "services.cards"],
   products: ["products.main", "products.info"],
   contact: ["contact.main", "contact.info", "contact.form"],
   vacatures: ["vacatures.main", "vacatures.application"],
@@ -104,7 +105,13 @@ export const FIXED_SECTION_DEFS: Record<FixedSectionKey, FixedSectionDefinition>
     required: false,
   },
   "services.main": {
-    label: "Diensten",
+    label: "Diensten - Intro",
+    movable: true,
+    hideable: true,
+    required: false,
+  },
+  "services.cards": {
+    label: "Dienstkaarten",
     movable: true,
     hideable: true,
     required: false,

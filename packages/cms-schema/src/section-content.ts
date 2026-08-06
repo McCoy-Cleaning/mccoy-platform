@@ -14,12 +14,15 @@ import {
   type ProductCard,
   type ProductsInfoContent,
   type ProductsMainContent,
+  type ServiceCard,
+  type ServicesCardsContent,
   type ServicesMainContent,
   type StatsContent,
   type VacaturesApplicationContent,
   type VacaturesMainContent,
   type WorkGalleryContent,
 } from "./content";
+import { newFixedLayoutItem, type LayoutItem } from "./layout";
 import { FIXED_SECTIONS_BY_PAGE, type FixedSectionKey } from "./sections";
 import type { BuiltinCmsPage } from "./types";
 import { normalizeVacaturesApplicationContent } from "./vacatures-application";
@@ -209,6 +212,71 @@ export function migrateProductsCompositeSplit(content: PageSectionContent): Page
   return changed ? out : content;
 }
 
+/**
+ * Legacy services.main held intro + cards. Move cards into services.cards and
+ * omit `cards` from main so intro and dienstkaarten stay independently editable.
+ */
+export function migrateServicesCompositeSplit(content: PageSectionContent): PageSectionContent {
+  let out: PageSectionContent = { ...content };
+  let changed = false;
+  const rawMain = out["services.main"] as Record<string, unknown> | undefined;
+
+  if (rawMain && typeof rawMain === "object" && Array.isArray(rawMain.cards)) {
+    const cards = rawMain.cards as ServiceCard[];
+    out["services.main"] = {
+      eyebrow: typeof rawMain.eyebrow === "string" ? rawMain.eyebrow : undefined,
+      heading: typeof rawMain.heading === "string" ? rawMain.heading : "",
+      intro: typeof rawMain.intro === "string" ? rawMain.intro : "",
+    } satisfies ServicesMainContent;
+    changed = true;
+
+    const existingCards = out["services.cards"] as ServicesCardsContent | undefined;
+    if (!existingCards || !Array.isArray(existingCards.cards)) {
+      out["services.cards"] = { cards };
+    } else if (existingCards.cards.length === 0 && cards.length > 0) {
+      out["services.cards"] = { cards };
+    }
+  }
+
+  return changed ? out : content;
+}
+
+/**
+ * Content split plus one-shot layout insert for `services.cards` while legacy
+ * `main.cards` is still present. After cards leave main, intentional layout
+ * deletes are not re-inserted.
+ */
+export function migrateServicesPageSplit(
+  content: PageSectionContent,
+  layout: LayoutItem[],
+): { content: PageSectionContent; layout: LayoutItem[] } {
+  const rawMain = content["services.main"] as Record<string, unknown> | undefined;
+  const hadLegacyCards = !!(
+    rawMain &&
+    typeof rawMain === "object" &&
+    Array.isArray(rawMain.cards)
+  );
+  const nextContent = migrateServicesCompositeSplit(content);
+
+  if (!hadLegacyCards) {
+    return { content: nextContent, layout };
+  }
+
+  const hasCardsSlot = layout.some((i) => i.kind === "fixed" && i.key === "services.cards");
+  if (hasCardsSlot) {
+    return { content: nextContent, layout };
+  }
+
+  const item = newFixedLayoutItem("services.cards");
+  const mainIdx = layout.findIndex((i) => i.kind === "fixed" && i.key === "services.main");
+  const nextLayout =
+    mainIdx >= 0
+      ? [...layout.slice(0, mainIdx + 1), item, ...layout.slice(mainIdx + 1)]
+      : [...layout, item];
+
+  return { content: nextContent, layout: nextLayout };
+}
+
 export function ensureBuiltinSectionContent(
   page: BuiltinCmsPage,
   legacyOverrides?: Record<string, string>,
@@ -218,6 +286,9 @@ export function ensureBuiltinSectionContent(
 
   if (page.pageKey === "products") {
     out = migrateProductsCompositeSplit(out);
+  }
+  if (page.pageKey === "services") {
+    out = migrateServicesCompositeSplit(out);
   }
 
   for (const key of FIXED_SECTIONS_BY_PAGE[page.pageKey]) {
@@ -240,8 +311,8 @@ export function ensureBuiltinSectionContent(
       if (key === "home.partners") {
         next = migrateEmptyPartnersContent(parsed as PartnersContent) as typeof parsed;
       }
-      if (key === "services.main") {
-        next = migrateOriginalServicesImages(parsed as ServicesMainContent) as typeof parsed;
+      if (key === "services.cards") {
+        next = migrateOriginalServicesImages(parsed as ServicesCardsContent) as typeof parsed;
       }
       if (key === "vacatures.application") {
         const main = out["vacatures.main"] as VacaturesMainContent | undefined;
@@ -266,8 +337,8 @@ export function ensureBuiltinSectionContent(
     if (key === "home.workGallery") {
       def = migrateLegacyWorkGalleryContent(def as WorkGalleryContent);
     }
-    if (key === "services.main") {
-      def = migrateOriginalServicesImages(def as ServicesMainContent);
+    if (key === "services.cards") {
+      def = migrateOriginalServicesImages(def as ServicesCardsContent);
     }
     if (key === "vacatures.application") {
       const main = out["vacatures.main"] as VacaturesMainContent | undefined;

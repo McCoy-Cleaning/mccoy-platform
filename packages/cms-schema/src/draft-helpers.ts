@@ -2,6 +2,7 @@ import type { PageDraft } from "./types";
 
 export function isDraftDirty(draft: PageDraft | undefined): boolean {
   if (!draft) return false;
+  // editorMeta alone is not content — ignore when deciding dirtiness.
   if (Object.keys(draft.overrides ?? {}).length > 0) return true;
   if (draft.page) return true;
   if (draft.sectionContent && Object.keys(draft.sectionContent).length > 0) return true;

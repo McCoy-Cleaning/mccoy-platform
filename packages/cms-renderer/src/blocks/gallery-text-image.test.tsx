@@ -166,11 +166,11 @@ describe("gallery text+image render", () => {
     expect(html).toContain("Mozaïek titel");
     expect(html).toContain("auto-rows-[220px]");
     expect(html).not.toContain('data-cms-gallery-item="service"');
-    expect(html).toContain('data-cms-gallery-intro="centered"');
-    expect(html).toContain("text-center");
+    expect(html).toContain("object-cover");
+    expect(html).toContain("group-hover:scale-110");
   });
 
-  it("matches photo orientation in the media frame (fill without crop-zoom)", () => {
+  it("fills the media frame edge-to-edge (object-cover)", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
@@ -186,8 +186,8 @@ describe("gallery text+image render", () => {
         }),
       }),
     );
-    expect(html).toContain("object-contain");
-    expect(html).not.toContain("object-cover");
+    expect(html).toContain("object-cover");
+    expect(html).not.toContain("object-contain");
     expect(html).toContain("aspect-square");
   });
 });

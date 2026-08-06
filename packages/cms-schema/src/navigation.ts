@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { cmsImageSchema, cmsButtonSchema, createItemId, type CmsImage, type CmsButton } from "./content";
+import {
+  cmsImageSchema,
+  cmsButtonSchema,
+  createItemId,
+  normalizeCmsButton,
+  type CmsImage,
+  type CmsButton,
+} from "./content";
 import { cmsLinkSchema } from "./links";
 import type { CmsLink } from "./cms-link-model";
 
@@ -84,7 +91,15 @@ export function defaultSiteNavigation(): SiteNavigationContent {
 }
 
 export function parseSiteNavigation(value: unknown): SiteNavigationContent | null {
-  const parsed = siteNavigationContentSchema.safeParse(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  // Soft-normalize CTAs first so incomplete external drafts / popup shapes survive.
+  const soft = {
+    ...rec,
+    jobsCta: "jobsCta" in rec ? normalizeCmsButton(rec.jobsCta) : undefined,
+    quoteCta: "quoteCta" in rec ? normalizeCmsButton(rec.quoteCta) : undefined,
+  };
+  const parsed = siteNavigationContentSchema.safeParse(soft);
   return parsed.success ? parsed.data : null;
 }
 
@@ -92,7 +107,16 @@ export function parseSiteNavigation(value: unknown): SiteNavigationContent | nul
 export function parseSiteNavigationResult(
   value: unknown,
 ): { ok: true; data: SiteNavigationContent } | { ok: false; reason: string } {
-  const parsed = siteNavigationContentSchema.safeParse(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, reason: "Ongeldige navigatie-inhoud: verwacht een object." };
+  }
+  const rec = value as Record<string, unknown>;
+  const soft = {
+    ...rec,
+    jobsCta: "jobsCta" in rec ? normalizeCmsButton(rec.jobsCta) : undefined,
+    quoteCta: "quoteCta" in rec ? normalizeCmsButton(rec.quoteCta) : undefined,
+  };
+  const parsed = siteNavigationContentSchema.safeParse(soft);
   if (parsed.success) return { ok: true, data: parsed.data };
   const issue = parsed.error.issues[0];
   const path = issue?.path?.length ? ` (${issue.path.join(".")})` : "";

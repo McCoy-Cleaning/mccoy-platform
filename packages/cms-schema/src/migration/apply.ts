@@ -144,28 +144,28 @@ function seedFromLegacy(
     }
   }
   if (fixedKey === "services.main") {
-    if (role === "intro") {
+    if (role === "intro" || role === "primary") {
       return { title: rec.heading ?? "Diensten", body: rec.intro ?? rec.body };
     }
-    if (role === "cards") {
-      const cards = Array.isArray(rec.cards)
-        ? rec.cards
-        : Array.isArray(rec.items)
-          ? rec.items
-          : [];
-      return {
-        title: rec.heading ?? "Diensten",
-        projects: cards.map((entry) => {
-          const row = isRecord(entry) ? entry : {};
-          return {
-            id: row.id,
-            title: row.title ?? row.name,
-            category: row.category,
-            image: row.image,
-          };
-        }),
-      };
-    }
+  }
+  if (fixedKey === "services.cards") {
+    const cards = Array.isArray(rec.cards)
+      ? rec.cards
+      : Array.isArray(rec.items)
+        ? rec.items
+        : [];
+    return {
+      title: rec.heading ?? "Diensten",
+      projects: cards.map((entry) => {
+        const row = isRecord(entry) ? entry : {};
+        return {
+          id: row.id,
+          title: row.title ?? row.name,
+          category: row.category,
+          image: row.image,
+        };
+      }),
+    };
   }
   if (fixedKey === "products.main") {
     const intro = typeof rec.intro === "string" ? rec.intro.trim() : "";

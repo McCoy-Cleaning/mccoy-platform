@@ -60,6 +60,7 @@ function gridColumnsClass(columns: GalleryColumns): string {
 
 /**
  * Portrait service photo: tall 3:4 frame filled edge-to-edge (`object-cover`).
+ * Chrome (ring / radius / hover) only — image crop and fit stay fixed.
  */
 function ServicePhoto({
   image,
@@ -72,14 +73,17 @@ function ServicePhoto({
     <div
       data-cms-media-fit="portrait-cover"
       className={cn(
-        "relative aspect-[3/4] w-full overflow-hidden rounded-xl",
-        "ring-1 ring-white/10",
+        "relative aspect-[3/4] w-full overflow-hidden rounded-2xl",
+        "bg-white/[0.03] ring-1 ring-inset ring-white/12",
+        "transition-[box-shadow,ring-color] duration-500",
+        "group-hover:ring-white/22 group-hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.65)]",
+        "motion-reduce:transition-none motion-reduce:group-hover:shadow-none",
         className,
       )}
     >
       <CmsImageView
         image={image}
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="absolute inset-0 h-full w-full object-cover object-center transition duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
       />
     </div>
   );
@@ -101,25 +105,25 @@ function ServiceCopy({
     <div
       className={cn(
         "min-w-0 text-left",
-        textFirst ? "mb-4 sm:mb-5" : "mt-5",
+        textFirst ? "mb-4 sm:mb-5" : "mt-5 sm:mt-6",
       )}
     >
-      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span
-          className="text-sm font-semibold tabular-nums tracking-[0.04em] text-primary"
+          className="text-[0.8125rem] font-semibold tabular-nums tracking-[0.08em] text-primary"
           aria-hidden
         >
           {formatIndex(index)}
         </span>
         {caption ? (
-          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-white/45">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-white/48">
             {caption}
           </p>
         ) : null}
       </div>
 
       {title ? (
-        <h3 className="mt-2.5 font-display text-xl font-semibold leading-[1.15] tracking-[-0.025em] text-[#f2f4f7] break-words sm:text-[1.35rem] sm:leading-[1.12]">
+        <h3 className="mt-3 font-display text-xl font-semibold leading-[1.15] tracking-[-0.028em] text-[#f2f4f7] break-words sm:text-[1.4rem] sm:leading-[1.12]">
           {title}
         </h3>
       ) : null}
@@ -131,7 +135,7 @@ function ServiceCopy({
             bodyOnly
               ? "mt-2.5 font-display text-lg font-semibold leading-[1.2] tracking-[-0.02em] text-[#f2f4f7]"
               : cn(
-                  "mt-2.5 text-sm leading-[1.65] text-white/58 sm:text-[0.9375rem]",
+                  "mt-3 text-sm leading-[1.7] text-white/58 sm:text-[0.9375rem] sm:leading-[1.72]",
                   !title && !caption ? "mt-2" : undefined,
                 ),
           )}
@@ -184,7 +188,7 @@ function RowCopy({
   return (
     <div className={cn("min-w-0 flex flex-col justify-center text-left", className)}>
       {caption ? (
-        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-white/45">
+        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-white/48">
           {caption}
         </p>
       ) : null}
@@ -192,7 +196,7 @@ function RowCopy({
         <h3
           className={cn(
             "font-display max-w-[16ch] text-3xl font-semibold leading-[1.05] tracking-[-0.035em] text-[#f2f4f7] break-words sm:text-4xl lg:text-[2.65rem] lg:leading-[1.02]",
-            caption ? "mt-3" : undefined,
+            caption ? "mt-3.5" : undefined,
           )}
         >
           {title}
@@ -205,8 +209,8 @@ function RowCopy({
             bodyOnly
               ? "font-display max-w-[18ch] text-2xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#f2f4f7] sm:text-3xl"
               : cn(
-                  "max-w-md text-base leading-relaxed text-white/60",
-                  hasLead ? "mt-5" : undefined,
+                  "max-w-md text-base leading-relaxed text-white/60 sm:text-[1.0625rem] sm:leading-[1.7]",
+                  hasLead ? "mt-5 sm:mt-6" : undefined,
                 ),
           )}
         >
@@ -247,7 +251,7 @@ export function GalleryTextAndImageView({
         ) : sideBySide ? (
           <div
             data-cms-gallery-media="rows"
-            className="space-y-14 sm:space-y-16 lg:space-y-20"
+            className="space-y-16 sm:space-y-20 lg:space-y-24"
           >
             {items.map((item) => {
               const fields = readCopy(item);
@@ -264,7 +268,7 @@ export function GalleryTextAndImageView({
                 <article
                   key={item.id}
                   className={cn(
-                    "grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-14",
+                    "group grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-16",
                     textFirst
                       ? "md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
                       : "md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]",
@@ -289,7 +293,7 @@ export function GalleryTextAndImageView({
           <div
             data-cms-gallery-media="services"
             className={cn(
-              "grid items-start gap-x-6 gap-y-10 sm:gap-x-7 sm:gap-y-12 lg:gap-x-8 lg:gap-y-12",
+              "grid items-start gap-x-6 gap-y-12 sm:gap-x-8 sm:gap-y-14 lg:gap-x-10 lg:gap-y-16",
               gridColumnsClass(columns),
             )}
           >

@@ -33,31 +33,47 @@ export function GallerySectionIntro({
       className={cn("mx-auto max-w-3xl bg-transparent text-center", className)}
     >
       {hasEyebrow ? (
-        <div className="flex items-center justify-center gap-3">
-          <span className="h-px w-5 shrink-0 bg-primary sm:w-6" aria-hidden />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-xs">
+        <div className="flex items-center justify-center gap-3 sm:gap-3.5">
+          <span
+            className="h-px w-6 shrink-0 bg-primary/80 sm:w-8"
+            aria-hidden
+          />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">
             {eyebrow}
           </p>
-          <span className="h-px w-5 shrink-0 bg-primary sm:w-6" aria-hidden />
+          <span
+            className="h-px w-6 shrink-0 bg-primary/80 sm:w-8"
+            aria-hidden
+          />
         </div>
       ) : null}
 
       {hasTitle ? (
         <h2
           className={cn(
-            "font-display text-[1.65rem] font-semibold leading-[1.15] tracking-[-0.028em] text-[#f2f4f7] break-words sm:text-[2.05rem] sm:leading-[1.12] lg:text-[2.35rem] lg:leading-[1.1]",
-            hasEyebrow ? "mt-4 sm:mt-5" : null,
+            "font-display text-[1.75rem] font-semibold leading-[1.12] tracking-[-0.03em] text-[#f2f4f7] break-words sm:text-[2.15rem] sm:leading-[1.1] lg:text-[2.5rem] lg:leading-[1.08]",
+            hasEyebrow ? "mt-5 sm:mt-6" : null,
           )}
         >
           {title}
         </h2>
       ) : null}
 
+      {hasTitle || hasEyebrow ? (
+        <div
+          className={cn(
+            "mx-auto h-px w-16 bg-gradient-to-r from-transparent via-primary/70 to-transparent sm:w-20",
+            hasTitle ? "mt-5 sm:mt-6" : "mt-4",
+          )}
+          aria-hidden
+        />
+      ) : null}
+
       {hasIntro ? (
         <p
           className={cn(
-            "mx-auto max-w-2xl text-[0.9375rem] leading-[1.65] text-white/58 sm:text-[1rem] sm:leading-[1.68]",
-            hasTitle || hasEyebrow ? "mt-4 sm:mt-5" : null,
+            "mx-auto max-w-2xl text-[0.9375rem] leading-[1.7] text-white/58 sm:text-base sm:leading-[1.72]",
+            hasTitle || hasEyebrow ? "mt-5 sm:mt-6" : null,
           )}
         >
           {intro}
@@ -67,7 +83,7 @@ export function GallerySectionIntro({
   );
 }
 
-/** Open stack: centered lead → media with tight rhythm. */
+/** Open stack: centered lead → media with generous rhythm. */
 export function GalleryUnifiedPanel({
   children,
   className,
@@ -86,7 +102,7 @@ export function GalleryUnifiedPanel({
   return (
     <div
       {...unitAttrs}
-      className={cn("flex flex-col gap-6 sm:gap-7 lg:gap-8", className)}
+      className={cn("flex flex-col gap-10 sm:gap-12 lg:gap-14", className)}
     >
       {children}
     </div>

@@ -21,10 +21,8 @@ export const FIXED_SECTION_MIGRATION_ROLES: Record<FixedSectionKey, readonly Mig
     { role: "vision", blockType: "textImage" },
     { role: "history", blockType: "textImage" },
   ],
-  "services.main": [
-    { role: "intro", blockType: "centered" },
-    { role: "cards", blockType: "portfolio" },
-  ],
+  "services.main": [{ role: "intro", blockType: "centered" }],
+  "services.cards": [{ role: "primary", blockType: "portfolio" }],
   "products.main": [{ role: "primary", blockType: "textImage" }],
   "products.info": [{ role: "primary", blockType: "featureGrid" }],
   "contact.main": [{ role: "primary", blockType: "hero" }],

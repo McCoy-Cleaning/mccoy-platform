@@ -46,8 +46,16 @@ describe("composite section editor rows", () => {
     });
   });
 
-  it("expands services into intro + cards", () => {
+  it("keeps services as two independent fixed rows (not composite)", () => {
     const layout = defaultFixedLayout("services");
+    const rows = buildEditorLayoutRows(layout, {
+      blockLabel: () => "Sectie",
+      minMovableIndex: 0,
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => !r.composite)).toBe(true);
+    expect(rows.map((r) => r.label)).toEqual(["Diensten - Intro", "Dienstkaarten"]);
+    expect(rows.every((r) => r.canDelete)).toBe(true);
     expect(countEditorSections(layout)).toBe(2);
   });
 });

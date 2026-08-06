@@ -127,7 +127,7 @@ describe("section content", () => {
   });
 
   it("remaps mis-seeded service and gallery images to the original paths", () => {
-    const services = defaultSectionContent("services.main") as {
+    const services = defaultSectionContent("services.cards") as {
       cards: Array<{ id: string; image: { src: string } }>;
     };
     // Simulate pre-fix generic defaults
@@ -185,9 +185,6 @@ describe("section content", () => {
     const heroSrc = `${seedBase}/134be222-7354-472a-852f-68584c9ee3c2.jpg`;
 
     const services = migrateOriginalServicesImages({
-      eyebrow: "Diensten",
-      heading: "Ons aanbod",
-      intro: "x",
       cards: [
         {
           id: "svc_regular",
@@ -349,7 +346,7 @@ describe("section content", () => {
     expect(merged.heading).toBe(base.heading);
   });
 
-  it("keeps empty services.main cards empty after ensure", () => {
+  it("keeps empty services.cards empty after ensure (legacy main.cards split)", () => {
     const page = {
       id: "page_services",
       slug: "diensten",
@@ -374,9 +371,11 @@ describe("section content", () => {
     };
     const ensured = ensureBuiltinSectionContent(page);
     const main = ensured["services.main"];
+    const cards = ensured["services.cards"];
     expect(main?.heading).toBe("Custom heading");
     expect(main?.intro).toBe("Custom intro");
-    expect(main?.cards).toEqual([]);
+    expect(main && "cards" in main ? main.cards : undefined).toBeUndefined();
+    expect(cards?.cards).toEqual([]);
   });
 
   it("does not re-apply flat hero.* overrides over existing structured hero content", () => {

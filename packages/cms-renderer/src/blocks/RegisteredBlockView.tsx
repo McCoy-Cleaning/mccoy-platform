@@ -84,7 +84,7 @@ function FitImage({
 }
 
 /**
- * Gallery / media tile: photo fits fully inside the frame (no crop-zoom).
+ * Gallery / media tile: image crops to fill the entire frame edge-to-edge (no letterboxing).
  */
 function CoverFillImage({
   image,
@@ -99,11 +99,11 @@ function CoverFillImage({
 }) {
   if (!image) return null;
   return (
-    <div className={cn("relative overflow-hidden bg-black/35", aspectClass, className)}>
+    <div className={cn("relative overflow-hidden bg-white/[0.04]", aspectClass, className)}>
       <CmsImageView
         image={image}
         className={cn(
-          "absolute inset-0 h-full w-full object-contain object-center",
+          "absolute inset-0 h-full w-full object-cover object-center",
           imgClassName,
         )}
       />
@@ -516,7 +516,13 @@ export function RegisteredBlockView({
               {images.map((img) => (
                 <div
                   key={img.id}
-                  className="group relative mb-6 break-inside-avoid overflow-hidden rounded-3xl ring-1 ring-white/10 transition duration-500 hover:ring-white/20 sm:mb-8 lg:mb-10"
+                  className={cn(
+                    "group relative mb-6 break-inside-avoid overflow-hidden rounded-[1.35rem] bg-white/[0.03] sm:mb-8 lg:mb-10",
+                    "ring-1 ring-inset ring-white/12",
+                    "transition-[box-shadow,ring-color] duration-500",
+                    "hover:ring-white/22 hover:shadow-[0_22px_48px_-30px_rgba(0,0,0,0.7)]",
+                    "motion-reduce:transition-none motion-reduce:hover:shadow-none",
+                  )}
                 >
                   <CmsImageView
                     image={img.image}
@@ -539,12 +545,19 @@ export function RegisteredBlockView({
               {images.map((img) => (
                 <div
                   key={img.id}
-                  className="group relative overflow-hidden rounded-3xl ring-1 ring-white/10 transition duration-500 hover:ring-white/20"
+                  className={cn(
+                    "group relative overflow-hidden rounded-[1.35rem] bg-white/[0.03]",
+                    "ring-1 ring-inset ring-white/12",
+                    "transition-[box-shadow,ring-color] duration-500",
+                    "hover:ring-white/22 hover:shadow-[0_22px_48px_-30px_rgba(0,0,0,0.7)]",
+                    "motion-reduce:transition-none motion-reduce:hover:shadow-none",
+                  )}
                 >
                   <CoverFillImage
                     image={img.image}
                     aspectClass="aspect-square"
                     className="w-full"
+                    imgClassName="transition duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   />
                 </div>
               ))}

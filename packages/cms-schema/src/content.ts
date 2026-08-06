@@ -138,10 +138,14 @@ export type AboutMainContent = {
   historyImage?: CmsImage;
 };
 
+/** Intro chrome only — service cards live on `services.cards`. */
 export type ServicesMainContent = {
   eyebrow?: string;
   heading: string;
   intro: string;
+};
+
+export type ServicesCardsContent = {
   cards: ServiceCard[];
 };
 
@@ -217,6 +221,7 @@ export type SectionContentMap = {
   "home.workGallery": WorkGalleryContent;
   "about.main": AboutMainContent;
   "services.main": ServicesMainContent;
+  "services.cards": ServicesCardsContent;
   "products.main": ProductsMainContent;
   "products.info": ProductsInfoContent;
   "contact.main": FormPageChromeContent;
@@ -234,6 +239,59 @@ export type SectionContentMap = {
 export type PageSectionContent = Partial<{
   [K in FixedSectionKey]: SectionContentMap[K];
 }>;
+
+function defaultServiceCards(): ServiceCard[] {
+  return [
+    {
+      id: "svc_regular",
+      title: "Reguliere schoonmaak",
+      description:
+        "Een schone werkomgeving is belangrijk voor zowel medewerkers als bezoekers. Bij McCoy Cleaning verzorgen wij professionele reguliere schoonmaak voor bedrijven, kantoren, winkels, praktijken en bedrijfspanden in en rondom Twente.",
+      image: localImage("/images/cms/work-regular-sander.png", "Reguliere schoonmaak"),
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "svc_horeca",
+      title: "Horeca schoonmaak",
+      description:
+        "In de horeca draait alles om beleving, uitstraling en hygiëne. Wij verzorgen professionele horeca schoonmaak voor restaurants, cafés, hotels en lunchrooms in en rondom Twente.",
+      image: localImage("/images/cms/work-horeca.jpg", "Horeca schoonmaak"),
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "svc_oplevering",
+      title: "Opleveringsschoonmaak",
+      description:
+        "Na een verbouwing of renovatie blijft vaak veel stof en bouwafval achter. McCoy Cleaning verzorgt professionele opleveringsschoonmaak voor woningen, kantoren, winkels en bedrijfspanden in en rondom Twente.",
+      image: localImage("/images/cms/work-oplevering-hal.png", "Opleveringsschoonmaak"),
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "svc_floor",
+      title: "Vloeronderhoud",
+      description:
+        "Vloeren bepalen voor een groot deel de uitstraling van een ruimte. Met professioneel vloeronderhoud van McCoy Cleaning blijven jouw vloeren schoon, verzorgd en langer in topconditie.",
+      image: localImage("/images/cms/work-floor-scrubber.jpg", "Vloeronderhoud"),
+      link: { type: "internal_route", route: "contact" },
+    },
+    {
+      id: "svc_furniture",
+      title: "Meubelreiniging",
+      description:
+        "Stoffen meubels, leren banken en stoelen verdienen specialistische zorg. Met professionele extractie en pH-neutrale producten reinigen wij grondig zonder de vezels te beschadigen.",
+      image: localImage("/images/cms/work-furniture-bank.jpg", "Meubelreiniging"),
+      link: { type: "internal_route", route: "offerte" },
+    },
+    {
+      id: "svc_glass",
+      title: "Glasbewassing & Buitenreiniging",
+      description:
+        "De buitenkant van een pand bepaalt de eerste indruk. Schone ramen, een verzorgde gevel en een nette entree dragen direct bij aan een professionele en betrouwbare uitstraling.",
+      image: localImage("/images/cms/work-glass-van.jpg", "Glasbewassing & Buitenreiniging"),
+      link: { type: "internal_route", route: "offerte" },
+    },
+  ];
+}
 
 function defaultProductCards(): ProductCard[] {
   return [
@@ -377,6 +435,9 @@ export const servicesMainContentSchema: z.ZodType<ServicesMainContent> = z.objec
   eyebrow: z.string().optional(),
   heading: z.string().min(1),
   intro: z.string(),
+});
+
+export const servicesCardsContentSchema: z.ZodType<ServicesCardsContent> = z.object({
   cards: z.array(serviceCardSchema),
 });
 
@@ -455,6 +516,7 @@ export const SECTION_CONTENT_SCHEMAS: {
   "home.workGallery": workGalleryContentSchema,
   "about.main": aboutMainContentSchema,
   "services.main": servicesMainContentSchema,
+  "services.cards": servicesCardsContentSchema,
   "products.main": productsMainContentSchema,
   "products.info": productsInfoContentSchema,
   "contact.main": formPageChromeContentSchema,
@@ -691,57 +753,11 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         eyebrow: "Diensten",
         heading: "Ons aanbod",
         intro: "Een volledig schoonmaakaanbod door één vast eigen team in Twente.",
-        cards: [
-          {
-            id: "svc_regular",
-            title: "Reguliere schoonmaak",
-            description:
-              "Een schone werkomgeving is belangrijk voor zowel medewerkers als bezoekers. Bij McCoy Cleaning verzorgen wij professionele reguliere schoonmaak voor bedrijven, kantoren, winkels, praktijken en bedrijfspanden in en rondom Twente.",
-            image: localImage("/images/cms/work-regular-sander.png", "Reguliere schoonmaak"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "svc_horeca",
-            title: "Horeca schoonmaak",
-            description:
-              "In de horeca draait alles om beleving, uitstraling en hygiëne. Wij verzorgen professionele horeca schoonmaak voor restaurants, cafés, hotels en lunchrooms in en rondom Twente.",
-            image: localImage("/images/cms/work-horeca.jpg", "Horeca schoonmaak"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "svc_oplevering",
-            title: "Opleveringsschoonmaak",
-            description:
-              "Na een verbouwing of renovatie blijft vaak veel stof en bouwafval achter. McCoy Cleaning verzorgt professionele opleveringsschoonmaak voor woningen, kantoren, winkels en bedrijfspanden in en rondom Twente.",
-            image: localImage("/images/cms/work-oplevering-hal.png", "Opleveringsschoonmaak"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "svc_floor",
-            title: "Vloeronderhoud",
-            description:
-              "Vloeren bepalen voor een groot deel de uitstraling van een ruimte. Met professioneel vloeronderhoud van McCoy Cleaning blijven jouw vloeren schoon, verzorgd en langer in topconditie.",
-            image: localImage("/images/cms/work-floor-scrubber.jpg", "Vloeronderhoud"),
-            link: { type: "internal_route", route: "contact" },
-          },
-          {
-            id: "svc_furniture",
-            title: "Meubelreiniging",
-            description:
-              "Stoffen meubels, leren banken en stoelen verdienen specialistische zorg. Met professionele extractie en pH-neutrale producten reinigen wij grondig zonder de vezels te beschadigen.",
-            image: localImage("/images/cms/work-furniture-bank.jpg", "Meubelreiniging"),
-            link: { type: "internal_route", route: "offerte" },
-          },
-          {
-            id: "svc_glass",
-            title: "Glasbewassing & Buitenreiniging",
-            description:
-              "De buitenkant van een pand bepaalt de eerste indruk. Schone ramen, een verzorgde gevel en een nette entree dragen direct bij aan een professionele en betrouwbare uitstraling.",
-            image: localImage("/images/cms/work-glass-van.jpg", "Glasbewassing & Buitenreiniging"),
-            link: { type: "internal_route", route: "offerte" },
-          },
-        ],
       } satisfies ServicesMainContent;
+    case "services.cards":
+      return {
+        cards: defaultServiceCards(),
+      } satisfies ServicesCardsContent;
     case "products.main":
       return {
         eyebrow: "Producten",
@@ -1033,7 +1049,7 @@ export function migrateOriginalHeroImage(content: HomeHeroContent): HomeHeroCont
   return content;
 }
 
-export function migrateOriginalServicesImages(content: ServicesMainContent): ServicesMainContent {
+export function migrateOriginalServicesImages(content: ServicesCardsContent): ServicesCardsContent {
   let changed = false;
   const cards = content.cards.map((card) => {
     const target = ORIGINAL_SERVICE_IMAGE_BY_ID[card.id];

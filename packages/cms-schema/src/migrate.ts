@@ -92,6 +92,18 @@ const pageDraftSchema = z.object({
   slug: z.string().optional(),
   description: z.string().optional(),
   inNav: z.boolean().optional(),
+  editorMeta: z
+    .object({
+      schemaVersion: z.number(),
+      layoutVersion: z.number(),
+      baselineRevisionId: z.string(),
+      baselineContentHash: z.string(),
+      contentHash: z.string(),
+      dirty: z.boolean(),
+      savedAt: z.number(),
+      restoredFromStorage: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const persistedSchema = z.object({

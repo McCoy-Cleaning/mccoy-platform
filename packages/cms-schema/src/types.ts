@@ -139,6 +139,21 @@ export interface PageDraft {
   slug?: string;
   description?: string;
   inNav?: boolean;
+  /**
+   * Editor-session metadata for restore / conflict detection.
+   * Cleared on save/publish/discard. Never restore when dirty:false or hash===baseline.
+   */
+  editorMeta?: {
+    schemaVersion: number;
+    layoutVersion: number;
+    baselineRevisionId: string;
+    baselineContentHash: string;
+    contentHash: string;
+    dirty: boolean;
+    savedAt: number;
+    /** True when this envelope was rehydrated from localStorage on a later visit. */
+    restoredFromStorage?: boolean;
+  };
 }
 
 /** Explicit snapshot sent to the preview iframe — not the live draft. */

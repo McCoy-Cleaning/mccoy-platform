@@ -25,7 +25,7 @@ import {
   type FixedSectionKey,
 } from "./sections";
 import type { Block, BuiltinCmsPage, CmsPage, CustomCmsPage } from "./types";
-import { ensureBuiltinSectionContent } from "./section-content";
+import { ensureBuiltinSectionContent, migrateServicesPageSplit } from "./section-content";
 import { ensurePageLocaleFields } from "./migrate-locale";
 import { validatePageSectionContent } from "./content";
 import { validatePageBlocksForPublish } from "./blocks/validate";
@@ -251,6 +251,13 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
 
   next.layout = ensureLastLocked(ensureFirstLocked(rebuilt, pageKey), pageKey);
   next.layoutVersion = CURRENT_LAYOUT_VERSION;
+
+  if (pageKey === "services") {
+    const split = migrateServicesPageSplit(next.sectionContent ?? {}, next.layout);
+    next.sectionContent = split.content;
+    next.layout = split.layout;
+  }
+
   next.sectionContent = ensureBuiltinSectionContent(next);
   delete next.extraBlocks;
   return next;
