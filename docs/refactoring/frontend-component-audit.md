@@ -502,7 +502,7 @@ Admin-local `EmptyState` / `ErrorState` / `InlineLoader` + `AdminFormField` (`.a
 
 **Checkpoint commit (structural):** `9c7bb0470bc7d4e73bd9b5e817ead77e6b729c48` — *Extract cms-editor fixed inspectors into sibling modules (Stage 4 structural).*
 
-**Closeout docs commit:** recorded after this section’s follow-up / localisation matrix (separate small commit).
+**Closeout docs commit:** `32e0a6355645d8c26b1e93ddf63d98a1f6cce9d2` — *Document Stage 4 closeout and locale E2E savePage follow-up.*
 
 ### Locale E2E (`test:e2e:locale`) classification
 
