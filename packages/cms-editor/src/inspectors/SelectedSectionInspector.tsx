@@ -12,6 +12,7 @@ import {
   type PartnersContent,
   type ProductsInfoContent,
   type ProductsMainContent,
+  type ServicesCardsContent,
   type ServicesMainContent,
   type StatsContent,
   type VacaturesApplicationContent,
@@ -27,6 +28,7 @@ import { ContactInfoInspector } from "./ContactInfoInspector";
 import { ContactFormInspector } from "./ContactFormInspector";
 import { AboutMainInspector } from "./AboutMainInspector";
 import { ServicesMainInspector } from "./ServicesMainInspector";
+import { ServicesCardsInspector } from "./ServicesCardsInspector";
 import { ProductsMainInspector } from "./ProductsMainInspector";
 import { ProductsInfoInspector } from "./ProductsInfoInspector";
 import { PartnersInspector } from "./PartnersInspector";
@@ -164,8 +166,16 @@ export function SelectedSectionInspector({
     return (
       <ServicesMainInspector
         content={content as ServicesMainContent}
-        {...imageProps}
         part={partId}
+        onPatch={(patch) => onSectionPatch(key, patch)}
+      />
+    );
+  }
+  if (key === "services.cards") {
+    return (
+      <ServicesCardsInspector
+        content={content as ServicesCardsContent}
+        {...imageProps}
         onPatch={(patch) => onSectionPatch(key, patch)}
       />
     );

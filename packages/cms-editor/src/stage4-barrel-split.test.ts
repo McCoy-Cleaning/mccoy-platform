@@ -70,6 +70,7 @@ const EXPECTED_EXPORTS = [
   "ContactFormInspector",
   "AboutMainInspector",
   "ServicesMainInspector",
+  "ServicesCardsInspector",
   "ProductsMainInspector",
   "ProductsInfoInspector",
   "PartnersInspector",

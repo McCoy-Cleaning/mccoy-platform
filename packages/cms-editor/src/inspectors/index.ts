@@ -4,6 +4,7 @@ export { ContactInfoInspector } from "./ContactInfoInspector";
 export { ContactFormInspector } from "./ContactFormInspector";
 export { AboutMainInspector } from "./AboutMainInspector";
 export { ServicesMainInspector } from "./ServicesMainInspector";
+export { ServicesCardsInspector } from "./ServicesCardsInspector";
 export { ProductsMainInspector } from "./ProductsMainInspector";
 export { ProductsInfoInspector } from "./ProductsInfoInspector";
 export { PartnersInspector } from "./PartnersInspector";

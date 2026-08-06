@@ -82,6 +82,7 @@ export {
   ContactFormInspector,
   AboutMainInspector,
   ServicesMainInspector,
+  ServicesCardsInspector,
   ProductsMainInspector,
   ProductsInfoInspector,
   PartnersInspector,
