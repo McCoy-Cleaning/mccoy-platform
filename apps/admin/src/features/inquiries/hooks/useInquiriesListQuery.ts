@@ -1,9 +1,5 @@
 import * as React from "react";
-import {
-  listAdminFormInbox,
-  markAdminRequestsNotificationsRead,
-} from "@/lib/api/admin-requests.functions";
-import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
+import { listAdminFormInbox } from "@/lib/api/admin-requests.functions";
 import type { FormInboxMessageSummary, InboxScopeFacet } from "@mccoy/email/contracts";
 import type { KindFilter, ScopeFilter } from "../types/search";
 import {
@@ -104,14 +100,8 @@ export function useInquiriesListQuery(params: {
         new Set(result.items.map((item) => item.id)),
       );
       bumpTombstones((n) => n + 1);
-
-      void markAdminRequestsNotificationsRead()
-        .then((res) => {
-          if (res.ok && res.count > 0) refreshAdminRequestsUnreadBadge();
-        })
-        .catch(() => {
-          /* non-fatal */
-        });
+      // Do not mark all `requests` notifications read on list load — that cleared
+      // the bell badge for applicant replies. Mark read when opening an inquiry.
     } catch {
       if (generation !== requestGenerationRef.current) return;
       if (!hasSuccessfulDataRef.current) {

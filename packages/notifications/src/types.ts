@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = [
   // Active / Stage C–D
   "website_request.received",
   "website_request.reply_failed",
+  "website_request.applicant_replied",
   "cms.publish_failed",
   "cms.publish_succeeded",
   "mailbox.connection_failed",
@@ -33,6 +34,7 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export const ACTIVE_NOTIFICATION_TYPES = [
   "website_request.received",
   "website_request.reply_failed",
+  "website_request.applicant_replied",
   "cms.publish_failed",
   "cms.publish_succeeded",
   "mailbox.connection_failed",

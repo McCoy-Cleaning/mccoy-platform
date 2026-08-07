@@ -11,7 +11,7 @@ import type { FormInboxMessage, FormInboxMessageSummary } from "@mccoy/email/con
 
 vi.mock("@/lib/api/admin-requests.functions", () => ({
   listAdminFormInbox: vi.fn(),
-  markAdminRequestsNotificationsRead: vi.fn(async () => ({ ok: true, count: 0 })),
+  markAdminRequestNotificationsReadForEntity: vi.fn(async () => ({ ok: true, count: 0 })),
   deleteAdminFormInboxMessage: vi.fn(),
   bulkDeleteAdminFormInboxMessages: vi.fn(),
   replyAdminFormInboxMessage: vi.fn(),

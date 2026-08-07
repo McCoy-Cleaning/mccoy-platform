@@ -11,8 +11,8 @@ const pathSchema = z
   .string()
   .trim()
   .min(1)
-  .max(200)
-  .regex(/^\/[A-Za-z0-9/_-]*$/);
+  .max(500)
+  .regex(/^\/[A-Za-z0-9/_-]*(?:\?[A-Za-z0-9_.=%:-]*)?$/);
 
 export const websiteRequestReceivedMetadataSchema = z
   .object({
@@ -26,6 +26,21 @@ export const websiteRequestReplyFailedMetadataSchema = z
   .object({
     requestId: uuidSchema,
     errorCode: shortCodeSchema.optional(),
+  })
+  .strict();
+
+export const websiteRequestApplicantRepliedMetadataSchema = z
+  .object({
+    requestId: uuidSchema,
+    requestNumber: shortLabelSchema.optional(),
+    submitterName: shortLabelSchema.optional(),
+    /** Encoded inbox id (`req:…`) for deep-link open — not stored in destination_path. */
+    inboxMessageId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .regex(/^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/),
   })
   .strict();
 
@@ -71,6 +86,7 @@ export const notificationDestinationPathSchema = pathSchema;
 export const ACTIVE_NOTIFICATION_METADATA_SCHEMAS = {
   "website_request.received": websiteRequestReceivedMetadataSchema,
   "website_request.reply_failed": websiteRequestReplyFailedMetadataSchema,
+  "website_request.applicant_replied": websiteRequestApplicantRepliedMetadataSchema,
   "cms.publish_failed": cmsPublishFailedMetadataSchema,
   "cms.publish_succeeded": cmsPublishSucceededMetadataSchema,
   "mailbox.connection_failed": mailboxConnectionFailedMetadataSchema,

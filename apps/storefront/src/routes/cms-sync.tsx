@@ -31,6 +31,7 @@ function CmsSyncFrame() {
       currentOrigin: window.location.origin,
       envAdminOrigin: import.meta.env.VITE_ADMIN_ORIGIN as string | undefined,
       referrer: document.referrer,
+      ancestorOrigins: "ancestorOrigins" in location ? location.ancestorOrigins : null,
     });
 
     const reply = (msg: CmsSyncChildToParent, targetOrigin: string) => {

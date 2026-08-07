@@ -72,6 +72,8 @@ export function websiteRequestSummaryToInboxSummary(
   request: WebsiteRequest | WebsiteRequestSummary,
 ): FormInboxMessageSummary {
   const id = encodeRequestMessageId(request.id, REQUEST_MAILBOX);
+  // new = never handled; open = customer replied / needs attention (after staff reply cycle).
+  const unread = request.status === "new" || request.status === "open";
   return {
     id,
     uid: graphIdToSyntheticUid(request.id),
@@ -81,9 +83,9 @@ export function websiteRequestSummaryToInboxSummary(
       ? `${request.submitterName} <${request.submitterEmail}>`
       : request.submitterName,
     to: "info@mccoy.nl",
-    date: request.createdAt,
+    date: request.updatedAt || request.createdAt,
     snippet: snippetFrom(request),
-    unread: request.status === "new",
+    unread,
     submitterName: request.submitterName || null,
     submitterEmail: request.submitterEmail || null,
     requestNumber: request.number,
@@ -239,18 +241,8 @@ export async function getWebsiteRequestFormInboxMessage(
   const request = await getWebsiteRequest(decoded.requestId);
   if (!request || !isActiveRequestStatus(request.status)) return null;
 
-  // Pull Graph conversation into mail_messages so applicant replies appear in Gesprek.
-  // List-time ingest alone misses replies that arrive while the detail panel is open.
-  try {
-    const { syncWebsiteRequestGraphThread } = await import("./sync-request-graph-thread");
-    await syncWebsiteRequestGraphThread(decoded.requestId);
-  } catch (error) {
-    console.error("[website-request-inbox] graph thread sync failed", {
-      requestId: decoded.requestId,
-      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
-    });
-  }
-
+  // DB-only open path — Graph sync runs in getWebsiteRequestFormInboxThread so
+  // the root message paints without waiting on Microsoft Graph.
   let mailMessages: Array<{
     id: string;
     direction: "inbound" | "outbound";
@@ -278,6 +270,20 @@ export async function getWebsiteRequestFormInboxMessage(
 export async function getWebsiteRequestFormInboxThread(
   id: string,
 ): Promise<FormInboxThreadItem[]> {
+  const decoded = decodeInboxMessageId(id);
+  if (decoded.provider !== "request" && decoded.provider !== "e2e") return [];
+
+  // Pull Graph conversation into mail_messages so applicant replies appear in Gesprek.
+  try {
+    const { syncWebsiteRequestGraphThread } = await import("./sync-request-graph-thread");
+    await syncWebsiteRequestGraphThread(decoded.requestId);
+  } catch (error) {
+    console.error("[website-request-inbox] graph thread sync failed", {
+      requestId: decoded.requestId,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
   const message = await getWebsiteRequestFormInboxMessage(id);
   return message?.thread ?? [];
 }

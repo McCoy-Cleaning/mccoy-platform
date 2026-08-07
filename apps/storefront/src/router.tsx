@@ -8,13 +8,12 @@ export const getRouter = () => {
   const router = createRouter({
     routeTree,
     context: { queryClient },
-    // CMS page loaders hit server fns (not React Query). Preload on hover/touch so
-    // nav clicks reuse cached loader data instead of blocking on a cold round-trip.
+    // CMS loaders prefer in-memory pages (instant). Preload on hover/touch.
     defaultPreload: "intent",
     defaultPreloadDelay: 0,
-    defaultPreloadStaleTime: 120_000,
-    // Soft cross-fade between routes when the browser supports View Transitions.
-    defaultViewTransition: true,
+    defaultPreloadStaleTime: 300_000,
+    // Avoid View Transitions waiting on heavy image pages — swap content immediately.
+    defaultViewTransition: false,
   });
 
   return router;

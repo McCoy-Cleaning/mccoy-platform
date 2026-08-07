@@ -190,6 +190,41 @@ export async function markAllRead(userId: string, category?: string): Promise<nu
   return data?.length ?? 0;
 }
 
+/**
+ * Mark unread notifications for a specific entity (e.g. one website_request) as read.
+ * Used when staff opens that Aanvraag — not when merely viewing the list.
+ */
+export async function markReadForEntity(
+  userId: string,
+  entityType: string,
+  entityId: string,
+): Promise<number> {
+  const supabase = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const type = entityType.trim();
+  const id = entityId.trim();
+  if (!type || !id) return 0;
+
+  const { data, error } = await supabase
+    .from("notification_recipients")
+    .update({
+      read_at: now,
+      seen_at: now,
+    })
+    .eq("user_id", userId)
+    .is("read_at", null)
+    .is("dismissed_at", null)
+    .eq("notifications.entity_type", type)
+    .eq("notifications.entity_id", id)
+    .select("id, notifications!inner(entity_type, entity_id)");
+
+  if (error) {
+    throw new Error(`markReadForEntity failed: ${error.message}`);
+  }
+
+  return data?.length ?? 0;
+}
+
 export async function dismiss(userId: string, notificationId: string): Promise<void> {
   const supabase = createSupabaseServiceClient();
   const now = new Date().toISOString();

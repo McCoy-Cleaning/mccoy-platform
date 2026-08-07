@@ -36,6 +36,10 @@ import {
   effectiveSiteNavigation,
   mergeNavigationPatch,
   parseSiteNavigationResult,
+  defaultSiteFooter,
+  effectiveSiteFooter,
+  mergeFooterPatch,
+  parseSiteFooterResult,
   applyCustomPageNavLink,
   canEnableCustomPageInNav,
   dedupeCustomPageNavLinks,
@@ -75,6 +79,7 @@ import {
   type PageSectionContent,
   type PreviewSnapshot,
   type SiteNavigationContent,
+  type SiteFooterContent,
   type TranslationFieldMetadata,
 } from "@mccoy/cms-schema";
 import { pushPublishedChromeToStorefront } from "./publish-sync";
@@ -210,6 +215,8 @@ function sanitizeLoadedNavigation(state: CmsPersistedState): {
     ...working,
     navigation,
     navigationDraft,
+    footer: working.footer ?? defaultSiteFooter(),
+    footerDraft: working.footerDraft ?? null,
   };
   reconcileCustomInNavFromLinks(next, navigation.links);
   const changed =
@@ -316,6 +323,8 @@ function initial(): CmsPersistedState {
     draft: {},
     navigation: defaultSiteNavigation(),
     navigationDraft: null,
+    footer: defaultSiteFooter(),
+    footerDraft: null,
     previewSnapshots: {},
     version: CMS_SCHEMA_VERSION,
   };
@@ -400,6 +409,8 @@ function persistable(state: CmsPersistedState): CmsPersistedState {
     draft: state.draft,
     navigation: state.navigation,
     navigationDraft: state.navigationDraft ?? null,
+    footer: state.footer ?? defaultSiteFooter(),
+    footerDraft: state.footerDraft ?? null,
     previewSnapshots: {},
     version: state.version,
     migrationRecovery: state.migrationRecovery,
@@ -417,7 +428,12 @@ const WRITE_FAIL_REASON =
 function write(state: CmsPersistedState): boolean {
   // Shallow clone so useSyncExternalStore always sees a new snapshot identity,
   // even when callers mutate the object returned by read() in place.
-  memoryState = { ...state, navigationDraft: state.navigationDraft ?? null };
+  memoryState = {
+    ...state,
+    navigationDraft: state.navigationDraft ?? null,
+    footer: state.footer ?? defaultSiteFooter(),
+    footerDraft: state.footerDraft ?? null,
+  };
   cachedSnapshot = null;
   let persisted = false;
   try {
@@ -574,6 +590,7 @@ export const cms = {
       .map((p) => toNavChromePageStub(p));
     pushPublishedChromeToStorefront({
       navigation: navToSave,
+      footer: s.footer ?? defaultSiteFooter(),
       pages: customPages,
     });
     return { ok: true };
@@ -581,6 +598,54 @@ export const cms = {
   discardNavigationDraft() {
     const s = read();
     writeOrAlert({ ...s, navigationDraft: null });
+  },
+  getFooter(): SiteFooterContent {
+    const s = read();
+    return effectiveSiteFooter(s.footer, s.footerDraft);
+  },
+  getPublishedFooter(): SiteFooterContent {
+    return structuredClone(read().footer ?? defaultSiteFooter());
+  },
+  hasFooterDraft() {
+    const s = read();
+    return s.footerDraft != null;
+  },
+  patchFooter(
+    patch: Partial<{ [K in keyof SiteFooterContent]: SiteFooterContent[K] | null }>,
+  ): { ok: true } | { ok: false; reason: string } {
+    const s = read();
+    const current = effectiveSiteFooter(s.footer, s.footerDraft);
+    const merged = mergeFooterPatch(current, patch);
+    const validated = parseSiteFooterResult(merged);
+    if (!validated.ok) return validated;
+    write({ ...s, footerDraft: validated.data });
+    return { ok: true };
+  },
+  setFooterDraft(next: SiteFooterContent): { ok: true } | { ok: false; reason: string } {
+    const validated = parseSiteFooterResult(next);
+    if (!validated.ok) return validated;
+    const s = read();
+    write({ ...s, footerDraft: validated.data });
+    return { ok: true };
+  },
+  saveFooter(): { ok: true } | { ok: false; reason: string } {
+    const s = read();
+    const draft = s.footerDraft;
+    if (!draft) return { ok: false, reason: "Geen footerconcept om op te slaan." };
+    const validated = parseSiteFooterResult(draft);
+    if (!validated.ok) return validated;
+    if (!write({ ...s, footer: validated.data, footerDraft: null })) {
+      return { ok: false, reason: WRITE_FAIL_REASON };
+    }
+    pushPublishedChromeToStorefront({
+      navigation: s.navigation ?? defaultSiteNavigation(),
+      footer: validated.data,
+    });
+    return { ok: true };
+  },
+  discardFooterDraft() {
+    const s = read();
+    writeOrAlert({ ...s, footerDraft: null });
   },
   updatePage(id: string, patch: Partial<CmsPage>): { ok: true } | { ok: false; reason: string } {
     const s = read();
@@ -1597,4 +1662,9 @@ export function useEditablePage(pageId: string): CmsPage | undefined {
 export function useSiteNavigation(): SiteNavigationContent {
   const state = useCms();
   return effectiveSiteNavigation(state.navigation, state.navigationDraft ?? null);
+}
+
+export function useSiteFooter(): SiteFooterContent {
+  const state = useCms();
+  return effectiveSiteFooter(state.footer, state.footerDraft ?? null);
 }

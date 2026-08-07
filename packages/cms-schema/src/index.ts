@@ -33,6 +33,7 @@ export * from "./form-scope";
 export * from "./resolve-published-form";
 export * from "./collect-published-form-scopes";
 export * from "./navigation";
+export * from "./footer";
 export * from "./nav-custom-pages";
 export * from "./section-content";
 export * from "./cms-text-fallback";

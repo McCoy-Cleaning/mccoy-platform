@@ -19,6 +19,7 @@ export function ensurePlatformToastBridge(): void {
       title: event.title,
       description: event.description,
       dedupeKey: event.dedupeKey,
+      href: event.href,
     });
   });
 }

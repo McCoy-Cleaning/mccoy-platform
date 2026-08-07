@@ -276,6 +276,21 @@ export async function countWebsiteRequests(): Promise<number> {
   return store.requests.length;
 }
 
+export async function countWebsiteRequestsCreatedBetween(
+  fromIso: string,
+  toIso?: string,
+): Promise<number> {
+  const store = await readStore();
+  const fromMs = Date.parse(fromIso);
+  const toMs = toIso ? Date.parse(toIso) : Date.now();
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return 0;
+  return store.requests.filter((r) => {
+    const created = Date.parse(r.createdAt);
+    if (!Number.isFinite(created)) return false;
+    return created >= fromMs && created < toMs;
+  }).length;
+}
+
 export async function clearOrphanWebsiteRequestScopes(
   activeScopeKeys: string[],
 ): Promise<{ cleared: number }> {
@@ -322,5 +337,6 @@ export const jsonWebsiteRequestsStore: WebsiteRequestsStore = {
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
   countWebsiteRequests,
+  countWebsiteRequestsCreatedBetween,
   clearOrphanWebsiteRequestScopes,
 };

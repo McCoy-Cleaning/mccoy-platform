@@ -55,6 +55,7 @@ import {
   SectionEyebrow,
   SectionSurface,
 } from "@mccoy/cms-renderer";
+import { DeliveryImage } from "@/components/site/DeliveryImage";
 import { cn } from "@/lib/utils";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
@@ -184,15 +185,17 @@ export function ServicesCards() {
               >
               <article className="flex h-full flex-col">
                 <div className="relative h-44 shrink-0 overflow-hidden bg-black/35">
-                  <img
+                  <DeliveryImage
                     src={card.imageSrc}
                     alt={card.title}
+                    variant="gallery"
                     width={600}
                     height={360}
-                    loading="lazy"
-                    decoding="async"
+                    // First row is usually in view on desktop; avoid lazy delay there.
+                    loading={i < 3 ? "eager" : "lazy"}
+                    fetchPriority={i === 0 ? "high" : undefined}
                     sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.04]"
+                    className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
                   <div className="absolute left-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/40">
@@ -249,9 +252,11 @@ export function ServicesCards() {
                       className="service-modal-panel fixed z-[101] grid max-w-5xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-3xl border border-primary/30 bg-card shadow-[0_40px_120px_-20px_rgba(63,182,242,0.5)] sm:rounded-[2rem] md:grid-cols-2 md:grid-rows-1"
                     >
                       <div className="relative h-40 shrink-0 overflow-hidden bg-black/35 sm:h-64 md:h-auto">
-                        <img
+                        <DeliveryImage
                           src={card.imageSrc}
                           alt={card.title}
+                          variant="gallery"
+                          loading="eager"
                           className="h-full w-full object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent md:bg-gradient-to-r" />
@@ -390,8 +395,10 @@ function PillarRow({
       <motion.div
         initial={soft ? false : { opacity: 0, x: reverse ? 28 : -28 }}
         whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: soft ? 0 : 0.85, ease: [0.83, 0, 0.17, 1] }}
+        // No negative rootMargin — inset margins keep first-screen blocks at
+        // opacity:0 after SPA navigations until the user scrolls.
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: soft ? 0 : 0.55, ease: [0.83, 0, 0.17, 1] }}
         className="relative lg:col-span-6"
       >
         <div className="relative overflow-hidden rounded-[2rem] border border-white/10 shadow-[0_30px_80px_-30px_rgba(63,182,242,0.45)]">
@@ -430,8 +437,8 @@ function PillarRow({
         <motion.div
           initial={soft ? false : { opacity: 0, x: reverse ? -60 : 60 }}
           whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: soft ? 0 : 0.9, ease: [0.22, 1, 0.36, 1] }}
+          viewport={{ once: true, amount: 0.25 }}
+          transition={{ duration: soft ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/40">
@@ -480,9 +487,8 @@ export function About() {
         <div className="grid gap-10 lg:grid-cols-12">
           <motion.div
             variants={fadeUp}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
+            // Paint heading immediately on route enter (no blank SPA flash).
+            initial={false}
             className="lg:col-span-7"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>

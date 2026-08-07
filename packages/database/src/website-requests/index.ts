@@ -68,6 +68,10 @@ export const appendWebsiteRequestReply: WebsiteRequestsStore["appendWebsiteReque
 export const countWebsiteRequests: WebsiteRequestsStore["countWebsiteRequests"] = () =>
   getWebsiteRequestsStore().countWebsiteRequests();
 
+export const countWebsiteRequestsCreatedBetween: WebsiteRequestsStore["countWebsiteRequestsCreatedBetween"] =
+  (fromIso, toIso) =>
+    getWebsiteRequestsStore().countWebsiteRequestsCreatedBetween(fromIso, toIso);
+
 export const clearOrphanWebsiteRequestScopes: WebsiteRequestsStore["clearOrphanWebsiteRequestScopes"] =
   (activeScopeKeys) => getWebsiteRequestsStore().clearOrphanWebsiteRequestScopes(activeScopeKeys);
 

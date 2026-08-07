@@ -1,4 +1,5 @@
 import { parseSiteNavigation, type SiteNavigationContent } from "./navigation";
+import { parseSiteFooter, type SiteFooterContent } from "./footer";
 import type { CmsPage } from "./types";
 
 /**
@@ -17,6 +18,8 @@ export type CmsSyncParentToChild = {
   channel: typeof CMS_SYNC_CHANNEL;
   type: "sync-published-navigation";
   navigation: SiteNavigationContent;
+  /** Optional published footer; omitted keeps storefront footer unchanged. */
+  footer?: SiteFooterContent;
   /** Upsert these published pages into the storefront chrome store (e.g. after Opslaan). */
   pages?: CmsPage[];
   /** Remove published pages by id (e.g. after delete). */
@@ -43,6 +46,7 @@ export type CmsSyncChildToParent =
 export type CmsPublishedChromeBroadcast = {
   channel: typeof CMS_SYNC_BROADCAST;
   navigation: SiteNavigationContent;
+  footer?: SiteFooterContent;
   pages?: CmsPage[];
   removePageIds?: string[];
 };
@@ -68,6 +72,7 @@ export function isCmsSyncParentMessage(data: unknown): data is CmsSyncParentToCh
   const msg = data as CmsSyncParentToChild;
   if (msg.channel !== CMS_SYNC_CHANNEL || msg.type !== "sync-published-navigation") return false;
   if (parseSiteNavigation(msg.navigation) == null) return false;
+  if (msg.footer !== undefined && parseSiteFooter(msg.footer) == null) return false;
   if (msg.pages !== undefined && !isCmsPageArray(msg.pages)) return false;
   if (msg.removePageIds !== undefined && !isStringIdArray(msg.removePageIds)) return false;
   return true;
@@ -94,14 +99,19 @@ export function parseSyncPublishedNavigation(
 
 export function parseSyncPublishedChrome(data: unknown): {
   navigation: SiteNavigationContent;
+  footer?: SiteFooterContent;
   pages?: CmsPage[];
   removePageIds?: string[];
 } | null {
   if (!isCmsSyncParentMessage(data)) return null;
   const navigation = parseSiteNavigation(data.navigation);
   if (!navigation) return null;
+  const footer =
+    data.footer === undefined ? undefined : parseSiteFooter(data.footer) ?? undefined;
+  if (data.footer !== undefined && !footer) return null;
   return {
     navigation,
+    footer,
     pages: data.pages,
     removePageIds: data.removePageIds,
   };
@@ -114,6 +124,7 @@ export function isCmsPublishedChromeBroadcast(
   const msg = data as CmsPublishedChromeBroadcast;
   if (msg.channel !== CMS_SYNC_BROADCAST) return false;
   if (parseSiteNavigation(msg.navigation) == null) return false;
+  if (msg.footer !== undefined && parseSiteFooter(msg.footer) == null) return false;
   if (msg.pages !== undefined && !isCmsPageArray(msg.pages)) return false;
   if (msg.removePageIds !== undefined && !isStringIdArray(msg.removePageIds)) return false;
   return true;
@@ -121,6 +132,7 @@ export function isCmsPublishedChromeBroadcast(
 
 export function broadcastPublishedChrome(payload: {
   navigation: SiteNavigationContent;
+  footer?: SiteFooterContent;
   pages?: CmsPage[];
   removePageIds?: string[];
 }): void {
@@ -130,6 +142,7 @@ export function broadcastPublishedChrome(payload: {
     const message: CmsPublishedChromeBroadcast = {
       channel: CMS_SYNC_BROADCAST,
       navigation: payload.navigation,
+      footer: payload.footer,
       pages: payload.pages,
       removePageIds: payload.removePageIds,
     };

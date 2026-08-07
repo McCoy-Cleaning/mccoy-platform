@@ -7,6 +7,7 @@ import { AnimatedLogo } from "./AnimatedLogo";
 import { CmsLinkAnchor } from "./CmsLinkAnchor";
 import { useCms, useSiteNavigation } from "@/lib/cms/store";
 import { warmPublishedCmsOnNavIntent } from "@/lib/cms/published-hydrate";
+import { prefetchMarketingPage } from "@/lib/cms/route-page-loader";
 import { useI18n } from "@/lib/i18n";
 import { localizedNavLabel } from "@/lib/cms-i18n";
 import { localWebpSibling, NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
@@ -141,14 +142,19 @@ function NavLinkItem({
     );
   }
 
+  const warmNav = () => {
+    warmPublishedCmsOnNavIntent();
+    prefetchMarketingPage(to.startsWith("/") ? to : `/${to}`);
+  };
+
   return (
     <Link
       to={to}
       preload="intent"
       activeOptions={{ exact }}
-      onMouseEnter={warmPublishedCmsOnNavIntent}
-      onFocus={warmPublishedCmsOnNavIntent}
-      onTouchStart={warmPublishedCmsOnNavIntent}
+      onMouseEnter={warmNav}
+      onFocus={warmNav}
+      onTouchStart={warmNav}
       className="group relative rounded-full px-4 py-2 text-[13px] font-medium uppercase tracking-[0.1em] text-white/65 transition hover:text-white lg:px-5"
     >
       {({ isActive }) => (

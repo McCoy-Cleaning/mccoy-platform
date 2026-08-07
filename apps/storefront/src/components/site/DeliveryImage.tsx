@@ -51,6 +51,10 @@ export function DeliveryImage({
     remote?.fallbackSrc ??
     src;
 
+  const loading = rest.loading ?? (variant === "hero" ? undefined : "lazy");
+  const decoding = rest.decoding ?? "async";
+  const imgProps = { ...rest, loading, decoding };
+
   if (webpSrcSet) {
     return (
       <picture>
@@ -58,7 +62,7 @@ export function DeliveryImage({
         {remote?.jpegSrcSet ? (
           <source type="image/jpeg" srcSet={remote.jpegSrcSet} sizes={resolvedSizes} />
         ) : null}
-        <img src={imgSrc} alt={alt} sizes={resolvedSizes} className={className} {...rest} />
+        <img src={imgSrc} alt={alt} sizes={resolvedSizes} className={className} {...imgProps} />
       </picture>
     );
   }
@@ -73,13 +77,13 @@ export function DeliveryImage({
           alt={alt}
           sizes={resolvedSizes}
           className={className}
-          {...rest}
+          {...imgProps}
         />
       </picture>
     );
   }
 
-  return <img src={src} alt={alt} sizes={resolvedSizes} className={className} {...rest} />;
+  return <img src={src} alt={alt} sizes={resolvedSizes} className={className} {...imgProps} />;
 }
 
 function firstSrcFromSrcSet(srcSet: string): string | undefined {

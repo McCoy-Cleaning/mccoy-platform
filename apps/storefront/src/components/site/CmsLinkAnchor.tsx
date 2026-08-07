@@ -8,6 +8,8 @@ import {
 } from "@mccoy/cms-schema";
 import { useCms } from "@/lib/cms/store";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
+import { warmPublishedCmsOnNavIntent } from "@/lib/cms/published-hydrate";
+import { prefetchMarketingPage } from "@/lib/cms/route-page-loader";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,16 +39,37 @@ export function CmsLinkAnchor({
   const rel = linkRel(link) ?? (external ? "noopener noreferrer" : undefined);
 
   if (link?.type === "internal_route" || (link?.type === "internal" && href.startsWith("/"))) {
+    const warmNav = () => {
+      warmPublishedCmsOnNavIntent();
+      const path = href.split(/[?#]/)[0] ?? href;
+      if (path.startsWith("/")) prefetchMarketingPage(path);
+    };
     // TanStack typed routes prefer `to`; use plain <a> for hash/query and edit safety.
     if (href.includes("#") || href.includes("?") || isEdit) {
       return (
-        <a href={href} className={className} target={target} rel={rel} data-cms-nav={isEdit ? "" : undefined}>
+        <a
+          href={href}
+          className={className}
+          target={target}
+          rel={rel}
+          data-cms-nav={isEdit ? "" : undefined}
+          onMouseEnter={isEdit ? undefined : warmNav}
+          onFocus={isEdit ? undefined : warmNav}
+          onTouchStart={isEdit ? undefined : warmNav}
+        >
           {children}
         </a>
       );
     }
     return (
-      <Link to={href} preload="intent" className={className}>
+      <Link
+        to={href}
+        preload="intent"
+        className={className}
+        onMouseEnter={warmNav}
+        onFocus={warmNav}
+        onTouchStart={warmNav}
+      >
         {children}
       </Link>
     );

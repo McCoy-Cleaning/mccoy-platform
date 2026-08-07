@@ -1210,6 +1210,8 @@ async function listMailboxFormInboxMessages(options?: {
     try {
       const listed = await listGraphFormInboxMessages(options);
       if (listed.syncCandidates && listed.syncCandidates.length > 0) {
+        // Await sync so applicant-reply notifications are enqueued before the
+        // request ends (fire-and-forget was dropped on serverless / early exit).
         try {
           const { syncGraphInboxAfterList } = await import("./graph-inbox-sync");
           const { getGraphMailConfig } = await import("./graph-config");
@@ -1297,51 +1299,65 @@ export async function listFormInboxMessages(options?: {
 
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
 
-  // Mailbox + website_requests, merged by WR- number. Requests without a mailbox
-  // copy still appear — that is the Aanvragen product contract.
-  let mailboxItems: FormInboxMessageSummary[] = [];
-  try {
-    const mailbox = await listMailboxFormInboxMessages({
+  // Parallel mailbox + website_requests + suppress list — list must not wait serially.
+  const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
+    listMailboxFormInboxMessages({
       ...options,
-      // Defer scope/kind filtering until after merge so request-only rows apply.
       kind: "all",
       scopeKey: "all",
       limit: MAX_LIMIT,
-    });
-    mailboxItems = mailbox.items;
-  } catch (error) {
+    }),
+    (async () => {
+      const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
+      return listWebsiteRequestInboxSummaries({
+        kind: "all",
+        scopeKey: "all",
+        limit: 200,
+      });
+    })(),
+    (async () => {
+      const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
+      return listHiddenWebsiteRequestNumbers();
+    })(),
+  ]);
+
+  let mailboxItems: FormInboxMessageSummary[] = [];
+  if (mailboxSettled.status === "fulfilled") {
+    mailboxItems = mailboxSettled.value.items;
+  } else {
     console.error("[form-inbox] mailbox list failed; continuing with website requests", {
-      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      message:
+        mailboxSettled.reason instanceof Error
+          ? mailboxSettled.reason.message.slice(0, 160)
+          : "unknown",
     });
   }
-
-  const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
-  const { mergeMailboxAndWebsiteRequestSummaries } = await import("./enrich-inbox-scopes");
-  const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
 
   let requestItems: FormInboxMessageSummary[] = [];
-  try {
-    requestItems = await listWebsiteRequestInboxSummaries({
-      kind: "all",
-      scopeKey: "all",
-      limit: 200,
-    });
-  } catch (error) {
+  if (requestSettled.status === "fulfilled") {
+    requestItems = requestSettled.value;
+  } else {
     console.error("[form-inbox] website request list failed", {
-      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      message:
+        requestSettled.reason instanceof Error
+          ? requestSettled.reason.message.slice(0, 160)
+          : "unknown",
     });
   }
 
-  // Closed/spam inquiries must not reappear via leftover Graph/IMAP form copies.
   let hiddenRequestNumbers = new Set<string>();
-  try {
-    hiddenRequestNumbers = new Set(await listHiddenWebsiteRequestNumbers());
-  } catch (error) {
+  if (hiddenSettled.status === "fulfilled") {
+    hiddenRequestNumbers = new Set(hiddenSettled.value);
+  } else {
     console.error("[form-inbox] closed-request suppress list failed", {
-      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      message:
+        hiddenSettled.reason instanceof Error
+          ? hiddenSettled.reason.message.slice(0, 160)
+          : "unknown",
     });
   }
 
+  const { mergeMailboxAndWebsiteRequestSummaries } = await import("./enrich-inbox-scopes");
   const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems, {
     hiddenRequestNumbers,
   });

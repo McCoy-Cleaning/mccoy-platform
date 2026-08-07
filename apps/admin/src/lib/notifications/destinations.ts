@@ -14,6 +14,11 @@ const ADMIN_DESTINATION_ALLOWLIST = [
 
 const FALLBACK_DESTINATION = "/admin";
 
+const INBOX_MESSAGE_ID_RE =
+  /^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/;
+const REQUEST_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
  * `destination_path` is written by trusted server workers (see the
  * notification metadata allowlists in `@mccoy/notifications`), but we never
@@ -23,7 +28,56 @@ const FALLBACK_DESTINATION = "/admin";
 export function resolveAdminNotificationDestination(path: string | null | undefined): string {
   if (!path) return FALLBACK_DESTINATION;
   const isAllowed = ADMIN_DESTINATION_ALLOWLIST.some(
-    (allowed) => path === allowed || path.startsWith(`${allowed}/`),
+    (allowed) =>
+      path === allowed ||
+      path.startsWith(`${allowed}/`) ||
+      path.startsWith(`${allowed}?`),
   );
   return isAllowed ? path : FALLBACK_DESTINATION;
+}
+
+/**
+ * Build Aanvragen deep link from notification metadata / entity refs.
+ * Legacy rows only have destination `/admin/inquiries` + requestId in metadata.
+ */
+export function resolveInquiryNotificationHref(options: {
+  type?: string | null;
+  destinationPath?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  encodeRequestMessageId: (requestId: string) => string;
+}): string {
+  const meta = options.metadata ?? {};
+  const inboxMessageId =
+    typeof meta.inboxMessageId === "string" ? meta.inboxMessageId.trim() : "";
+  if (inboxMessageId && INBOX_MESSAGE_ID_RE.test(inboxMessageId)) {
+    return resolveAdminNotificationDestination(
+      `/admin/inquiries?id=${encodeURIComponent(inboxMessageId)}`,
+    );
+  }
+
+  const requestIdRaw =
+    (typeof meta.requestId === "string" && meta.requestId.trim()) ||
+    (options.entityType === "website_request" && typeof options.entityId === "string"
+      ? options.entityId.trim()
+      : "");
+  const isRequestNotification =
+    options.type === "website_request.received" ||
+    options.type === "website_request.applicant_replied" ||
+    options.type === "website_request.reply_failed";
+
+  if (isRequestNotification && requestIdRaw && REQUEST_UUID_RE.test(requestIdRaw)) {
+    const inboxId = options.encodeRequestMessageId(requestIdRaw);
+    return resolveAdminNotificationDestination(
+      `/admin/inquiries?id=${encodeURIComponent(inboxId)}`,
+    );
+  }
+
+  return resolveAdminNotificationDestination(options.destinationPath ?? null);
+}
+
+/** Browser-safe encoder matching `@mccoy/email` `encodeRequestMessageId` default mailbox. */
+export function encodeWebsiteRequestInboxId(requestId: string): string {
+  return `req:${encodeURIComponent("website-requests")}:${encodeURIComponent(requestId)}`;
 }

@@ -1,5 +1,6 @@
 import {
   CMS_SCHEMA_VERSION,
+  defaultSiteFooter,
   defaultSiteNavigation,
   normalizeCmsPage,
   type BuiltinPageKey,
@@ -115,4 +116,5 @@ export function builtinCmsSeedPages(): CmsPage[] {
 }
 
 export const CMS_SEED_NAVIGATION = defaultSiteNavigation();
+export const CMS_SEED_FOOTER = defaultSiteFooter();
 export const CMS_SEED_SCHEMA_VERSION = CMS_SCHEMA_VERSION;

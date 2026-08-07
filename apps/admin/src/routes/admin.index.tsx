@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Globe2,
   Inbox,
@@ -8,18 +9,26 @@ import {
   ArrowRight,
   Activity,
   Sparkles,
+  Minus,
 } from "lucide-react";
+
+import {
+  getAdminOverviewStats,
+  type AdminOverviewStats,
+} from "@/lib/api/admin-overview.functions";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminOverview,
 });
 
-const STATS = [
-  { label: "Nieuwe aanvragen (7 dagen)", value: "24", delta: "+18%", icon: Inbox, tone: "from-[#1e88e5] to-[#22d3ee]" },
-  { label: "Website bezoekers", value: "1.842", delta: "+6%", icon: Globe2, tone: "from-[#7c3aed] to-[#ec4899]" },
-  { label: "Actieve gebruikers", value: "8", delta: "+2", icon: Users, tone: "from-[#22c55e] to-[#84cc16]" },
-  { label: "Producten", value: "42", delta: "live", icon: Package, tone: "from-[#f59e0b] to-[#ef4444]" },
-];
+type StatCard = {
+  label: string;
+  value: string;
+  delta: string;
+  deltaTone: "up" | "down" | "neutral" | "pending";
+  icon: typeof Inbox;
+  tone: string;
+};
 
 const SECTIONS = [
   {
@@ -75,7 +84,137 @@ function todayLabel(): string {
   }
 }
 
+function formatNlNumber(n: number): string {
+  try {
+    return new Intl.NumberFormat("nl-NL").format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+function requestTrendDelta(
+  current: number,
+  previous: number,
+): { delta: string; deltaTone: StatCard["deltaTone"] } {
+  if (previous === 0) {
+    if (current === 0) return { delta: "0%", deltaTone: "neutral" };
+    return { delta: "nieuw", deltaTone: "up" };
+  }
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct > 0) return { delta: `+${pct}%`, deltaTone: "up" };
+  if (pct < 0) return { delta: `${pct}%`, deltaTone: "down" };
+  return { delta: "0%", deltaTone: "neutral" };
+}
+
+function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
+  const requests = stats?.newRequestsLast7Days ?? null;
+  const previous = stats?.newRequestsPrevious7Days ?? 0;
+  const requestTrend =
+    requests === null
+      ? { delta: "…", deltaTone: "neutral" as const }
+      : requestTrendDelta(requests, previous);
+
+  const visitors = stats?.websiteVisitors ?? null;
+  const visitorsPrevious = stats?.websiteVisitorsPrevious7Days ?? 0;
+  const visitorTrend =
+    stats === null
+      ? { delta: "…", deltaTone: "neutral" as const }
+      : visitors === null
+        ? { delta: "niet gekoppeld", deltaTone: "pending" as const }
+        : requestTrendDelta(visitors, visitorsPrevious);
+
+  return [
+    {
+      label: "Nieuwe aanvragen (7 dagen)",
+      value: requests === null ? "—" : formatNlNumber(requests),
+      delta: requestTrend.delta,
+      deltaTone: requestTrend.deltaTone,
+      icon: Inbox,
+      tone: "from-[#1e88e5] to-[#22d3ee]",
+    },
+    {
+      label: "Website bezoekers (7 dagen)",
+      value: visitors === null ? "—" : formatNlNumber(visitors),
+      delta: visitorTrend.delta,
+      deltaTone: visitorTrend.deltaTone,
+      icon: Globe2,
+      tone: "from-[#7c3aed] to-[#ec4899]",
+    },
+    {
+      label: "Actieve gebruikers",
+      value:
+        stats === null ? "—" : formatNlNumber(stats.activeStaffCount),
+      delta: "team",
+      deltaTone: "neutral",
+      icon: Users,
+      tone: "from-[#22c55e] to-[#84cc16]",
+    },
+    {
+      label: "Producten",
+      value: "—",
+      delta: "binnenkort",
+      deltaTone: "pending",
+      icon: Package,
+      tone: "from-[#f59e0b] to-[#ef4444]",
+    },
+  ];
+}
+
+function DeltaBadge({
+  delta,
+  tone,
+}: {
+  delta: string;
+  tone: StatCard["deltaTone"];
+}) {
+  if (tone === "pending" || tone === "neutral") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-white/55">
+        <Minus className="h-3.5 w-3.5" /> {delta}
+      </span>
+    );
+  }
+  if (tone === "down") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-rose-300">
+        <TrendingUp className="h-3.5 w-3.5 rotate-180" /> {delta}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+      <TrendingUp className="h-3.5 w-3.5" /> {delta}
+    </span>
+  );
+}
+
 function AdminOverview() {
+  const [stats, setStats] = useState<AdminOverviewStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAdminOverviewStats()
+      .then((result) => {
+        if (!cancelled) setStats(result);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStats({
+            newRequestsLast7Days: 0,
+            newRequestsPrevious7Days: 0,
+            activeStaffCount: 0,
+            websiteVisitors: null,
+            websiteVisitorsPrevious7Days: null,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cards = buildStatCards(stats);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Hero */}
@@ -142,7 +281,7 @@ function AdminOverview() {
           Kort overzicht
         </h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {STATS.map((s) => {
+          {cards.map((s) => {
             const Icon = s.icon;
             return (
               <div
@@ -154,9 +293,7 @@ function AdminOverview() {
                   <div className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${s.tone} shadow-lg`}>
                     <Icon className="h-5 w-5 text-white" />
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-                    <TrendingUp className="h-3.5 w-3.5" /> {s.delta}
-                  </span>
+                  <DeltaBadge delta={s.delta} tone={s.deltaTone} />
                 </div>
                 <div className="relative mt-4">
                   <div className="text-3xl font-bold tracking-tight tabular-nums">{s.value}</div>

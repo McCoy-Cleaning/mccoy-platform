@@ -9,30 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminRecoverMfaRouteImport } from './routes/admin.recover-mfa'
-import { Route as AdminProductsRouteImport } from './routes/admin.products'
-import { Route as AdminMfaRouteImport } from './routes/admin.mfa'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AdminInviteRouteImport } from './routes/admin.invite'
 import { Route as AdminInquiriesRouteImport } from './routes/admin.inquiries'
+import { Route as AdminInviteRouteImport } from './routes/admin.invite'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminMfaRouteImport } from './routes/admin.mfa'
+import { Route as AdminProductsRouteImport } from './routes/admin.products'
+import { Route as AdminRecoverMfaRouteImport } from './routes/admin.recover-mfa'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsiteIndexRouteImport } from './routes/admin.website.index'
-import { Route as AdminWebsiteMediaRouteImport } from './routes/admin.website.media'
 import { Route as AdminWebsitePageIdRouteImport } from './routes/admin.website.$pageId'
+import { Route as AdminWebsiteMediaRouteImport } from './routes/admin.website.media'
+import { Route as AdminWebsiteOtherFooterRouteImport } from './routes/admin.website.other.footer'
 import { Route as AdminWebsiteOtherNavigationRouteImport } from './routes/admin.website.other.navigation'
 
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -40,34 +41,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminRecoverMfaRoute = AdminRecoverMfaRouteImport.update({
-  id: '/recover-mfa',
-  path: '/recover-mfa',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminProductsRoute = AdminProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminMfaRoute = AdminMfaRouteImport.update({
-  id: '/mfa',
-  path: '/mfa',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const AdminInquiriesRoute = AdminInquiriesRouteImport.update({
+  id: '/inquiries',
+  path: '/inquiries',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminInviteRoute = AdminInviteRouteImport.update({
@@ -75,9 +51,34 @@ const AdminInviteRoute = AdminInviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminInquiriesRoute = AdminInquiriesRouteImport.update({
-  id: '/inquiries',
-  path: '/inquiries',
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMfaRoute = AdminMfaRouteImport.update({
+  id: '/mfa',
+  path: '/mfa',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductsRoute = AdminProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRecoverMfaRoute = AdminRecoverMfaRouteImport.update({
+  id: '/recover-mfa',
+  path: '/recover-mfa',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminWebsiteIndexRoute = AdminWebsiteIndexRouteImport.update({
@@ -85,14 +86,19 @@ const AdminWebsiteIndexRoute = AdminWebsiteIndexRouteImport.update({
   path: '/website/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminWebsitePageIdRoute = AdminWebsitePageIdRouteImport.update({
+  id: '/website/$pageId',
+  path: '/website/$pageId',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminWebsiteMediaRoute = AdminWebsiteMediaRouteImport.update({
   id: '/website/media',
   path: '/website/media',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminWebsitePageIdRoute = AdminWebsitePageIdRouteImport.update({
-  id: '/website/$pageId',
-  path: '/website/$pageId',
+const AdminWebsiteOtherFooterRoute = AdminWebsiteOtherFooterRouteImport.update({
+  id: '/website/other/footer',
+  path: '/website/other/footer',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminWebsiteOtherNavigationRoute =
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
   '/admin/website/media': typeof AdminWebsiteMediaRoute
   '/admin/website/': typeof AdminWebsiteIndexRoute
+  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
   '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
   '/admin/website/media': typeof AdminWebsiteMediaRoute
   '/admin/website': typeof AdminWebsiteIndexRoute
+  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
   '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
 }
 export interface FileRoutesById {
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
   '/admin/website/media': typeof AdminWebsiteMediaRoute
   '/admin/website/': typeof AdminWebsiteIndexRoute
+  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
   '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/admin/website/$pageId'
     | '/admin/website/media'
     | '/admin/website/'
+    | '/admin/website/other/footer'
     | '/admin/website/other/navigation'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/admin/website/$pageId'
     | '/admin/website/media'
     | '/admin/website'
+    | '/admin/website/other/footer'
     | '/admin/website/other/navigation'
   id:
     | '__root__'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/admin/website/$pageId'
     | '/admin/website/media'
     | '/admin/website/'
+    | '/admin/website/other/footer'
     | '/admin/website/other/navigation'
   fileRoutesById: FileRoutesById
 }
@@ -213,18 +225,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -234,46 +246,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/recover-mfa': {
-      id: '/admin/recover-mfa'
-      path: '/recover-mfa'
-      fullPath: '/admin/recover-mfa'
-      preLoaderRoute: typeof AdminRecoverMfaRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/products': {
-      id: '/admin/products'
-      path: '/products'
-      fullPath: '/admin/products'
-      preLoaderRoute: typeof AdminProductsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/mfa': {
-      id: '/admin/mfa'
-      path: '/mfa'
-      fullPath: '/admin/mfa'
-      preLoaderRoute: typeof AdminMfaRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
+    '/admin/inquiries': {
+      id: '/admin/inquiries'
+      path: '/inquiries'
+      fullPath: '/admin/inquiries'
+      preLoaderRoute: typeof AdminInquiriesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/invite': {
@@ -283,11 +260,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminInviteRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/inquiries': {
-      id: '/admin/inquiries'
-      path: '/inquiries'
-      fullPath: '/admin/inquiries'
-      preLoaderRoute: typeof AdminInquiriesRouteImport
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/mfa': {
+      id: '/admin/mfa'
+      path: '/mfa'
+      fullPath: '/admin/mfa'
+      preLoaderRoute: typeof AdminMfaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/products': {
+      id: '/admin/products'
+      path: '/products'
+      fullPath: '/admin/products'
+      preLoaderRoute: typeof AdminProductsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/recover-mfa': {
+      id: '/admin/recover-mfa'
+      path: '/recover-mfa'
+      fullPath: '/admin/recover-mfa'
+      preLoaderRoute: typeof AdminRecoverMfaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/website/': {
@@ -297,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWebsiteIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/website/$pageId': {
+      id: '/admin/website/$pageId'
+      path: '/website/$pageId'
+      fullPath: '/admin/website/$pageId'
+      preLoaderRoute: typeof AdminWebsitePageIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/website/media': {
       id: '/admin/website/media'
       path: '/website/media'
@@ -304,11 +323,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWebsiteMediaRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/website/$pageId': {
-      id: '/admin/website/$pageId'
-      path: '/website/$pageId'
-      fullPath: '/admin/website/$pageId'
-      preLoaderRoute: typeof AdminWebsitePageIdRouteImport
+    '/admin/website/other/footer': {
+      id: '/admin/website/other/footer'
+      path: '/website/other/footer'
+      fullPath: '/admin/website/other/footer'
+      preLoaderRoute: typeof AdminWebsiteOtherFooterRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/website/other/navigation': {
@@ -334,6 +353,7 @@ interface AdminRouteChildren {
   AdminWebsitePageIdRoute: typeof AdminWebsitePageIdRoute
   AdminWebsiteMediaRoute: typeof AdminWebsiteMediaRoute
   AdminWebsiteIndexRoute: typeof AdminWebsiteIndexRoute
+  AdminWebsiteOtherFooterRoute: typeof AdminWebsiteOtherFooterRoute
   AdminWebsiteOtherNavigationRoute: typeof AdminWebsiteOtherNavigationRoute
 }
 
@@ -350,6 +370,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminWebsitePageIdRoute: AdminWebsitePageIdRoute,
   AdminWebsiteMediaRoute: AdminWebsiteMediaRoute,
   AdminWebsiteIndexRoute: AdminWebsiteIndexRoute,
+  AdminWebsiteOtherFooterRoute: AdminWebsiteOtherFooterRoute,
   AdminWebsiteOtherNavigationRoute: AdminWebsiteOtherNavigationRoute,
 }
 

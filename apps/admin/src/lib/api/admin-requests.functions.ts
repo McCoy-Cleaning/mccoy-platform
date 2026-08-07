@@ -9,6 +9,7 @@ import {
   listWebsiteRequestMailMessages,
   listWebsiteRequests,
   markAllNotificationsRead,
+  markNotificationsReadForEntity,
   NotificationOutboxUnavailableError,
   notificationUnreadCount,
   processNotificationOutbox,
@@ -248,7 +249,35 @@ export const getAdminRequestsUnreadCount = createServerFn({ method: "POST" }).ha
   }
 });
 
-/** Clears the Aanvragen badge — called when staff opens the Aanvragen list. */
+/** Clears the Aanvragen badge for one website request — called when staff opens that inquiry. */
+export const markAdminRequestNotificationsReadForEntity = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const data = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+    const entityId = typeof data.entityId === "string" ? data.entityId.trim() : "";
+    if (!entityId) throw new Error("entityId is required");
+    return { entityId };
+  })
+  .handler(async ({ data }) => {
+    try {
+      const session = await requireAdminSession();
+      if (!session.userId || !hasSupabaseServiceConfig()) {
+        return { ok: true as const, count: 0 };
+      }
+      const count = await markNotificationsReadForEntity(
+        session.userId,
+        "website_request",
+        data.entityId,
+      );
+      return { ok: true as const, count };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+/**
+ * @deprecated Prefer markAdminRequestNotificationsReadForEntity — blanket list clear
+ * hid the bell badge for applicant replies. Kept for rare admin tooling.
+ */
 export const markAdminRequestsNotificationsRead = createServerFn({ method: "POST" }).handler(
   async () => {
     try {
@@ -389,15 +418,14 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
         };
       }
 
-      // listFormInboxMessages merges mailbox + website_requests (by WR- number).
-      // Requests remain visible when the CMS form or mailbox copy is gone.
-      // Safety net: persist-clear orphan scopes before listing (publish also reconciles).
-      try {
-        const { reconcileOrphanWebsiteRequestScopes } = await import("@mccoy/database/server");
-        await reconcileOrphanWebsiteRequestScopes();
-      } catch {
-        /* display-time clear in listFormInboxMessages still applies */
-      }
+      // Safety net: persist-clear orphan scopes — do not block inbox paint.
+      void import("@mccoy/database/server")
+        .then(({ reconcileOrphanWebsiteRequestScopes }) =>
+          reconcileOrphanWebsiteRequestScopes(),
+        )
+        .catch(() => {
+          /* display-time clear in listFormInboxMessages still applies */
+        });
 
       let result: Awaited<ReturnType<typeof listFormInboxMessages>>;
       try {
@@ -492,18 +520,13 @@ export const getAdminFormInboxThread = createServerFn({ method: "POST" })
         };
       }
 
-      // Load message first so request-backed Graph sync runs once. Parallel
-      // message+thread loads raced and could overwrite Gesprek without the
-      // applicant reply that sync just appended.
+      // Load root without blocking; request-backed Graph sync runs in getFormInboxThread.
       const message = await getFormInboxMessage(data.id);
       let thread = message?.thread ?? [];
       try {
-        const decoded = decodeInboxMessageId(data.id);
-        if (decoded.provider !== "request" && decoded.provider !== "e2e") {
-          thread = await getFormInboxThread(data.id);
-        }
+        thread = await getFormInboxThread(data.id);
       } catch {
-        thread = message?.thread ?? (await getFormInboxThread(data.id));
+        thread = message?.thread ?? [];
       }
       const merged = await mergePersistedRepliesIntoThread(
         thread,

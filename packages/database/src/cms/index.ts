@@ -46,6 +46,7 @@ export {
 export {
   builtinCmsSeedPages,
   CMS_SEED_NAVIGATION,
+  CMS_SEED_FOOTER,
   CMS_SEED_SCHEMA_VERSION,
 } from "./seeds";
 export { loadCmsPageForWebsiteForm } from "./load-page-for-form";

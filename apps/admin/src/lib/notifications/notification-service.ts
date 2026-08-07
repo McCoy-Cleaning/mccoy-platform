@@ -14,6 +14,10 @@ import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
 
 import { ensurePlatformToastBridge } from "./toast-bridge";
 import type { AdminNotificationItem, NotificationServiceState } from "./types";
+import {
+  encodeWebsiteRequestInboxId,
+  resolveInquiryNotificationHref,
+} from "./destinations";
 
 ensurePlatformToastBridge();
 
@@ -22,6 +26,8 @@ const REFRESH_DEBOUNCE_MS = 400;
 const HEARTBEAT_INTERVAL_MS = 4_000;
 const HEARTBEAT_STALE_MS = 11_000;
 const MAX_TOASTED_PER_REFRESH = 5;
+/** Fallback when Realtime publication is missing or the channel drops. */
+const POLL_INTERVAL_MS = 15_000;
 
 type BroadcastMutationOp = "read" | "read-all" | "dismiss" | "open";
 
@@ -78,6 +84,7 @@ class AdminNotificationService {
   private channel: RealtimeChannel | null = null;
   private broadcast: BroadcastChannel | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private pollTimer: ReturnType<typeof setInterval> | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(userId: string) {
@@ -109,6 +116,7 @@ class AdminNotificationService {
     void this.refreshPreferences();
     this.setupRealtime();
     this.setupBroadcastChannel();
+    this.setupPolling();
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", this.handleVisibilityChange);
     }
@@ -122,6 +130,7 @@ class AdminNotificationService {
     this.started = false;
     this.teardownRealtime();
     this.teardownBroadcastChannel();
+    this.teardownPolling();
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", this.handleVisibilityChange);
     }
@@ -248,26 +257,20 @@ class AdminNotificationService {
         (item) => !previousIds.has(item.recipientId) && !item.readAt && !item.dismissedAt,
       );
       for (const item of newlyArrived.slice(0, MAX_TOASTED_PER_REFRESH)) {
-        emitPlatformEvent({
-          type: "notification-received",
-          notificationId: item.notificationId,
-          notificationType: item.type,
-          category: item.category,
-        });
-        if (item.category === "requests") {
-          refreshAdminRequestsUnreadBadge();
-        }
-        if (typeof document !== "undefined" && document.hidden) {
-          this.maybeShowBrowserNotification(item);
-        } else {
-          emitPlatformEvent({
-            type: "ui-toast",
-            kind: toastKindForSeverity(item.severity),
-            title: item.title,
-            description: item.body ?? undefined,
-            dedupeKey: `notification:${item.notificationId}`,
-          });
-        }
+        this.emitArrival(item);
+      }
+    } else {
+      // If the page loads after a reply (Realtime missed / no publication yet),
+      // still surface a toast for unread items from the last 15 minutes.
+      const recentCutoff = Date.now() - 15 * 60_000;
+      const recentUnread = items.filter(
+        (item) =>
+          !item.readAt &&
+          !item.dismissedAt &&
+          new Date(item.createdAt).getTime() >= recentCutoff,
+      );
+      for (const item of recentUnread.slice(0, MAX_TOASTED_PER_REFRESH)) {
+        this.emitArrival(item, { preferInAppToast: true });
       }
     }
 
@@ -276,6 +279,45 @@ class AdminNotificationService {
     this.status = "ready";
     this.error = null;
     this.notify();
+  }
+
+  private emitArrival(
+    item: AdminNotificationItem,
+    options?: { preferInAppToast?: boolean },
+  ): void {
+    emitPlatformEvent({
+      type: "notification-received",
+      notificationId: item.notificationId,
+      notificationType: item.type,
+      category: item.category,
+    });
+    if (item.category === "requests") {
+      refreshAdminRequestsUnreadBadge();
+    }
+    const useBrowserPopup =
+      !options?.preferInAppToast &&
+      typeof document !== "undefined" &&
+      document.hidden;
+    if (useBrowserPopup) {
+      this.maybeShowBrowserNotification(item);
+      return;
+    }
+    const href = resolveInquiryNotificationHref({
+      type: item.type,
+      destinationPath: item.destinationPath,
+      entityType: item.entityType,
+      entityId: item.entityId,
+      metadata: item.metadata,
+      encodeRequestMessageId: encodeWebsiteRequestInboxId,
+    });
+    emitPlatformEvent({
+      type: "ui-toast",
+      kind: toastKindForSeverity(item.severity),
+      title: item.title,
+      description: item.body ?? "Open meldingen om te bekijken.",
+      dedupeKey: `notification:${item.notificationId}`,
+      href,
+    });
   }
 
   private applyLocalMutation(op: BroadcastMutationOp, notificationId?: string): void {
@@ -313,6 +355,14 @@ class AdminNotificationService {
     if (this.browserEnabledByType.get(item.type) !== true) return;
     if (!this.isLeaderTab()) return;
     try {
+      const href = resolveInquiryNotificationHref({
+        type: item.type,
+        destinationPath: item.destinationPath,
+        entityType: item.entityType,
+        entityId: item.entityId,
+        metadata: item.metadata,
+        encodeRequestMessageId: encodeWebsiteRequestInboxId,
+      });
       const notification = new Notification(item.title, {
         body: item.body ?? undefined,
         silent: true,
@@ -321,6 +371,7 @@ class AdminNotificationService {
       notification.onclick = () => {
         window.focus();
         notification.close();
+        if (href) window.location.assign(href);
       };
     } catch {
       // Notification constructor can throw in restricted/embedded contexts — ignore.
@@ -356,6 +407,22 @@ class AdminNotificationService {
     if (this.channel) {
       void this.channel.unsubscribe();
       this.channel = null;
+    }
+  }
+
+  private setupPolling(): void {
+    if (typeof window === "undefined") return;
+    this.teardownPolling();
+    this.pollTimer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      this.scheduleRefresh();
+    }, POLL_INTERVAL_MS);
+  }
+
+  private teardownPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = undefined;
     }
   }
 

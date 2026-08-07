@@ -20,8 +20,9 @@ import {
   notificationPreferenceUpdateSchema,
 } from "@mccoy/validation";
 
-import { resolveAdminNotificationDestination } from "@/lib/notifications/destinations";
+import { resolveInquiryNotificationHref } from "@/lib/notifications/destinations";
 import type { AdminNotificationItem, AdminNotificationPreference } from "@/lib/notifications/types";
+import { encodeRequestMessageId } from "@mccoy/email/server";
 
 function authErrorResult(error: unknown) {
   if (error instanceof AdminAuthError) {
@@ -139,9 +140,17 @@ export const openAdminNotification = createServerFn({ method: "POST" })
       const items = await listNotificationsForUser(userId, { limit: 100 });
       const match = items.find((item) => item.notificationId === data.notificationId);
       await markNotificationOpened(userId, data.notificationId);
+
       return {
         ok: true as const,
-        destinationPath: resolveAdminNotificationDestination(match?.destinationPath ?? null),
+        destinationPath: resolveInquiryNotificationHref({
+          type: match?.type,
+          destinationPath: match?.destinationPath,
+          entityType: match?.entityType,
+          entityId: match?.entityId,
+          metadata: match?.metadata ?? null,
+          encodeRequestMessageId,
+        }),
       };
     } catch (error) {
       return authErrorResult(error);

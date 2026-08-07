@@ -98,6 +98,7 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 - `MCCOY_ALLOW_INDEXING` — storefront crawl override (`1` force allow, `0` force deny). Default: allow only when `VERCEL_ENV=production`; preview/local/staging stay `noindex` (see `packages/security/src/indexing.ts`)
 - `MCCOY_DATA_DIR` — optional override for local/file CMS and request stores
 - `GROQ_*` — content AI (**Admin only**)
+- `VERCEL_TOKEN`, `VERCEL_WEB_ANALYTICS_PROJECT_ID`, optional `VERCEL_TEAM_ID` — admin overview visitor counts from Vercel Web Analytics API (**Admin only**, server-side). Enable Web Analytics on the storefront Vercel project; Hobby includes 50k events/month and a ~1 month reporting window. Do not put these on `VITE_*`.
 
 ## Website requests / Aanvragen
 
@@ -106,6 +107,11 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 ## CMS live edit
 
 Admin embeds the Storefront origin in an iframe (`VITE_STOREFRONT_ORIGIN`). Storefront accepts `_cmsMode=edit` and `/cms-preview` for draft/preview rendering only — not staff authoring chrome.
+
+Site chrome editors (not per-page sections):
+
+- **Navigatie** — `/admin/website/other/navigation`
+- **Footer** — `/admin/website/other/footer`
 
 ### Staging admin → production www
 

@@ -271,6 +271,25 @@ export async function countWebsiteRequests(): Promise<number> {
   return count ?? 0;
 }
 
+export async function countWebsiteRequestsCreatedBetween(
+  fromIso: string,
+  toIso?: string,
+): Promise<number> {
+  const supabase = createSupabaseServiceClient();
+  let query = supabase
+    .from("website_requests")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", fromIso);
+  if (toIso) {
+    query = query.lt("created_at", toIso);
+  }
+  const { count, error } = await query;
+  if (error) {
+    throw new Error(`countWebsiteRequestsCreatedBetween failed: ${error.message}`);
+  }
+  return count ?? 0;
+}
+
 export async function clearOrphanWebsiteRequestScopes(
   activeScopeKeys: string[],
 ): Promise<{ cleared: number }> {
@@ -319,5 +338,6 @@ export const supabaseWebsiteRequestsStore: WebsiteRequestsStore = {
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
   countWebsiteRequests,
+  countWebsiteRequestsCreatedBetween,
   clearOrphanWebsiteRequestScopes,
 };

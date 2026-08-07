@@ -57,12 +57,18 @@ describe("useInquiriesRealtimeRefresh", () => {
   it("debounces loadList when a website_request notification arrives", async () => {
     vi.useFakeTimers();
     const loadList = vi.fn();
+    const softRefreshDetail = vi.fn();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     function Harness() {
-      useInquiriesRealtimeRefresh({ loadList, debounceMs: 200 });
+      useInquiriesRealtimeRefresh({
+        loadList,
+        selectedId: "req:website-requests:abc",
+        softRefreshDetail,
+        debounceMs: 200,
+      });
       return null;
     }
 
@@ -74,23 +80,26 @@ describe("useInquiriesRealtimeRefresh", () => {
       emitPlatformEvent({
         type: "notification-received",
         notificationId: "n-new",
-        notificationType: "website_request.received",
+        notificationType: "website_request.applicant_replied",
         category: "requests",
       });
       emitPlatformEvent({
         type: "notification-received",
         notificationId: "n-new-2",
-        notificationType: "website_request.received",
+        notificationType: "website_request.applicant_replied",
         category: "requests",
       });
     });
 
     expect(loadList).not.toHaveBeenCalled();
+    expect(softRefreshDetail).not.toHaveBeenCalled();
 
     await act(async () => {
       vi.advanceTimersByTime(200);
     });
 
     expect(loadList).toHaveBeenCalledTimes(1);
+    expect(softRefreshDetail).toHaveBeenCalledTimes(1);
+    expect(softRefreshDetail).toHaveBeenCalledWith("req:website-requests:abc");
   });
 });

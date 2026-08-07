@@ -9,6 +9,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { Analytics } from "@vercel/analytics/react";
 import { CmsUiLocaleProvider } from "@mccoy/cms-renderer";
 
 // Side-effect import so Start can discover CSS for Early Hints.
@@ -274,6 +275,30 @@ function RootComponent() {
           </DeferredCmsEditShell>
         </CmsUiLocaleBridge>
       </PublishedCmsProvider>
+      {/*
+        Vercel Web Analytics: cookieless / hashed visitor identity.
+        No storefront cookie-consent banner yet — when one is added for optional
+        tracking, gate with beforeSend returning null until accepted.
+        Skip CMS bridge routes so admin preview traffic does not inflate counts.
+      */}
+      <Analytics
+        beforeSend={(event) => {
+          try {
+            const path = new URL(event.url).pathname;
+            if (
+              path === "/cms-preview" ||
+              path === "/cms-sync" ||
+              path.startsWith("/cms-preview/") ||
+              path.startsWith("/cms-sync/")
+            ) {
+              return null;
+            }
+          } catch {
+            return event;
+          }
+          return event;
+        }}
+      />
     </QueryClientProvider>
   );
 }

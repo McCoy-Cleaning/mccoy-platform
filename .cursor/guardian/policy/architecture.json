@@ -2,7 +2,10 @@
   "enforceAppIsolation": true,
   "forbidPackageSourceDeepImports": true,
   "forbidRelativeBoundaryEscape": true,
-  "allowCycles": [],
+  "allowCycles": [
+    "apps/admin/src/router\\.tsx -> apps/admin/src/routeTree\\.gen\\.ts -> apps/admin/src/router\\.tsx",
+    "apps/storefront/src/router\\.tsx -> apps/storefront/src/routeTree\\.gen\\.ts -> apps/storefront/src/router\\.tsx"
+  ],
   "exceptions": [],
   "zones": [
     {

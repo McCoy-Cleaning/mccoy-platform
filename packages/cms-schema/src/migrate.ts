@@ -13,6 +13,7 @@ import { parseContentAlign } from "./layout-presentation";
 import { CURRENT_LAYOUT_VERSION, isFixedSectionKey } from "./sections";
 import { normalizeCmsPage, resolvePageKey } from "./pipeline";
 import { defaultSiteNavigation, parseSiteNavigation } from "./navigation";
+import { defaultSiteFooter, parseSiteFooter } from "./footer";
 import { navigationWithResolvedCustomLinks } from "./nav-custom-pages";
 import { ensurePageLocaleFields } from "./migrate-locale";
 
@@ -113,6 +114,8 @@ const persistedSchema = z.object({
   draft: z.record(z.unknown()).optional(),
   navigation: z.unknown().optional(),
   navigationDraft: z.unknown().optional(),
+  footer: z.unknown().optional(),
+  footerDraft: z.unknown().optional(),
   previewSnapshots: z.record(z.unknown()).optional(),
   version: z.number().optional(),
   corruptPayload: z.string().optional(),
@@ -343,6 +346,10 @@ export function migrateAndValidate(raw: unknown): LoadResult {
       ? navigationWithResolvedCustomLinks(navigationDraftRaw, pages)
       : null;
 
+    const footer = parseSiteFooter(data.footer) ?? defaultSiteFooter();
+    const footerDraft =
+      data.footerDraft == null ? null : parseSiteFooter(data.footerDraft);
+
     const state: CmsPersistedState = {
       schemaVersion: CMS_SCHEMA_VERSION,
       pages,
@@ -350,6 +357,8 @@ export function migrateAndValidate(raw: unknown): LoadResult {
       draft,
       navigation,
       navigationDraft: navigationDraftParsed,
+      footer,
+      footerDraft,
       previewSnapshots: {},
       version: data.version ?? schemaVersion,
       migrationRecovery: recovery,

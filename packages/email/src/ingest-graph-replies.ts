@@ -113,8 +113,18 @@ export async function ingestGraphReplyCandidates(options: {
       isRead: msg.isRead !== false,
     });
 
-    if (upsert?.status === "appended") appended += 1;
-    else if (upsert?.status === "already_processed") alreadyProcessed += 1;
+    if (upsert?.status === "appended") {
+      appended += 1;
+      const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
+      await notifyApplicantReplyAppended({
+        requestId: result.inquiryId,
+        mailMessageId: upsert.id,
+        mailbox,
+        senderAddress: fromAddress,
+      });
+    } else if (upsert?.status === "already_processed") {
+      alreadyProcessed += 1;
+    }
   }
 
   return { appended, alreadyProcessed, unmatched };
