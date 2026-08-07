@@ -191,13 +191,19 @@ export type HomeHeroPreloadLink = {
 
 /** Desktop-only hero image preload for `/` and `/en` head links. */
 export function homeHeroPreloadLink(heroSrc: string): HomeHeroPreloadLink {
-  const remote = supabasePhotoSrcSets(heroSrc, [640, 960, 1280]);
+  // Match DeliveryImage hero (`resize: "contain"`) so preload URL === <img> URL.
+  const remote = supabasePhotoSrcSets(heroSrc, [640, 960, 1280], { resize: "contain" });
   const webpSrcSet =
     remote?.webpSrcSet ??
     heroWebpSrcSet(heroSrc) ??
     "/images/cms/hero-cleaning-640.webp 640w, /images/cms/hero-cleaning-960.webp 960w, /images/cms/hero-cleaning-1280.webp 1280w";
   const preloadHref = remote
-    ? supabaseTransformedUrl(heroSrc, { width: 640, quality: 72, format: "webp" })
+    ? supabaseTransformedUrl(heroSrc, {
+        width: 640,
+        quality: 72,
+        format: "webp",
+        resize: "contain",
+      })
     : "/images/cms/hero-cleaning-640.webp";
   return {
     rel: "preload",

@@ -322,23 +322,6 @@ export async function loadPublishedPageSnapshot(
     if (seedOrMissing.kind !== "not_found") {
       writeSnapshotCache(pathname, configVersion, seedOrMissing);
     }
-    // #region agent log
-    if (seedOrMissing.kind === "not_found") {
-      fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-        body: JSON.stringify({
-          sessionId: "8f1793",
-          runId: "pre-fix",
-          hypothesisId: "E",
-          location: "load-published-page.server.ts:loadPublishedPageSnapshot",
-          message: "CMS resolve returned not_found",
-          data: { pathname, configVersion, primaryKind: result.kind },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    }
-    // #endregion
     return seedOrMissing;
   } catch (error) {
     notePrimaryStoreFailure(error);

@@ -96,35 +96,6 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   }
 
   const captured = consumeLastCapturedError();
-  // #region agent log
-  const capturedSummary =
-    captured instanceof Error
-      ? {
-          name: captured.name,
-          message: captured.message,
-          isNotFound: (captured as { isNotFound?: boolean }).isNotFound === true,
-        }
-      : captured && typeof captured === "object"
-        ? {
-            keys: Object.keys(captured as object).slice(0, 12),
-            isNotFound: (captured as { isNotFound?: boolean }).isNotFound === true,
-            message: String((captured as { message?: unknown }).message ?? ""),
-          }
-        : { raw: String(captured) };
-  fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-    body: JSON.stringify({
-      sessionId: "8f1793",
-      runId: "pre-fix",
-      hypothesisId: "A",
-      location: "server.ts:normalizeCatastrophicSsrResponse",
-      message: "h3 HTTPError 500 normalized",
-      data: { bodyPreview: body.slice(0, 200), capturedSummary },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   console.error(captured ?? new Error(`h3 swallowed SSR error: ${body}`));
   return new Response(renderErrorPage(), {
     status: 500,
@@ -150,58 +121,15 @@ function withIndexingHeaders(response: Response): Response {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    const reqUrl = request.url;
-    const reqMethod = request.method;
     try {
       ensureMonorepoEnvLoaded();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      // #region agent log
-      fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-        body: JSON.stringify({
-          sessionId: "8f1793",
-          runId: "pre-fix",
-          hypothesisId: "B",
-          location: "server.ts:fetch",
-          message: "SSR handler response",
-          data: {
-            url: reqUrl,
-            method: reqMethod,
-            status: response.status,
-            contentType: response.headers.get("content-type"),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       const normalized = await normalizeCatastrophicSsrResponse(response);
       const withRobots = withIndexingHeaders(normalized);
       const secured = applySecurityHeaders(withRobots, { app: "storefront" });
       return await maybeCompressResponse(request, secured);
     } catch (error) {
-      // #region agent log
-      fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-        body: JSON.stringify({
-          sessionId: "8f1793",
-          runId: "pre-fix",
-          hypothesisId: "C",
-          location: "server.ts:fetch:catch",
-          message: "fetch threw before normalize",
-          data: {
-            url: reqUrl,
-            method: reqMethod,
-            name: error instanceof Error ? error.name : typeof error,
-            message: error instanceof Error ? error.message : String(error),
-            code: (error as { code?: string })?.code,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       console.error(error);
       return applySecurityHeaders(
         withIndexingHeaders(

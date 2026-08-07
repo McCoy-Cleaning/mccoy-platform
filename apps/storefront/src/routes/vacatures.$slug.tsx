@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   EMPLOYMENT_TYPE_LABELS_NL,
@@ -8,9 +8,8 @@ import {
   resolveVacancyPublicSlug,
   type VacancyItem,
 } from "@mccoy/cms-schema";
-import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
+import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 
 function findVacancyBySlug(vacancies: VacancyItem[], slug: string): VacancyItem | null {
@@ -19,22 +18,7 @@ function findVacancyBySlug(vacancies: VacancyItem[], slug: string): VacancyItem 
 }
 
 export const Route = createFileRoute("/vacatures/$slug")({
-  loader: async () => {
-    const { loadPublishedPageForPath } = await import("@/lib/api/cms-published.functions");
-    const { resultJson } = await loadPublishedPageForPath({ data: { pathname: "/vacatures" } });
-    const result = JSON.parse(resultJson) as Awaited<
-      ReturnType<typeof import("@/lib/cms/load-published-page.server").loadPublishedPageSnapshot>
-    >;
-    if (result.kind === "redirect") {
-      throw redirect({ href: result.toPath, statusCode: result.statusCode });
-    }
-    // Builtin page — always seeded + published; a missing snapshot means the CMS
-    // store is broken, not that the page is legitimately absent.
-    if (result.kind !== "snapshot") {
-      throw new Error("cms: vacatures/$slug loader must return a snapshot");
-    }
-    return { snapshot: result.snapshot };
-  },
+  loader: () => loadMarketingPublishedPage("/vacatures"),
   head: ({ params }) => ({
     meta: [
       { title: `${params.slug} — Vacatures | McCoy Cleaning` },
@@ -85,21 +69,6 @@ function VacatureDetailPageBody() {
   }, [page, slug]);
 
   if (!vacancy) {
-    // #region agent log
-    fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-      body: JSON.stringify({
-        sessionId: "8f1793",
-        runId: "pre-fix",
-        hypothesisId: "D",
-        location: "vacatures.$slug.tsx:VacatureDetailPageBody",
-        message: "throw notFound during render (missing vacancy)",
-        data: { slug, pageKind: page?.kind ?? null },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     throw notFound();
   }
 
@@ -116,9 +85,7 @@ function VacatureDetailPageBody() {
     .join(" · ");
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <Navbar />
-      <main className="mx-auto max-w-3xl px-4 pb-20 pt-32 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-3xl px-4 pb-20 pt-32 sm:px-6 lg:px-8">
         <Link to="/vacatures" className="text-sm font-medium text-white/55 hover:text-white">
           ← Alle vacatures
         </Link>
@@ -195,8 +162,6 @@ function VacatureDetailPageBody() {
             </Link>
           </div>
         </article>
-      </main>
-      <Footer />
-    </div>
+    </main>
   );
 }
