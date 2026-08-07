@@ -261,10 +261,34 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
     if (pageId === "page_products") {
       cms.ensureProductsBlocksMigration(pageId);
     }
+    if (pageId === "page_home") {
+      cms.ensureHomeHeroBlocksMigration(pageId);
+    }
+    if (pageId === "page_about") {
+      cms.ensureAboutBlocksMigration(pageId);
+    }
+    if (pageId === "page_offerte") {
+      cms.ensureOfferteBlocksMigration(pageId);
+    }
+    if (pageId === "page_privacy" || pageId === "page_terms") {
+      cms.ensureLegalBlocksMigration(pageId);
+    }
     const refreshFromServer = () => {
       void cms.reconcileLocalCustomPagesWithServer().then(() => {
         if (pageId === "page_products") {
           cms.ensureProductsBlocksMigration(pageId);
+        }
+        if (pageId === "page_home") {
+          cms.ensureHomeHeroBlocksMigration(pageId);
+        }
+        if (pageId === "page_about") {
+          cms.ensureAboutBlocksMigration(pageId);
+        }
+        if (pageId === "page_offerte") {
+          cms.ensureOfferteBlocksMigration(pageId);
+        }
+        if (pageId === "page_privacy" || pageId === "page_terms") {
+          cms.ensureLegalBlocksMigration(pageId);
         }
         bridge.bump();
       });

@@ -32,8 +32,9 @@ const STOREFRONT_CRITICAL_CSS = [
   "html{color-scheme:dark}",
   "html,body,#root{background:#141a28;color:#f5f7fb;margin:0}",
   'body{font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif}',
-  "#home{min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
-  '#home h1{font-family:Archivo,"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}',
+  // Home / default heroes only — Offerte formChrome intros must stay content-sized.
+  "#home,[data-cms-block-type=hero]:not([data-cms-presentation=formChrome]){min-height:100svh;box-sizing:border-box;padding-top:5.5rem}",
+  '#home h1,[data-cms-block-type=hero]:not([data-cms-presentation=formChrome]) h1{font-family:Archivo,"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:clamp(2.75rem,12vw,4.5rem);line-height:0.98;letter-spacing:-0.03em;font-weight:700;color:#fff;margin:1.5rem 0 0}',
   "header[data-site-header]{background:rgba(20,26,40,.92)}",
 ].join("");
 

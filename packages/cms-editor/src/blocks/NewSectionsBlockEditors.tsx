@@ -1,12 +1,20 @@
 import * as React from "react";
 import {
+  createFormFieldItem,
   createItemId,
+  normalizeQuoteRequestForm,
+  seedDefaultFurnitureCleaningFields,
+  seedDefaultGlassWashingFields,
   type ContactInfoCardsBlockData,
   type LegalArticlesBlockData,
   type PartnersMarqueeBlockData,
+  type QuoteFormKind,
   type QuoteRequestFormBlockData,
+  type QuoteRequestFormTab,
   type StatsCountersBlockData,
 } from "@mccoy/cms-schema";
+import { SectionAiToolbar, collectShallowStringFields } from "../ai-assist";
+import { ContactFormFieldsEditor } from "./ContactFormFieldsEditor";
 import { NlEnField, blockEnPath } from "./en-draft-fields";
 import { ObjectListEditor } from "./ObjectListEditor";
 import { BlockImageField, Field, Section, inputClass, selectClass } from "./shared-fields";
@@ -282,60 +290,164 @@ export function ContactInfoCardsBlockEditor({
   );
 }
 
+function emptyQuoteTab(kind: QuoteFormKind): QuoteRequestFormTab {
+  if (kind === "furniture_cleaning") {
+    return {
+      id: createItemId("tab"),
+      kind,
+      tag: "Vloer- & meubelreiniging",
+      title: "Vloer- & meubelonderhoud",
+      description: "",
+      icon: "sofa",
+      fields: seedDefaultFurnitureCleaningFields(),
+    };
+  }
+  return {
+    id: createItemId("tab"),
+    kind: "glass_washing",
+    tag: "Glasbewassing",
+    title: "Glasbewassing & gevelreiniging",
+    description: "",
+    icon: "glass",
+    fields: seedDefaultGlassWashingFields(),
+  };
+}
+
 export function QuoteRequestFormBlockEditor({
   value,
   onChange,
   blockId,
 }: BaseProps<QuoteRequestFormBlockData>) {
+  const data = normalizeQuoteRequestForm(value);
+
+  const updateTab = (index: number, patch: Partial<QuoteRequestFormTab>) => {
+    const tabs = data.tabs.map((tab, i) => (i === index ? { ...tab, ...patch } : tab));
+    onChange({ ...data, tabs });
+  };
+
   return (
     <div className="space-y-6">
       <Section title="Presentatie">
-        <NlEnField label="Titel" enPath={blockEnPath(blockId, "heading")}>
+        <NlEnField label="Titel (optioneel)" enPath={blockEnPath(blockId, "heading")}>
           <input
             className={inputClass}
-            value={value.heading}
-            onChange={(e) => onChange({ ...value, heading: e.target.value })}
+            value={data.heading ?? ""}
+            onChange={(e) => onChange({ ...data, heading: e.target.value || undefined })}
           />
         </NlEnField>
-        <NlEnField label="Beschrijving" enPath={blockEnPath(blockId, "description")} multiline>
+        <NlEnField label="Beschrijving (optioneel)" enPath={blockEnPath(blockId, "description")} multiline>
           <textarea
             className={`${inputClass} min-h-[3rem]`}
-            value={value.description ?? ""}
-            onChange={(e) => onChange({ ...value, description: e.target.value || undefined })}
+            value={data.description ?? ""}
+            onChange={(e) => onChange({ ...data, description: e.target.value || undefined })}
           />
         </NlEnField>
-        <Field label="Standaard scope">
+        <Field label="Standaard tab">
           <select
             className={selectClass}
-            value={value.defaultScope}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                defaultScope: e.target.value as QuoteRequestFormBlockData["defaultScope"],
-              })
-            }
+            value={data.defaultTabId ?? data.tabs[0]?.id ?? ""}
+            onChange={(e) => onChange({ ...data, defaultTabId: e.target.value || undefined })}
           >
-            <option value="glass_cleaning">Glasreiniging</option>
-            <option value="furniture_cleaning">Meubelreiniging</option>
+            {data.tabs.map((tab) => (
+              <option key={tab.id} value={tab.id}>
+                {tab.title || tab.tag || tab.id}
+              </option>
+            ))}
           </select>
         </Field>
-        <Field label="Verzendknop">
+        <Field label="Verzendknop (standaard)">
           <input
             className={inputClass}
-            value={value.submitLabel}
-            onChange={(e) => onChange({ ...value, submitLabel: e.target.value })}
+            value={data.submitLabel}
+            onChange={(e) => onChange({ ...data, submitLabel: e.target.value })}
           />
         </Field>
-        <Field label="Succesbericht">
+        <Field label="Succesbericht (standaard)">
           <textarea
             className={`${inputClass} min-h-[3rem]`}
-            value={value.successMessage}
-            onChange={(e) => onChange({ ...value, successMessage: e.target.value })}
+            value={data.successMessage}
+            onChange={(e) => onChange({ ...data, successMessage: e.target.value })}
           />
         </Field>
         <p className="text-[11px] text-white/45">
           Ontvangers, mailbox en endpoints worden server-side bepaald — niet in dit blok.
         </p>
+      </Section>
+
+      <Section title="Tabs">
+        <ObjectListEditor<QuoteRequestFormTab>
+          items={data.tabs}
+          onChange={(tabs) => onChange({ ...data, tabs })}
+          createItem={() => emptyQuoteTab("glass_washing")}
+          cloneItem={(tab) => ({
+            ...tab,
+            id: createItemId("tab"),
+            fields: tab.fields.map((f) => ({
+              ...f,
+              id: createFormFieldItem(f.label, f.type).id,
+            })),
+          })}
+          addLabel="Tab toevoegen"
+          renderItem={(tab, actions, index) => (
+            <div className="space-y-3 rounded-lg border border-white/10 bg-black/10 p-3">
+              <Field label="Formuliertype">
+                <select
+                  className={selectClass}
+                  value={tab.kind}
+                  onChange={(e) => updateTab(index, { kind: e.target.value as QuoteFormKind })}
+                >
+                  <option value="glass_washing">Glasbewassing</option>
+                  <option value="furniture_cleaning">Meubelreiniging</option>
+                </select>
+              </Field>
+              <NlEnField label="Tag" enPath={blockEnPath(blockId, `tabs.${index}.tag`)}>
+                <input
+                  className={inputClass}
+                  value={tab.tag}
+                  onChange={(e) => updateTab(index, { tag: e.target.value })}
+                />
+              </NlEnField>
+              <NlEnField label="Titel" enPath={blockEnPath(blockId, `tabs.${index}.title`)}>
+                <input
+                  className={inputClass}
+                  value={tab.title}
+                  onChange={(e) => updateTab(index, { title: e.target.value })}
+                />
+              </NlEnField>
+              <NlEnField
+                label="Beschrijving"
+                enPath={blockEnPath(blockId, `tabs.${index}.description`)}
+                multiline
+              >
+                <textarea
+                  className={`${inputClass} min-h-[4rem]`}
+                  value={tab.description}
+                  onChange={(e) => updateTab(index, { description: e.target.value })}
+                />
+              </NlEnField>
+              <ContactFormFieldsEditor
+                fields={tab.fields}
+                blockId={blockId}
+                onChange={(fields) => updateTab(index, { fields })}
+              />
+              <div className="flex gap-2 pt-1">
+                <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveUp}>
+                  Omhoog
+                </button>
+                <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveDown}>
+                  Omlaag
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-rose-300/80 hover:text-rose-200"
+                  onClick={actions.remove}
+                >
+                  Tab verwijderen
+                </button>
+              </div>
+            </div>
+          )}
+        />
       </Section>
     </div>
   );
@@ -346,9 +458,41 @@ export function LegalArticlesBlockEditor({
   onChange,
   blockId,
 }: BaseProps<LegalArticlesBlockData>) {
+  const pathPrefix = blockId ? `block:${blockId}` : undefined;
   return (
     <div className="space-y-6">
+      {pathPrefix ? (
+        <SectionAiToolbar
+          pathPrefix={pathPrefix}
+          fields={collectShallowStringFields(
+            value as unknown as Record<string, unknown>,
+            ["eyebrow", "heading", "updatedLabel"],
+            { includeEmpty: true },
+          )}
+          fieldLabels={{
+            eyebrow: "Eyebrow",
+            heading: "Paginakop",
+            updatedLabel: "Bijgewerkt-label",
+          }}
+          onApplyDutch={(nl) => {
+            const patch: Partial<LegalArticlesBlockData> = {};
+            if (typeof nl.eyebrow === "string") patch.eyebrow = nl.eyebrow || undefined;
+            if (typeof nl.heading === "string") patch.heading = nl.heading;
+            if (typeof nl.updatedLabel === "string") {
+              patch.updatedLabel = nl.updatedLabel || undefined;
+            }
+            onChange({ ...value, ...patch });
+          }}
+        />
+      ) : null}
       <Section title="Kop">
+        <NlEnField label="Eyebrow" enPath={blockEnPath(blockId, "eyebrow")}>
+          <input
+            className={inputClass}
+            value={value.eyebrow ?? ""}
+            onChange={(e) => onChange({ ...value, eyebrow: e.target.value || undefined })}
+          />
+        </NlEnField>
         <NlEnField label="Titel" enPath={blockEnPath(blockId, "heading")}>
           <input
             className={inputClass}
@@ -356,13 +500,13 @@ export function LegalArticlesBlockEditor({
             onChange={(e) => onChange({ ...value, heading: e.target.value })}
           />
         </NlEnField>
-        <Field label="Updated label">
+        <NlEnField label="Bijgewerkt-label" enPath={blockEnPath(blockId, "updatedLabel")}>
           <input
             className={inputClass}
             value={value.updatedLabel ?? ""}
             onChange={(e) => onChange({ ...value, updatedLabel: e.target.value || undefined })}
           />
-        </Field>
+        </NlEnField>
         <Field label="Updated at (YYYY-MM-DD)">
           <input
             className={inputClass}
@@ -382,15 +526,18 @@ export function LegalArticlesBlockEditor({
             content: "",
           })}
           addLabel="Artikel toevoegen"
-          renderItem={(item, actions) => (
+          renderItem={(item, actions, index) => (
             <div className="space-y-3">
-              <Field label="Kop">
+              <NlEnField
+                label="Kop"
+                enPath={blockEnPath(blockId, `articles.${index}.heading`)}
+              >
                 <input
                   className={inputClass}
                   value={item.heading}
                   onChange={(e) => actions.update({ ...item, heading: e.target.value })}
                 />
-              </Field>
+              </NlEnField>
               <Field label="Anker">
                 <input
                   className={inputClass}
@@ -398,13 +545,17 @@ export function LegalArticlesBlockEditor({
                   onChange={(e) => actions.update({ ...item, anchor: e.target.value })}
                 />
               </Field>
-              <Field label="Inhoud">
+              <NlEnField
+                label="Inhoud"
+                enPath={blockEnPath(blockId, `articles.${index}.content`)}
+                multiline
+              >
                 <textarea
                   className={`${inputClass} min-h-[6rem]`}
                   value={item.content}
                   onChange={(e) => actions.update({ ...item, content: e.target.value })}
                 />
-              </Field>
+              </NlEnField>
             </div>
           )}
         />

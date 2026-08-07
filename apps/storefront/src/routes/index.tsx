@@ -1,4 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  resolveHomeHeroBlocksLayout,
+  type BuiltinCmsPage,
+} from "@mccoy/cms-schema";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
@@ -7,6 +11,7 @@ import { useEdit } from "@/lib/cms/edit-mode-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 import { homeHeroPreloadLink } from "@/lib/image-delivery";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { resolveHomeHeroImageSrc } from "@/lib/cms/home-hero-src";
 
 export const Route = createFileRoute("/")({
   loader: () => loadMarketingPublishedPage("/"),
@@ -18,10 +23,7 @@ export const Route = createFileRoute("/")({
     }
     const base = tanstackHeadFromCms(loaderData.head);
     const page = loaderData.snapshot.page;
-    const heroSrc =
-      (page.kind === "builtin"
-        ? (page.sectionContent?.["home.hero"] as { image?: { src?: string } } | undefined)?.image?.src
-        : undefined) ?? "/images/cms/hero-cleaning.jpg";
+    const heroSrc = resolveHomeHeroImageSrc(page);
     return {
       ...base,
       links: [...(base.links ?? []), homeHeroPreloadLink(heroSrc)],
@@ -41,7 +43,11 @@ function Index() {
 
 function HomePage() {
   const { snapshot } = Route.useLoaderData();
-  const page = useCmsPageForView("page_home") ?? snapshot.page;
+  const raw = useCmsPageForView("page_home") ?? snapshot.page;
+  const page =
+    raw?.kind === "builtin" && raw.pageKey === "home"
+      ? resolveHomeHeroBlocksLayout(raw as BuiltinCmsPage).page
+      : raw;
   const { mode } = useEdit();
   const editing = mode === "edit";
 

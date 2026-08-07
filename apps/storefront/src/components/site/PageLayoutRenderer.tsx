@@ -1,6 +1,13 @@
 import * as React from "react";
 import type { BuiltinPageKey, BuiltinCmsPage, CmsPage, FixedSectionKey, LayoutItem } from "@mccoy/cms-schema";
-import { resolveLayoutItemContentAlign, suppressedProductsFixedKeys } from "@mccoy/cms-schema";
+import {
+  resolveLayoutItemContentAlign,
+  suppressedAboutFixedKeys,
+  suppressedHomeHeroFixedKeys,
+  suppressedLegalFixedKeys,
+  suppressedOfferteFixedKeys,
+  suppressedProductsFixedKeys,
+} from "@mccoy/cms-schema";
 import { ContentAlignProvider } from "@mccoy/cms-renderer/content-align";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { clientDevError } from "@/lib/client-log";
@@ -285,10 +292,16 @@ export function PageLayoutRenderer({
     const map = new Map(page.blocks.map((b) => [b.id, b]));
     return map;
   }, [page.blocks]);
-  const suppressFixed =
-    page.kind === "builtin"
-      ? suppressedProductsFixedKeys(page as BuiltinCmsPage)
-      : new Set<FixedSectionKey>();
+  const suppressFixed = React.useMemo(() => {
+    if (page.kind !== "builtin") return new Set<FixedSectionKey>();
+    const builtin = page as BuiltinCmsPage;
+    const next = suppressedProductsFixedKeys(builtin);
+    for (const key of suppressedHomeHeroFixedKeys(builtin)) next.add(key);
+    for (const key of suppressedAboutFixedKeys(builtin)) next.add(key);
+    for (const key of suppressedOfferteFixedKeys(builtin)) next.add(key);
+    for (const key of suppressedLegalFixedKeys(builtin)) next.add(key);
+    return next;
+  }, [page]);
 
   return (
     <>

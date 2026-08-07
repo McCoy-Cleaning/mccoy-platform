@@ -4,9 +4,13 @@ import {
   CMS_PAGE_CREATE_FORBIDDEN_REASON,
   ensureEnglishLocaleContentFromDrafts,
   ensurePageLocaleFields,
+  parseSiteFooterResult,
+  parseSiteNavigationResult,
   validatePublishableCmsPage,
   type CmsPage,
   type Locale,
+  type SiteFooterContent,
+  type SiteNavigationContent,
 } from "@mccoy/cms-schema";
 import {
   builtinCmsSeedPages,
@@ -214,12 +218,14 @@ export const adminListPublishedCustomPageIds = createServerFn({ method: "POST" }
 /**
  * Active published payloads for all pages — used to hydrate the admin editor
  * so Secties shows the live text/images instead of empty seed stubs.
+ * Also returns durable site chrome (navigation/footer) when present.
  * Returned as JSON string for TanStack Start serializability.
  */
 export const adminGetPublishedCmsPages = createServerFn({ method: "POST" }).handler(async () => {
   try {
     await requireAdminSession();
     const store = await ensureSeeded();
+    const site = await store.getSite();
     const pageRows = await store.listPages();
     const pages: CmsPage[] = [];
     for (const row of pageRows) {
@@ -228,11 +234,69 @@ export const adminGetPublishedCmsPages = createServerFn({ method: "POST" }).hand
         pages.push(ensurePageLocaleFields(rev.payload));
       }
     }
-    return jsonClone({ ok: true as const, pagesJson: JSON.stringify(pages) });
+    return jsonClone({
+      ok: true as const,
+      pagesJson: JSON.stringify(pages),
+      navigationJson: site.navigation ? JSON.stringify(site.navigation) : null,
+      footerJson: site.footer ? JSON.stringify(site.footer) : null,
+    });
   } catch (error) {
     return mapAuthError(error);
   }
 });
+
+const siteChromeSchema = z
+  .object({
+    navigation: z.record(z.unknown()).optional(),
+    footer: z.record(z.unknown()).optional(),
+  })
+  .refine((v) => v.navigation !== undefined || v.footer !== undefined, {
+    message: "navigation or footer required",
+  });
+
+/**
+ * Persist published navigation and/or footer chrome (admin Opslaan).
+ * Validates payloads server-side; browser is untrusted.
+ */
+export const adminPublishCmsSiteChrome = createServerFn({ method: "POST" })
+  .validator(siteChromeSchema)
+  .handler(async ({ data }) => {
+    try {
+      await requireAdminSession();
+      const store = await ensureSeeded();
+
+      let navigation: SiteNavigationContent | undefined;
+      let footer: SiteFooterContent | undefined;
+      if (data.navigation !== undefined) {
+        const parsed = parseSiteNavigationResult(data.navigation);
+        if (!parsed.ok) {
+          return { ok: false as const, error: parsed.reason, code: "validation" as const };
+        }
+        navigation = parsed.data;
+      }
+      if (data.footer !== undefined) {
+        const parsed = parseSiteFooterResult(data.footer);
+        if (!parsed.ok) {
+          return { ok: false as const, error: parsed.reason, code: "validation" as const };
+        }
+        footer = parsed.data;
+      }
+
+      const result = await store.saveSiteChrome({
+        siteId: DEFAULT_CMS_SITE_ID,
+        ...(navigation !== undefined ? { navigation } : {}),
+        ...(footer !== undefined ? { footer } : {}),
+      });
+      return jsonClone({
+        ok: true as const,
+        configVersion: result.configVersion,
+        navigationJson: result.navigation ? JSON.stringify(result.navigation) : null,
+        footerJson: result.footer ? JSON.stringify(result.footer) : null,
+      });
+    } catch (error) {
+      return mapAuthError(error);
+    }
+  });
 
 const publishSchema = z.object({
   pageId: z.string().min(1),

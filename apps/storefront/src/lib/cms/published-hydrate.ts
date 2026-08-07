@@ -1,8 +1,42 @@
-import type { CmsPage } from "@mccoy/cms-schema";
+import {
+  parseSiteFooterResult,
+  parseSiteNavigationResult,
+  type CmsPage,
+  type SiteFooterContent,
+  type SiteNavigationContent,
+} from "@mccoy/cms-schema";
 import { hydratePublishedCmsState, isPublishedCmsBundleHydrated } from "@/lib/cms/store";
 import { clientDevError } from "@/lib/client-log";
 
 let hydratePromise: Promise<boolean> | null = null;
+
+function parseBundleChrome(
+  navigationJson: string | null | undefined,
+  footerJson: string | null | undefined,
+): {
+  navigation?: SiteNavigationContent;
+  footer?: SiteFooterContent;
+} {
+  let navigation: SiteNavigationContent | undefined;
+  let footer: SiteFooterContent | undefined;
+  if (typeof navigationJson === "string" && navigationJson.length > 0) {
+    try {
+      const parsed = parseSiteNavigationResult(JSON.parse(navigationJson) as unknown);
+      if (parsed.ok) navigation = parsed.data;
+    } catch {
+      /* ignore corrupt durable chrome */
+    }
+  }
+  if (typeof footerJson === "string" && footerJson.length > 0) {
+    try {
+      const parsed = parseSiteFooterResult(JSON.parse(footerJson) as unknown);
+      if (parsed.ok) footer = parsed.data;
+    } catch {
+      /* ignore corrupt durable chrome */
+    }
+  }
+  return { navigation, footer };
+}
 
 async function fetchAndHydratePublishedBundle(): Promise<boolean> {
   try {
@@ -10,7 +44,11 @@ async function fetchAndHydratePublishedBundle(): Promise<boolean> {
     const bundle = await getPublishedCmsBundle();
     if (!bundle.ok) return false;
     const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
-    hydratePublishedCmsState({ pages });
+    const chrome = parseBundleChrome(
+      "navigationJson" in bundle ? bundle.navigationJson : null,
+      "footerJson" in bundle ? bundle.footerJson : null,
+    );
+    hydratePublishedCmsState({ pages, ...chrome });
     return true;
   } catch (error) {
     clientDevError("[cms] failed to load published bundle", error);

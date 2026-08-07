@@ -1,4 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  resolveAboutBlocksLayout,
+  type BuiltinCmsPage,
+} from "@mccoy/cms-schema";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { pageSectionRenderers } from "@/components/site/pageSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
@@ -39,7 +43,11 @@ function AboutPage() {
 
 function AboutPageBody() {
   const { snapshot } = Route.useLoaderData();
-  const page = useCmsPageForView("page_about") ?? snapshot.page;
+  const raw = useCmsPageForView("page_about") ?? snapshot.page;
+  const page =
+    raw?.kind === "builtin" && raw.pageKey === "about"
+      ? resolveAboutBlocksLayout(raw as BuiltinCmsPage).page
+      : raw;
   const { mode } = useEdit();
   const editing = mode === "edit";
 

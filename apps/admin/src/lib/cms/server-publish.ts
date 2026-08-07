@@ -1,7 +1,8 @@
-import type { CmsPage } from "@mccoy/cms-schema";
+import type { CmsPage, SiteFooterContent, SiteNavigationContent } from "@mccoy/cms-schema";
 import {
   adminDeleteCmsPage,
   adminPublishCmsPage,
+  adminPublishCmsSiteChrome,
   adminSaveCmsDraft,
   adminGetCmsPageStatus,
 } from "@/lib/api/cms-publish.functions";
@@ -11,6 +12,7 @@ export type ServerDeleteResult = { ok: true } | { ok: false; error: string };
 export type ServerDraftResult =
   | { ok: true; draftRevisionNumber: number }
   | { ok: false; error: string };
+export type ServerChromePublishResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Persist a saved CMS page into the shared server published store so storefront
@@ -74,6 +76,41 @@ export async function saveConceptPageToServer(page: CmsPage): Promise<ServerDraf
     const message =
       error instanceof Error ? error.message : "Concept opslaan op de server mislukte.";
     console.warn("[cms] server concept save failed:", error);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Persist navigation and/or footer chrome so storefront cold loads keep logo
+ * heights and other chrome (not only ephemeral BroadcastChannel / iframe sync).
+ */
+export async function publishSiteChromeToServer(input: {
+  navigation?: SiteNavigationContent;
+  footer?: SiteFooterContent;
+}): Promise<ServerChromePublishResult> {
+  try {
+    if (input.navigation === undefined && input.footer === undefined) {
+      return { ok: false, error: "Navigatie of footer ontbreekt." };
+    }
+    const result = await adminPublishCmsSiteChrome({
+      data: {
+        ...(input.navigation !== undefined
+          ? { navigation: input.navigation as unknown as Record<string, unknown> }
+          : {}),
+        ...(input.footer !== undefined
+          ? { footer: input.footer as unknown as Record<string, unknown> }
+          : {}),
+      },
+    });
+    if (!result.ok) {
+      console.warn("[cms] server chrome publish after Opslaan failed:", result.error);
+      return { ok: false, error: result.error };
+    }
+    return { ok: true };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Server-publicatie van navigatie/footer mislukt.";
+    console.warn("[cms] server chrome publish after Opslaan failed:", error);
     return { ok: false, error: message };
   }
 }

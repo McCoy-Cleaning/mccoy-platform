@@ -5,9 +5,13 @@
 import {
   ensurePageLocaleFields,
   normalizeCmsPath,
+  parseSiteFooterResult,
+  parseSiteNavigationResult,
   type CmsPage,
   type CmsPagePublishedEvent,
   type Locale,
+  type SiteFooterContent,
+  type SiteNavigationContent,
 } from "@mccoy/cms-schema";
 
 import { createSupabaseServiceClient, hasSupabaseServiceConfig } from "../supabase";
@@ -34,6 +38,8 @@ import {
   type UpsertPageInput,
   type DeletePageInput,
   type DeletePageResult,
+  type SaveSiteChromeInput,
+  type SaveSiteChromeResult,
 } from "./types";
 
 type SiteRow = {
@@ -43,6 +49,8 @@ type SiteRow = {
   config_version: number;
   created_at: string;
   updated_at: string;
+  navigation?: SiteNavigationContent | null;
+  footer?: SiteFooterContent | null;
 };
 
 type PageRow = {
@@ -81,6 +89,15 @@ type LocaleRow = {
   public_path: string;
 };
 
+function mapSiteChromeField<T>(
+  value: unknown,
+  parse: (v: unknown) => { ok: true; data: T } | { ok: false; reason: string },
+): T | null {
+  if (value == null) return null;
+  const parsed = parse(value);
+  return parsed.ok ? parsed.data : null;
+}
+
 function mapSite(row: SiteRow): CmsSiteRecord {
   return {
     id: row.id,
@@ -89,6 +106,8 @@ function mapSite(row: SiteRow): CmsSiteRecord {
     configVersion: row.config_version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    navigation: mapSiteChromeField(row.navigation, parseSiteNavigationResult),
+    footer: mapSiteChromeField(row.footer, parseSiteFooterResult),
   };
 }
 
@@ -282,6 +301,58 @@ export function createSupabaseCmsStore(): CmsStore {
       if (error) throw new Error(`cms getSite: ${error.message}`);
       if (!data) throw new Error("cms site not found");
       return mapSite(data as SiteRow);
+    },
+
+    async saveSiteChrome(input: SaveSiteChromeInput): Promise<SaveSiteChromeResult> {
+      if (input.navigation === undefined && input.footer === undefined) {
+        throw new Error("cms saveSiteChrome: navigation or footer required");
+      }
+      const siteId = input.siteId ?? DEFAULT_CMS_SITE_ID;
+      const supabase = createSupabaseServiceClient();
+      const current = await this.getSite(siteId);
+
+      let navigation = current.navigation ?? null;
+      let footer = current.footer ?? null;
+      if (input.navigation !== undefined) {
+        const parsed = parseSiteNavigationResult(input.navigation);
+        if (!parsed.ok) throw new Error(`cms saveSiteChrome: ${parsed.reason}`);
+        navigation = parsed.data;
+      }
+      if (input.footer !== undefined) {
+        const parsed = parseSiteFooterResult(input.footer);
+        if (!parsed.ok) throw new Error(`cms saveSiteChrome: ${parsed.reason}`);
+        footer = parsed.data;
+      }
+
+      const nextVersion = current.configVersion + 1;
+      const updatedAt = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("cms_sites")
+        .update({
+          navigation,
+          footer,
+          config_version: nextVersion,
+          updated_at: updatedAt,
+        })
+        .eq("id", current.id)
+        .select("*")
+        .single();
+      if (error) throw new Error(`cms saveSiteChrome: ${error.message}`);
+
+      await fallback
+        .saveSiteChrome({
+          siteId: current.id,
+          ...(input.navigation !== undefined ? { navigation: input.navigation } : {}),
+          ...(input.footer !== undefined ? { footer: input.footer } : {}),
+        })
+        .catch(() => undefined);
+
+      const site = mapSite(data as SiteRow);
+      return {
+        configVersion: site.configVersion,
+        navigation: site.navigation ?? null,
+        footer: site.footer ?? null,
+      };
     },
 
     async listPages(siteId = DEFAULT_CMS_SITE_ID) {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultSiteFooter, defaultSiteNavigation } from "@mccoy/cms-schema";
 import { createFileCmsStore } from "./file-store";
 import { builtinCmsSeedPages } from "./seeds";
 import { resolvePublicCmsRequest } from "./resolve";
@@ -382,5 +383,56 @@ describe("file cms store publish + resolve", () => {
     await expect(
       store.deletePage({ siteId: site.id, pageId: "page_home" }),
     ).rejects.toThrow(/aangepaste/i);
+  });
+});
+
+describe("file cms store site chrome", () => {
+  it("persists navigation logo heights and leaves footer untouched on partial save", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+
+    const before = await store.getSite();
+    expect(before.navigation ?? null).toBeNull();
+    expect(before.footer ?? null).toBeNull();
+
+    const navigation = {
+      ...defaultSiteNavigation(),
+      logoHeightDesktop: 96,
+      logoHeightMobile: 40,
+    };
+    const savedNav = await store.saveSiteChrome({ navigation });
+    expect(savedNav.navigation?.logoHeightDesktop).toBe(96);
+    expect(savedNav.navigation?.logoHeightMobile).toBe(40);
+    expect(savedNav.footer).toBeNull();
+
+    const afterNav = await store.getSite();
+    expect(afterNav.navigation?.logoHeightDesktop).toBe(96);
+    expect(afterNav.navigation?.logoHeightMobile).toBe(40);
+    expect(afterNav.footer ?? null).toBeNull();
+    expect(afterNav.configVersion).toBeGreaterThan(before.configVersion);
+
+    const footer = {
+      ...defaultSiteFooter(),
+      logoHeight: 48,
+      logoHeightMobile: 28,
+    };
+    const savedFooter = await store.saveSiteChrome({ footer });
+    expect(savedFooter.navigation?.logoHeightDesktop).toBe(96);
+    expect(savedFooter.footer?.logoHeight).toBe(48);
+    expect(savedFooter.footer?.logoHeightMobile).toBe(28);
+
+    const afterBoth = await store.getSite();
+    expect(afterBoth.navigation?.logoHeightDesktop).toBe(96);
+    expect(afterBoth.footer?.logoHeight).toBe(48);
+  });
+
+  it("rejects invalid navigation payloads", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    await expect(
+      store.saveSiteChrome({
+        navigation: { links: "nope" } as unknown as ReturnType<typeof defaultSiteNavigation>,
+      }),
+    ).rejects.toThrow(/navigatie|navigation/i);
   });
 });

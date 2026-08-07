@@ -19,6 +19,12 @@ import {
 } from "./blocks/StructuredLinkField";
 import type { ImagePickerProps } from "./inspector-types";
 import { Field, inputClass, iconBtnClass, TrashIcon } from "./inspector-chrome";
+import {
+  filterProjectImagesForStorage,
+  lookupResolvedProjectImage,
+  resolveCmsImageDisplaySrc,
+  resolveProjectThumbSrc,
+} from "./resolve-media-src";
 
 export function PrototypeImageField({
   value,
@@ -64,44 +70,23 @@ export function PrototypeImageField({
     setUploads(readUploadedImages());
   }, []);
 
-  const mediaSrc = React.useCallback(
-    (src: string) => {
-      if (!src) return "";
-      if (/^(https?:|data:|blob:)/i.test(src)) return src;
-      if (!assetBaseUrl) return src;
-      const path = src.startsWith("/") ? src : `/${src}`;
-      return `${assetBaseUrl.replace(/\/$/, "")}${path}`;
-    },
-    [assetBaseUrl],
+  const mediaOptions = React.useMemo(
+    () => ({ assetBaseUrl, resolveProjectImage }),
+    [assetBaseUrl, resolveProjectImage],
   );
 
-  /** Prefer seeded Supabase catalog URL over admin-origin `/images/...` (404). */
   const projectThumbSrc = React.useCallback(
-    (path: string) => {
-      const normalized = path.startsWith("/") ? path : `/${path}`;
-      const resolved = resolveProjectImage?.(normalized) ?? resolveProjectImage?.(path);
-      if (resolved?.src) return mediaSrc(resolved.src);
-      return mediaSrc(path);
-    },
-    [resolveProjectImage, mediaSrc],
+    (path: string) => resolveProjectThumbSrc(path, mediaOptions),
+    [mediaOptions],
   );
 
-  const previewSrc = mediaSrc(value.src);
+  const previewSrc = resolveCmsImageDisplaySrc(value.src, mediaOptions);
   React.useEffect(() => {
     setBroken(false);
   }, [previewSrc]);
 
   const { scoped, rest } = React.useMemo(() => {
-    let catalog = projectImages;
-    if (resolveProjectImage) {
-      const resolvedOnly = projectImages.filter((img) => {
-        const path = img.path.startsWith("/") ? img.path : `/${img.path}`;
-        return Boolean(resolveProjectImage(path) ?? resolveProjectImage(img.path));
-      });
-      // Once the Storage map has hits, hide local-only paths that 404 on staging/prod.
-      // While the map is still empty (loading / empty library), keep the full catalog.
-      if (resolvedOnly.length > 0) catalog = resolvedOnly;
-    }
+    const catalog = filterProjectImagesForStorage(projectImages, resolveProjectImage);
     if (preferTags.length === 0) return { scoped: catalog, rest: [] as typeof catalog };
     const score = (img: { tags?: string[] }) =>
       preferTags.reduce((n, tag) => n + (img.tags?.includes(tag) ? 1 : 0), 0);
@@ -118,7 +103,7 @@ export function PrototypeImageField({
     (path: string) => {
       const normalized = path.startsWith("/") ? path : `/${path}`;
       if (value.src === normalized || value.src.endsWith(normalized)) return true;
-      const resolved = resolveProjectImage?.(normalized) ?? resolveProjectImage?.(path);
+      const resolved = lookupResolvedProjectImage(path, resolveProjectImage);
       return Boolean(resolved && resolved.assetId === value.assetId);
     },
     [value.src, value.assetId, resolveProjectImage],
@@ -154,7 +139,7 @@ export function PrototypeImageField({
 
   const applyLocalPath = (path: string, altFallback?: string) => {
     const src = path.startsWith("/") ? path : `/${path}`;
-    const resolved = resolveProjectImage?.(src) ?? resolveProjectImage?.(path);
+    const resolved = lookupResolvedProjectImage(path, resolveProjectImage);
     if (resolved) {
       onChange({
         ...resolved,

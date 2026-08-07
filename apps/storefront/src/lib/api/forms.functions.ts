@@ -3,6 +3,7 @@ import {
   resolvePublishedContactFormFields,
   resolvePublishedFormScope,
   resolvePublishedJobApplicationFields,
+  resolvePublishedQuoteFormFields,
   resolveVacancyApplication,
   validateContactFormSubmission,
 } from "@mccoy/cms-schema";
@@ -42,6 +43,21 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
 
       if (data.kind === "inquiry") {
         const resolvedFields = resolvePublishedContactFormFields(page, data.sourceId);
+        if (resolvedFields.ok) {
+          const validated = validateContactFormSubmission(resolvedFields.fields, data.fields ?? {});
+          if (!validated.ok) {
+            return { ok: false as const, error: validated.reason, code: "validation" as const };
+          }
+          payload = { ...payload, fields: validated.sanitized };
+        }
+      }
+
+      if (data.kind === "glass_washing" || data.kind === "furniture_cleaning") {
+        const resolvedFields = resolvePublishedQuoteFormFields(
+          page,
+          data.sourceId,
+          data.kind,
+        );
         if (resolvedFields.ok) {
           const validated = validateContactFormSubmission(resolvedFields.fields, data.fields ?? {});
           if (!validated.ok) {

@@ -381,3 +381,21 @@
     transform: none;
   }
 }
+
+/*
+ * CMS-controlled logo heights (nav + footer).
+ * Do not rely on Tailwind arbitrary `h-[length:var(...)]` — that utility often
+ * fails to apply in production builds, so slider changes appeared to do nothing.
+ */
+[data-cms-logo] {
+  height: var(--cms-logo-h);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  aspect-ratio: auto;
+}
+@media (min-width: 768px) {
+  [data-cms-logo] {
+    height: var(--cms-logo-h-md, var(--cms-logo-h));
+  }
+}

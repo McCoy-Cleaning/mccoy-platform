@@ -60,6 +60,7 @@ const POLICY_FIXED_EQUIVALENTS: Record<
   string,
   Partial<Record<BlockType, FixedSectionKey>>
 > = {
+  page_home: { hero: "home.hero" },
   page_contact: { contactForm: "contact.form" },
   page_offerte: { quoteRequestForm: "offerte.form" },
 };

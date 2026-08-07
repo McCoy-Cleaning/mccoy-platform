@@ -1,4 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  resolveLegalBlocksLayout,
+  type BuiltinCmsPage,
+} from "@mccoy/cms-schema";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { pageSectionRenderers } from "@/components/site/pageSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
@@ -36,7 +40,11 @@ function PrivacyPage() {
 
 function PrivacyPageBody() {
   const { snapshot } = Route.useLoaderData();
-  const page = useCmsPageForView("page_privacy") ?? snapshot.page;
+  const raw = useCmsPageForView("page_privacy") ?? snapshot.page;
+  const page =
+    raw?.kind === "builtin" && raw.pageKey === "privacy"
+      ? resolveLegalBlocksLayout(raw as BuiltinCmsPage).page
+      : raw;
   const { mode } = useEdit();
   const editing = mode === "edit";
 

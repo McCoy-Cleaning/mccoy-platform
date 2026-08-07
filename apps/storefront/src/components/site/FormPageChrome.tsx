@@ -32,7 +32,7 @@ function FormPageChromeSection({
 
   return (
     <section
-      className="relative py-10 sm:py-14 md:py-16"
+      className="relative flex min-h-[16rem] items-center py-10 sm:min-h-[18rem] sm:py-14 md:min-h-[20rem] md:py-16"
       data-cms-section={sectionKey}
     >
       <SectionInner>

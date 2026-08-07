@@ -124,6 +124,17 @@ export type HeroHeadingAccent = {
   accent?: string;
   afterAccent?: string;
 };
+export type HeroTrustItem = {
+  id: string;
+  value: string;
+  label: string;
+};
+export type HeroHighlightStat = {
+  value: string;
+  label: string;
+};
+export type HeroPresentation = "default" | "formChrome";
+
 export type HeroBlockData = {
   eyebrow?: string;
   title: string;
@@ -134,11 +145,31 @@ export type HeroBlockData = {
   secondaryCta?: CmsButton;
   image?: CmsImage;
   align?: "left" | "center";
+  /** Trust strip under CTAs (Home hero parity). */
+  trustItems?: HeroTrustItem[];
+  /** Floating badge on the hero media card (bottom-left). */
+  highlightStat?: HeroHighlightStat;
+  /** Floating certification chip on the hero media card (top-right). */
+  certBadge?: string;
+  /**
+   * `formChrome` — Offerte/Contact-style intro (eyebrow + h1 + body + optional image).
+   * Matches storefront FormPageChrome design.
+   */
+  presentation?: HeroPresentation;
 };
 const heroHeadingAccentSchema = z.object({
   beforeAccent: z.string().optional(),
   accent: z.string().optional(),
   afterAccent: z.string().optional(),
+});
+const heroTrustItemSchema = z.object({
+  id: z.string().min(1),
+  value: z.string(),
+  label: z.string(),
+});
+const heroHighlightStatSchema = z.object({
+  value: z.string(),
+  label: z.string(),
 });
 const heroSchema: z.ZodType<HeroBlockData> = z.object({
   eyebrow: z.string().optional(),
@@ -149,14 +180,40 @@ const heroSchema: z.ZodType<HeroBlockData> = z.object({
   secondaryCta: cmsButtonSchema.optional(),
   image: z.custom<CmsImage | undefined>((v) => v === undefined || normalizeCmsImage(v) != null).optional(),
   align: z.enum(["left", "center"]).optional(),
+  trustItems: z.array(heroTrustItemSchema).optional(),
+  highlightStat: heroHighlightStatSchema.optional(),
+  certBadge: z.string().optional(),
+  presentation: z.enum(["default", "formChrome"]).optional(),
 });
+
+/** Default trust strip matching the live Home hero / stats factory. */
+export const DEFAULT_HERO_TRUST_ITEMS: readonly HeroTrustItem[] = [
+  { id: "stat_years", value: "25+", label: "Jaar ervaring" },
+  { id: "stat_team", value: "100%", label: "Vast eigen team" },
+  { id: "stat_clients", value: "160+", label: "Tevreden klanten" },
+];
+
 function createDefaultHero(): HeroBlockData {
   return {
-    eyebrow: "McCoy Cleaning",
-    title: "Een krachtige titel",
-    subtitle: "Korte boodschap",
-    cta: { label: "Vraag offerte aan", link: { type: "internal_route", route: "offerte" } },
+    eyebrow: "Live Clean",
+    title: "Bij McCoy wordt kwaliteit",
+    headingAccent: { accent: "zichtbaar." },
+    subtitle:
+      "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is.",
+    secondaryCta: {
+      label: "Bekijk onze diensten",
+      link: { type: "internal_route", route: "services" },
+    },
+    image: {
+      assetId: "local:images/cms/hero-cleaning.jpg",
+      src: "/images/cms/hero-cleaning.jpg",
+      alt: "McCoy Cleaning professional at work",
+      decorative: false,
+    },
     align: "left",
+    trustItems: DEFAULT_HERO_TRUST_ITEMS.map((item) => ({ ...item })),
+    highlightStat: { value: "25+", label: "Jaar ervaring" },
+    certBadge: "Gecertificeerd",
   };
 }
 function normalizeHeroHeadingAccent(raw: unknown): HeroHeadingAccent | undefined {
@@ -176,24 +233,55 @@ function normalizeHeroHeadingAccent(raw: unknown): HeroHeadingAccent | undefined
   if (!accent.beforeAccent && !accent.accent && !accent.afterAccent) return undefined;
   return accent;
 }
+function parseOptionalButton(raw: unknown): CmsButton | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const parsed = cmsButtonSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+function normalizeHeroTrustItems(raw: unknown): HeroTrustItem[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const items = raw
+    .map((entry) => {
+      const row = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+      const id = typeof row.id === "string" && row.id ? row.id : createItemId("trust");
+      return {
+        id,
+        value: typeof row.value === "string" ? row.value : "",
+        label: typeof row.label === "string" ? row.label : "",
+      };
+    })
+    .filter((item) => item.value.trim() || item.label.trim());
+  return items.length ? items : undefined;
+}
+function normalizeHeroHighlightStat(raw: unknown): HeroHighlightStat | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const rec = raw as Record<string, unknown>;
+  const value = str(rec, "value");
+  const label = str(rec, "label");
+  if (!value && !label) return undefined;
+  return { value, label };
+}
 function normalizeHero(value: unknown): HeroBlockData {
   const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const secondary =
-    rec.secondaryCta && typeof rec.secondaryCta === "object"
-      ? (() => {
-          const parsed = cmsButtonSchema.safeParse(rec.secondaryCta);
-          return parsed.success ? parsed.data : undefined;
-        })()
-      : undefined;
+  const primary = legacyCta(rec) ?? parseOptionalButton(rec.primaryCta);
+  const secondary = parseOptionalButton(rec.secondaryCta);
+  const title = str(rec, "title") || str(rec, "heading", "Titel");
+  const subtitle = str(rec, "subtitle") || str(rec, "body") || undefined;
+  const presentation: HeroPresentation | undefined =
+    rec.presentation === "formChrome" ? "formChrome" : undefined;
   const data: HeroBlockData = {
     eyebrow: str(rec, "eyebrow") || undefined,
-    title: str(rec, "title", "Titel"),
+    title,
     headingAccent: normalizeHeroHeadingAccent(rec.headingAccent),
-    subtitle: str(rec, "subtitle") || undefined,
-    cta: legacyCta(rec),
+    subtitle: subtitle || undefined,
+    cta: primary,
     secondaryCta: secondary,
     image: normalizeCmsImage(rec.image),
     align: rec.align === "center" ? "center" : "left",
+    trustItems: normalizeHeroTrustItems(rec.trustItems),
+    highlightStat: normalizeHeroHighlightStat(rec.highlightStat),
+    certBadge: str(rec, "certBadge") || undefined,
+    ...(presentation ? { presentation } : {}),
   };
   return heroSchema.safeParse(data).success ? data : createDefaultHero();
 }
@@ -534,7 +622,15 @@ export type FeatureGridBlockData = {
   intro?: string;
 };
 
-export type TextImagePresentation = "default" | "productsIntro";
+export type TextImagePresentation = "default" | "productsIntro" | "aboutPillar";
+
+export type AboutIntroPillar = {
+  id: string;
+  icon: string;
+  label: string;
+};
+
+export type CenteredPresentation = "default" | "aboutIntro";
 
 // —— Spacer ——
 export type SpacerSize = "xs" | "sm" | "md" | "lg" | "xl";
@@ -679,8 +775,8 @@ export const catalogDefinitions = {
     type: "hero",
     label: "Hero",
     category: "Hero & intro",
-    description: "Grote intro-sectie",
-    dataVersion: 2,
+    description: "Full-bleed intro met media, CTAs en trust strip (Home-pariteit)",
+    dataVersion: 3,
     schema: heroSchema,
     createDefault: createDefaultHero,
     normalize: normalizeHero,
@@ -703,28 +799,72 @@ export const catalogDefinitions = {
     type: "centered",
     label: "Gecentreerde tekst",
     category: "Content",
-    dataVersion: 1,
-    schema: titleBodyCtaSchema(),
-    createDefault: (): TitleBodyCta => ({
+    dataVersion: 2,
+    schema: z.object({
+      title: z.string(),
+      body: z.string().optional(),
+      cta: cmsButtonSchema.optional(),
+      presentation: z.enum(["default", "aboutIntro"]).optional(),
+      eyebrow: z.string().optional(),
+      pillars: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            icon: z.string(),
+            label: z.string(),
+          }),
+        )
+        .optional(),
+    }),
+    createDefault: (): TitleBodyCta & {
+      presentation?: CenteredPresentation;
+      eyebrow?: string;
+      pillars?: AboutIntroPillar[];
+    } => ({
       title: "Klaar om te beginnen?",
       body: "Korte boodschap",
       cta: { label: "Neem contact op", link: { type: "internal_route", route: "contact" } },
     }),
-    normalize: (v) => normalizeTitleBodyCta(v, "Titel"),
+    normalize: (value) => {
+      const base = normalizeTitleBodyCta(value, "Titel");
+      const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const presentation: CenteredPresentation | undefined =
+        rec.presentation === "aboutIntro" ? "aboutIntro" : undefined;
+      const pillars: AboutIntroPillar[] = [];
+      if (Array.isArray(rec.pillars)) {
+        for (const entry of rec.pillars) {
+          if (!entry || typeof entry !== "object") continue;
+          const row = entry as Record<string, unknown>;
+          const label = str(row, "label");
+          if (!label) continue;
+          pillars.push({
+            id: str(row, "id") || createItemId("pillar"),
+            icon: str(row, "icon", "award"),
+            label,
+          });
+        }
+      }
+      return {
+        ...base,
+        ...(presentation ? { presentation } : {}),
+        ...(str(rec, "eyebrow") ? { eyebrow: str(rec, "eyebrow") } : {}),
+        ...(pillars.length ? { pillars } : {}),
+      };
+    },
     capabilities: { duplicable: true, removable: true, publishable: true },
   }),
   textImage: def({
     type: "textImage",
     label: "Tekst met afbeelding",
     category: "Content",
-    dataVersion: 1,
+    dataVersion: 2,
     schema: z.object({
       title: z.string(),
       body: z.string().optional(),
       image: z.custom<CmsImage | undefined>().optional(),
       reverse: z.boolean().optional(),
-      /** Producten intro chrome (flyer + CTAs + notice). */
-      presentation: z.enum(["default", "productsIntro"]).optional(),
+      /** Producten intro / Over ons pillar chrome. */
+      presentation: z.enum(["default", "productsIntro", "aboutPillar"]).optional(),
       eyebrow: z.string().optional(),
       /** Webshop / aside notice — separate from intro `body` paragraphs. */
       notice: z.string().optional(),
@@ -738,6 +878,13 @@ export const catalogDefinitions = {
           }),
         )
         .optional(),
+      /** Over ons pillar number badge (e.g. "01"). */
+      tag: z.string().optional(),
+      /** Lucide-ish icon key for about pillar (target/eye/history). */
+      icon: z.string().optional(),
+      aspectClassName: z.string().optional(),
+      objectPosition: z.string().optional(),
+      scaleMode: z.enum(["default", "soft"]).optional(),
     }),
     createDefault: () => ({
       title: "Waarom voor ons kiezen",
@@ -746,8 +893,12 @@ export const catalogDefinitions = {
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-      const presentation =
-        rec.presentation === "productsIntro" ? ("productsIntro" as const) : undefined;
+      const presentation: TextImagePresentation | undefined =
+        rec.presentation === "productsIntro"
+          ? "productsIntro"
+          : rec.presentation === "aboutPillar"
+            ? "aboutPillar"
+            : undefined;
       const metrics = normalizeProductsIntroMetrics(rec.metrics, presentation === "productsIntro");
       return {
         title: str(rec, "title", "Titel"),
@@ -758,6 +909,11 @@ export const catalogDefinitions = {
         ...(str(rec, "eyebrow") ? { eyebrow: str(rec, "eyebrow") } : {}),
         ...(str(rec, "notice") ? { notice: str(rec, "notice") } : {}),
         ...(metrics ? { metrics } : {}),
+        ...(str(rec, "tag") ? { tag: str(rec, "tag") } : {}),
+        ...(str(rec, "icon") ? { icon: str(rec, "icon") } : {}),
+        ...(str(rec, "aspectClassName") ? { aspectClassName: str(rec, "aspectClassName") } : {}),
+        ...(str(rec, "objectPosition") ? { objectPosition: str(rec, "objectPosition") } : {}),
+        ...(rec.scaleMode === "soft" ? { scaleMode: "soft" as const } : {}),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },

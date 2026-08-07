@@ -180,6 +180,10 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
   const productsMigrated =
     pageKey === "products" &&
     (productsMigration?.status === "migrated" || productsMigration?.status === "verified");
+  const homeHeroMigration = next.homeHeroBlocksMigration;
+  const homeHeroMigrated =
+    pageKey === "home" &&
+    (homeHeroMigration?.status === "migrated" || homeHeroMigration?.status === "verified");
 
   if (!layout.length) {
     if (productsMigrated) {
@@ -209,6 +213,11 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
             i.kind === "fixed" &&
             (i.key === "products.main" || i.key === "products.info")
           ),
+      );
+    }
+    if (homeHeroMigrated) {
+      layout = layout.filter(
+        (i) => !(i.kind === "fixed" && i.key === "home.hero"),
       );
     }
   }

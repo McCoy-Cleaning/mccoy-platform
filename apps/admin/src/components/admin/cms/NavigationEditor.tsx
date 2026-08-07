@@ -52,12 +52,14 @@ export function NavigationEditor() {
   };
 
   const onSave = () => {
-    const result = cms.saveNavigation();
-    if (!result.ok) {
-      setStatusMessage({ tone: "err", text: result.reason });
-      return;
-    }
-    setStatusMessage({ tone: "ok", text: "Navigatie opgeslagen." });
+    void (async () => {
+      const result = await cms.saveNavigation();
+      if (!result.ok) {
+        setStatusMessage({ tone: "err", text: result.reason });
+        return;
+      }
+      setStatusMessage({ tone: "ok", text: "Navigatie opgeslagen." });
+    })();
   };
 
   const onDiscard = () => {

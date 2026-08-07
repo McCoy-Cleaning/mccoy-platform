@@ -226,16 +226,18 @@ function seedFromLegacy(
   }
   if (fixedKey === "offerte.form") {
     return {
-      heading: rec.heading ?? "Offerte aanvragen",
+      heading: rec.heading,
       description: rec.description ?? rec.body,
-      enabledScopes: ["glass_cleaning", "furniture_cleaning"],
-      defaultScope: "glass_cleaning",
       submitLabel: rec.submitLabel ?? "Verstuur aanvraag",
-      successMessage: rec.successMessage ?? "Bedankt — we nemen zo snel mogelijk contact op.",
+      successMessage: rec.successMessage ?? "Bedankt! We nemen zo snel mogelijk contact op.",
+      glassScope: rec.glassScope,
+      furnitureScope: rec.furnitureScope,
+      fields: rec.fields,
     };
   }
   if (fixedKey === "privacy.main" || fixedKey === "terms.main") {
     return {
+      eyebrow: rec.eyebrow,
       heading: rec.heading ?? rec.title,
       updatedLabel: rec.updatedLabel,
       updatedAt: rec.updatedAt,

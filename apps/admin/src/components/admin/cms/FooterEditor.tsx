@@ -52,12 +52,14 @@ export function FooterEditor() {
   };
 
   const onSave = () => {
-    const result = cms.saveFooter();
-    if (!result.ok) {
-      setStatusMessage({ tone: "err", text: result.reason });
-      return;
-    }
-    setStatusMessage({ tone: "ok", text: "Footer opgeslagen." });
+    void (async () => {
+      const result = await cms.saveFooter();
+      if (!result.ok) {
+        setStatusMessage({ tone: "err", text: result.reason });
+        return;
+      }
+      setStatusMessage({ tone: "ok", text: "Footer opgeslagen." });
+    })();
   };
 
   const onDiscard = () => {

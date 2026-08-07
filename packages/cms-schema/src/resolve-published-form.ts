@@ -15,9 +15,11 @@ import { isLayoutItemHidden, type LayoutItem } from "./layout";
 import { fixedLayoutId } from "./sections";
 import {
   getBlockDataDefinition,
+  normalizeQuoteRequestForm,
   type ContactFormBlockData,
   type FormFieldItem,
   type NewsletterBlockData,
+  type QuoteRequestFormBlockData,
   resolveContactFormFields,
   resolveJobApplicationFields,
 } from "./blocks";
@@ -222,7 +224,13 @@ export function resolvePublishedFormScope(
       if (layoutItem && isLayoutItemHidden(layoutItem)) {
         return { ok: false, reason: "Dit formulier is niet beschikbaar.", code: "hidden" };
       }
-      if (normalized.blocks.some((b) => b.id === migrated.blockId && b.type === "quoteRequestForm")) {
+      const quoteBlock = normalized.blocks.find(
+        (b) => b.id === migrated.blockId && b.type === "quoteRequestForm",
+      );
+      if (quoteBlock) {
+        const def = getBlockDataDefinition("quoteRequestForm");
+        const data = def.normalize(quoteBlock.data) as QuoteRequestFormBlockData;
+        const tab = data.tabs.find((t) => t.kind === kind);
         const content = normalized.sectionContent?.["offerte.form"] as
           | ContactFormContent
           | undefined;
@@ -233,7 +241,7 @@ export function resolvePublishedFormScope(
             pageId,
             sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
             kind,
-            scope: sectionScope(content, kind),
+            scope: tab?.scope ?? sectionScope(content, kind),
           },
         };
       }
@@ -343,6 +351,12 @@ export function resolvePublishedFormScope(
     if (kind !== "glass_washing" && kind !== "furniture_cleaning") {
       return { ok: false, reason: "Ongeldig formuliertype.", code: "kind_mismatch" };
     }
+    const def = getBlockDataDefinition("quoteRequestForm");
+    const data = def.normalize(block.data) as QuoteRequestFormBlockData;
+    const tab = data.tabs.find((t) => t.kind === kind);
+    if (!tab) {
+      return { ok: false, reason: "Formulier niet gevonden.", code: "not_found" };
+    }
     const content = normalized.sectionContent?.["offerte.form"] as ContactFormContent | undefined;
     return {
       ok: true,
@@ -351,7 +365,7 @@ export function resolvePublishedFormScope(
         pageId,
         sourceId,
         kind,
-        scope: sectionScope(content, kind),
+        scope: tab.scope ?? sectionScope(content, kind),
       },
     };
   }
@@ -437,4 +451,41 @@ export function resolvePublishedJobApplicationFields(
   const raw = normalized.sectionContent?.["vacatures.application"];
   const content = normalizeVacaturesApplicationContent(raw, main?.applicationScope);
   return { ok: true, fields: resolveJobApplicationFields(content.fields) };
+}
+
+export type ResolvePublishedQuoteFormFieldsResult =
+  | { ok: true; fields: FormFieldItem[] }
+  | { ok: false };
+
+/**
+ * Resolve offerte tab fields for server validation.
+ * Supports quoteRequestForm blocks and (legacy) empty fixed offerte.form defaults.
+ */
+export function resolvePublishedQuoteFormFields(
+  page: CmsPage | null | undefined,
+  sourceId: string,
+  kind: FormKind,
+): ResolvePublishedQuoteFormFieldsResult {
+  if (!page || (kind !== "glass_washing" && kind !== "furniture_cleaning")) {
+    return { ok: false };
+  }
+  const normalized = normalizeCmsPage(page);
+  if (!isOffertePage(normalized)) return { ok: false };
+
+  const migrated = findFormBlockByType(normalized, "quoteRequestForm");
+  const bySource = normalized.blocks.find((b) => b.id === sourceId && b.type === "quoteRequestForm");
+  const block =
+    bySource ??
+    (migrated
+      ? normalized.blocks.find((b) => b.id === migrated.blockId && b.type === "quoteRequestForm")
+      : undefined);
+  if (block) {
+    const data = normalizeQuoteRequestForm(block.data);
+    const tab = data.tabs.find((t) => t.kind === kind);
+    if (!tab) return { ok: false };
+    return { ok: true, fields: resolveContactFormFields(tab.fields) };
+  }
+
+  // Legacy fixed form: no CMS field list — skip authoritative field validation.
+  return { ok: false };
 }

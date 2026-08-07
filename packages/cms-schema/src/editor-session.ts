@@ -11,6 +11,10 @@ import { applyDraftToPage, isDraftDirty } from "./draft";
 import { localizeCmsPageForLocale } from "./en-field-drafts";
 import type { Locale } from "./locale";
 import { resolveProductsBlocksLayout } from "./migration/products-blocks";
+import { resolveHomeHeroBlocksLayout } from "./migration/home-hero-blocks";
+import { resolveAboutBlocksLayout } from "./migration/about-blocks";
+import { resolveOfferteBlocksLayout } from "./migration/offerte-blocks";
+import { resolveLegalBlocksLayout } from "./migration/legal-blocks";
 import { countEditorSections } from "./composite-sections";
 
 /** Stable JSON for hashes — browser-safe (no node:crypto). */
@@ -89,6 +93,38 @@ function stripVolatilePageFields(page: CmsPage): unknown {
     delete mig.migratedAt;
     clone.productsBlocksMigration = mig;
   }
+  if (
+    clone.homeHeroBlocksMigration &&
+    typeof clone.homeHeroBlocksMigration === "object"
+  ) {
+    const mig = { ...(clone.homeHeroBlocksMigration as Record<string, unknown>) };
+    delete mig.migratedAt;
+    clone.homeHeroBlocksMigration = mig;
+  }
+  if (
+    clone.aboutBlocksMigration &&
+    typeof clone.aboutBlocksMigration === "object"
+  ) {
+    const mig = { ...(clone.aboutBlocksMigration as Record<string, unknown>) };
+    delete mig.migratedAt;
+    clone.aboutBlocksMigration = mig;
+  }
+  if (
+    clone.offerteBlocksMigration &&
+    typeof clone.offerteBlocksMigration === "object"
+  ) {
+    const mig = { ...(clone.offerteBlocksMigration as Record<string, unknown>) };
+    delete mig.migratedAt;
+    clone.offerteBlocksMigration = mig;
+  }
+  if (
+    clone.legalBlocksMigration &&
+    typeof clone.legalBlocksMigration === "object"
+  ) {
+    const mig = { ...(clone.legalBlocksMigration as Record<string, unknown>) };
+    delete mig.migratedAt;
+    clone.legalBlocksMigration = mig;
+  }
   return clone;
 }
 
@@ -104,7 +140,7 @@ export function fnv1aHex(input: string): string {
 
 /**
  * Canonical display resolve shared by Admin preview and storefront public pages.
- * Does not persist. Producten fixed→blocks runs in memory only.
+ * Does not persist. Producten / Home hero fixed→blocks run in memory only.
  */
 export function resolveCmsPageForDisplay(
   page: CmsPage,
@@ -113,6 +149,25 @@ export function resolveCmsPageForDisplay(
   const normalized = normalizeCmsPage(structuredClone(page));
   if (normalized.kind === "builtin" && normalized.pageKey === "products") {
     const migrated = resolveProductsBlocksLayout(normalized as BuiltinCmsPage).page;
+    return localizeCmsPageForLocale(migrated, locale);
+  }
+  if (normalized.kind === "builtin" && normalized.pageKey === "home") {
+    const migrated = resolveHomeHeroBlocksLayout(normalized as BuiltinCmsPage).page;
+    return localizeCmsPageForLocale(migrated, locale);
+  }
+  if (normalized.kind === "builtin" && normalized.pageKey === "about") {
+    const migrated = resolveAboutBlocksLayout(normalized as BuiltinCmsPage).page;
+    return localizeCmsPageForLocale(migrated, locale);
+  }
+  if (normalized.kind === "builtin" && normalized.pageKey === "offerte") {
+    const migrated = resolveOfferteBlocksLayout(normalized as BuiltinCmsPage).page;
+    return localizeCmsPageForLocale(migrated, locale);
+  }
+  if (
+    normalized.kind === "builtin" &&
+    (normalized.pageKey === "privacy" || normalized.pageKey === "terms")
+  ) {
+    const migrated = resolveLegalBlocksLayout(normalized as BuiltinCmsPage).page;
     return localizeCmsPageForLocale(migrated, locale);
   }
   return localizeCmsPageForLocale(normalized, locale);

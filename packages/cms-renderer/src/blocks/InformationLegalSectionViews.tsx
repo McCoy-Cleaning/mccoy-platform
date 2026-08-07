@@ -92,44 +92,57 @@ const items =
 
 export function LegalArticlesSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
   const type = "legalArticles" as BlockType;
-const articles =
-        (d.articles as Array<{ id: string; heading: string; anchor: string; content: string }>) ??
-        [];
-      return (
-        <SectionShell blockType={type} innerMaxWidth="3xl">
-          <h1 className="font-display text-4xl text-foreground">{String(d.heading ?? "")}</h1>
-          {typeof d.updatedLabel === "string" && d.updatedAt ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {d.updatedLabel}: {String(d.updatedAt)}
-            </p>
-          ) : null}
-          {articles.length > 1 ? (
-            <SectionSurface variant="outlined" className="mt-8 p-4">
-              <nav aria-label="Inhoudsopgave">
-                <ol className="space-y-2 text-sm">
-                  {articles.map((a) => (
-                    <li key={a.id}>
-                      <a className="text-primary hover:underline" href={`#${a.anchor}`}>
-                        {a.heading}
-                      </a>
-                    </li>
-                  ))}
-                </ol>
-              </nav>
-            </SectionSurface>
-          ) : null}
-          <div className="mt-10 space-y-10">
-            {articles.map((a) => (
-              <SectionSurface key={a.id} variant="outlined" className="p-5 sm:p-6">
-                <article id={a.anchor}>
-                  <h2 className="font-display text-2xl text-foreground">{a.heading}</h2>
-                  <p className="mt-4 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground">
-                    {a.content}
-                  </p>
-                </article>
-              </SectionSurface>
-            ))}
-          </div>
-        </SectionShell>
-      );
+  const articles =
+    (d.articles as Array<{ id: string; heading: string; anchor: string; content: string }>) ??
+    [];
+  const eyebrow = typeof d.eyebrow === "string" ? d.eyebrow.trim() : "";
+  const updatedLabel = typeof d.updatedLabel === "string" ? d.updatedLabel.trim() : "";
+  const updatedAt = typeof d.updatedAt === "string" ? d.updatedAt.trim() : "";
+  const updatedLine =
+    updatedLabel && updatedAt
+      ? `${updatedLabel}: ${updatedAt}`
+      : updatedLabel || (updatedAt ? updatedAt : "");
+  return (
+    <SectionShell blockType={type} innerMaxWidth="3xl">
+      {eyebrow ? <SectionEyebrow className="tracking-[0.25em]">{eyebrow}</SectionEyebrow> : null}
+      <h1
+        className={cn(
+          "font-display text-foreground",
+          eyebrow ? "mt-3 text-5xl md:text-6xl" : "text-4xl",
+        )}
+      >
+        {String(d.heading ?? "")}
+      </h1>
+      {updatedLine ? (
+        <p className="mt-3 text-sm text-muted-foreground">{updatedLine}</p>
+      ) : null}
+      {articles.length > 1 ? (
+        <SectionSurface variant="outlined" className="mt-8 p-4">
+          <nav aria-label="Inhoudsopgave">
+            <ol className="space-y-2 text-sm">
+              {articles.map((a) => (
+                <li key={a.id}>
+                  <a className="text-primary hover:underline" href={`#${a.anchor}`}>
+                    {a.heading}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </SectionSurface>
+      ) : null}
+      <div className="mt-10 space-y-6">
+        {articles.map((a) => (
+          <SectionSurface key={a.id} variant="outlined" className="p-7 md:p-9">
+            <article id={a.anchor}>
+              <h2 className="font-display text-2xl text-foreground md:text-3xl">{a.heading}</h2>
+              <div className="mt-4 space-y-3 whitespace-pre-line text-[15px] leading-relaxed text-muted-foreground">
+                {a.content}
+              </div>
+            </article>
+          </SectionSurface>
+        ))}
+      </div>
+    </SectionShell>
+  );
 }

@@ -17,7 +17,8 @@ import {
 } from "./layout-presentation";
 import { canAddBlockType, canRemoveBlockType, policyFixedEquivalentForBlock } from "./page-block-policies";
 import { getBlockDataDefinition } from "./blocks/registry";
-import type { ContactFormContent } from "./content";
+import type { ContactFormContent, HomeHeroContent, StatsContent } from "./content";
+import { seedHeroBlockFromHomeHeroContent } from "./migration/home-hero-blocks";
 import { FIXED_SECTION_DEFS, FIXED_SECTIONS_BY_PAGE, type BuiltinPageKey, type FixedSectionKey } from "./sections";
 import type { Block, BuiltinCmsPage, CmsPage, CustomCmsPage } from "./types";
 
@@ -61,10 +62,27 @@ function replacePolicyFixedWithBlock(page: CmsPage, block: Block): void {
     (item) => !(item.kind === "fixed" && item.key === fixedKey),
   );
 
-  if (page.kind !== "builtin" || fixedKey !== "contact.form" || block.type !== "contactForm") {
+  if (page.kind !== "builtin") return;
+  const builtin = page as BuiltinCmsPage;
+
+  if (fixedKey === "home.hero" && block.type === "hero") {
+    const content = builtin.sectionContent?.["home.hero"] as HomeHeroContent | undefined;
+    const stats = builtin.sectionContent?.["home.stats"] as StatsContent | undefined;
+    const trustItems = stats?.items?.map((item) => ({
+      id: item.id,
+      value: item.value,
+      label: item.label,
+    }));
+    const def = getBlockDataDefinition("hero");
+    const seeded = seedHeroBlockFromHomeHeroContent(content, trustItems);
+    block.data = seeded as Block["data"];
+    block.dataVersion = def.dataVersion;
     return;
   }
-  const builtin = page as BuiltinCmsPage;
+
+  if (fixedKey !== "contact.form" || block.type !== "contactForm") {
+    return;
+  }
   const content = builtin.sectionContent?.["contact.form"] as ContactFormContent | undefined;
   if (!content) return;
 

@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { CmsImage, LogoBackdropResolved } from "@mccoy/cms-schema";
 import type { CmsImageCompressProfile } from "./compress-image";
+import { resolveCmsAssetSrc } from "./resolve-media-src";
 
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
@@ -198,14 +199,6 @@ export function ImageStripPreview({
   size?: "default" | "large";
   emptyLabel?: string;
 }) {
-  const mediaSrc = (src: string) => {
-    if (!src) return "";
-    if (/^(https?:|data:|blob:)/i.test(src)) return src;
-    if (!assetBaseUrl) return src;
-    const path = src.startsWith("/") ? src : `/${src}`;
-    return `${assetBaseUrl.replace(/\/$/, "")}${path}`;
-  };
-
   if (items.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-white/15 bg-black/20 px-3 py-4 text-center text-[11px] text-white/40">
@@ -231,7 +224,7 @@ export function ImageStripPreview({
         }`;
         const img = (
           <img
-            src={mediaSrc(item.src)}
+            src={resolveCmsAssetSrc(item.src, assetBaseUrl)}
             alt=""
             className={`h-full w-full object-contain ${padClass}`}
           />

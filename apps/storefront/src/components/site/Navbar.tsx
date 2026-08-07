@@ -23,18 +23,15 @@ const MobileMenu = lazy(() =>
   import("./MobileMenu").then((m) => ({ default: m.MobileMenu })),
 );
 
-/** CSS vars for responsive logo height; apply height via Tailwind classes. */
+/** CSS vars for responsive logo height (`[data-cms-logo]` in styles.css). */
 function logoSizeVars(mobilePx: number, desktopPx: number): CSSProperties {
   return {
+    ["--cms-logo-h" as string]: `${mobilePx}px`,
+    ["--cms-logo-h-md" as string]: `${desktopPx}px`,
     ["--nav-logo-h" as string]: `${mobilePx}px`,
     ["--nav-logo-h-md" as string]: `${desktopPx}px`,
-    width: "auto",
-    aspectRatio: "auto",
   };
 }
-
-const LOGO_HEIGHT_CLASS =
-  "h-[length:var(--nav-logo-h)] w-auto object-contain md:h-[length:var(--nav-logo-h-md)]";
 
 export function Navbar() {
   const cmsState = useCms();
@@ -80,6 +77,7 @@ export function Navbar() {
               <picture>
                 {logoWebp ? <source type="image/webp" srcSet={logoWebp} /> : null}
                 <img
+                  data-cms-logo=""
                   src={logoWebp ?? logoSrc}
                   alt={navigation.logo?.decorative ? "" : navigation.logo?.alt || "McCoy Cleaning"}
                   width={logoWidthAttr}
@@ -87,11 +85,10 @@ export function Navbar() {
                   decoding="async"
                   fetchPriority="low"
                   style={logoStyle}
-                  className={LOGO_HEIGHT_CLASS}
                 />
               </picture>
             ) : (
-              <AnimatedLogo style={logoStyle} className={LOGO_HEIGHT_CLASS} />
+              <AnimatedLogo data-cms-logo="" style={logoStyle} />
             )}
           </Link>
 

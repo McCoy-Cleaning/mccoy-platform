@@ -42,16 +42,19 @@ describe("e2e-inventory catalog (M5)", () => {
     expect(BUILTIN_CMS_INVENTORY_PAGES.every((p) => p.title.length > 0)).toBe(true);
   });
 
-  it("about.main expands to composite inventory row ids", () => {
+  it("about.main accepts composite fixed rows or migrated block rows", () => {
     const rows = expectedFixedInventoryForPage("page_about", "about");
     const about = rows.find((r) => r.fixedKey === "about.main");
-    expect(about?.kind).toBe("fixed");
+    expect(about?.kind).toBe("fixed-or-migrated-blocks");
     expect(about?.layoutRowIds).toEqual([
       compositeEditorRowId(fixedLayoutId("about.main"), "header"),
       compositeEditorRowId(fixedLayoutId("about.main"), "mission"),
       compositeEditorRowId(fixedLayoutId("about.main"), "vision"),
       compositeEditorRowId(fixedLayoutId("about.main"), "history"),
     ]);
+    if (about?.kind === "fixed-or-migrated-blocks") {
+      expect(about.migratedLayoutRowIds).toHaveLength(4);
+    }
   });
 
   it("products keys accept fixed or pilot migrated layout row ids", () => {
