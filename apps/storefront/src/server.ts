@@ -4,8 +4,9 @@ import { applySecurityHeaders } from "@mccoy/security/headers";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 import "./lib/error-capture";
 
-import { consumeLastCapturedError } from "./lib/error-capture";
+import { consumeLastCapturedError, consumeRecentClientDisconnect } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { isClientDisconnectError } from "./lib/is-client-disconnect-error";
 
 ensureMonorepoEnvLoaded();
 
@@ -83,9 +84,17 @@ function mergeVary(existing: string | null, value: string): string {
   return `${existing}, ${value}`;
 }
 
+/** Client already left — no body is useful; avoid error-page HTML noise. */
+function clientDisconnectResponse(): Response {
+  return new Response(null, { status: 204 });
+}
+
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  response: Response,
+  request: Request,
+): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return response;
@@ -96,6 +105,12 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   }
 
   const captured = consumeLastCapturedError();
+  const recentDisconnect = consumeRecentClientDisconnect();
+  const requestAborted = request.signal.aborted;
+  if (requestAborted || recentDisconnect || isClientDisconnectError(captured)) {
+    return clientDisconnectResponse();
+  }
+
   console.error(captured ?? new Error(`h3 swallowed SSR error: ${body}`));
   return new Response(renderErrorPage(), {
     status: 500,
@@ -125,11 +140,14 @@ export default {
       ensureMonorepoEnvLoaded();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      const normalized = await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response, request);
       const withRobots = withIndexingHeaders(normalized);
       const secured = applySecurityHeaders(withRobots, { app: "storefront" });
       return await maybeCompressResponse(request, secured);
     } catch (error) {
+      if (isClientDisconnectError(error)) {
+        return clientDisconnectResponse();
+      }
       console.error(error);
       return applySecurityHeaders(
         withIndexingHeaders(

@@ -42,6 +42,7 @@ const LOCAL_CMS_WEBP_BASENAMES = new Set([
   "work-oplevering",
   "work-floor",
   "work-glass",
+  "work-glass-van",
   "work-oplevering-hal",
   "work-regular-sander",
   "work-floor-scrubber",
@@ -175,6 +176,11 @@ export const PARTNER_LOGO_SIZES = "(min-width: 640px) 12rem, 10rem";
 /** Wider page rail (max ~96rem) — keep mosaic tiles from requesting oversized originals. */
 export const GALLERY_IMAGE_SIZES =
   "(min-width: 1536px) 480px, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw";
+/** Service card rail — 3-col desktop, 2-col tablet, full-bleed mobile. */
+export const SERVICES_CARD_IMAGE_SIZES =
+  "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw";
+/** Desktop first row shows three cards; mobile only needs the first tile early. */
+export const SERVICES_CARD_ROW_PRELOAD_MEDIA = "(min-width: 1024px)";
 export const NAV_LOGO_WIDTH = 480;
 export const NAV_LOGO_HEIGHT = 320;
 
@@ -187,6 +193,17 @@ export type HomeHeroPreloadLink = {
   imageSizes: string;
   fetchPriority: "high";
   media: string;
+};
+
+export type ServicesCardPreloadLink = {
+  rel: "preload";
+  as: "image";
+  type?: "image/webp";
+  href: string;
+  imageSrcSet?: string;
+  imageSizes?: string;
+  fetchPriority: "high" | "low" | "auto";
+  media?: string;
 };
 
 /** Desktop-only hero image preload for `/` and `/en` head links. */
@@ -215,4 +232,70 @@ export function homeHeroPreloadLink(heroSrc: string): HomeHeroPreloadLink {
     fetchPriority: "high",
     media: HERO_IMAGE_PRELOAD_MEDIA,
   };
+}
+
+/**
+ * Match DeliveryImage gallery/photo delivery for a single CMS card src so head
+ * preload URL === the URL the `<img>` will request.
+ */
+function galleryPhotoDeliveryUrls(src: string): {
+  href: string;
+  webpSrcSet?: string;
+  type?: "image/webp";
+} | null {
+  if (!src || src.includes("placeholder")) return null;
+  const remote = supabasePhotoSrcSets(src, [480, 800, 1200], { resize: "contain" });
+  if (remote) {
+    return {
+      href: supabaseTransformedUrl(src, {
+        width: 480,
+        quality: 72,
+        format: "webp",
+        resize: "contain",
+      }),
+      webpSrcSet: remote.webpSrcSet,
+      type: "image/webp",
+    };
+  }
+  const localCms = localCmsPhotoWebpSrcSet(src);
+  if (localCms) {
+    const href = localCms.split(",")[0]?.trim().split(/\s+/)[0];
+    if (!href) return null;
+    return { href, webpSrcSet: localCms, type: "image/webp" };
+  }
+  if (isLocalPublicImageSrc(src)) {
+    return { href: src };
+  }
+  return null;
+}
+
+/**
+ * Preload above-the-fold service card photos for `/services`.
+ * Card 0: all viewports (often LCP after the H1). Cards 1–2: desktop row only.
+ */
+export function servicesCardsPreloadLinks(
+  imageSrcs: readonly string[],
+): ServicesCardPreloadLink[] {
+  const links: ServicesCardPreloadLink[] = [];
+  const seen = new Set<string>();
+  imageSrcs.slice(0, 3).forEach((src, i) => {
+    const delivery = galleryPhotoDeliveryUrls(src);
+    if (!delivery || seen.has(delivery.href)) return;
+    seen.add(delivery.href);
+    links.push({
+      rel: "preload",
+      as: "image",
+      href: delivery.href,
+      ...(delivery.type ? { type: delivery.type } : {}),
+      ...(delivery.webpSrcSet
+        ? {
+            imageSrcSet: delivery.webpSrcSet,
+            imageSizes: SERVICES_CARD_IMAGE_SIZES,
+          }
+        : {}),
+      fetchPriority: i === 0 ? "high" : "auto",
+      ...(i > 0 ? { media: SERVICES_CARD_ROW_PRELOAD_MEDIA } : {}),
+    });
+  });
+  return links;
 }

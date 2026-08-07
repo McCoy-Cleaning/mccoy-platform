@@ -38,5 +38,15 @@ describe("ServicesCards media + dual CTAs", () => {
     expect(servicesCardsBody).toContain("items-stretch");
     expect(servicesCardsBody).toContain("flex h-full flex-col");
     expect(servicesCardsBody).toContain("mt-auto flex w-full items-center justify-between gap-3");
+
+    // Above-the-fold first row: eager + shared sizes; below-fold stays lazy.
+    expect(servicesCardsBody).toContain('loading={i < 3 ? "eager" : "lazy"}');
+    expect(servicesCardsBody).toContain("SERVICES_CARD_IMAGE_SIZES");
+
+    // Fallbacks must use public CMS paths so DeliveryImage can serve WebP siblings.
+    expect(src).toContain("SERVICE_CARD_FALLBACK_SRCS");
+    expect(src).toContain("/images/cms/work-regular-sander.png");
+    expect(src).not.toContain("@/assets/mccoy-regular-sander");
+    expect(src).not.toContain("@/assets/mccoy-service-glass-van");
   });
 });
