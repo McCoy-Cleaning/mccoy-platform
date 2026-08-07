@@ -308,6 +308,7 @@ let publishedCmsBundleHydrated = false;
 export function hydratePublishedCmsState(input: {
   pages: CmsPage[];
   navigation?: SiteNavigationContent;
+  footer?: SiteFooterContent;
 }): void {
   publishedCmsBundleHydrated = true;
   const serverPages = input.pages.map((p) => normalizeCmsPage(p));
@@ -365,9 +366,11 @@ export function hydratePublishedCmsState(input: {
   });
   const pages = [...mergedServer, ...pendingCustom];
   lastHydratedServerCustomIds = serverCustomIds;
-  // Do not reuse in-memory navigation: it keeps deleted custom links and re-backfills
-  // them whenever a ghost page is still pending. Durable nav = builtins + server inNav.
-  const baseNav = input.navigation ?? defaultSiteNavigation();
+  // Prefer durable bundle chrome; keep in-memory/chrome-sync when bundle omits it
+  // (older deploys or pages-only hydrate) so mid-session logo heights are not wiped.
+  const baseNav =
+    input.navigation ?? current?.navigation ?? defaultSiteNavigation();
+  const baseFooter = input.footer ?? current?.footer ?? defaultSiteFooter();
   // resolveStorefrontNavLinks drops orphan internal links and backfills inNav pages.
   const next: CmsPersistedState = {
     schemaVersion: CMS_SCHEMA_VERSION,
@@ -376,7 +379,7 @@ export function hydratePublishedCmsState(input: {
     draft: {},
     navigation: navigationWithResolvedCustomLinks(baseNav, pages),
     navigationDraft: null,
-    footer: current?.footer ?? defaultSiteFooter(),
+    footer: baseFooter,
     footerDraft: null,
     previewSnapshots: {},
     version: CMS_SCHEMA_VERSION,

@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import {
   assertPickerTypesMatchRegistry,
+  createDefaultBlock,
   createDefaultOffers,
   productAssortmentTemplateData,
   productIntroTemplateData,
@@ -57,18 +58,11 @@ export const TEMPLATES: TemplateDef[] = [
   {
     type: "hero",
     name: "Hero",
-    description: "Grote intro-sectie met titel, subtitel, CTA en afbeelding.",
+    description:
+      "Full-bleed Home-pariteit: titel, accent, CTAs, media-kaart, trust strip en keurmerk.",
     category: "Hero & intro",
     icon: Layout,
-    defaultData: {
-      eyebrow: "McCoy Cleaning",
-      title: "Een krachtige titel die aandacht trekt",
-      subtitle: "Kort een sterke boodschap die uitlegt waarom bezoekers moeten blijven lezen.",
-      ctaLabel: "Vraag offerte aan",
-      ctaHref: "/offerte",
-      image: "",
-      align: "left",
-    },
+    defaultData: createDefaultBlock("hero").data as Record<string, any>,
   },
   {
     type: "richText",
@@ -472,16 +466,10 @@ export const TEMPLATES: TemplateDef[] = [
   {
     type: "quoteRequestForm",
     name: "Offerteformulier",
-    description: "Presentatie voor offerte-aanvraag (server bepaalt bron).",
+    description: "Multi-tab offerteformulier met bewerkbare velden per tab.",
     category: "Conversion",
     icon: Mail,
-    defaultData: {
-      heading: "Offerte aanvragen",
-      enabledScopes: ["glass_cleaning", "furniture_cleaning"],
-      defaultScope: "glass_cleaning",
-      submitLabel: "Verstuur aanvraag",
-      successMessage: "Bedankt — we nemen zo snel mogelijk contact op.",
-    },
+    defaultData: {},
   },
   {
     type: "legalArticles",

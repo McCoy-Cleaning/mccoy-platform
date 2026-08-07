@@ -27,17 +27,13 @@ function ContactIcon({ kind }: { kind: string }) {
   return <MapPin className="mt-0.5 h-4 w-4 text-primary" />;
 }
 
+/** CSS vars for responsive logo height (`[data-cms-logo]` in styles.css). */
 function footerLogoVars(mobilePx: number, desktopPx: number): CSSProperties {
   return {
-    ["--footer-logo-h" as string]: `${mobilePx}px`,
-    ["--footer-logo-h-md" as string]: `${desktopPx}px`,
-    width: "auto",
-    aspectRatio: "auto",
+    ["--cms-logo-h" as string]: `${mobilePx}px`,
+    ["--cms-logo-h-md" as string]: `${desktopPx}px`,
   };
 }
-
-const FOOTER_LOGO_HEIGHT_CLASS =
-  "h-[length:var(--footer-logo-h)] w-auto object-contain md:h-[length:var(--footer-logo-h-md)]";
 
 export function Footer() {
   const footer = useSiteFooter();
@@ -62,6 +58,7 @@ export function Footer() {
               <picture>
                 <source type="image/webp" srcSet={logoWebpUrl} />
                 <img
+                  data-cms-logo=""
                   src={logoUrl}
                   alt={logo.alt || "McCoy Cleaning"}
                   width={logoWidthAttr}
@@ -69,11 +66,11 @@ export function Footer() {
                   loading="lazy"
                   decoding="async"
                   style={logoStyle}
-                  className={FOOTER_LOGO_HEIGHT_CLASS}
                 />
               </picture>
             ) : (
               <img
+                data-cms-logo=""
                 src={logoSrc}
                 alt={logo.decorative ? "" : logo.alt || "McCoy Cleaning"}
                 width={logoWidthAttr}
@@ -81,7 +78,6 @@ export function Footer() {
                 loading="lazy"
                 decoding="async"
                 style={logoStyle}
-                className={FOOTER_LOGO_HEIGHT_CLASS}
               />
             )}
             {footer.tagline ? (

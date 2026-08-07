@@ -8,17 +8,31 @@ import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-conte
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 import {
   localizeCmsPageForLocale,
+  resolveAboutBlocksLayout,
+  resolveLegalBlocksLayout,
+  resolveOfferteBlocksLayout,
   resolveProductsBlocksLayout,
   type BuiltinCmsPage,
   type BuiltinPageKey,
   type CmsPage,
 } from "@mccoy/cms-schema";
 
-/** Match /products: in-memory Producten fixed→blocks, then re-apply EN overlays. */
-function withProductsBlocksCompat(page: CmsPage): CmsPage {
-  if (page.kind !== "builtin" || page.pageKey !== "products") return page;
-  const migrated = resolveProductsBlocksLayout(page as BuiltinCmsPage).page;
-  return localizeCmsPageForLocale(migrated, "en");
+/** Match /products|/about|/offerte|/privacy|/terms: in-memory fixed→blocks, then re-apply EN overlays. */
+function withMigratedBlocksCompat(page: CmsPage): CmsPage {
+  if (page.kind !== "builtin") return page;
+  let working = page as BuiltinCmsPage;
+  if (working.pageKey === "products") {
+    working = resolveProductsBlocksLayout(working).page;
+  } else if (working.pageKey === "about") {
+    working = resolveAboutBlocksLayout(working).page;
+  } else if (working.pageKey === "offerte") {
+    working = resolveOfferteBlocksLayout(working).page;
+  } else if (working.pageKey === "privacy" || working.pageKey === "terms") {
+    working = resolveLegalBlocksLayout(working).page;
+  } else {
+    return page;
+  }
+  return localizeCmsPageForLocale(working, "en");
 }
 
 /**
@@ -42,7 +56,7 @@ export const Route = createFileRoute("/en/$")({
     }
     const snapshot = {
       ...result.snapshot,
-      page: withProductsBlocksCompat(result.snapshot.page),
+      page: withMigratedBlocksCompat(result.snapshot.page),
     };
     return { snapshot, head: result.head, pathname };
   },
@@ -66,7 +80,7 @@ function EnglishCmsPageBody() {
   const { snapshot } = Route.useLoaderData();
   // Prefer client hydrate (includes enFieldDrafts) localized for /en; fall back to loader snapshot.
   const viewed = useCmsPageForView(snapshot.page.id) ?? snapshot.page;
-  const page = React.useMemo(() => withProductsBlocksCompat(viewed), [viewed]);
+  const page = React.useMemo(() => withMigratedBlocksCompat(viewed), [viewed]);
   const pageKey = page.kind === "builtin" ? (page.pageKey as BuiltinPageKey | null) : null;
 
   return (

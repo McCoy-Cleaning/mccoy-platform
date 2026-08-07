@@ -56,6 +56,9 @@ function HomeWorkGallerySection() {
 
 /**
  * Homepage renderer map. Keeps About/Services/Products image modules out of `/`.
+ * `home.hero` is suppressed once migrated to the reusable `hero` block
+ * ({@link resolveHomeHeroBlocksLayout}); the fixed renderer remains only as a
+ * dual-read fallback for unmigrated snapshots.
  */
 export const homeSectionRenderers: PageSectionRenderers = {
   home: {

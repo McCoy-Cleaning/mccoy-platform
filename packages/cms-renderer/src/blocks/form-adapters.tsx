@@ -17,12 +17,24 @@ export type ContactFormSubmitInput = {
   website?: string;
 };
 
+export type QuoteFormSubmitInput = {
+  blockId: string;
+  pageId: string;
+  kind: "glass_washing" | "furniture_cleaning";
+  fields: Record<string, string>;
+  /** Honeypot — must stay empty */
+  website?: string;
+};
+
 export type CmsFormAdapters = {
   submitNewsletter?: (
     input: NewsletterSubmitInput,
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   submitContactForm?: (
     input: ContactFormSubmitInput,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  submitQuoteForm?: (
+    input: QuoteFormSubmitInput,
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 

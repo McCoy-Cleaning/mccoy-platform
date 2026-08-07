@@ -15,6 +15,8 @@ export {
   type UpsertPageInput,
   type DeletePageInput,
   type DeletePageResult,
+  type SaveSiteChromeInput,
+  type SaveSiteChromeResult,
 } from "./types";
 
 export { createFileCmsStore, getFileCmsStore } from "./file-store";

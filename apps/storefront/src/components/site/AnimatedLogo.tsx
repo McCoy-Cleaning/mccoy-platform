@@ -6,15 +6,20 @@ import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
 type Props = {
   className?: string;
   style?: CSSProperties;
+  "data-cms-logo"?: string;
 };
 
 /**
  * McCoy wordmark — static image (no Motion) so the navbar stays off the
  * homepage JS / TBT critical path.
  */
-export function AnimatedLogo({ className = "h-12 md:h-16 w-auto", style }: Props) {
+export function AnimatedLogo({
+  className = "relative inline-block",
+  style,
+  "data-cms-logo": dataCmsLogo,
+}: Props) {
   return (
-    <div className={`relative inline-block ${className}`} style={style}>
+    <div className={className} style={style} data-cms-logo={dataCmsLogo}>
       <picture>
         <source type="image/webp" srcSet={logoWebpUrl} />
         <img

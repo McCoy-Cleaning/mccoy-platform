@@ -21,12 +21,14 @@ describe("security headers", () => {
     expect(csp).toContain("http://localhost:5173");
   });
 
-  it("allows admin connect-src to the same storefront origins as frame-src", () => {
+  it("allows admin connect-src and img-src to the same storefront origins as frame-src", () => {
     const csp = buildContentSecurityPolicy("admin");
     const connectSrc =
       csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
     const frameSrc =
       csp.split(";").find((part) => part.trim().startsWith("frame-src")) ?? "";
+    const imgSrc =
+      csp.split(";").find((part) => part.trim().startsWith("img-src")) ?? "";
 
     expect(connectSrc).toContain("'self'");
     expect(connectSrc.split(/\s+/)).toContain("https:");
@@ -36,7 +38,11 @@ describe("security headers", () => {
     expect(connectSrc).toContain("https://www.mccoy.nl");
     expect(connectSrc).toContain("https://mccoy.nl");
 
-    // Probe origins must match embed origins (shared storefront origin list).
+    expect(imgSrc.split(/\s+/)).toContain("https:");
+    expect(imgSrc).toContain("data:");
+    expect(imgSrc).toContain("blob:");
+
+    // Probe / thumbnail origins must match embed origins (shared storefront list).
     for (const origin of [
       "http://localhost:5173",
       "http://127.0.0.1:5173",
@@ -45,10 +51,11 @@ describe("security headers", () => {
     ]) {
       expect(frameSrc).toContain(origin);
       expect(connectSrc).toContain(origin);
+      expect(imgSrc).toContain(origin);
     }
   });
 
-  it("includes VITE_STOREFRONT_ORIGIN in both admin frame-src and connect-src", () => {
+  it("includes VITE_STOREFRONT_ORIGIN in admin frame-src, connect-src, and img-src", () => {
     const prev = process.env.VITE_STOREFRONT_ORIGIN;
     process.env.VITE_STOREFRONT_ORIGIN = "https://preview-storefront.example/";
     try {
@@ -57,8 +64,11 @@ describe("security headers", () => {
         csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
       const frameSrc =
         csp.split(";").find((part) => part.trim().startsWith("frame-src")) ?? "";
+      const imgSrc =
+        csp.split(";").find((part) => part.trim().startsWith("img-src")) ?? "";
       expect(frameSrc).toContain("https://preview-storefront.example");
       expect(connectSrc).toContain("https://preview-storefront.example");
+      expect(imgSrc).toContain("https://preview-storefront.example");
     } finally {
       if (prev === undefined) delete process.env.VITE_STOREFRONT_ORIGIN;
       else process.env.VITE_STOREFRONT_ORIGIN = prev;

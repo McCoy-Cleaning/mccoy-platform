@@ -26,6 +26,15 @@ export function missingFixedInventoryKeys(
       if (!fixedPresent) missing.push(entry.fixedKey);
       continue;
     }
+    if (entry.kind === "fixed-or-migrated-blocks") {
+      const migratedPresent = entry.migratedLayoutRowIds.every((id) => presentRowIds.has(id));
+      if (!fixedPresent && !migratedPresent) {
+        missing.push(
+          `${entry.fixedKey} (need rows ${entry.layoutRowIds.join("|")} or ${entry.migratedLayoutRowIds.join("|")})`,
+        );
+      }
+      continue;
+    }
     const migratedPresent = presentRowIds.has(entry.migratedLayoutRowId);
     if (!fixedPresent && !migratedPresent) {
       missing.push(
@@ -86,6 +95,18 @@ export async function expectFixedSectionInventory(page: Page, pageId: string) {
       await expect(
         fixed.or(migrated).first(),
         `Neither fixed nor products-pilot row for ${entry.fixedKey}`,
+      ).toBeVisible();
+      continue;
+    }
+    if (entry.kind === "fixed-or-migrated-blocks") {
+      const fixed = page.locator(`[data-cms-fixed-key="${entry.fixedKey}"]`);
+      let migrated = page.locator(`[data-cms-layout-row="${entry.migratedLayoutRowIds[0]}"]`);
+      for (const id of entry.migratedLayoutRowIds.slice(1)) {
+        migrated = migrated.or(page.locator(`[data-cms-layout-row="${id}"]`));
+      }
+      await expect(
+        fixed.or(migrated).first(),
+        `Neither fixed nor migrated rows for ${entry.fixedKey}`,
       ).toBeVisible();
       continue;
     }

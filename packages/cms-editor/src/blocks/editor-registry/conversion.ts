@@ -111,8 +111,8 @@ export const conversionEditorRegistry = {
     [
       "heading",
       "description",
-      "enabledScopes",
-      "defaultScope",
+      "tabs",
+      "defaultTabId",
       "submitLabel",
       "successMessage",
     ],

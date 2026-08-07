@@ -37,6 +37,13 @@ export {
 export type { BlockEditorDefinition, EditorQuality } from "./blocks/editor-definition";
 export { BulkImageAddButton, ImageStripPreview } from "./BulkImageAdd";
 export type { CmsImagePickerProps } from "./image-picker-props";
+export {
+  filterProjectImagesForStorage,
+  lookupResolvedProjectImage,
+  resolveCmsAssetSrc,
+  resolveCmsImageDisplaySrc,
+  resolveProjectThumbSrc,
+} from "./resolve-media-src";
 
 export {
   CMS_MAX_IMAGE_UPLOAD_BYTES,

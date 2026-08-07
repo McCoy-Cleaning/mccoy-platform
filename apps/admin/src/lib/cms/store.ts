@@ -28,6 +28,10 @@ import {
   parseBlockData,
   resolveProductsBlocksLayout,
   forceProductsIntroAssortmentPair,
+  resolveHomeHeroBlocksLayout,
+  resolveAboutBlocksLayout,
+  resolveOfferteBlocksLayout,
+  resolveLegalBlocksLayout,
   cloneJobsDataWithNewIds,
   normalizeJobs,
   createItemId,
@@ -83,7 +87,12 @@ import {
   type TranslationFieldMetadata,
 } from "@mccoy/cms-schema";
 import { pushPublishedChromeToStorefront } from "./publish-sync";
-import { deleteSavedPageFromServer, publishSavedPageToServer, saveConceptPageToServer } from "./server-publish";
+import {
+  deleteSavedPageFromServer,
+  publishSavedPageToServer,
+  publishSiteChromeToServer,
+  saveConceptPageToServer,
+} from "./server-publish";
 import {
   adminGetCmsPageStatus,
   adminGetPublishedCmsPages,
@@ -557,7 +566,7 @@ export const cms = {
     write({ ...s, navigationDraft: validated.data });
     return { ok: true };
   },
-  saveNavigation(): { ok: true } | { ok: false; reason: string } {
+  async saveNavigation(): Promise<{ ok: true } | { ok: false; reason: string }> {
     const s = read();
     const draft = s.navigationDraft;
     if (!draft) return { ok: false, reason: "Geen navigatieconcept om op te slaan." };
@@ -579,6 +588,17 @@ export const cms = {
     ).length;
     if (customLinkCount > MAX_EXTRA_CUSTOM_NAV_PAGES && customLinkCount > publishedCustomCount) {
       return { ok: false, reason: CUSTOM_NAV_CAP_REASON };
+    }
+
+    // Durable store first — ephemeral iframe/BroadcastChannel sync alone does not survive reload.
+    const server = await publishSiteChromeToServer({ navigation: navToSave });
+    if (!server.ok) {
+      return {
+        ok: false,
+        reason:
+          server.error ||
+          "Navigatie kon niet worden opgeslagen op de live site. Probeer opnieuw.",
+      };
     }
 
     reconcileCustomInNavFromLinks(s, navToSave.links);
@@ -628,12 +648,23 @@ export const cms = {
     write({ ...s, footerDraft: validated.data });
     return { ok: true };
   },
-  saveFooter(): { ok: true } | { ok: false; reason: string } {
+  async saveFooter(): Promise<{ ok: true } | { ok: false; reason: string }> {
     const s = read();
     const draft = s.footerDraft;
     if (!draft) return { ok: false, reason: "Geen footerconcept om op te slaan." };
     const validated = parseSiteFooterResult(draft);
     if (!validated.ok) return validated;
+
+    const server = await publishSiteChromeToServer({ footer: validated.data });
+    if (!server.ok) {
+      return {
+        ok: false,
+        reason:
+          server.error ||
+          "Footer kon niet worden opgeslagen op de live site. Probeer opnieuw.",
+      };
+    }
+
     if (!write({ ...s, footer: validated.data, footerDraft: null })) {
       return { ok: false, reason: WRITE_FAIL_REASON };
     }
@@ -758,6 +789,42 @@ export const cms = {
         pages: mergedPages,
         draft: nextDraft,
       };
+
+      // Hydrate durable site chrome when the editor has no unsaved nav/footer draft.
+      if (
+        next.navigationDraft == null &&
+        "navigationJson" in published &&
+        typeof published.navigationJson === "string" &&
+        published.navigationJson.length > 0
+      ) {
+        try {
+          const parsed = parseSiteNavigationResult(
+            JSON.parse(published.navigationJson) as unknown,
+          );
+          if (parsed.ok) {
+            next = { ...next, navigation: parsed.data };
+            pagesTouched = true;
+          }
+        } catch {
+          /* ignore corrupt durable chrome */
+        }
+      }
+      if (
+        next.footerDraft == null &&
+        "footerJson" in published &&
+        typeof published.footerJson === "string" &&
+        published.footerJson.length > 0
+      ) {
+        try {
+          const parsed = parseSiteFooterResult(JSON.parse(published.footerJson) as unknown);
+          if (parsed.ok) {
+            next = { ...next, footer: parsed.data };
+            pagesTouched = true;
+          }
+        } catch {
+          /* ignore corrupt durable chrome */
+        }
+      }
     }
 
     const { state: sanitized, changed: navChanged } = sanitizeLoadedNavigation(next);
@@ -853,6 +920,130 @@ export const cms = {
     };
 
     return run();
+  },
+
+  /**
+   * Home hero fixed→reusable hero block: resolve once and persist draft when changed.
+   * Storefront must never call this (admin is the persistence authority).
+   */
+  ensureHomeHeroBlocksMigration(pageId: string): {
+    changed: boolean;
+    report: ReturnType<typeof resolveHomeHeroBlocksLayout>["report"] | null;
+  } {
+    const page = editablePage(read(), pageId);
+    if (!page || page.kind !== "builtin" || page.pageKey !== "home") {
+      return { changed: false, report: null };
+    }
+    const resolved = resolveHomeHeroBlocksLayout(page);
+    if (!resolved.changed) {
+      return { changed: false, report: resolved.report };
+    }
+    const before = JSON.stringify({
+      layout: page.layout,
+      blocks: page.blocks,
+      migration: page.homeHeroBlocksMigration ?? null,
+    });
+    const after = JSON.stringify({
+      layout: resolved.page.layout,
+      blocks: resolved.page.blocks,
+      migration: resolved.page.homeHeroBlocksMigration ?? null,
+    });
+    if (before === after) {
+      return { changed: false, report: resolved.report };
+    }
+    commitDraftPage(read(), pageId, resolved.page);
+    return { changed: true, report: resolved.report };
+  },
+
+  ensureAboutBlocksMigration(pageId: string): {
+    changed: boolean;
+    report: ReturnType<typeof resolveAboutBlocksLayout>["report"] | null;
+  } {
+    const page = editablePage(read(), pageId);
+    if (!page || page.kind !== "builtin" || page.pageKey !== "about") {
+      return { changed: false, report: null };
+    }
+    const resolved = resolveAboutBlocksLayout(page);
+    if (!resolved.changed) {
+      return { changed: false, report: resolved.report };
+    }
+    const before = JSON.stringify({
+      layout: page.layout,
+      blocks: page.blocks,
+      migration: page.aboutBlocksMigration ?? null,
+    });
+    const after = JSON.stringify({
+      layout: resolved.page.layout,
+      blocks: resolved.page.blocks,
+      migration: resolved.page.aboutBlocksMigration ?? null,
+    });
+    if (before === after) {
+      return { changed: false, report: resolved.report };
+    }
+    commitDraftPage(read(), pageId, resolved.page);
+    return { changed: true, report: resolved.report };
+  },
+
+  ensureOfferteBlocksMigration(pageId: string): {
+    changed: boolean;
+    report: ReturnType<typeof resolveOfferteBlocksLayout>["report"] | null;
+  } {
+    const page = editablePage(read(), pageId);
+    if (!page || page.kind !== "builtin" || page.pageKey !== "offerte") {
+      return { changed: false, report: null };
+    }
+    const resolved = resolveOfferteBlocksLayout(page);
+    if (!resolved.changed) {
+      return { changed: false, report: resolved.report };
+    }
+    const before = JSON.stringify({
+      layout: page.layout,
+      blocks: page.blocks,
+      migration: page.offerteBlocksMigration ?? null,
+    });
+    const after = JSON.stringify({
+      layout: resolved.page.layout,
+      blocks: resolved.page.blocks,
+      migration: resolved.page.offerteBlocksMigration ?? null,
+    });
+    if (before === after) {
+      return { changed: false, report: resolved.report };
+    }
+    commitDraftPage(read(), pageId, resolved.page);
+    return { changed: true, report: resolved.report };
+  },
+
+  ensureLegalBlocksMigration(pageId: string): {
+    changed: boolean;
+    report: ReturnType<typeof resolveLegalBlocksLayout>["report"] | null;
+  } {
+    const page = editablePage(read(), pageId);
+    if (
+      !page ||
+      page.kind !== "builtin" ||
+      (page.pageKey !== "privacy" && page.pageKey !== "terms")
+    ) {
+      return { changed: false, report: null };
+    }
+    const resolved = resolveLegalBlocksLayout(page);
+    if (!resolved.changed) {
+      return { changed: false, report: resolved.report };
+    }
+    const before = JSON.stringify({
+      layout: page.layout,
+      blocks: page.blocks,
+      migration: page.legalBlocksMigration ?? null,
+    });
+    const after = JSON.stringify({
+      layout: resolved.page.layout,
+      blocks: resolved.page.blocks,
+      migration: resolved.page.legalBlocksMigration ?? null,
+    });
+    if (before === after) {
+      return { changed: false, report: resolved.report };
+    }
+    commitDraftPage(read(), pageId, resolved.page);
+    return { changed: true, report: resolved.report };
   },
 
   /**

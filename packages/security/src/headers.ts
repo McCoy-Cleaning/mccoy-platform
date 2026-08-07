@@ -48,12 +48,14 @@ function defaultAdminFrameAncestors(): string[] {
 }
 
 /**
- * Storefront origins the admin CMS may embed (`frame-src`) and probe
- * (`connect-src`, e.g. edit-canvas reachability fetch).
+ * Storefront origins the admin CMS may embed (`frame-src`), probe
+ * (`connect-src`, e.g. edit-canvas reachability fetch), and load CMS
+ * project thumbnails from (`img-src`).
  * Without an explicit `frame-src`, CSP falls back to `default-src 'self'` and
  * blocks cross-origin www — the iframe stays blank.
- * Without matching `connect-src` entries, http://localhost storefront probes
- * fail even when `https:` is allowed (http local origins are not covered).
+ * Without matching `connect-src` / `img-src` entries, http://localhost
+ * storefront probes and `/images/...` thumbnails fail even when `https:` is
+ * allowed (http local origins are not covered by the bare `https:` token).
  */
 function defaultAdminStorefrontOrigins(): string[] {
   const fromEnv = [
@@ -78,15 +80,17 @@ export function buildContentSecurityPolicy(
   if (app === "admin") {
     const storefrontOrigins = defaultAdminStorefrontOrigins();
     const frameSrc = unique(["'self'", ...storefrontOrigins]);
-    // Same storefront origins as frame-src so CMS reachability probes work
-    // against local http:// storefronts (https: does not cover http localhost).
+    // Same storefront origins as frame-src so CMS reachability probes and
+    // project-photo thumbnails work against local http:// storefronts
+    // (https: does not cover http localhost).
     const connectSrc = unique(["'self'", "https:", "wss:", ...storefrontOrigins]);
+    const imgSrc = unique(["'self'", "data:", "blob:", "https:", ...storefrontOrigins]);
     return [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
-      "img-src 'self' data: blob: https:",
+      `img-src ${imgSrc.join(" ")}`,
       // Google Fonts CSS + files (admin __root.tsx stylesheet link).
       "font-src 'self' data: https: https://fonts.gstatic.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",

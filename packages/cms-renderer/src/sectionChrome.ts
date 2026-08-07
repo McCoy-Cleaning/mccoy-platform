@@ -66,7 +66,7 @@ const FORM_SECTION: SectionChromeConfig = {
  * Never infer header ownership from the presence of a title field.
  */
 export const BLOCK_CHROME_CONFIG: Record<BlockType, SectionChromeConfig> = {
-  hero: { headerMode: "block", surfaceMode: "none", widthMode: "page", ambient: true },
+  hero: { headerMode: "block", surfaceMode: "none", widthMode: "fullBleed", ambient: false },
   richText: READING,
   centered: { headerMode: "block", surfaceMode: "none", widthMode: "wideReading", ambient: false },
   textImage: PAGE_BLOCK,

@@ -14,6 +14,11 @@ import {
   compositePartsFor,
 } from "./composite-sections";
 import { productsMigrationBlockId } from "./migration/products-blocks";
+import { aboutMigrationBlockId } from "./migration/about-blocks";
+import {
+  offerteFormMigrationBlockId,
+  offerteMainMigrationBlockId,
+} from "./migration/offerte-blocks";
 import {
   FIXED_SECTION_DEFS,
   FIXED_SECTIONS_BY_PAGE,
@@ -57,6 +62,13 @@ export type FixedInventoryExpectation =
       layoutRowIds: string[];
       /** Layout row id after Producten fixed→blocks pilot replace. */
       migratedLayoutRowId: string;
+    }
+  | {
+      kind: "fixed-or-migrated-blocks";
+      fixedKey: FixedSectionKey;
+      layoutRowIds: string[];
+      /** One or more layout row ids after fixed→blocks migration. */
+      migratedLayoutRowIds: string[];
     };
 
 function fixedLayoutRowIdsForKey(key: FixedSectionKey): string[] {
@@ -85,6 +97,32 @@ export function expectedFixedInventoryForPage(
         fixedKey,
         layoutRowIds,
         migratedLayoutRowId: `block:${blockId}`,
+      };
+    }
+    if (pageKey === "about" && fixedKey === "about.main") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: (
+          ["intro", "mission", "vision", "history"] as const
+        ).map((role) => `block:${aboutMigrationBlockId(pageId, role)}`),
+      };
+    }
+    if (pageKey === "offerte" && fixedKey === "offerte.main") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: [`block:${offerteMainMigrationBlockId(pageId)}`],
+      };
+    }
+    if (pageKey === "offerte" && fixedKey === "offerte.form") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: [`block:${offerteFormMigrationBlockId(pageId)}`],
       };
     }
     return {

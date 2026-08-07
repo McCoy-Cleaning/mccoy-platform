@@ -4,6 +4,8 @@ import type {
   DraftUpdateCommand,
   Locale,
   LocalePublicationState,
+  SiteFooterContent,
+  SiteNavigationContent,
   TranslationFreshness,
 } from "@mccoy/cms-schema";
 
@@ -17,6 +19,22 @@ export type CmsSiteRecord = {
   configVersion: number;
   createdAt: string;
   updatedAt: string;
+  /** Published navigation chrome; null until first Navigatie Opslaan. */
+  navigation?: SiteNavigationContent | null;
+  /** Published footer chrome; null until first Footer Opslaan. */
+  footer?: SiteFooterContent | null;
+};
+
+export type SaveSiteChromeInput = {
+  siteId?: string;
+  navigation?: SiteNavigationContent;
+  footer?: SiteFooterContent;
+};
+
+export type SaveSiteChromeResult = {
+  configVersion: number;
+  navigation: SiteNavigationContent | null;
+  footer: SiteFooterContent | null;
 };
 
 export type CmsPageRecord = {
@@ -136,6 +154,11 @@ export type CmsPublishedLookup = {
  */
 export interface CmsStore {
   getSite(siteId?: string): Promise<CmsSiteRecord>;
+  /**
+   * Persist published navigation and/or footer chrome on the site record.
+   * Omitted fields keep their previous durable values.
+   */
+  saveSiteChrome(input: SaveSiteChromeInput): Promise<SaveSiteChromeResult>;
   listPages(siteId?: string): Promise<CmsPageRecord[]>;
   getPage(pageId: string, siteId?: string): Promise<CmsPageRecord | null>;
   upsertPage(input: UpsertPageInput): Promise<CmsPageRecord>;

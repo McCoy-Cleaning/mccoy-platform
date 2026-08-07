@@ -56,6 +56,10 @@ export const getPublishedCmsBundle = createServerFn({ method: "POST" }).handler(
         configVersion: site.configVersion,
       },
       pagesJson: JSON.stringify(publishedPages),
+      /** Null until Navigatie Opslaan writes durable chrome. */
+      navigationJson: site.navigation ? JSON.stringify(site.navigation) : null,
+      /** Null until Footer Opslaan writes durable chrome. */
+      footerJson: site.footer ? JSON.stringify(site.footer) : null,
       publishedLocaleStatesJson: JSON.stringify(localeStates),
     };
   } catch (error) {

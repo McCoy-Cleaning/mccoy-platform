@@ -11,6 +11,8 @@ import {
   missingFixedSectionKeys,
   parseCompositeEditorRowId,
   resolveLayoutItemContentAlign,
+  parseHomeHeroBlocksMigrationState,
+  parseLegalBlocksMigrationState,
   parseProductsBlocksMigrationState,
   type FixedSectionKey,
 } from "@mccoy/cms-schema";
@@ -133,6 +135,103 @@ export function BuiltinLayoutEditor({
     cms.ensureProductsBlocksMigration(pageId);
   }, [page, pageId]);
 
+  // Home hero fixed→reusable hero block ensure when Secties opens.
+  const lastHomeHeroEnsureKey = React.useRef("");
+  React.useEffect(() => {
+    if (!page || page.kind !== "builtin" || page.pageKey !== "home") return;
+    const hasHeroBlock = page.layout.some((item) => {
+      if (item.kind !== "block") return false;
+      return page.blocks.some((b) => b.id === item.blockId && b.type === "hero");
+    });
+    const hasFixedHero = page.layout.some(
+      (item) => item.kind === "fixed" && item.key === "home.hero",
+    );
+    if (hasHeroBlock && !hasFixedHero) return;
+    const key = JSON.stringify({
+      hasHeroBlock,
+      hasFixedHero,
+      migration: page.homeHeroBlocksMigration ?? null,
+    });
+    if (lastHomeHeroEnsureKey.current === key) return;
+    lastHomeHeroEnsureKey.current = key;
+    cms.ensureHomeHeroBlocksMigration(pageId);
+  }, [page, pageId]);
+
+  const lastAboutEnsureKey = React.useRef("");
+  React.useEffect(() => {
+    if (!page || page.kind !== "builtin" || page.pageKey !== "about") return;
+    const hasIntro = page.layout.some((item) => {
+      if (item.kind !== "block") return false;
+      return page.blocks.some(
+        (b) =>
+          b.id === item.blockId &&
+          b.type === "centered" &&
+          (b.data as { presentation?: string })?.presentation === "aboutIntro",
+      );
+    });
+    const hasFixed = page.layout.some(
+      (item) => item.kind === "fixed" && item.key === "about.main",
+    );
+    if (hasIntro && !hasFixed) return;
+    const key = JSON.stringify({
+      hasIntro,
+      hasFixed,
+      migration: page.aboutBlocksMigration ?? null,
+    });
+    if (lastAboutEnsureKey.current === key) return;
+    lastAboutEnsureKey.current = key;
+    cms.ensureAboutBlocksMigration(pageId);
+  }, [page, pageId]);
+
+  const lastOfferteEnsureKey = React.useRef("");
+  React.useEffect(() => {
+    if (!page || page.kind !== "builtin" || page.pageKey !== "offerte") return;
+    const hasForm = page.layout.some((item) => {
+      if (item.kind !== "block") return false;
+      return page.blocks.some((b) => b.id === item.blockId && b.type === "quoteRequestForm");
+    });
+    const hasFixedForm = page.layout.some(
+      (item) => item.kind === "fixed" && item.key === "offerte.form",
+    );
+    if (hasForm && !hasFixedForm) return;
+    const key = JSON.stringify({
+      hasForm,
+      hasFixedForm,
+      migration: page.offerteBlocksMigration ?? null,
+    });
+    if (lastOfferteEnsureKey.current === key) return;
+    lastOfferteEnsureKey.current = key;
+    cms.ensureOfferteBlocksMigration(pageId);
+  }, [page, pageId]);
+
+  const lastLegalEnsureKey = React.useRef("");
+  React.useEffect(() => {
+    if (
+      !page ||
+      page.kind !== "builtin" ||
+      (page.pageKey !== "privacy" && page.pageKey !== "terms")
+    ) {
+      return;
+    }
+    const fixedKey = page.pageKey === "privacy" ? "privacy.main" : "terms.main";
+    const hasLegal = page.layout.some((item) => {
+      if (item.kind !== "block") return false;
+      return page.blocks.some((b) => b.id === item.blockId && b.type === "legalArticles");
+    });
+    const hasFixed = page.layout.some(
+      (item) => item.kind === "fixed" && item.key === fixedKey,
+    );
+    if (hasLegal && !hasFixed) return;
+    const key = JSON.stringify({
+      hasLegal,
+      hasFixed,
+      migration: page.legalBlocksMigration ?? null,
+    });
+    if (lastLegalEnsureKey.current === key) return;
+    lastLegalEnsureKey.current = key;
+    cms.ensureLegalBlocksMigration(pageId);
+  }, [page, pageId]);
+
   if (!page || page.kind !== "builtin") return null;
 
   const editorRows = buildEditorLayoutRows(page.layout, {
@@ -151,11 +250,25 @@ export function BuiltinLayoutEditor({
     page.kind === "builtin" ? parseProductsBlocksMigrationState(page.productsBlocksMigration) : null;
   const productsMigrated =
     productsMigration?.status === "migrated" || productsMigration?.status === "verified";
+  const homeHeroMigration =
+    page.kind === "builtin"
+      ? parseHomeHeroBlocksMigrationState(page.homeHeroBlocksMigration)
+      : null;
+  const homeHeroMigrated =
+    homeHeroMigration?.status === "migrated" || homeHeroMigration?.status === "verified";
+  const legalMigration =
+    page.kind === "builtin"
+      ? parseLegalBlocksMigrationState(page.legalBlocksMigration)
+      : null;
+  const legalMigrated =
+    legalMigration?.status === "migrated" || legalMigration?.status === "verified";
   const missingFixed = (
     page.pageKey ? missingFixedSectionKeys(page.pageKey, page.layout) : []
   ).filter((key) => {
     // After Producten migration, restore via Sectie toevoegen (blocks), not fixed keys.
     if (productsMigrated && (key === "products.main" || key === "products.info")) return false;
+    if (homeHeroMigrated && key === "home.hero") return false;
+    if (legalMigrated && (key === "privacy.main" || key === "terms.main")) return false;
     return true;
   });
   const showProductsEmptyHelper =

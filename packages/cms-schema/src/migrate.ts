@@ -81,6 +81,15 @@ const pageSchema = z.object({
       sources: z.array(z.enum(["products.main", "products.info"])).optional(),
     })
     .optional(),
+  /** Home hero fixed→reusable hero block — never infer from empty layout. */
+  homeHeroBlocksMigration: z
+    .object({
+      version: z.literal(1),
+      status: z.enum(["not_started", "migrated", "verified"]),
+      migratedAt: z.string().optional(),
+      sources: z.array(z.literal("home.hero")).optional(),
+    })
+    .optional(),
 });
 
 const pageDraftSchema = z.object({

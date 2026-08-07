@@ -1,8 +1,20 @@
 import { z } from "zod";
 import type { CmsImage } from "../cms-image";
 import { createItemId } from "../ids";
+import {
+  formScopeSnapshotSchema,
+  normalizeFormScopeSnapshot,
+  type FormScopeSnapshot,
+} from "../form-scope";
 import type { BlockType } from "../types";
 import type { CmsBlockDataDefinition } from "./definition";
+import {
+  createFormFieldItem,
+  createFormFieldOption,
+  formFieldItemSchema,
+  normalizeFormFields,
+  type FormFieldItem,
+} from "./form-fields";
 import { normalizeCmsImage } from "./image-normalize";
 
 function str(rec: Record<string, unknown>, key: string, fallback = ""): string {
@@ -332,91 +344,279 @@ export const contactInfoCardsDefinition = def({
   },
 });
 
-// —— Quote request form (presentation only) ——
+// —— Quote request form (multi-tab, custom fields) ——
+/** @deprecated Prefer QuoteFormKind — kept for dual-read of older block JSON. */
 export type QuoteScopeId = "glass_cleaning" | "furniture_cleaning";
 
+/** Aligns with domain FormKind for glass/furniture offerte submits. */
+export type QuoteFormKind = "glass_washing" | "furniture_cleaning";
+
+export type QuoteRequestFormTab = {
+  id: string;
+  /** Server form kind for this tab. */
+  kind: QuoteFormKind;
+  tag: string;
+  title: string;
+  description: string;
+  icon?: string;
+  /** Custom fields (name/email stay built-in). Same editor model as contactForm. */
+  fields: FormFieldItem[];
+  submitLabel?: string;
+  successMessage?: string;
+  scope?: FormScopeSnapshot;
+};
+
 export type QuoteRequestFormBlockData = {
-  heading: string;
+  heading?: string;
   description?: string;
-  enabledScopes: QuoteScopeId[];
-  defaultScope: QuoteScopeId;
+  tabs: QuoteRequestFormTab[];
+  defaultTabId?: string;
+  /** Shared fallbacks when a tab omits them. */
   submitLabel: string;
   successMessage: string;
+  /**
+   * Legacy dual-read fields (pre-tabs). Normalize lifts these into tabs.
+   * @deprecated
+   */
+  enabledScopes?: QuoteScopeId[];
+  /** @deprecated */
+  defaultScope?: QuoteScopeId;
 };
+
+const quoteFormKindSchema = z.enum(["glass_washing", "furniture_cleaning"]);
+
+export const quoteRequestFormTabSchema: z.ZodType<QuoteRequestFormTab> = z.object({
+  id: z.string().min(1),
+  kind: quoteFormKindSchema,
+  tag: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string(),
+  icon: z.string().optional(),
+  fields: z.array(formFieldItemSchema),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  scope: formScopeSnapshotSchema.optional(),
+});
 
 export const quoteRequestFormSchema: z.ZodType<QuoteRequestFormBlockData> = z
   .object({
-    heading: z.string().min(1),
+    heading: z.string().optional(),
     description: z.string().optional(),
-    enabledScopes: z
-      .array(z.enum(["glass_cleaning", "furniture_cleaning"]))
-      .min(1)
-      .max(2),
-    defaultScope: z.enum(["glass_cleaning", "furniture_cleaning"]),
+    tabs: z.array(quoteRequestFormTabSchema).min(1).max(8),
+    defaultTabId: z.string().optional(),
     submitLabel: z.string().min(1),
     successMessage: z.string().min(1),
+    enabledScopes: z.array(z.enum(["glass_cleaning", "furniture_cleaning"])).optional(),
+    defaultScope: z.enum(["glass_cleaning", "furniture_cleaning"]).optional(),
   })
   .superRefine((data, ctx) => {
-    if (!data.enabledScopes.includes(data.defaultScope)) {
+    if (data.defaultTabId && !data.tabs.some((t) => t.id === data.defaultTabId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "defaultScope must be one of enabledScopes",
-        path: ["defaultScope"],
+        message: "defaultTabId must match a tab id",
+        path: ["defaultTabId"],
       });
     }
   });
 
+function optSelect(label: string, options: readonly string[]): FormFieldItem {
+  return createFormFieldItem(label, "select", {
+    options: options.map((o) => createFormFieldOption(o, o)),
+  });
+}
+
+/** Exact NL field labels/options from the live Offerteformulier (window tab). */
+export function seedDefaultGlassWashingFields(): FormFieldItem[] {
+  return [
+    createFormFieldItem("Telefoon", "phone"),
+    createFormFieldItem("Bedrijfsnaam", "company"),
+    createFormFieldItem("Aantal verdiepingen", "text"),
+    createFormFieldItem("Aantal ramen (indicatie)", "text"),
+    createFormFieldItem("Hoogste raam (meter)", "text"),
+    optSelect("Bereikbaarheid", [
+      "Vanaf de grond",
+      "Ladder",
+      "Hoogwerker",
+      "Gondel / glazenwasserslift",
+    ]),
+    optSelect("Binnen, buiten of beide?", ["Alleen buiten", "Alleen binnen", "Binnen + buiten"]),
+    optSelect("Frequentie", ["4× per jaar", "6× per jaar", "Maandelijks", "Eenmalig"]),
+    createFormFieldItem("Foto's van de situatie (optioneel)", "file"),
+    createFormFieldItem("Uw bericht", "textarea"),
+  ];
+}
+
+/** Exact NL field labels/options from the live Offerteformulier (furniture tab). */
+export function seedDefaultFurnitureCleaningFields(): FormFieldItem[] {
+  return [
+    createFormFieldItem("Telefoon", "phone"),
+    createFormFieldItem("Bedrijfsnaam", "company"),
+    optSelect("Type meubel / vloer", [
+      "Stoffen bank / fauteuil",
+      "Lederen meubilair",
+      "Bureaustoelen",
+      "Tapijt / vloerbedekking",
+      "Harde vloer (PVC / linoleum)",
+      "Marmoleum / natuursteen",
+      "Parket",
+      "Matrassen",
+    ]),
+    createFormFieldItem("Aantal stuks", "text"),
+    createFormFieldItem("Materiaal / stof (indien bekend)", "text"),
+    createFormFieldItem("Oppervlakte (m²)", "text"),
+    createFormFieldItem("Foto's van de situatie (optioneel)", "file"),
+    createFormFieldItem("Bijzondere vlekken of geuren", "textarea"),
+  ];
+}
+
 export function createDefaultQuoteRequestForm(): QuoteRequestFormBlockData {
   return {
-    heading: "Offerte aanvragen",
-    description: "Kies uw type reiniging en vul het formulier in.",
-    enabledScopes: ["glass_cleaning", "furniture_cleaning"],
-    defaultScope: "glass_cleaning",
+    heading: undefined,
+    description: undefined,
     submitLabel: "Verstuur aanvraag",
-    successMessage: "Bedankt — we nemen zo snel mogelijk contact op.",
+    successMessage: "Bedankt! We nemen zo snel mogelijk contact op.",
+    defaultTabId: "tab_glass",
+    tabs: [
+      {
+        id: "tab_glass",
+        kind: "glass_washing",
+        tag: "Glasbewassing",
+        title: "Glasbewassing & gevelreiniging",
+        description:
+          "Streep­vrij schone ramen binnen én buiten — van pui op straatniveau tot hoogwerkers en gondels. Vertel ons zo veel mogelijk over het pand, dan rekenen wij u direct een eerlijke prijs voor.",
+        icon: "glass",
+        fields: seedDefaultGlassWashingFields(),
+      },
+      {
+        id: "tab_furniture",
+        kind: "furniture_cleaning",
+        tag: "Vloer- & meubelreiniging",
+        title: "Vloer- & meubelonderhoud",
+        description:
+          "Diepe reiniging en bescherming van stoffen meubilair, lederen banken, tapijten en harde vloeren. Wij werken met professionele extractie-apparatuur en pH-neutrale middelen die de vezel sparen.",
+        icon: "sofa",
+        fields: seedDefaultFurnitureCleaningFields(),
+      },
+    ],
+  };
+}
+
+function legacyScopeToKind(scope: string): QuoteFormKind {
+  if (scope === "furniture_cleaning") return "furniture_cleaning";
+  return "glass_washing";
+}
+
+function normalizeQuoteTab(raw: unknown, index: number): QuoteRequestFormTab | null {
+  if (!isRecord(raw)) return null;
+  const kindRaw = str(raw, "kind") || str(raw, "scope") || str(raw, "defaultScope");
+  const kind: QuoteFormKind =
+    kindRaw === "furniture_cleaning" || kindRaw === "furniture"
+      ? "furniture_cleaning"
+      : kindRaw === "glass_washing" ||
+          kindRaw === "glass_cleaning" ||
+          kindRaw === "glass" ||
+          kindRaw === "window"
+        ? "glass_washing"
+        : index === 1
+          ? "furniture_cleaning"
+          : "glass_washing";
+  const defaults =
+    kind === "furniture_cleaning"
+      ? createDefaultQuoteRequestForm().tabs[1]!
+      : createDefaultQuoteRequestForm().tabs[0]!;
+  const fieldsRaw = normalizeFormFields(raw.fields).filter((field) => {
+    if (field.type === "name" || field.type === "email") return false;
+    return true;
+  });
+  return {
+    id: str(raw, "id") || (kind === "furniture_cleaning" ? "tab_furniture" : "tab_glass"),
+    kind,
+    tag: str(raw, "tag") || defaults.tag,
+    title: str(raw, "title") || defaults.title,
+    description: str(raw, "description") || str(raw, "desc") || str(raw, "body") || defaults.description,
+    icon: str(raw, "icon") || defaults.icon,
+    fields: fieldsRaw.length ? fieldsRaw : defaults.fields,
+    submitLabel: str(raw, "submitLabel") || undefined,
+    successMessage: str(raw, "successMessage") || undefined,
+    scope: normalizeFormScopeSnapshot(raw.scope) ?? undefined,
   };
 }
 
 export function normalizeQuoteRequestForm(value: unknown): QuoteRequestFormBlockData {
   const rec = isRecord(value) ? value : {};
-  const scopesRaw = Array.isArray(rec.enabledScopes) ? rec.enabledScopes : [];
-  const enabledScopes = scopesRaw.filter(
-    (s): s is QuoteScopeId => s === "glass_cleaning" || s === "furniture_cleaning",
+  const submitLabel = str(rec, "submitLabel", "Verstuur aanvraag");
+  const successMessage = str(
+    rec,
+    "successMessage",
+    "Bedankt! We nemen zo snel mogelijk contact op.",
   );
-  const defaultScope: QuoteScopeId =
-    rec.defaultScope === "furniture_cleaning" ? "furniture_cleaning" : "glass_cleaning";
+  const heading = str(rec, "heading") || undefined;
+  const description = str(rec, "description") || str(rec, "body") || undefined;
+
+  let tabs: QuoteRequestFormTab[] = [];
+  if (Array.isArray(rec.tabs) && rec.tabs.length > 0) {
+    for (let i = 0; i < rec.tabs.length; i++) {
+      const tab = normalizeQuoteTab(rec.tabs[i], i);
+      if (tab) tabs.push(tab);
+    }
+  }
+
+  // Legacy enabledScopes / defaultScope → two factory tabs when tabs missing.
+  if (!tabs.length) {
+    const scopesRaw = Array.isArray(rec.enabledScopes) ? rec.enabledScopes : [];
+    const scopes = scopesRaw.filter(
+      (s): s is QuoteScopeId => s === "glass_cleaning" || s === "furniture_cleaning",
+    );
+    const factory = createDefaultQuoteRequestForm();
+    if (scopes.length) {
+      tabs = factory.tabs.filter((t) =>
+        scopes.some((s) => legacyScopeToKind(s) === t.kind),
+      );
+      if (!tabs.length) tabs = factory.tabs;
+    } else {
+      tabs = factory.tabs;
+    }
+  }
+
+  const defaultTabId =
+    str(rec, "defaultTabId") ||
+    (rec.defaultScope === "furniture_cleaning"
+      ? tabs.find((t) => t.kind === "furniture_cleaning")?.id
+      : tabs[0]?.id) ||
+    tabs[0]?.id;
+
   const data: QuoteRequestFormBlockData = {
-    heading: str(rec, "heading", "Offerte aanvragen"),
-    description: str(rec, "description") || str(rec, "body") || undefined,
-    enabledScopes: enabledScopes.length
-      ? enabledScopes
-      : ["glass_cleaning", "furniture_cleaning"],
-    defaultScope: enabledScopes.includes(defaultScope)
-      ? defaultScope
-      : (enabledScopes[0] ?? "glass_cleaning"),
-    submitLabel: str(rec, "submitLabel", "Verstuur aanvraag"),
-    successMessage: str(
-      rec,
-      "successMessage",
-      "Bedankt — we nemen zo snel mogelijk contact op.",
-    ),
+    heading,
+    description,
+    tabs,
+    defaultTabId,
+    submitLabel,
+    successMessage,
   };
   return quoteRequestFormSchema.safeParse(data).success
     ? data
     : createDefaultQuoteRequestForm();
 }
 
+export function quoteFormKindForTab(tab: QuoteRequestFormTab): QuoteFormKind {
+  return tab.kind;
+}
+
 export const quoteRequestFormDefinition = def({
   type: "quoteRequestForm",
   label: "Offerteformulier",
   category: "Conversion",
-  description: "Presentatie voor het offerte-aanvraagformulier (server bepaalt bron/scope).",
-  dataVersion: 1,
+  description:
+    "Multi-tab offerteformulier met bewerkbare velden per tab (zelfde veld-editor als contactformulier).",
+  dataVersion: 2,
   schema: quoteRequestFormSchema,
   createDefault: createDefaultQuoteRequestForm,
   normalize: normalizeQuoteRequestForm,
   capabilities: { duplicable: false, removable: true, publishable: true },
-  getSummary: () => "Offerteformulier",
+  getSummary: (data) => {
+    const d = normalizeQuoteRequestForm(data);
+    return `${d.tabs.length} tab${d.tabs.length === 1 ? "" : "s"}`;
+  },
 });
 
 // —— Legal articles ——
@@ -429,6 +629,7 @@ export type LegalArticleItem = {
 };
 
 export type LegalArticlesBlockData = {
+  eyebrow?: string;
   heading: string;
   updatedLabel?: string;
   updatedAt?: string;
@@ -446,6 +647,7 @@ function slugifyAnchor(input: string): string {
 }
 
 export const legalArticlesSchema: z.ZodType<LegalArticlesBlockData> = z.object({
+  eyebrow: z.string().optional(),
   heading: z.string().min(1),
   updatedLabel: z.string().optional(),
   updatedAt: z
@@ -507,7 +709,9 @@ export function normalizeLegalArticles(value: unknown): LegalArticlesBlockData {
   }
   const updatedAtRaw = str(rec, "updatedAt");
   const updatedAt = /^\d{4}-\d{2}-\d{2}$/.test(updatedAtRaw) ? updatedAtRaw : undefined;
+  const eyebrow = str(rec, "eyebrow") || undefined;
   const data: LegalArticlesBlockData = {
+    ...(eyebrow ? { eyebrow } : {}),
     heading: str(rec, "heading") || str(rec, "title") || "Juridische informatie",
     updatedLabel: str(rec, "updatedLabel") || undefined,
     updatedAt,

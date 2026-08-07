@@ -3,7 +3,7 @@ import { createItemId, type BlockEditorPresentation } from "@mccoy/cms-schema";
 import type { CmsImage } from "@mccoy/cms-schema";
 import type { CmsImagePickerProps } from "../image-picker-props";
 import { blockEnPath, NlEnField } from "./en-draft-fields";
-import { BlockImageField, Section, inputClass } from "./shared-fields";
+import { BlockImageField, Field, Section, inputClass } from "./shared-fields";
 
 export type ProductsIntroMetric = {
   id: string;
@@ -16,10 +16,15 @@ export type TextImageBlockData = {
   body?: string;
   image?: CmsImage;
   reverse?: boolean;
-  presentation?: "default" | "productsIntro";
+  presentation?: "default" | "productsIntro" | "aboutPillar";
   eyebrow?: string;
   notice?: string;
   metrics?: ProductsIntroMetric[];
+  tag?: string;
+  icon?: string;
+  aspectClassName?: string;
+  objectPosition?: string;
+  scaleMode?: "default" | "soft";
 };
 
 const DEFAULT_METRICS: ProductsIntroMetric[] = [
@@ -74,6 +79,24 @@ export function TextImageBlockEditor({
               onChange={(e) => onChange({ ...value, eyebrow: e.target.value })}
             />
           </NlEnField>
+        ) : null}
+        {value.presentation === "aboutPillar" ? (
+          <>
+            <Field label="Tag" hint="Bijv. 01 / 02 / 03">
+              <input
+                className={inputClass}
+                value={value.tag ?? ""}
+                onChange={(e) => onChange({ ...value, tag: e.target.value })}
+              />
+            </Field>
+            <Field label="Icoon" hint="target | eye | history">
+              <input
+                className={inputClass}
+                value={value.icon ?? ""}
+                onChange={(e) => onChange({ ...value, icon: e.target.value })}
+              />
+            </Field>
+          </>
         ) : null}
         <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
           <input
@@ -157,7 +180,13 @@ export function TextImageBlockEditor({
           <BlockImageField
             label="Sectie-afbeelding"
             value={value.image}
-            preferTags={["cms"]}
+            preferTags={
+              value.presentation === "aboutPillar"
+                ? ["about"]
+                : value.presentation === "productsIntro"
+                  ? ["products", "form"]
+                  : ["cms", "about", "gallery", "work"]
+            }
             enAltPath={blockEnPath(blockId, "image.alt")}
             projectImages={projectImages}
             assetBaseUrl={assetBaseUrl}

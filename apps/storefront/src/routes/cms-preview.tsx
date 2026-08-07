@@ -5,7 +5,12 @@ import {
   addTrustedMessageListener,
   isPreviewParentMessage,
   localizeCmsPageForLocale,
+  resolveAboutBlocksLayout,
+  resolveHomeHeroBlocksLayout,
+  resolveLegalBlocksLayout,
+  resolveOfferteBlocksLayout,
   resolveAdminParentOrigins,
+  type BuiltinCmsPage,
   type BuiltinPageKey,
   type PreviewSnapshot,
 } from "@mccoy/cms-schema";
@@ -128,7 +133,22 @@ const PAGE_KEY_BY_ID: Record<string, BuiltinPageKey> = {
 
 function PageFromSnapshot({ snapshot }: { snapshot: PreviewSnapshot }) {
   const locale = useActiveCmsLocale();
-  const page = localizeCmsPageForLocale(snapshot.page, locale);
+  let page = localizeCmsPageForLocale(snapshot.page, locale);
+  if (page.kind === "builtin" && page.pageKey === "home") {
+    page = resolveHomeHeroBlocksLayout(page as BuiltinCmsPage).page;
+  }
+  if (page.kind === "builtin" && page.pageKey === "about") {
+    page = resolveAboutBlocksLayout(page as BuiltinCmsPage).page;
+  }
+  if (page.kind === "builtin" && page.pageKey === "offerte") {
+    page = resolveOfferteBlocksLayout(page as BuiltinCmsPage).page;
+  }
+  if (
+    page.kind === "builtin" &&
+    (page.pageKey === "privacy" || page.pageKey === "terms")
+  ) {
+    page = resolveLegalBlocksLayout(page as BuiltinCmsPage).page;
+  }
 
   if (page.isCustom) {
     return <BlocksView blocks={page.blocks} pageId={page.id} />;

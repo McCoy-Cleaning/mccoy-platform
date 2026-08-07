@@ -6,6 +6,8 @@ import {
 } from "@mccoy/cms-renderer";
 import {
   cmsTextOrFallback,
+  DEFAULT_ABOUT_INTRO_PILLARS_EN,
+  DEFAULT_ABOUT_INTRO_PILLARS_NL,
   parseBlockData,
   productAssortmentTemplateData,
   productIntroTemplateData,
@@ -14,6 +16,7 @@ import {
   type CmsButton,
   type CmsImage,
   type CmsLink,
+  type QuoteFormKind,
 } from "@mccoy/cms-schema";
 import { submitWebsiteForm } from "@/lib/api/forms.functions";
 import { useI18n } from "@/lib/i18n";
@@ -21,6 +24,10 @@ import {
   ProductsAssortmentView,
   ProductsIntroView,
 } from "@/components/site/sections/ProductsBlockViews";
+import {
+  AboutIntroView,
+  AboutPillarRowView,
+} from "@/components/site/sections/AboutBlockViews";
 
 const ASSORTMENT_CARD_EN: Record<string, { title: string; body: string }> = {
   prod_hygiene: {
@@ -63,6 +70,23 @@ const storefrontFormAdapters: CmsFormAdapters = {
     const result = await submitWebsiteForm({
       data: {
         kind: "inquiry",
+        pageId: input.pageId,
+        sourceId: input.blockId,
+        fields: {
+          ...input.fields,
+          sourceBlockId: input.blockId.slice(0, 64),
+        },
+        website: input.website ?? "",
+      },
+    });
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: true };
+  },
+  async submitQuoteForm(input) {
+    const kind = input.kind as QuoteFormKind;
+    const result = await submitWebsiteForm({
+      data: {
+        kind,
         pageId: input.pageId,
         sourceId: input.blockId,
         fields: {
@@ -169,6 +193,61 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
   return null;
 }
 
+function AboutPresentationBlock({ block }: { block: Block }) {
+  const { lang } = useI18n();
+  const parsed = parseBlockData(block.type, block.data);
+  if (!parsed.ok) return null;
+  const d = parsed.data as Record<string, unknown>;
+
+  if (block.type === "centered" && d.presentation === "aboutIntro") {
+    const defaults = lang === "en" ? DEFAULT_ABOUT_INTRO_PILLARS_EN : DEFAULT_ABOUT_INTRO_PILLARS_NL;
+    const pillarsRaw = Array.isArray(d.pillars) ? d.pillars : defaults;
+    const pillars = pillarsRaw.map((p, i) => {
+      const row = p && typeof p === "object" ? (p as Record<string, unknown>) : {};
+      const fallback = defaults[i] ?? defaults[0]!;
+      return {
+        id: typeof row.id === "string" ? row.id : fallback.id,
+        icon: typeof row.icon === "string" ? row.icon : fallback.icon,
+        label: typeof row.label === "string" && row.label.trim() ? row.label : fallback.label,
+      };
+    });
+    return (
+      <AboutIntroView
+        eyebrow={typeof d.eyebrow === "string" ? d.eyebrow : lang === "en" ? "About us" : "Over ons"}
+        heading={String(d.title ?? "")}
+        pillars={pillars}
+        cta={(d.cta as CmsButton | undefined) ?? null}
+      />
+    );
+  }
+
+  if (block.type === "textImage" && d.presentation === "aboutPillar") {
+    const tag = typeof d.tag === "string" && d.tag.trim() ? d.tag : "01";
+    const index = tag === "02" ? 1 : tag === "03" ? 2 : 0;
+    return (
+      <AboutPillarRowView
+        title={String(d.title ?? "")}
+        body={typeof d.body === "string" ? d.body : ""}
+        iconKey={typeof d.icon === "string" ? d.icon : "target"}
+        image={(d.image as CmsImage | undefined) ?? null}
+        tag={tag}
+        index={typeof d.reverse === "boolean" ? (d.reverse ? 1 : 0) : index}
+        aspectClassName={
+          typeof d.aspectClassName === "string" ? d.aspectClassName : undefined
+        }
+        objectPosition={
+          typeof d.objectPosition === "string" ? d.objectPosition : undefined
+        }
+        scaleValues={
+          d.scaleMode === "soft" ? ([1.05, 1, 1.05] as [number, number, number]) : undefined
+        }
+      />
+    );
+  }
+
+  return null;
+}
+
 function usesProductsPresentation(block: Block): boolean {
   const parsed = parseBlockData(block.type, block.data);
   if (!parsed.ok) return false;
@@ -176,6 +255,16 @@ function usesProductsPresentation(block: Block): boolean {
   return (
     (block.type === "textImage" && presentation === "productsIntro") ||
     (block.type === "featureGrid" && presentation === "productsAssortment")
+  );
+}
+
+function usesAboutPresentation(block: Block): boolean {
+  const parsed = parseBlockData(block.type, block.data);
+  if (!parsed.ok) return false;
+  const presentation = (parsed.data as { presentation?: string }).presentation;
+  return (
+    (block.type === "centered" && presentation === "aboutIntro") ||
+    (block.type === "textImage" && presentation === "aboutPillar")
   );
 }
 
@@ -191,6 +280,8 @@ export function BlockView({
 }) {
   const rendered = usesProductsPresentation(block) ? (
     <ProductsPresentationBlock block={block} />
+  ) : usesAboutPresentation(block) ? (
+    <AboutPresentationBlock block={block} />
   ) : (
     <RegisteredBlockView block={block} adminMode={adminMode} />
   );

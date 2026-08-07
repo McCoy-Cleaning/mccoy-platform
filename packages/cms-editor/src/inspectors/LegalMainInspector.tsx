@@ -64,7 +64,6 @@ export function LegalMainInspector({
           fieldHint="eyebrow"
           maxChars={60}
           enableAi={false}
-          showEnDraft={false}
         />
         <InspectTextField
           label="Paginakop"
@@ -74,7 +73,6 @@ export function LegalMainInspector({
           fieldHint="heading"
           maxChars={120}
           enableAi={false}
-          showEnDraft={false}
         />
         <InspectTextField
           label="Bijgewerkt-label"
@@ -84,7 +82,6 @@ export function LegalMainInspector({
           fieldHint="updatedLabel"
           maxChars={160}
           enableAi={false}
-          showEnDraft={false}
         />
       </div>
 
@@ -121,7 +118,6 @@ export function LegalMainInspector({
                 fieldHint="title"
                 maxChars={160}
                 enableAi={false}
-                showEnDraft={false}
               />
               <InspectTextField
                 label="Tekst"
@@ -132,7 +128,6 @@ export function LegalMainInspector({
                 multiline
                 maxChars={8000}
                 enableAi={false}
-                showEnDraft={false}
               />
             </div>
           )}

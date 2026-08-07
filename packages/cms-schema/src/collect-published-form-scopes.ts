@@ -1,6 +1,11 @@
 import type { FormScopeSnapshot } from "@mccoy/domain";
 import type { CmsPage } from "./types";
-import { getBlockDataDefinition, type ContactFormBlockData, type NewsletterBlockData } from "./blocks";
+import {
+  getBlockDataDefinition,
+  type ContactFormBlockData,
+  type NewsletterBlockData,
+  type QuoteRequestFormBlockData,
+} from "./blocks";
 import type { ContactFormContent, VacaturesApplicationContent, VacaturesMainContent } from "./content";
 import { isLayoutItemHidden } from "./layout";
 import { normalizeCmsPage } from "./pipeline";
@@ -58,6 +63,12 @@ export function collectPublishedFormScopes(pages: CmsPage[]): PublishedFormScope
         const def = getBlockDataDefinition("newsletter");
         const data = def.normalize(block.data) as NewsletterBlockData;
         addScope(map, data.scope);
+      }
+
+      if (block.type === "quoteRequestForm") {
+        const def = getBlockDataDefinition("quoteRequestForm");
+        const data = def.normalize(block.data) as QuoteRequestFormBlockData;
+        for (const tab of data.tabs) addScope(map, tab.scope);
       }
     }
 

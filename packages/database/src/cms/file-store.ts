@@ -9,9 +9,13 @@ import { randomUUID } from "node:crypto";
 import {
   ensurePageLocaleFields,
   normalizeCmsPath,
+  parseSiteFooterResult,
+  parseSiteNavigationResult,
   type CmsPage,
   type CmsPagePublishedEvent,
   type Locale,
+  type SiteFooterContent,
+  type SiteNavigationContent,
 } from "@mccoy/cms-schema";
 import { getDataDir } from "@mccoy/security";
 
@@ -32,6 +36,8 @@ import {
   type UpsertPageInput,
   type DeletePageInput,
   type DeletePageResult,
+  type SaveSiteChromeInput,
+  type SaveSiteChromeResult,
 } from "./types";
 
 type StoreFile = {
@@ -66,7 +72,23 @@ function defaultSite(): CmsSiteRecord {
     configVersion: 1,
     createdAt: nowIso(),
     updatedAt: nowIso(),
+    navigation: null,
+    footer: null,
   };
+}
+
+function normalizeSiteChrome(site: CmsSiteRecord): CmsSiteRecord {
+  let navigation: SiteNavigationContent | null = null;
+  if (site.navigation != null) {
+    const parsed = parseSiteNavigationResult(site.navigation);
+    navigation = parsed.ok ? parsed.data : null;
+  }
+  let footer: SiteFooterContent | null = null;
+  if (site.footer != null) {
+    const parsed = parseSiteFooterResult(site.footer);
+    footer = parsed.ok ? parsed.data : null;
+  }
+  return { ...site, navigation, footer };
 }
 
 function emptyStore(): StoreFile {
@@ -128,6 +150,7 @@ async function readStore(backend: StoreBackend): Promise<StoreFile> {
       if (!parsed || parsed.version !== 1) {
         return backend.memory ?? emptyStore();
       }
+      parsed.site = normalizeSiteChrome(parsed.site ?? defaultSite());
       backend.memory = parsed;
       return parsed;
     } catch (error) {
@@ -582,7 +605,39 @@ export function createFileCmsStore(options: FileCmsStoreOptions = {}): CmsStore 
       if (siteId && store.site.id !== siteId && store.site.slug !== siteId) {
         throw new Error("cms site not found");
       }
-      return store.site;
+      return normalizeSiteChrome(store.site);
+    },
+
+    async saveSiteChrome(input: SaveSiteChromeInput): Promise<SaveSiteChromeResult> {
+      if (input.navigation === undefined && input.footer === undefined) {
+        throw new Error("cms saveSiteChrome: navigation or footer required");
+      }
+      return mutate(backend, (store) => {
+        const siteId = input.siteId ?? store.site.id;
+        if (store.site.id !== siteId && store.site.slug !== siteId) {
+          throw new Error("cms site not found");
+        }
+        if (input.navigation !== undefined) {
+          const parsed = parseSiteNavigationResult(input.navigation);
+          if (!parsed.ok) throw new Error(`cms saveSiteChrome: ${parsed.reason}`);
+          store.site.navigation = parsed.data;
+        }
+        if (input.footer !== undefined) {
+          const parsed = parseSiteFooterResult(input.footer);
+          if (!parsed.ok) throw new Error(`cms saveSiteChrome: ${parsed.reason}`);
+          store.site.footer = parsed.data;
+        }
+        // Bump explicitly so the returned configVersion matches the written site.
+        store.site.configVersion += 1;
+        store.site.updatedAt = nowIso();
+        const site = normalizeSiteChrome(store.site);
+        store.site = site;
+        return {
+          configVersion: site.configVersion,
+          navigation: site.navigation ?? null,
+          footer: site.footer ?? null,
+        };
+      });
     },
 
     async listPages(siteId) {

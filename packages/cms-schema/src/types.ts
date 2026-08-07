@@ -104,6 +104,46 @@ export type BuiltinCmsPage = PageBase & {
     /** Fixed keys converted on first migrate — used to avoid recreating intentionally deleted blocks. */
     sources?: Array<"products.main" | "products.info">;
   };
+  /**
+   * Home hero fixed→reusable `hero` block state.
+   * Persisted by admin after resolveHomeHeroBlocksLayout; storefront reads only.
+   */
+  homeHeroBlocksMigration?: {
+    version: 1;
+    status: "not_started" | "migrated" | "verified";
+    migratedAt?: string;
+    sources?: Array<"home.hero">;
+  };
+  /**
+   * Over ons fixed→reusable centered/textImage blocks state.
+   * Persisted by admin after resolveAboutBlocksLayout; storefront reads only.
+   */
+  aboutBlocksMigration?: {
+    version: 1;
+    status: "not_started" | "migrated" | "verified";
+    migratedAt?: string;
+    sources?: Array<"about.main">;
+  };
+  /**
+   * Offerte intro + form fixed→reusable blocks state.
+   * Persisted by admin after resolveOfferteBlocksLayout; storefront reads only.
+   */
+  offerteBlocksMigration?: {
+    version: 1;
+    status: "not_started" | "migrated" | "verified";
+    migratedAt?: string;
+    sources?: Array<"offerte.main" | "offerte.form">;
+  };
+  /**
+   * Privacy / Terms fixed→reusable `legalArticles` block state.
+   * Persisted by admin after resolveLegalBlocksLayout; storefront reads only.
+   */
+  legalBlocksMigration?: {
+    version: 1;
+    status: "not_started" | "migrated" | "verified";
+    migratedAt?: string;
+    sources?: Array<"privacy.main" | "terms.main">;
+  };
 };
 
 export type CustomCmsPage = PageBase & {

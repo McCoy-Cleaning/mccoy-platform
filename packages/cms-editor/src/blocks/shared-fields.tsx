@@ -14,6 +14,12 @@ import { EnDraftFor } from "./en-draft-fields";
 import { getPopupContentEditor } from "./popup-editor-bridge";
 import { PopupContentTypeChooser } from "./PopupContentTypePicker";
 import type { CmsImagePickerProps } from "../image-picker-props";
+import {
+  filterProjectImagesForStorage,
+  lookupResolvedProjectImage,
+  resolveCmsImageDisplaySrc,
+  resolveProjectThumbSrc,
+} from "../resolve-media-src";
 import { EmptyHint, Field, Section, inputClass, selectClass } from "./field-chrome";
 
 export { EmptyHint, Field, Section, inputClass, selectClass };
@@ -333,13 +339,23 @@ export function BlockImageField({
   const [uploadStatus, setUploadStatus] = React.useState<string | null>(null);
   const [srcError, setSrcError] = React.useState<string | null>(null);
 
-  const mediaSrc = (src: string) => {
-    if (!src) return "";
-    if (/^(https?:|data:|blob:)/i.test(src)) return src;
-    if (!assetBaseUrl) return src;
-    const path = src.startsWith("/") ? src : `/${src}`;
-    return `${assetBaseUrl.replace(/\/$/, "")}${path}`;
-  };
+  const mediaOptions = React.useMemo(
+    () => ({ assetBaseUrl, resolveProjectImage }),
+    [assetBaseUrl, resolveProjectImage],
+  );
+
+  const catalog = React.useMemo(
+    () => filterProjectImagesForStorage(projectImages, resolveProjectImage),
+    [projectImages, resolveProjectImage],
+  );
+
+  const orderedProjectImages = React.useMemo(() => {
+    if (preferTags.length === 0) return catalog;
+    return [
+      ...catalog.filter((p) => preferTags.some((t) => p.tags?.includes(t))),
+      ...catalog.filter((p) => !preferTags.some((t) => p.tags?.includes(t))),
+    ];
+  }, [catalog, preferTags]);
 
   const onUploadFile = async (files: FileList | null) => {
     const file = files?.[0];
@@ -387,7 +403,7 @@ export function BlockImageField({
 
   const applyLocalPath = (path: string, altFallback?: string) => {
     const src = path.startsWith("/") ? path : `/${path}`;
-    const resolved = resolveProjectImage?.(src) ?? resolveProjectImage?.(path);
+    const resolved = lookupResolvedProjectImage(path, resolveProjectImage);
     if (resolved) {
       onChange({
         ...resolved,
@@ -403,6 +419,13 @@ export function BlockImageField({
       alt: value?.alt || altFallback || label,
       decorative: value?.decorative === true,
     });
+  };
+
+  const pathMatchesValue = (path: string) => {
+    const normalized = path.startsWith("/") ? path : `/${path}`;
+    if (value?.src === normalized || value?.src.endsWith(normalized)) return true;
+    const resolved = lookupResolvedProjectImage(path, resolveProjectImage);
+    return Boolean(resolved && value?.assetId && resolved.assetId === value.assetId);
   };
 
   return (
@@ -425,7 +448,7 @@ export function BlockImageField({
           style={{ aspectRatio: "16 / 10", maxHeight: 144 }}
         >
           <img
-            src={mediaSrc(img.src)}
+            src={resolveCmsImageDisplaySrc(img.src, mediaOptions)}
             alt={img.decorative ? "" : img.alt || label}
             className="h-full w-full object-contain"
             aria-hidden={img.decorative === true}
@@ -472,37 +495,33 @@ export function BlockImageField({
         </div>
       ) : null}
 
-      {projectImages.length > 0 ? (
+      {orderedProjectImages.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-white/50">Of kies een bestaande projectfoto:</p>
           <div className="grid grid-cols-4 gap-2" role="listbox" aria-label={`${label} kiezen`}>
-            {(preferTags.length > 0
-              ? [
-                  ...projectImages.filter((p) => preferTags.some((t) => p.tags?.includes(t))),
-                  ...projectImages.filter((p) => !preferTags.some((t) => p.tags?.includes(t))),
-                ]
-              : projectImages
-            )
-              .slice(0, 12)
-              .map((item) => {
-                const src = item.path.startsWith("/") ? item.path : `/${item.path}`;
-                const selected = value?.src === src || value?.src.endsWith(src);
-                return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    title={item.label}
-                    onClick={() => applyLocalPath(item.path, item.label)}
-                    className={`h-14 overflow-hidden rounded-lg border bg-black/50 ${
-                      selected ? "border-sky-400 ring-2 ring-sky-400/50" : "border-white/10 hover:border-white/35"
-                    }`}
-                  >
-                    <img src={mediaSrc(src)} alt="" className="h-full w-full object-contain p-1" loading="lazy" />
-                  </button>
-                );
-              })}
+            {orderedProjectImages.slice(0, 12).map((item) => {
+              const selected = pathMatchesValue(item.path);
+              return (
+                <button
+                  key={item.path}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  title={item.label}
+                  onClick={() => applyLocalPath(item.path, item.label)}
+                  className={`h-14 overflow-hidden rounded-lg border bg-black/50 ${
+                    selected ? "border-sky-400 ring-2 ring-sky-400/50" : "border-white/10 hover:border-white/35"
+                  }`}
+                >
+                  <img
+                    src={resolveProjectThumbSrc(item.path, mediaOptions)}
+                    alt=""
+                    className="h-full w-full object-contain p-1"
+                    loading="lazy"
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
