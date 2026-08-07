@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Baseline HTTP security headers for McCoy admin + storefront.
  *
  * Storefront must remain embeddable by the admin CMS preview iframe
@@ -18,17 +18,54 @@ function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+/** Split comma/space-separated origin lists from env (staging + preview hosts). */
+function originsFromEnvValue(value: string | undefined): string[] {
+  if (!value || !value.trim()) return [];
+  return value
+    .split(/[\s,]+/)
+    .map((v) => v.trim().replace(/\/$/, ""))
+    .filter((v) => {
+      if (!v) return false;
+      try {
+        const u = new URL(v);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    });
+}
+
 function defaultAdminFrameAncestors(): string[] {
   const fromEnv = [
-    process.env.VITE_ADMIN_ORIGIN,
-    process.env.ADMIN_ORIGIN,
-    process.env.MCCOY_ADMIN_ORIGIN,
-  ]
-    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
-    .map((v) => v.trim().replace(/\/$/, ""));
+    ...originsFromEnvValue(process.env.MCCOY_ADMIN_FRAME_ANCESTORS),
+    ...originsFromEnvValue(process.env.VITE_ADMIN_ORIGIN),
+    ...originsFromEnvValue(process.env.ADMIN_ORIGIN),
+    ...originsFromEnvValue(process.env.MCCOY_ADMIN_ORIGIN),
+  ];
 
   // Local defaults used by Playwright / npm run dev:admin
   return unique([...fromEnv, "http://localhost:5174", "http://127.0.0.1:5174"]);
+}
+
+/**
+ * Storefront origins the admin CMS may embed (edit/preview iframes).
+ * Without an explicit `frame-src`, CSP falls back to `default-src 'self'` and
+ * blocks cross-origin www — the iframe stays blank.
+ */
+function defaultAdminFrameSrc(): string[] {
+  const fromEnv = [
+    ...originsFromEnvValue(process.env.MCCOY_STOREFRONT_FRAME_SRC),
+    ...originsFromEnvValue(process.env.VITE_STOREFRONT_ORIGIN),
+    ...originsFromEnvValue(process.env.STOREFRONT_ORIGIN),
+    ...originsFromEnvValue(process.env.MCCOY_STOREFRONT_ORIGIN),
+  ];
+  return unique([
+    ...fromEnv,
+    "https://www.mccoy.nl",
+    "https://mccoy.nl",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]);
 }
 
 export function buildContentSecurityPolicy(
@@ -36,6 +73,7 @@ export function buildContentSecurityPolicy(
   adminFrameAncestors: string[] = defaultAdminFrameAncestors(),
 ): string {
   if (app === "admin") {
+    const frameSrc = unique(["'self'", ...defaultAdminFrameSrc()]);
     return [
       "default-src 'self'",
       "base-uri 'self'",
@@ -47,6 +85,8 @@ export function buildContentSecurityPolicy(
       "script-src 'self' 'unsafe-inline'",
       "connect-src 'self' https: wss:",
       "form-action 'self'",
+      // CMS edit/preview embeds the storefront (often a different origin).
+      `frame-src ${frameSrc.join(" ")}`,
     ].join("; ");
   }
 

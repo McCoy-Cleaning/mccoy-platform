@@ -16,6 +16,15 @@ function normalizeOrigin(value: string): string {
   return value.replace(/\/$/, "");
 }
 
+/** Support comma-separated VITE_ADMIN_ORIGIN / frame-ancestor lists. */
+function originsFromEnvList(value?: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(/[\s,]+/)
+    .map((v) => normalizeOrigin(v.trim()))
+    .filter(Boolean);
+}
+
 function addSiblingLocalPort(origins: Set<string>, currentOrigin: string) {
   try {
     const u = new URL(currentOrigin);
@@ -35,9 +44,11 @@ export function resolveAdminParentOrigins(input: {
   currentOrigin: string;
   envAdminOrigin?: string | null;
   referrer?: string | null;
+  /** Chrome: parent browsing-context origins when embedded in an iframe. */
+  ancestorOrigins?: ArrayLike<string> | null;
 }): string[] {
   const origins = new Set<string>();
-  if (input.envAdminOrigin) origins.add(normalizeOrigin(input.envAdminOrigin));
+  for (const o of originsFromEnvList(input.envAdminOrigin)) origins.add(o);
   addSiblingLocalPort(origins, input.currentOrigin);
   if (input.referrer) {
     try {
@@ -46,9 +57,31 @@ export function resolveAdminParentOrigins(input: {
       /* ignore */
     }
   }
+  if (input.ancestorOrigins) {
+    for (let i = 0; i < input.ancestorOrigins.length; i++) {
+      const raw = input.ancestorOrigins[i];
+      if (typeof raw === "string" && raw) origins.add(normalizeOrigin(raw));
+    }
+  }
   // Same-origin embedding (tests / unified host)
   origins.add(normalizeOrigin(input.currentOrigin));
   return [...origins];
+}
+
+/**
+ * True for Vercel *deployment* hosts (`…-eringkpn6-….vercel.app`), not stable
+ * branch aliases (`…-git-development-….vercel.app`).
+ */
+export function isEphemeralVercelDeploymentOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.toLowerCase();
+    if (!host.endsWith(".vercel.app")) return false;
+    if (host.includes("-git-")) return false;
+    // project-<deploymentId>-team.vercel.app
+    return /-[a-z0-9]{6,}-[a-z0-9-]+\.vercel\.app$/i.test(host);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -59,7 +92,7 @@ export function resolveStorefrontChildOrigins(input: {
   envStorefrontOrigin?: string | null;
 }): string[] {
   const origins = new Set<string>();
-  if (input.envStorefrontOrigin) origins.add(normalizeOrigin(input.envStorefrontOrigin));
+  for (const o of originsFromEnvList(input.envStorefrontOrigin)) origins.add(o);
   addSiblingLocalPort(origins, input.currentOrigin);
   origins.add(normalizeOrigin(input.currentOrigin));
   return [...origins];

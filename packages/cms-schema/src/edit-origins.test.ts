@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveAdminParentOrigins, resolveStorefrontChildOrigins } from "./edit-origins";
+import {
+  isEphemeralVercelDeploymentOrigin,
+  resolveAdminParentOrigins,
+  resolveStorefrontChildOrigins,
+} from "./edit-origins";
 
 describe("edit-origins", () => {
   it("includes sibling admin port when storefront is on 5173", () => {
@@ -45,5 +49,26 @@ describe("edit-origins", () => {
     });
     expect(origins).toContain("http://localhost:4173");
     expect(origins).toContain("http://localhost:4174");
+  });
+
+  it("includes ancestorOrigins when embedded", () => {
+    const origins = resolveAdminParentOrigins({
+      currentOrigin: "https://www.mccoy.nl",
+      ancestorOrigins: ["https://mccoy-platform-admin-git-development-mccoy1.vercel.app"],
+    });
+    expect(origins).toContain("https://mccoy-platform-admin-git-development-mccoy1.vercel.app");
+  });
+
+  it("detects ephemeral vs stable Vercel admin hosts", () => {
+    expect(
+      isEphemeralVercelDeploymentOrigin(
+        "https://mccoy-platform-admin-eringkpn6-mccoy1.vercel.app",
+      ),
+    ).toBe(true);
+    expect(
+      isEphemeralVercelDeploymentOrigin(
+        "https://mccoy-platform-admin-git-development-mccoy1.vercel.app",
+      ),
+    ).toBe(false);
   });
 });
