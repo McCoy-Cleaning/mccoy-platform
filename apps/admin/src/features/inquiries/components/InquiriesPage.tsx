@@ -43,10 +43,44 @@ export function InquiriesPage() {
     clearTombstones,
   } = useInquiriesListQuery({ kind, scopeKey, debouncedQ });
 
-  useInquiriesRealtimeRefresh({ loadList });
-
-  const { selectedId, detail, setDetail, detailState, detailError, loadDetail, closeDetail } =
+  const { selectedId, detail, setDetail, detailState, detailError, loadDetail, softRefreshDetail, closeDetail } =
     useInquiryDetailQuery({ setItems });
+
+  useInquiriesRealtimeRefresh({ loadList, selectedId, softRefreshDetail });
+
+  const openInquiry = React.useCallback(
+    (id: string) => {
+      void navigate({
+        search: (prev) => ({ ...prev, id }),
+        replace: false,
+      });
+    },
+    [navigate],
+  );
+
+  const backToList = React.useCallback(() => {
+    closeDetail();
+    void navigate({
+      search: (prev) => {
+        const { id: _removed, ...rest } = prev;
+        return rest;
+      },
+      replace: true,
+    });
+  }, [closeDetail, navigate]);
+
+  // Hydrate detail from ?id= (open / refresh / notification deep link).
+  React.useEffect(() => {
+    const urlId = search.id;
+    if (!urlId) {
+      if (selectedId) closeDetail();
+      return;
+    }
+    if (urlId !== selectedId) {
+      void loadDetail(urlId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL id
+  }, [search.id]);
 
   const { selectedIds, setSelectedIds, toggleSelected, toggleSelectAllVisible } =
     useInquirySelection({
@@ -65,7 +99,7 @@ export function InquiriesPage() {
     registerTombstones,
     clearTombstones,
     selectedId,
-    closeDetail,
+    closeDetail: backToList,
   });
 
   const applySearch = React.useCallback(() => {
@@ -148,7 +182,7 @@ export function InquiriesPage() {
             icon: RefreshCw,
             onClick: () => {
               void loadList();
-              if (selectedId) void loadDetail(selectedId);
+              if (selectedId) softRefreshDetail(selectedId);
             },
           },
         ]}
@@ -171,7 +205,7 @@ export function InquiriesPage() {
           detail={detail}
           state={detailState}
           error={detailError}
-          onBack={closeDetail}
+          onBack={backToList}
           isPinned={selectedId ? isPinned(selectedId) : false}
           onTogglePin={
             selectedId
@@ -186,7 +220,7 @@ export function InquiriesPage() {
             const deletedId = selectedId;
             if (!deletedId) return;
             removePins([deletedId]);
-            closeDetail();
+            backToList();
             registerTombstones(
               new Map([
                 [
@@ -212,8 +246,15 @@ export function InquiriesPage() {
                 : prev,
             );
           }}
+          onRemoveReply={(id) => {
+            setDetail((prev) =>
+              prev && prev.id === selectedId
+                ? { ...prev, thread: prev.thread.filter((item) => item.id !== id) }
+                : prev,
+            );
+          }}
           onRefreshDetail={() => {
-            if (selectedId) void loadDetail(selectedId);
+            if (selectedId) softRefreshDetail(selectedId);
           }}
         />
       ) : (
@@ -407,7 +448,7 @@ export function InquiriesPage() {
               deletes.setBulkDeleteOpen(true);
             }}
             onToggleSelected={toggleSelected}
-            onOpenDetail={(id) => void loadDetail(id)}
+            onOpenDetail={openInquiry}
             onTogglePin={handleTogglePin}
             onRequestDelete={(id) => {
               deletes.setListDeleteError(null);

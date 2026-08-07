@@ -1,4 +1,4 @@
-﻿import * as React from "react";
+import * as React from "react";
 import {
   CMS_EDIT_CHANNEL,
   addTrustedMessageListener,
@@ -72,10 +72,15 @@ function useEditRoute(): { isEdit: boolean; pageId: string | null } {
 }
 
 function parentOrigins(): string[] {
+  const ancestors =
+    typeof location !== "undefined" && "ancestorOrigins" in location
+      ? location.ancestorOrigins
+      : null;
   return resolveAdminParentOrigins({
     currentOrigin: window.location.origin,
     envAdminOrigin: import.meta.env.VITE_ADMIN_ORIGIN as string | undefined,
     referrer: typeof document !== "undefined" ? document.referrer : null,
+    ancestorOrigins: ancestors,
   });
 }
 

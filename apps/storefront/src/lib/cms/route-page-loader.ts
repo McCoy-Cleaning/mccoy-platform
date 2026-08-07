@@ -6,7 +6,8 @@ import {
   stripLocalePrefix,
   type ResolvedPublishedCmsPage,
 } from "@mccoy/cms-schema";
-import { cms, isPublishedCmsBundleHydrated } from "@/lib/cms/store";
+import { cms } from "@/lib/cms/store";
+import { ensurePublishedCmsHydrated } from "@/lib/cms/published-hydrate";
 
 const BUILTIN_PATH_TO_PAGE_ID: Record<string, string> = {
   "/": "page_home",
@@ -37,11 +38,12 @@ function pathnameLocale(pathname: string): "nl" | "en" {
 }
 
 /**
- * Instant SPA navigations: reuse the idle-hydrated published bundle instead of
- * waiting on another server-fn round-trip.
+ * Instant SPA navigations: use whatever page is already in memory (seed or
+ * published hydrate). Do not wait for the network — first click must paint
+ * the shell immediately; hydrate upgrades content in the background.
  */
-function snapshotFromHydratedStore(pathname: string): MarketingPageLoaderData | null {
-  if (typeof window === "undefined" || !isPublishedCmsBundleHydrated()) return null;
+function snapshotFromClientMemory(pathname: string): MarketingPageLoaderData | null {
+  if (typeof window === "undefined") return null;
   const identity = identityPath(pathname);
   const pageId = BUILTIN_PATH_TO_PAGE_ID[identity];
   if (!pageId) return null;
@@ -67,9 +69,15 @@ function snapshotFromHydratedStore(pathname: string): MarketingPageLoaderData | 
  * Shared marketing-page loader: client memory first, server fn fallback.
  */
 export async function loadMarketingPublishedPage(pathname: string): Promise<MarketingPageLoaderData> {
-  const cached = snapshotFromHydratedStore(pathname);
-  if (cached) return cached;
+  const cached = snapshotFromClientMemory(pathname);
+  if (cached) {
+    // Refresh published bundle in the background without blocking navigation.
+    void ensurePublishedCmsHydrated();
+    return cached;
+  }
 
+  // Cold path: kick hydrate and wait for server snapshot (SSR / first visit).
+  void ensurePublishedCmsHydrated();
   const { loadPublishedPageForPath } = await import("@/lib/api/cms-published.functions");
   const { resultJson } = await loadPublishedPageForPath({ data: { pathname } });
   const result = JSON.parse(resultJson) as
@@ -84,4 +92,12 @@ export async function loadMarketingPublishedPage(pathname: string): Promise<Mark
     throw new Error(`cms: loader for ${pathname} must return a snapshot`);
   }
   return { snapshot: result.snapshot, head: result.head };
+}
+
+/** Prefetch a marketing path into the router loader cache (nav hover). */
+export function prefetchMarketingPage(pathname: string): void {
+  if (typeof window === "undefined") return;
+  void loadMarketingPublishedPage(pathname).catch(() => {
+    /* ignore prefetch errors */
+  });
 }

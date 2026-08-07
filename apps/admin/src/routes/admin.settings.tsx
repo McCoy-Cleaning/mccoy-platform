@@ -68,6 +68,10 @@ const NOTIFICATION_TYPE_COPY: Record<ActiveNotificationType, { label: string; de
     label: "Antwoord versturen mislukt",
     description: "Een antwoord op een aanvraag kon niet worden verzonden.",
   },
+  "website_request.applicant_replied": {
+    label: "Reactie op e-mail",
+    description: "Een aanvrager heeft geantwoord op een e-mail vanuit Aanvragen.",
+  },
   "cms.publish_failed": {
     label: "Publiceren mislukt",
     description: "Het publiceren van een website-pagina is mislukt.",

@@ -28,6 +28,7 @@
     "**/.git/**",
     "**/dist/**",
     "**/build/**",
+    "**/.output/**",
     "**/.next/**",
     "**/coverage/**",
     "**/target/**",

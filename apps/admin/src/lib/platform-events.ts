@@ -16,6 +16,7 @@ type PlatformEvent =
       title: string;
       description?: string;
       dedupeKey?: string;
+      href?: string;
     };
 
 type Listener = (event: PlatformEvent) => void;

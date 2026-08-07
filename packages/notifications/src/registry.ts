@@ -35,6 +35,16 @@ export const NOTIFICATION_REGISTRY: Record<
     expiresAfterDays: 90,
     active: true,
   },
+  "website_request.applicant_replied": {
+    type: "website_request.applicant_replied",
+    severity: "info",
+    category: "requests",
+    recipientResolver: "active_staff",
+    defaultChannels: IN_APP_BROWSER,
+    dedupeStrategy: "dedupe_key",
+    expiresAfterDays: 90,
+    active: true,
+  },
   "cms.publish_failed": {
     type: "cms.publish_failed",
     severity: "error",

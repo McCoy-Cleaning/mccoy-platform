@@ -105,7 +105,18 @@ async function persistSyncMessage(options: {
     isRead: options.msg.isRead,
   });
 
-  if (upsert?.status === "appended") return "appended";
+  if (upsert?.status === "appended") {
+    if (direction === "inbound") {
+      const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
+      await notifyApplicantReplyAppended({
+        requestId: options.requestId,
+        mailMessageId: upsert.id,
+        mailbox: options.mailbox,
+        senderAddress: options.msg.fromAddress,
+      });
+    }
+    return "appended";
+  }
   if (upsert?.status === "already_processed") return "already_processed";
   return "skipped";
 }

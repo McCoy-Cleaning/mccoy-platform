@@ -92,17 +92,27 @@ export function PrototypeImageField({
   }, [previewSrc]);
 
   const { scoped, rest } = React.useMemo(() => {
-    if (preferTags.length === 0) return { scoped: projectImages, rest: [] as typeof projectImages };
+    let catalog = projectImages;
+    if (resolveProjectImage) {
+      const resolvedOnly = projectImages.filter((img) => {
+        const path = img.path.startsWith("/") ? img.path : `/${img.path}`;
+        return Boolean(resolveProjectImage(path) ?? resolveProjectImage(img.path));
+      });
+      // Once the Storage map has hits, hide local-only paths that 404 on staging/prod.
+      // While the map is still empty (loading / empty library), keep the full catalog.
+      if (resolvedOnly.length > 0) catalog = resolvedOnly;
+    }
+    if (preferTags.length === 0) return { scoped: catalog, rest: [] as typeof catalog };
     const score = (img: { tags?: string[] }) =>
       preferTags.reduce((n, tag) => n + (img.tags?.includes(tag) ? 1 : 0), 0);
-    const byScore = (a: (typeof projectImages)[number], b: (typeof projectImages)[number]) =>
+    const byScore = (a: (typeof catalog)[number], b: (typeof catalog)[number]) =>
       score(b) - score(a) || a.label.localeCompare(b.label);
     const matches = (img: { tags?: string[] }) => preferTags.some((tag) => img.tags?.includes(tag));
     return {
-      scoped: projectImages.filter(matches).sort(byScore),
-      rest: projectImages.filter((img) => !matches(img)).sort(byScore),
+      scoped: catalog.filter(matches).sort(byScore),
+      rest: catalog.filter((img) => !matches(img)).sort(byScore),
     };
-  }, [projectImages, preferTags]);
+  }, [projectImages, preferTags, resolveProjectImage]);
 
   const pathMatchesValue = React.useCallback(
     (path: string) => {
@@ -120,15 +130,27 @@ export function PrototypeImageField({
     [value.assetId, value.src],
   );
 
+  const [brokenPaths, setBrokenPaths] = React.useState<Set<string>>(() => new Set());
+
   const ordered = React.useMemo(() => {
     const base = showAll || preferTags.length === 0 ? [...scoped, ...rest] : [...scoped];
     // Keep the active image visible even when it sits outside the scoped tags.
+    let next = base;
     if (value.src && !base.some((img) => pathMatchesValue(img.path))) {
       const orphan = projectImages.find((img) => pathMatchesValue(img.path));
-      if (orphan) return [orphan, ...base];
+      if (orphan) next = [orphan, ...base];
     }
-    return base;
-  }, [showAll, preferTags.length, scoped, rest, projectImages, value.src, pathMatchesValue]);
+    return next.filter((img) => !brokenPaths.has(img.path));
+  }, [
+    showAll,
+    preferTags.length,
+    scoped,
+    rest,
+    projectImages,
+    value.src,
+    pathMatchesValue,
+    brokenPaths,
+  ]);
 
   const applyLocalPath = (path: string, altFallback?: string) => {
     const src = path.startsWith("/") ? path : `/${path}`;
@@ -463,6 +485,14 @@ export function PrototypeImageField({
                     alt=""
                     className="h-full w-full object-contain p-1 transition group-hover:scale-[1.04]"
                     loading="lazy"
+                    onError={() => {
+                      setBrokenPaths((prev) => {
+                        if (prev.has(img.path)) return prev;
+                        const next = new Set(prev);
+                        next.add(img.path);
+                        return next;
+                      });
+                    }}
                   />
                   {selected ? (
                     <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-[9px] font-semibold text-primary-foreground">

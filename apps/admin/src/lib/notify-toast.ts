@@ -9,6 +9,8 @@ export type NotifyToastInput = {
   dedupeKey?: string;
   durationMs?: number;
   action?: { label: string; onAction: () => void };
+  /** When set, clicking the toast navigates here (full page assign). */
+  href?: string;
 };
 
 const recentDedupe = new Map<string, number>();
@@ -23,16 +25,27 @@ export function notifyToast(input: NotifyToastInput): void {
 
   const duration =
     input.durationMs ??
-    (input.kind === "error" ? 12_000 : input.kind === "warning" ? 8_000 : 4_500);
+    (input.kind === "error" ? 12_000 : input.kind === "warning" ? 8_000 : input.href ? 10_000 : 4_500);
+
+  const action =
+    input.action ??
+    (input.href
+      ? {
+          label: "Openen",
+          onAction: () => {
+            window.location.assign(input.href!);
+          },
+        }
+      : undefined);
 
   const opts = {
     id: input.dedupeKey,
     description: input.description,
     duration,
-    action: input.action
+    action: action
       ? {
-          label: input.action.label,
-          onClick: input.action.onAction,
+          label: action.label,
+          onClick: action.onAction,
         }
       : undefined,
   };

@@ -125,7 +125,7 @@ export {
   type FormInboxProviderMode,
 } from "./form-inbox-provider";
 export { clearGraphAccessTokenCache } from "./graph-auth";
-export { INBOX_MESSAGE_ID_PATTERN } from "./inbox-message-id";
+export { INBOX_MESSAGE_ID_PATTERN, encodeRequestMessageId } from "./inbox-message-id";
 export { bulkDeleteFailureMessage, type InboxBulkDeleteFailure } from "./inbox-delete-errors";
 export {
   bulkDeleteGraphMessages,

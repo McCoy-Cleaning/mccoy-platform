@@ -2,6 +2,7 @@ import type { BlockLayoutItem, LayoutItem } from "./layout";
 import type { BuiltinPageKey } from "./sections";
 import type { PageSectionContent } from "./content";
 import type { SiteNavigationContent } from "./navigation";
+import type { SiteFooterContent } from "./footer";
 import type { Localized, LocaleState } from "./locale";
 import type { CmsPageLocaleContent, PageTranslationMetaMap } from "./seo";
 import type { CmsRedirect, LocalizedPagePath } from "./paths";
@@ -174,6 +175,10 @@ export interface CmsPersistedState {
   navigation: SiteNavigationContent;
   /** Draft site navigation; null/undefined means no unsaved nav edits. */
   navigationDraft?: SiteNavigationContent | null;
+  /** Published site chrome — footer across all pages. */
+  footer: SiteFooterContent;
+  /** Draft site footer; null/undefined means no unsaved footer edits. */
+  footerDraft?: SiteFooterContent | null;
   /** Cleared on discard / after new edits invalidate preview. */
   previewSnapshots: Record<string, PreviewSnapshot>;
   version: number;

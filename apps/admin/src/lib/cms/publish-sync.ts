@@ -4,6 +4,7 @@ import {
   broadcastPublishedChrome,
   isCmsSyncChildMessage,
   type CmsPage,
+  type SiteFooterContent,
   type SiteNavigationContent,
 } from "@mccoy/cms-schema";
 import { storefrontOrigin } from "@/lib/cms/project-images";
@@ -12,12 +13,13 @@ const SYNC_TIMEOUT_MS = 8_000;
 
 export type PublishedChromePush = {
   navigation: SiteNavigationContent;
+  footer?: SiteFooterContent;
   pages?: CmsPage[];
   removePageIds?: string[];
 };
 
 /**
- * Prototype-only: push published navigation (+ optional pages) into the storefront.
+ * Prototype-only: push published navigation/footer (+ optional pages) into the storefront.
  *
  * After B5, the public storefront ignores localStorage — the /cms-sync iframe applies
  * chrome in-memory and BroadcastChannels other storefront tabs on the same origin.
@@ -60,6 +62,7 @@ export function pushPublishedChromeToStorefront(payload: PublishedChromePush): v
             channel: CMS_SYNC_CHANNEL,
             type: "sync-published-navigation",
             navigation: payload.navigation,
+            footer: payload.footer,
             pages: payload.pages,
             removePageIds: payload.removePageIds,
           },

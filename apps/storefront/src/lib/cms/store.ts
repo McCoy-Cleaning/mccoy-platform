@@ -20,6 +20,10 @@ import {
   effectiveSiteNavigation,
   mergeNavigationPatch,
   parseSiteNavigationResult,
+  defaultSiteFooter,
+  effectiveSiteFooter,
+  mergeFooterPatch,
+  parseSiteFooterResult,
   applyCustomPageNavLink,
   canEnableCustomPageInNav,
   dedupeCustomPageNavLinks,
@@ -43,6 +47,7 @@ import {
   type PageOverrides,
   type PreviewSnapshot,
   type SiteNavigationContent,
+  type SiteFooterContent,
 } from "@mccoy/cms-schema";
 
 const KEY = "mccoy_cms_v1";
@@ -156,6 +161,8 @@ function sanitizeLoadedNavigation(state: CmsPersistedState): {
     ...working,
     navigation,
     navigationDraft,
+    footer: working.footer ?? defaultSiteFooter(),
+    footerDraft: working.footerDraft ?? null,
   };
   reconcileCustomInNavFromLinks(next, navigation.links);
   const changed =
@@ -262,6 +269,8 @@ function initial(): CmsPersistedState {
     draft: {},
     navigation: defaultSiteNavigation(),
     navigationDraft: null,
+    footer: defaultSiteFooter(),
+    footerDraft: null,
     previewSnapshots: {},
     version: CMS_SCHEMA_VERSION,
   };
@@ -367,6 +376,8 @@ export function hydratePublishedCmsState(input: {
     draft: {},
     navigation: navigationWithResolvedCustomLinks(baseNav, pages),
     navigationDraft: null,
+    footer: current?.footer ?? defaultSiteFooter(),
+    footerDraft: null,
     previewSnapshots: {},
     version: CMS_SCHEMA_VERSION,
   };
@@ -404,6 +415,7 @@ function applyPublishedChromeToState(
   s: CmsPersistedState,
   input: {
     navigation: SiteNavigationContent;
+    footer?: SiteFooterContent;
     pages?: CmsPage[];
     removePageIds?: string[];
   },
@@ -426,11 +438,17 @@ function applyPublishedChromeToState(
     purged.state.navigation ?? input.navigation,
     purged.state.pages,
   );
+  const footer =
+    input.footer !== undefined
+      ? input.footer
+      : (s.footer ?? defaultSiteFooter());
   const next: CmsPersistedState = {
     ...s,
     pages: purged.state.pages,
     navigation,
     navigationDraft: null,
+    footer,
+    footerDraft: null,
   };
   reconcileCustomInNavFromLinks(next, navigation.links);
   return next;
@@ -501,6 +519,8 @@ function persistable(state: CmsPersistedState): CmsPersistedState {
     draft: state.draft,
     navigation: state.navigation,
     navigationDraft: state.navigationDraft ?? null,
+    footer: state.footer ?? defaultSiteFooter(),
+    footerDraft: state.footerDraft ?? null,
     previewSnapshots: {},
     version: state.version,
     migrationRecovery: state.migrationRecovery,
@@ -515,7 +535,12 @@ const WRITE_FAIL_REASON =
  * Persist to localStorage only in CMS edit-bridge mode (B5: public never writes localStorage).
  */
 function write(state: CmsPersistedState): boolean {
-  memoryState = { ...state, navigationDraft: state.navigationDraft ?? null };
+  memoryState = {
+    ...state,
+    navigationDraft: state.navigationDraft ?? null,
+    footer: state.footer ?? defaultSiteFooter(),
+    footerDraft: state.footerDraft ?? null,
+  };
   cachedSnapshot = null;
   let persisted = true;
   if (typeof window !== "undefined" && isCmsEditBridgeMode()) {
@@ -669,14 +694,22 @@ export const cms = {
   },
   applyPublishedChrome(input: {
     navigation: SiteNavigationContent;
+    footer?: SiteFooterContent;
     pages?: CmsPage[];
     removePageIds?: string[];
   }): { ok: true } | { ok: false; reason: string } {
     const validated = parseSiteNavigationResult(input.navigation);
     if (!validated.ok) return validated;
+    let footerValidated: SiteFooterContent | undefined;
+    if (input.footer !== undefined) {
+      const fr = parseSiteFooterResult(input.footer);
+      if (!fr.ok) return fr;
+      footerValidated = fr.data;
+    }
     const s = read();
     const next = applyPublishedChromeToState(s, {
       navigation: validated.data,
+      footer: footerValidated,
       pages: input.pages,
       removePageIds: input.removePageIds,
     });
@@ -685,15 +718,28 @@ export const cms = {
       pages: next.pages,
       navigation: next.navigation,
       navigationDraft: null,
+      footer: next.footer ?? defaultSiteFooter(),
+      footerDraft: null,
     };
     if (!write(next)) {
       return { ok: false, reason: WRITE_FAIL_REASON };
     }
     return { ok: true };
   },
+  getFooter(): SiteFooterContent {
+    const s = read();
+    return effectiveSiteFooter(s.footer, s.footerDraft);
+  },
+  getPublishedFooter(): SiteFooterContent {
+    return structuredClone(read().footer ?? defaultSiteFooter());
+  },
   discardNavigationDraft() {
     const s = read();
     writeOrAlert({ ...s, navigationDraft: null });
+  },
+  discardFooterDraft() {
+    const s = read();
+    writeOrAlert({ ...s, footerDraft: null });
   },
   updatePage(id: string, patch: Partial<CmsPage>): { ok: true } | { ok: false; reason: string } {
     const s = read();
@@ -972,6 +1018,7 @@ export function ensurePublishedChromeBroadcastListener(): void {
       if (!isCmsPublishedChromeBroadcast(event.data)) return;
       const result = cms.applyPublishedChrome({
         navigation: event.data.navigation,
+        footer: event.data.footer,
         pages: event.data.pages,
         removePageIds: event.data.removePageIds,
       });
@@ -1036,4 +1083,11 @@ export function useSiteNavigation(): SiteNavigationContent {
   // Public chrome uses published navigation only (drafts stay in the admin editor).
   // Resolve still runs in Navbar; publish path is already sanitized on hydrate/chrome sync.
   return cms.getPublishedNavigation();
+}
+
+export function useSiteFooter(): SiteFooterContent {
+  const state = useCms();
+  void state.version;
+  void state.footer;
+  return cms.getPublishedFooter();
 }

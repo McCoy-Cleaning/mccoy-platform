@@ -11,9 +11,11 @@ export function useInquiryReply(options: {
   reply: string;
   setReply: React.Dispatch<React.SetStateAction<string>>;
   onAppendReply: (item: FormInboxThreadItem) => void;
+  onRemoveReply?: (id: string) => void;
+  /** Soft merge only — must not blank the detail pane. */
   onRefreshDetail: () => void;
 }) {
-  const { detail, reply, setReply, onAppendReply, onRefreshDetail } = options;
+  const { detail, reply, setReply, onAppendReply, onRemoveReply, onRefreshDetail } = options;
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [replyError, setReplyError] = React.useState<string | null>(null);
@@ -28,41 +30,51 @@ export function useInquiryReply(options: {
   const performSend = React.useCallback(async () => {
     if (!detail) return;
     const body = reply.trim();
+    if (!body) return;
     setBusy(true);
     setReplyError(null);
     setReplySuccess(null);
+
+    const optimisticId = `local-reply:${detail.id}:${Date.now()}`;
+    const optimisticItem: FormInboxThreadItem = {
+      id: optimisticId,
+      uid: 0,
+      direction: "admin",
+      from: "McCoy",
+      to: detail.submitterEmail ?? "",
+      date: new Date().toISOString(),
+      subject: detail.subject.startsWith("Re:") ? detail.subject : `Re: ${detail.subject}`,
+      textBody: body,
+      messageId: null,
+      attachments: [],
+    };
+    onAppendReply(optimisticItem);
+    setReply("");
+    setConfirmOpen(false);
+
     try {
       const result = await replyAdminFormInboxMessage({
         data: { id: detail.id, body },
       });
       if (!result.ok) {
+        onRemoveReply?.(optimisticId);
         setReplyError(result.error);
+        setReply(body);
         setBusy(false);
         return;
       }
 
-      onAppendReply({
-        id: `local-reply:${detail.id}:${Date.now()}`,
-        uid: 0,
-        direction: "admin",
-        from: "McCoy",
-        to: result.toEmail,
-        date: new Date().toISOString(),
-        subject: detail.subject.startsWith("Re:") ? detail.subject : `Re: ${detail.subject}`,
-        textBody: body,
-        messageId: result.resendId ?? null,
-        attachments: [],
-      });
-      setReply("");
-      setConfirmOpen(false);
       setReplySuccess(`Antwoord verzonden naar ${result.toEmail}.`);
       setBusy(false);
-      window.setTimeout(() => onRefreshDetail(), 1200);
+      // Background reconcile only — never remount detail into a loading state.
+      window.setTimeout(() => onRefreshDetail(), 800);
     } catch {
+      onRemoveReply?.(optimisticId);
       setReplyError("Verzenden mislukt. Probeer het opnieuw.");
+      setReply(body);
       setBusy(false);
     }
-  }, [detail, onAppendReply, onRefreshDetail, reply, setReply]);
+  }, [detail, onAppendReply, onRemoveReply, onRefreshDetail, reply, setReply]);
 
   return {
     confirmOpen,

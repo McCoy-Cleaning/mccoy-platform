@@ -63,6 +63,21 @@ export function NotificationCentre({ className }: { className?: string }) {
     useAdminNotifications();
   const [panelOpen, setPanelOpen] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [attention, setAttention] = React.useState(false);
+  const prevUnreadRef = React.useRef<number | null>(null);
+
+  // Flash the bell when unread count rises so staff notice without opening the panel.
+  React.useEffect(() => {
+    const prev = prevUnreadRef.current;
+    prevUnreadRef.current = unreadCount;
+    if (prev == null) return;
+    if (unreadCount > prev) {
+      setAttention(true);
+      const t = window.setTimeout(() => setAttention(false), 8_000);
+      return () => window.clearTimeout(t);
+    }
+    if (unreadCount === 0) setAttention(false);
+  }, [unreadCount]);
 
   const handleOpenItem = async (item: AdminNotificationItem) => {
     if (busyId) return;
@@ -70,6 +85,7 @@ export function NotificationCentre({ className }: { className?: string }) {
     try {
       const destination = await open(item.notificationId);
       setPanelOpen(false);
+      setAttention(false);
       void navigate({ href: destination });
     } finally {
       setBusyId(null);
@@ -104,23 +120,45 @@ export function NotificationCentre({ className }: { className?: string }) {
     }
   };
 
+  const hasUnread = unreadCount > 0;
+
   return (
-    <Popover open={panelOpen} onOpenChange={setPanelOpen}>
+    <Popover
+      open={panelOpen}
+      onOpenChange={(open) => {
+        setPanelOpen(open);
+        if (open) setAttention(false);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={unreadCount > 0 ? `Meldingen, ${unreadCount} ongelezen` : "Meldingen"}
+          aria-label={hasUnread ? `Meldingen, ${unreadCount} ongelezen` : "Meldingen"}
           className={cn(
-            "relative grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white",
+            "relative grid shrink-0 place-items-center overflow-visible rounded-lg border text-white/70 transition",
+            "h-9 w-9 border-white/10 bg-white/5 hover:bg-white/10 hover:text-white",
+            hasUnread && "border-sky-400/40 bg-sky-500/15 text-white",
+            attention && "animate-pulse border-sky-300/70 bg-sky-500/25 text-white shadow-[0_0_0_3px_rgba(56,189,248,0.35)]",
             className,
           )}
         >
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#1e88e5] px-1 text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_rgba(10,10,15,1)]">
+          {hasUnread ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+          {hasUnread ? (
+            <span
+              className={cn(
+                "absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold leading-none text-white shadow-[0_0_0_2px_#0a0a0f]",
+                attention ? "bg-rose-500" : "bg-[#1e88e5]",
+              )}
+            >
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
-          )}
+          ) : null}
+          {attention ? (
+            <span
+              className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-sky-400/80 ring-offset-2 ring-offset-[#0a0a0f]"
+              aria-hidden
+            />
+          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent

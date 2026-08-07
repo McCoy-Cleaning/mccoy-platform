@@ -23,6 +23,7 @@ export function InboxDetail({
   onBack,
   onDeleted,
   onAppendReply,
+  onRemoveReply,
   onRefreshDetail,
   isPinned,
   onTogglePin,
@@ -33,6 +34,7 @@ export function InboxDetail({
   onBack: () => void;
   onDeleted: () => void;
   onAppendReply: (item: FormInboxThreadItem) => void;
+  onRemoveReply?: (id: string) => void;
   onRefreshDetail: () => void;
   isPinned: boolean;
   onTogglePin?: () => void;
@@ -43,6 +45,7 @@ export function InboxDetail({
     reply,
     setReply,
     onAppendReply,
+    onRemoveReply,
     onRefreshDetail,
   });
   const deleteMutation = useInquiryDetailDelete({ detail, onDeleted });

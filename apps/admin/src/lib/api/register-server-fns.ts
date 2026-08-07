@@ -5,6 +5,7 @@
  * "Invalid server function ID" for modules not yet transformed (e.g. admin-auth).
  */
 import "./admin-auth.functions";
+import "./admin-overview.functions";
 import "./admin-requests.functions";
 import "./cms-publish.functions";
 import "./cms-media.functions";

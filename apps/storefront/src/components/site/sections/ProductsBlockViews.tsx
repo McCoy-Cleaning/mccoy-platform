@@ -135,9 +135,8 @@ export function ProductsIntroView({
         <div className="grid items-start gap-12 lg:grid-cols-12 lg:gap-16">
           <motion.div
             variants={fadeUp}
-            initial={reduced ? false : "hidden"}
-            whileInView="show"
-            viewport={{ once: true }}
+            // Immediate paint on SPA enter — avoid opacity:0 until whileInView.
+            initial={false}
             className="lg:col-span-6"
           >
             {eyebrow ? (
@@ -193,10 +192,7 @@ export function ProductsIntroView({
 
           <motion.div
             variants={fadeUp}
-            initial={reduced ? false : "hidden"}
-            whileInView="show"
-            viewport={{ once: true }}
-            transition={reduced ? undefined : { delay: 0.12 }}
+            initial={false}
             className="lg:col-span-6"
           >
             {image && !isCmsPlaceholderSrc(image.src) ? (

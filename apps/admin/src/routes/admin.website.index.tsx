@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Layers,
   Navigation,
+  PanelBottom,
   ImageIcon,
   Lightbulb,
 } from "lucide-react";
@@ -189,7 +190,7 @@ function WebsitePage() {
             Ook handig
           </h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
             to="/admin/website/media"
             className="group relative rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07]"
@@ -199,7 +200,7 @@ function WebsitePage() {
                 <ImageIcon className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-lg font-bold tracking-tight">Foto's &amp; bestanden</div>
+                <div className="text-lg font-bold tracking-tight">Foto&apos;s &amp; bestanden</div>
                 <div className="text-sm text-white/45">Uw mediabibliotheek</div>
               </div>
             </div>
@@ -222,6 +223,23 @@ function WebsitePage() {
             </div>
             <p className="mt-4 text-[15px] leading-relaxed text-white/55">
               Bepaal welke knoppen bezoekers bovenaan de website zien.
+            </p>
+          </Link>
+          <Link
+            to="/admin/website/other/footer"
+            className="group relative rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#1e88e5]/15 text-[#2f9ff0]">
+                <PanelBottom className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-bold tracking-tight">Footer</div>
+                <div className="text-sm text-white/45">Onderkant van de website</div>
+              </div>
+            </div>
+            <p className="mt-4 text-[15px] leading-relaxed text-white/55">
+              Bewerk contactgegevens, dienstenlinks, keurmerken en juridische tekst onderaan.
             </p>
           </Link>
         </div>

@@ -29,6 +29,7 @@ export {
   unreadCount,
   markRead,
   markAllRead,
+  markReadForEntity,
   dismiss,
   markOpened,
 } from "./queries";
