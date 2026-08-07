@@ -81,6 +81,9 @@ describe("manual EN draft controls in editors", () => {
     ["columns", "Kolom toevoegen"],
     ["quote", "Quote"],
     ["plans", "Kenmerkenmatrix"],
+    ["contactForm", "Formuliervelden"],
+    ["jobs", "Vacature"],
+    ["featureGrid", "Kenmerk"],
   ] as const)("%s exposes EN · labels when AI assist is provided", (type, nlHint) => {
     const block = createDefaultBlock(type);
     const container = mount(
@@ -163,7 +166,7 @@ describe("isTranslatableFieldKey non-copy skips", () => {
 });
 
 describe("ContactFormInspector EN drafts", () => {
-  it("exposes EN · controls for custom field labels/placeholders and submit copy", () => {
+  it("exposes AI toolbar plus EN · controls for copy and custom fields", () => {
     const content = defaultSectionContent("contact.form") as ContactFormContent;
     const container = mount(
       <CmsAiAssistProvider value={mockAi()}>
@@ -172,6 +175,9 @@ describe("ContactFormInspector EN drafts", () => {
     );
     expect(container.textContent).not.toMatch(/Formulierlabels & placeholders/);
     expect(container.textContent).toMatch(/Formuliervelden/);
+    // Section AI / EN panel (same pattern as custom blocks + fixed sections)
+    expect(container.textContent).toMatch(/Engels|AI|Uitklappen|Genereer|Vertaal/i);
+    expect(container.textContent).toMatch(/EN · Eyebrow|EN · Kop|EN · Introductietekst/);
     expect(container.textContent).toMatch(/EN · Label/);
     expect(container.textContent).toMatch(/EN · Placeholder/);
     expect(container.textContent).toMatch(/EN · Knoptekst/);

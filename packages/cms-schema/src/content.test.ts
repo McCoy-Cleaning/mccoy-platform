@@ -694,10 +694,7 @@ describe("uploadedImage", () => {
     expect(form.body).toBe(
       "Of het nu gaat om het aanvragen van reguliere schoonmaak, specialistische reiniging of een algemene vraag, wij staan voor u klaar.",
     );
-    expect(form.highlights?.map((h) => h.text)).toEqual([
-      "Persoonlijk antwoord binnen één werkdag",
-      "Aanvragen verschijnen in het admin-portaal",
-    ]);
+    expect(form.highlights).toEqual([]);
     expect(form.textPlacement).toBe("left");
     expect((form as { formColumnsDesktop?: number }).formColumnsDesktop).toBe(2);
     expect(form.fields?.map((f) => f.type)).toEqual(["company", "phone", "textarea"]);
@@ -732,11 +729,22 @@ describe("uploadedImage", () => {
     expect(normalized.fields?.find((f) => f.type === "phone")?.placeholder).toBe("Bel ons");
   });
 
-  it("resolveContactFormHighlights respects omit vs empty list", () => {
-    expect(resolveContactFormHighlights({}, ["A", "B"])).toEqual(["A", "B"]);
+  it("resolveContactFormHighlights never injects hard-coded fallbacks", () => {
+    expect(resolveContactFormHighlights({}, ["A", "B"])).toEqual([]);
     expect(resolveContactFormHighlights({ highlights: [] }, ["A", "B"])).toEqual([]);
     expect(
       resolveContactFormHighlights({ highlights: [{ id: "1", text: " Custom " }] }, ["A"]),
     ).toEqual(["Custom"]);
+    expect(
+      resolveContactFormHighlights(
+        {
+          highlights: [
+            { id: "1", text: "Persoonlijk antwoord binnen één werkdag" },
+            { id: "2", text: "Aanvragen verschijnen in het admin-portaal" },
+          ],
+        },
+        [],
+      ),
+    ).toEqual([]);
   });
 });

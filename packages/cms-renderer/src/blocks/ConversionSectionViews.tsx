@@ -307,13 +307,8 @@ export function ContactFormSectionView({
   const twoCol = formColumnsDesktop === 2;
   const sideBySide = textPlacement === "left" || textPlacement === "right";
   const copyFirst = textPlacement === "top" || textPlacement === "left";
-  const highlights = resolveContactFormHighlights(
-    { highlights: d.highlights },
-    [
-      "Persoonlijk antwoord binnen één werkdag",
-      "Aanvragen verschijnen in het admin-portaal",
-    ],
-  );
+  // Only CMS-authored bullets — never inject hard-coded trust lines.
+  const highlights = resolveContactFormHighlights({ highlights: d.highlights }, []);
   const submitLabel = d.submitLabel?.trim() || "Verstuur aanvraag";
   const successMessage =
     d.successMessage?.trim() || d.confirmation?.trim() || CONTACT_FORM_SUCCESS_NL;

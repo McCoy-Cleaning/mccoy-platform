@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  defaultContactFormHighlights,
   normalizeContactFormColumnsDesktop,
   normalizeContactFormTextPlacement,
   seedDefaultContactFormFields,
@@ -108,7 +107,7 @@ export function ContactFormBlockEditor({
   const patch = (partial: Partial<ContactFormBlockData>) => onChange({ ...value, ...partial });
   const textPlacement = normalizeContactFormTextPlacement(value.textPlacement);
   const formColumnsDesktop = normalizeContactFormColumnsDesktop(value.formColumnsDesktop);
-  const highlights = value.highlights ?? defaultContactFormHighlights();
+  const highlights = value.highlights ?? [];
   const fields =
     value.fields?.length > 0
       ? value.fields
@@ -206,7 +205,7 @@ export function ContactFormBlockEditor({
 
       <Section title="Punten naast het formulier">
         <p className="mb-2 text-[11px] text-white/45">
-          Korte beloften of USP’s bij de tekstkolom. Leeg = standaardpunten.
+          Optionele beloften of USP’s bij de tekstkolom. Leeg = geen punten op de site.
         </p>
         <StringListEditor
           value={highlights}
@@ -214,23 +213,6 @@ export function ContactFormBlockEditor({
           addLabel="Punt toevoegen"
           enPathPrefix={blockId ? `block:${blockId}:highlights` : undefined}
         />
-        {value.highlights == null ? (
-          <button
-            type="button"
-            className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
-            onClick={() => patch({ highlights: defaultContactFormHighlights() })}
-          >
-            Standaardpunten vastleggen in CMS
-          </button>
-        ) : value.highlights.length === 0 ? (
-          <button
-            type="button"
-            className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
-            onClick={() => patch({ highlights: defaultContactFormHighlights() })}
-          >
-            Standaardpunten herstellen
-          </button>
-        ) : null}
       </Section>
 
       <Section title="Versturen & bevestiging">

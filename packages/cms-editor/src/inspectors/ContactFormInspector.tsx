@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  defaultContactFormHighlights,
   normalizeContactFormColumnsDesktop,
   normalizeContactFormTextPlacement,
   seedDefaultContactFormFields,
@@ -8,7 +7,10 @@ import {
   type ContactFormContent,
   type ContactFormTextPlacement,
 } from "@mccoy/cms-schema";
-import { InspectTextField } from "../ai-assist";
+import {
+  SectionAiToolbar,
+  collectShallowStringFields,
+} from "../ai-assist";
 import { ContactFormFieldsEditor } from "../blocks/ContactFormFieldsEditor";
 import { FormScopeField } from "../blocks/FormScopeField";
 import { StringListEditor } from "../blocks/StringListEditor";
@@ -35,6 +37,16 @@ const COLUMNS_OPTIONS: Array<{
   { id: 2, label: "2 kolommen", hint: "Velden naast elkaar op desktop" },
 ];
 
+const CONTACT_COPY_KEYS = [
+  "eyebrow",
+  "heading",
+  "body",
+  "submitLabel",
+  "consent",
+  "successMessage",
+  "successDetail",
+] as const;
+
 export function ContactFormInspector({
   content,
   onPatch,
@@ -47,7 +59,7 @@ export function ContactFormInspector({
   sectionKey?: "contact.form" | "offerte.form";
 }) {
   const isOfferte = sectionKey === "offerte.form";
-  const highlights = content.highlights ?? (isOfferte ? [] : defaultContactFormHighlights());
+  const highlights = content.highlights ?? [];
   const textPlacement = normalizeContactFormTextPlacement(content.textPlacement);
   const formColumnsDesktop = normalizeContactFormColumnsDesktop(content.formColumnsDesktop);
   const fields =
@@ -57,6 +69,23 @@ export function ContactFormInspector({
           labels: content.labels,
           placeholders: content.placeholders,
         });
+  const pathPrefix = `section:${sectionKey}`;
+
+  const aiFields = collectShallowStringFields(
+    content as unknown as Record<string, unknown>,
+    [...CONTACT_COPY_KEYS],
+    { includeEmpty: true },
+  );
+
+  const applyDutch = (nl: Record<string, string>) => {
+    const patch: Partial<ContactFormContent> = {};
+    for (const key of CONTACT_COPY_KEYS) {
+      if (typeof nl[key] === "string") {
+        patch[key] = nl[key] || undefined;
+      }
+    }
+    onPatch(patch);
+  };
 
   return (
     <div className="space-y-4">
@@ -64,40 +93,59 @@ export function ContactFormInspector({
         Het {formLabel.toLowerCase()} is vast onderdeel van de pagina: verbergen kan, verwijderen
         niet. Kop, tekst, punten, knop en formuliervelden zijn hier bewerkbaar. Via de
         sectiecatalogus kunt u het formulier ook als blok toevoegen (vervangt deze vaste sectie op
-        Contact).
+        Contact). Engelse concepten staan in het AI-paneel (of onder formuliervelden); Opslaan vult
+        ontbrekende EN-drafts vanuit NL.
       </p>
+
+      {!isOfferte ? (
+        <SectionAiToolbar
+          pathPrefix={pathPrefix}
+          fields={aiFields}
+          fieldLabels={{
+            eyebrow: "Eyebrow",
+            heading: "Kop",
+            body: "Introductietekst",
+            submitLabel: "Knoptekst",
+            consent: "Toestemmingstekst",
+            successMessage: "Succeskop",
+            successDetail: "Succes-subtekst",
+          }}
+          onApplyDutch={applyDutch}
+        />
+      ) : null}
 
       <Section title="Kop & tekst">
         {!isOfferte ? (
-          <Field label="Eyebrow">
+          <NlEnField label="Eyebrow" enPath={sectionEnPath(sectionKey, "eyebrow")}>
             <input
               className={inputClass}
               value={content.eyebrow ?? ""}
               onChange={(e) => onPatch({ eyebrow: e.target.value || undefined })}
               placeholder="Contact"
             />
-          </Field>
+          </NlEnField>
         ) : null}
-        <Field label="Kop boven formulier">
+        <NlEnField label="Kop boven formulier" enPath={sectionEnPath(sectionKey, "heading")}>
           <input
             className={inputClass}
             value={content.heading ?? ""}
             onChange={(e) => onPatch({ heading: e.target.value || undefined })}
             placeholder="Laten we praten over uw pand."
           />
-        </Field>
+        </NlEnField>
         {!isOfferte ? (
-          <InspectTextField
+          <NlEnField
             label="Introductietekst"
-            value={content.body ?? ""}
-            onChange={(v) => onPatch({ body: v || undefined })}
-            fieldPath={`section:${sectionKey}:body`}
-            fieldHint="body"
+            enPath={sectionEnPath(sectionKey, "body")}
             multiline
-            maxChars={600}
-            placeholder="Tekst naast het formulier."
-            enableAi={false}
-          />
+          >
+            <textarea
+              className={`${inputClass} min-h-[4rem]`}
+              value={content.body ?? ""}
+              onChange={(e) => onPatch({ body: e.target.value || undefined })}
+              placeholder="Tekst naast het formulier."
+            />
+          </NlEnField>
         ) : null}
         {!isOfferte ? (
           <Field
@@ -166,40 +214,20 @@ export function ContactFormInspector({
       {!isOfferte ? (
         <Section title="Punten naast het formulier">
           <p className="mb-2 text-[11px] text-white/45">
-            Korte beloften of USP’s bij de tekstkolom. Leeg = standaardpunten van de site.
+            Optionele beloften of USP’s bij de tekstkolom. Leeg = geen punten op de site.
           </p>
           <StringListEditor
             value={highlights}
             onChange={(next) => onPatch({ highlights: next })}
             addLabel="Punt toevoegen"
-            enPathPrefix={`section:${sectionKey}:highlights`}
+            enPathPrefix={`${pathPrefix}:highlights`}
           />
-          {content.highlights == null ? (
-            <button
-              type="button"
-              className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
-              onClick={() => onPatch({ highlights: defaultContactFormHighlights() })}
-            >
-              Standaardpunten vastleggen in CMS
-            </button>
-          ) : content.highlights.length === 0 ? (
-            <button
-              type="button"
-              className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
-              onClick={() => onPatch({ highlights: defaultContactFormHighlights() })}
-            >
-              Standaardpunten herstellen
-            </button>
-          ) : null}
         </Section>
       ) : null}
 
       {!isOfferte ? (
         <Section title="Versturen & bevestiging">
-          <NlEnField
-            label="Knoptekst"
-            enPath={sectionEnPath(sectionKey, "submitLabel")}
-          >
+          <NlEnField label="Knoptekst" enPath={sectionEnPath(sectionKey, "submitLabel")}>
             <input
               className={inputClass}
               value={content.submitLabel ?? ""}
@@ -207,36 +235,35 @@ export function ContactFormInspector({
               placeholder="Verstuur aanvraag"
             />
           </NlEnField>
-          <InspectTextField
-            label="Toestemmingstekst"
-            value={content.consent ?? ""}
-            onChange={(v) => onPatch({ consent: v || undefined })}
-            fieldPath={`section:${sectionKey}:consent`}
-            fieldHint="consent"
-            multiline
-            maxChars={280}
-            enableAi={false}
-          />
           <NlEnField
-            label="Succeskop"
-            enPath={sectionEnPath(sectionKey, "successMessage")}
+            label="Toestemmingstekst"
+            enPath={sectionEnPath(sectionKey, "consent")}
+            multiline
           >
+            <textarea
+              className={`${inputClass} min-h-[3rem]`}
+              value={content.consent ?? ""}
+              onChange={(e) => onPatch({ consent: e.target.value || undefined })}
+            />
+          </NlEnField>
+          <NlEnField label="Succeskop" enPath={sectionEnPath(sectionKey, "successMessage")}>
             <input
               className={inputClass}
               value={content.successMessage ?? ""}
               onChange={(e) => onPatch({ successMessage: e.target.value || undefined })}
             />
           </NlEnField>
-          <InspectTextField
+          <NlEnField
             label="Succes-subtekst"
-            value={content.successDetail ?? ""}
-            onChange={(v) => onPatch({ successDetail: v || undefined })}
-            fieldPath={`section:${sectionKey}:successDetail`}
-            fieldHint="body"
+            enPath={sectionEnPath(sectionKey, "successDetail")}
             multiline
-            maxChars={280}
-            enableAi={false}
-          />
+          >
+            <textarea
+              className={`${inputClass} min-h-[3rem]`}
+              value={content.successDetail ?? ""}
+              onChange={(e) => onPatch({ successDetail: e.target.value || undefined })}
+            />
+          </NlEnField>
         </Section>
       ) : null}
 

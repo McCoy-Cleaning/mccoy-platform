@@ -127,10 +127,8 @@ export function ContactFormSection() {
   const eyebrow = cmsTextOrFallback(content.eyebrow, t.contact.kicker, "Contact");
   const heading = cmsTextOrFallback(content.heading, t.contact.title, "Laten we praten over uw pand.");
   const intro = cmsTextOrFallback(content.body, t.contact.sub, DEFAULT_CONTACT_FORM_INTRO_NL);
-  const highlights = resolveContactFormHighlights(content, [
-    t.contact.responseWithin,
-    t.contact.requestsInPortal,
-  ]);
+  // Only CMS-authored bullets — never inject hard-coded i18n trust lines.
+  const highlights = resolveContactFormHighlights(content, []);
   const submitLabel = cmsTextOrFallback(content.submitLabel, t.contact.submit, "Verstuur aanvraag");
   const successMessage = cmsTextOrFallback(
     content.successMessage,

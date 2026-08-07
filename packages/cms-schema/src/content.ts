@@ -49,7 +49,18 @@ export { cmsImageSchema } from "./cms-image";
 export type { LegalArticle, LegalMainContent } from "./legal-defaults";
 export { createItemId } from "./ids";
 export type { TextListItem } from "./blocks/text-list";
-export type { ContactFormTextPlacement } from "./blocks/form-fields";
+export type {
+  ContactFormColumnsDesktop,
+  ContactFormTextPlacement,
+} from "./blocks/form-fields";
+/** Re-export early (before `./blocks`) so consumers never see a circular undefined binding. */
+export {
+  formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
+  normalizeFormFields,
+  seedDefaultContactFormFields,
+} from "./blocks/form-fields";
 
 export {
   CMS_BUTTON_ACTIONS,
@@ -238,7 +249,10 @@ export type ContactInfoContent = {
 export const DEFAULT_CONTACT_FORM_INTRO_NL =
   "Of het nu gaat om het aanvragen van reguliere schoonmaak, specialistische reiniging of een algemene vraag, wij staan voor u klaar.";
 
-/** Default highlight bullets (NL) beside the contact form — match storefront i18n. */
+/**
+ * @deprecated No longer seeded on contact forms. Kept for editor “restore” helpers only.
+ * Storefront must not inject these when CMS highlights are omitted.
+ */
 export const DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL: readonly string[] = [
   "Persoonlijk antwoord binnen één werkdag",
   "Aanvragen verschijnen in het admin-portaal",
@@ -270,7 +284,7 @@ export type ContactFormContent = {
   heading?: string;
   /** Plain-text intro in the copy column. */
   body?: string;
-  /** Bullet points in the copy column. Omit for storefront i18n defaults; `[]` hides them. */
+  /** Bullet points in the copy column. Omit or `[]` = none (no hard-coded storefront fallbacks). */
   highlights?: TextListItem[];
   /**
    * Where copy sits relative to the form.
@@ -305,20 +319,46 @@ export function defaultContactFormHighlights(): TextListItem[] {
   return DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL.map((text) => createTextListItem(text));
 }
 
+const LEGACY_HARDCODED_HIGHLIGHT_SETS: readonly (readonly string[])[] = [
+  DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL,
+  [
+    "Personal reply within one working day",
+    "Requests appear in the admin portal",
+  ],
+];
+
+/** Drop the old hard-coded trust bullets if they were seeded into CMS. */
+export function stripLegacyHardcodedContactHighlights(
+  highlights: TextListItem[] | undefined,
+): TextListItem[] | undefined {
+  if (!highlights?.length) return highlights;
+  const texts = highlights.map((h) => h.text.trim());
+  for (const legacy of LEGACY_HARDCODED_HIGHLIGHT_SETS) {
+    if (
+      texts.length === legacy.length &&
+      texts.every((text, index) => text === legacy[index])
+    ) {
+      return [];
+    }
+  }
+  return highlights;
+}
+
 /**
  * Resolve contact-form highlight bullets for the storefront.
- * - `undefined` → use locale fallbacks (legacy / empty CMS)
- * - `[]` → intentionally empty (no bullets)
+ * - `undefined` or `[]` → no bullets (do not inject hard-coded copy)
  * - otherwise → trimmed non-empty CMS texts
+ *
+ * `localeFallbacks` is ignored (kept for call-site compatibility).
  */
 export function resolveContactFormHighlights(
   content: Pick<ContactFormContent, "highlights">,
-  localeFallbacks: readonly string[],
+  _localeFallbacks: readonly string[] = [],
 ): string[] {
-  if (content.highlights !== undefined) {
-    return content.highlights.map((h) => h.text.trim()).filter(Boolean);
-  }
-  return localeFallbacks.map((t) => t.trim()).filter(Boolean);
+  void _localeFallbacks;
+  const highlights = stripLegacyHardcodedContactHighlights(content.highlights);
+  if (!highlights?.length) return [];
+  return highlights.map((h) => h.text.trim()).filter(Boolean);
 }
 
 /** Shared shape for privacy / terms pages — header + ordered text blocks. */
@@ -691,7 +731,7 @@ export function normalizeContactFormContent(raw: unknown): ContactFormContent {
     normalizedFields.length > 0
       ? normalizedFields
       : seedDefaultContactFormFields({ labels, placeholders });
-  const highlights =
+  const highlightsRaw =
     rec.highlights === undefined ? undefined : (
       Array.isArray(rec.highlights)
         ? rec.highlights
@@ -710,6 +750,7 @@ export function normalizeContactFormContent(raw: unknown): ContactFormContent {
             .filter((item): item is TextListItem => Boolean(item && item.text.trim()))
         : undefined
     );
+  const highlights = stripLegacyHardcodedContactHighlights(highlightsRaw);
 
   return {
     eyebrow: typeof rec.eyebrow === "string" ? rec.eyebrow || undefined : undefined,
@@ -1055,7 +1096,7 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         eyebrow: "Contact",
         heading: "Laten we praten over uw pand.",
         body: DEFAULT_CONTACT_FORM_INTRO_NL,
-        highlights: defaultContactFormHighlights(),
+        highlights: [],
         textPlacement: "left",
         formColumnsDesktop: 2,
         submitLabel: "Verstuur aanvraag",
