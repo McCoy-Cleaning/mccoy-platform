@@ -95,9 +95,40 @@ function EditCanvasIframe({
   minHeightClass?: string;
 }) {
   const reachability = useStorefrontReachability(origin, editUrl);
+  const stableAdminOrigin = React.useMemo(() => {
+    const fromEnv = (import.meta.env.VITE_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, "");
+    if (fromEnv && !fromEnv.includes("localhost")) return fromEnv;
+    return "https://mccoy-platform-admin-git-development-mccoy1.vercel.app";
+  }, []);
+  const onEphemeralAdminHost = React.useMemo(() => {
+    try {
+      const host = window.location.hostname.toLowerCase();
+      if (!host.endsWith(".vercel.app")) return false;
+      if (host.includes("-git-")) return false;
+      return /-[a-z0-9]{6,}-[a-z0-9-]+\.vercel\.app$/i.test(host);
+    } catch {
+      return false;
+    }
+  }, []);
+  const stableAdminHref = `${stableAdminOrigin}${window.location.pathname}${window.location.search}`;
 
   return (
     <div className={cn("relative h-full min-h-0", minHeightClass)}>
+      {onEphemeralAdminHost ? (
+        <div
+          role="status"
+          className="absolute inset-x-0 top-0 z-20 border-b border-amber-500/40 bg-amber-50 px-4 py-2.5 text-center"
+        >
+          <p className="text-xs font-medium text-amber-950 leading-relaxed">
+            Je gebruikt een tijdelijke Vercel-deployment-URL. Productie-www mag alleen de{" "}
+            <span className="font-semibold">stable</span> admin embedden — open{" "}
+            <a className="underline font-semibold" href={stableAdminHref}>
+              {stableAdminOrigin}
+            </a>{" "}
+            (niet de …-xxxxx-… deploy-link).
+          </p>
+        </div>
+      ) : null}
       {reachability === "unreachable" ? (
         <div
           role="alert"

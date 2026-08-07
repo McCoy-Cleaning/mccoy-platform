@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   applySecurityHeaders,
   buildContentSecurityPolicy,
@@ -12,6 +12,13 @@ describe("security headers", () => {
     expect(headers["Content-Security-Policy"]).toMatch(/frame-ancestors\s+'none'/);
     expect(headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+  });
+
+  it("allows admin to embed the storefront (frame-src), not only same-origin", () => {
+    const csp = buildContentSecurityPolicy("admin");
+    expect(csp).toMatch(/frame-src\s+'self'/);
+    expect(csp).toContain("https://www.mccoy.nl");
+    expect(csp).toContain("http://localhost:5173");
   });
 
   it("keeps storefront embeddable by admin (no X-Frame-Options DENY)", () => {
@@ -32,8 +39,6 @@ describe("security headers", () => {
     expect(csp).toContain("https://www.facebook.com");
     expect(csp).toContain("https://web.facebook.com");
     expect(csp).toContain("https://www.fb.com");
-    // Admin CSP must not open frame-src for third-party embeds
-    expect(buildContentSecurityPolicy("admin")).not.toContain("frame-src");
   });
 
   it("applies headers onto an existing Response", () => {
@@ -50,5 +55,19 @@ describe("security headers", () => {
     expect(buildContentSecurityPolicy("storefront", ["https://admin.example"])).toContain(
       "https://admin.example",
     );
+  });
+
+  it("parses comma-separated admin frame ancestors from env", () => {
+    const prev = process.env.MCCOY_ADMIN_FRAME_ANCESTORS;
+    process.env.MCCOY_ADMIN_FRAME_ANCESTORS =
+      "https://admin-a.example, https://admin-b.example/";
+    try {
+      const csp = buildContentSecurityPolicy("storefront");
+      expect(csp).toContain("https://admin-a.example");
+      expect(csp).toContain("https://admin-b.example");
+    } finally {
+      if (prev === undefined) delete process.env.MCCOY_ADMIN_FRAME_ANCESTORS;
+      else process.env.MCCOY_ADMIN_FRAME_ANCESTORS = prev;
+    }
   });
 });

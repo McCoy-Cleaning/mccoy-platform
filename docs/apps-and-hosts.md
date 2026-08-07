@@ -106,3 +106,17 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 ## CMS live edit
 
 Admin embeds the Storefront origin in an iframe (`VITE_STOREFRONT_ORIGIN`). Storefront accepts `_cmsMode=edit` and `/cms-preview` for draft/preview rendering only — not staff authoring chrome.
+
+### Staging admin → production www
+
+Two CSPs must both allow the embed:
+
+1. **Storefront** `frame-ancestors` — must include the admin origin (`VITE_ADMIN_ORIGIN` / `MCCOY_ADMIN_FRAME_ANCESTORS` on the storefront project).
+2. **Admin** `frame-src` — must include the storefront origin (`VITE_STOREFRONT_ORIGIN` / defaults `https://www.mccoy.nl`). Without this, `default-src 'self'` blocks the iframe and the canvas stays blank.
+
+Also:
+
+- Use the **stable** admin host, e.g. `https://mccoy-platform-admin-git-development-mccoy1.vercel.app`.
+- Do **not** use per-deployment links (`…-eringkpn6-….vercel.app`).
+- Confirm in the admin tab: `location.origin` must equal the stable URL exactly.
+- After changing env vars, **redeploy** the app that reads them (admin for `frame-src` / `VITE_STOREFRONT_ORIGIN`; storefront for `frame-ancestors`).
