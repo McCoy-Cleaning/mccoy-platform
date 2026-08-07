@@ -7,6 +7,18 @@ ensureMonorepoEnvLoaded();
 
 const ADMIN_ORIGIN = process.env.E2E_ADMIN_ORIGIN ?? "http://localhost:5174";
 const STOREFRONT_ORIGIN = process.env.E2E_STOREFRONT_ORIGIN ?? "http://localhost:5173";
+
+function originPort(origin: string, fallback: number): number {
+  try {
+    const port = Number(new URL(origin).port);
+    return Number.isFinite(port) && port > 0 ? port : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const STOREFRONT_PORT = originPort(STOREFRONT_ORIGIN, 5173);
+const ADMIN_PORT = originPort(ADMIN_ORIGIN, 5174);
 const E2E_DATA_DIR = process.env.E2E_MCCOY_DATA_DIR ?? join(process.cwd(), ".data", "e2e-cms");
 const AUTH_DIR = join(process.cwd(), "e2e", ".auth");
 const AUTH_FILE = join(AUTH_DIR, "admin.json");
@@ -178,8 +190,8 @@ export default defineConfig({
   webServer: [
     {
       command: usePreview
-        ? `${cleanDistCommand("apps/storefront/dist")} && npm run ${buildScript} -w @mccoy/storefront && npm run preview -w @mccoy/storefront -- --host localhost --port 5173 --strictPort`
-        : "npm run dev -w @mccoy/storefront -- --host localhost --port 5173 --strictPort",
+        ? `${cleanDistCommand("apps/storefront/dist")} && npm run ${buildScript} -w @mccoy/storefront && npm run preview -w @mccoy/storefront -- --host localhost --port ${STOREFRONT_PORT} --strictPort`
+        : `npm run dev -w @mccoy/storefront -- --host localhost --port ${STOREFRONT_PORT} --strictPort`,
       url: STOREFRONT_ORIGIN,
       reuseExistingServer: reuse,
       timeout: 600_000,
@@ -187,8 +199,8 @@ export default defineConfig({
     },
     {
       command: usePreview
-        ? `${cleanDistCommand("apps/admin/dist")} && npm run ${buildScript} -w @mccoy/admin && npm run preview -w @mccoy/admin -- --host localhost --port 5174 --strictPort`
-        : "npm run dev -w @mccoy/admin -- --host localhost --port 5174 --strictPort",
+        ? `${cleanDistCommand("apps/admin/dist")} && npm run ${buildScript} -w @mccoy/admin && npm run preview -w @mccoy/admin -- --host localhost --port ${ADMIN_PORT} --strictPort`
+        : `npm run dev -w @mccoy/admin -- --host localhost --port ${ADMIN_PORT} --strictPort`,
       url: `${ADMIN_ORIGIN}/admin/login`,
       reuseExistingServer: reuse,
       timeout: 600_000,

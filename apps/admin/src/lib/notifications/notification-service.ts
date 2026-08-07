@@ -9,7 +9,8 @@ import {
   openAdminNotification,
 } from "@/lib/api/notifications.functions";
 import { emitPlatformEvent } from "@/lib/platform-events";
-import { getAdminBrowserSupabase } from "@/lib/supabase-browser";
+import { getAdminRealtimeSupabase } from "@/lib/supabase-browser";
+import { adminHydrateRealtimeAccessToken } from "@/lib/api/admin-auth.functions";
 import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
 
 import { ensurePlatformToastBridge } from "./toast-bridge";
@@ -86,6 +87,8 @@ class AdminNotificationService {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private pollTimer: ReturnType<typeof setInterval> | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private realtimeAuthRenewTimer: ReturnType<typeof setTimeout> | undefined;
+  private realtimeExpiresAt: number | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
@@ -378,35 +381,86 @@ class AdminNotificationService {
     }
   }
 
-  private setupRealtime(): void {
-    const supabase = getAdminBrowserSupabase();
-    if (!supabase) return;
-    this.channel = supabase
-      .channel(`admin-notifications-${this.userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notification_recipients",
-          filter: `user_id=eq.${this.userId}`,
-        },
-        () => this.scheduleRefresh(),
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          if (this.channelDisconnected) this.scheduleRefresh();
-          this.channelDisconnected = false;
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          this.channelDisconnected = true;
-        }
-      });
+  private async applyRealtimeAccessToken(): Promise<boolean> {
+    const supabase = getAdminRealtimeSupabase();
+    if (!supabase) return false;
+    const hydrated = await adminHydrateRealtimeAccessToken();
+    if (!hydrated.ok) return false;
+    const { accessToken, expiresAt } = hydrated.hydration;
+    supabase.realtime.setAuth(accessToken);
+    this.realtimeExpiresAt = expiresAt;
+    this.scheduleRealtimeAuthRenewal();
+    return true;
   }
 
-  private teardownRealtime(): void {
+  private scheduleRealtimeAuthRenewal(): void {
+    if (this.realtimeAuthRenewTimer) {
+      clearTimeout(this.realtimeAuthRenewTimer);
+      this.realtimeAuthRenewTimer = undefined;
+    }
+    if (!this.realtimeExpiresAt) return;
+    const renewInMs = Math.max(15_000, this.realtimeExpiresAt - Date.now() - 60_000);
+    this.realtimeAuthRenewTimer = setTimeout(() => {
+      void this.applyRealtimeAccessToken().then((ok) => {
+        if (!ok) this.channelDisconnected = true;
+      });
+    }, renewInMs);
+  }
+
+  private setupRealtime(): void {
+    void (async () => {
+      const supabase = getAdminRealtimeSupabase();
+      if (!supabase) return;
+      const authed = await this.applyRealtimeAccessToken();
+      if (!authed || !this.started) return;
+
+      this.teardownRealtimeChannelOnly();
+      this.channel = supabase
+        .channel(`admin-notifications-${this.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notification_recipients",
+            filter: `user_id=eq.${this.userId}`,
+          },
+          () => this.scheduleRefresh(),
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            if (this.channelDisconnected) this.scheduleRefresh();
+            this.channelDisconnected = false;
+          } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            this.channelDisconnected = true;
+            // Re-auth via cookie session then resubscribe shortly.
+            void this.applyRealtimeAccessToken();
+          }
+        });
+    })();
+  }
+
+  private teardownRealtimeChannelOnly(): void {
     if (this.channel) {
       void this.channel.unsubscribe();
       this.channel = null;
+    }
+  }
+
+  private teardownRealtime(): void {
+    if (this.realtimeAuthRenewTimer) {
+      clearTimeout(this.realtimeAuthRenewTimer);
+      this.realtimeAuthRenewTimer = undefined;
+    }
+    this.realtimeExpiresAt = null;
+    this.teardownRealtimeChannelOnly();
+    const supabase = getAdminRealtimeSupabase();
+    if (supabase) {
+      try {
+        supabase.realtime.setAuth("");
+      } catch {
+        // ignore
+      }
     }
   }
 

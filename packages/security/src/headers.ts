@@ -48,11 +48,14 @@ function defaultAdminFrameAncestors(): string[] {
 }
 
 /**
- * Storefront origins the admin CMS may embed (edit/preview iframes).
+ * Storefront origins the admin CMS may embed (`frame-src`) and probe
+ * (`connect-src`, e.g. edit-canvas reachability fetch).
  * Without an explicit `frame-src`, CSP falls back to `default-src 'self'` and
  * blocks cross-origin www — the iframe stays blank.
+ * Without matching `connect-src` entries, http://localhost storefront probes
+ * fail even when `https:` is allowed (http local origins are not covered).
  */
-function defaultAdminFrameSrc(): string[] {
+function defaultAdminStorefrontOrigins(): string[] {
   const fromEnv = [
     ...originsFromEnvValue(process.env.MCCOY_STOREFRONT_FRAME_SRC),
     ...originsFromEnvValue(process.env.VITE_STOREFRONT_ORIGIN),
@@ -73,17 +76,23 @@ export function buildContentSecurityPolicy(
   adminFrameAncestors: string[] = defaultAdminFrameAncestors(),
 ): string {
   if (app === "admin") {
-    const frameSrc = unique(["'self'", ...defaultAdminFrameSrc()]);
+    const storefrontOrigins = defaultAdminStorefrontOrigins();
+    const frameSrc = unique(["'self'", ...storefrontOrigins]);
+    // Same storefront origins as frame-src so CMS reachability probes work
+    // against local http:// storefronts (https: does not cover http localhost).
+    const connectSrc = unique(["'self'", "https:", "wss:", ...storefrontOrigins]);
     return [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "img-src 'self' data: blob: https:",
-      "font-src 'self' data: https:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline'",
-      "connect-src 'self' https: wss:",
+      // Google Fonts CSS + files (admin __root.tsx stylesheet link).
+      "font-src 'self' data: https: https://fonts.gstatic.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // vercel.live = Vercel preview feedback toolbar (not Web Analytics).
+      "script-src 'self' 'unsafe-inline' https://vercel.live",
+      `connect-src ${connectSrc.join(" ")}`,
       "form-action 'self'",
       // CMS edit/preview embeds the storefront (often a different origin).
       `frame-src ${frameSrc.join(" ")}`,
@@ -97,9 +106,9 @@ export function buildContentSecurityPolicy(
     "object-src 'none'",
     `frame-ancestors ${ancestors.join(" ")}`,
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https:",
-    "style-src 'self' 'unsafe-inline'",
-    "script-src 'self' 'unsafe-inline'",
+    "font-src 'self' data: https: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com",
     "connect-src 'self' https: wss:",
     "form-action 'self'",
     // CMS video embeds: YouTube, Vimeo, Facebook plugins (see resolveSafeVideoEmbed)

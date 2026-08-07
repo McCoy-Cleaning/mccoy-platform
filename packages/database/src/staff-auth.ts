@@ -5,16 +5,22 @@ import { isStaffRole } from "@mccoy/domain";
 import {
   AdminAuthError,
   assertAdminLoginRateLimit,
+  assertAdminSameOriginMutation,
   clearAllAdminAuthCookies,
+  clearAdminMfaFlowCookie,
   clearSupabaseAuthCookies,
   getAdminCredentials,
+  isAdminMfaBrowserPurpose,
   isLegacyAdminAuthEnabled,
+  issueAdminMfaFlowCookie,
   issueAdminSessionCookie,
   issueSupabaseAuthCookies,
   preferSupabaseAdminAuth,
+  readAdminMfaFlowCookie,
   readAdminSessionFromCookie,
   readSupabaseAccessToken,
   readSupabaseRefreshToken,
+  type AdminMfaBrowserPurpose,
   type AdminPrincipal,
 } from "@mccoy/security";
 
@@ -90,6 +96,39 @@ function readAal(accessToken: string): "aal1" | "aal2" {
   const aal = payload?.aal;
   return aal === "aal2" ? "aal2" : "aal1";
 }
+
+function readSessionId(accessToken: string): string | null {
+  const payload = decodeJwtPayload(accessToken);
+  const sessionId = payload?.session_id;
+  return typeof sessionId === "string" && sessionId.trim() ? sessionId.trim() : null;
+}
+
+function readJwtExpiryMs(accessToken: string): number {
+  const payload = decodeJwtPayload(accessToken);
+  const exp = payload?.exp;
+  if (typeof exp === "number" && Number.isFinite(exp)) {
+    return exp * 1000;
+  }
+  return Date.now() + 55 * 60 * 1000;
+}
+
+/** Explicit Realtime DTO — never return a Supabase Session object. */
+export type RealtimeAccessHydration = {
+  accessToken: string;
+  expiresAt: number;
+};
+
+export function buildRealtimeAccessHydration(accessToken: string): RealtimeAccessHydration {
+  return {
+    accessToken,
+    expiresAt: readJwtExpiryMs(accessToken),
+  };
+}
+
+export type MfaBrowserSessionHydration = {
+  accessToken: string;
+  refreshToken: string;
+};
 
 function createUserScopedClient(accessToken: string) {
   const { url, publishableKey } = getSupabasePublicConfig();
@@ -544,7 +583,7 @@ export async function establishStaffSessionFromEmailAuthCallback(input: {
 
 /**
  * Re-hydrate supabase-js from HttpOnly cookies after a clean reload (no URL tokens).
- * Used for MFA enroll when the invite page already exchanged the link server-side.
+ * @deprecated Prefer startMfaBrowserFlow + ensureMfaBrowserSession (purpose-gated).
  */
 export async function hydrateBrowserStaffAuthFromCookies(): Promise<
   | { ok: true; accessToken: string; refreshToken: string }
@@ -575,12 +614,207 @@ export async function hydrateBrowserStaffAuthFromCookies(): Promise<
   }
 }
 
+/**
+ * Cookie-authenticated access-token hydrate for Realtime (`realtime.setAuth` only).
+ * Never returns a refresh token.
+ */
+export async function hydrateRealtimeAccessToken(): Promise<
+  | { ok: true; hydration: RealtimeAccessHydration }
+  | {
+      ok: false;
+      error: string;
+      code?: "missing_session" | "unauthorized" | "unknown";
+    }
+> {
+  try {
+    assertAdminSameOriginMutation();
+    const access = await refreshAccessTokenIfNeeded();
+    if (!access) {
+      return {
+        ok: false,
+        error: "Niet geautoriseerd. Log opnieuw in.",
+        code: "missing_session",
+      };
+    }
+    await resolveSupabasePrincipal(access, { allowMfaEnrollment: true });
+    return { ok: true, hydration: buildRealtimeAccessHydration(access) };
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "unauthorized" };
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Realtime-token kon niet worden geladen.",
+      code: "unknown",
+    };
+  }
+}
+
+/**
+ * Begin a purpose-bound MFA browser flow (HttpOnly capability cookie).
+ * Does not return Supabase tokens.
+ */
+export async function startMfaBrowserFlow(input: {
+  purpose: AdminMfaBrowserPurpose;
+}): Promise<
+  | { ok: true; purpose: AdminMfaBrowserPurpose; expiresAt: number }
+  | {
+      ok: false;
+      error: string;
+      code?: "unauthorized" | "invalid_purpose" | "missing_session" | "unknown";
+    }
+> {
+  try {
+    assertAdminSameOriginMutation();
+    if (!isAdminMfaBrowserPurpose(input.purpose)) {
+      return { ok: false, error: "Ongeldig MFA-doel.", code: "invalid_purpose" };
+    }
+    const access = await refreshAccessTokenIfNeeded();
+    if (!access) {
+      return {
+        ok: false,
+        error: "Niet geautoriseerd. Log opnieuw in.",
+        code: "missing_session",
+      };
+    }
+    const { principal } = await resolveSupabasePrincipal(access, {
+      allowMfaEnrollment: true,
+    });
+    if (!principal.userId) {
+      return {
+        ok: false,
+        error: "Niet geautoriseerd. Log opnieuw in.",
+        code: "unauthorized",
+      };
+    }
+    const capability = issueAdminMfaFlowCookie({
+      userId: principal.userId,
+      sessionId: readSessionId(access),
+      purpose: input.purpose,
+    });
+    return {
+      ok: true,
+      purpose: capability.purpose,
+      expiresAt: capability.expiresAt,
+    };
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "unauthorized" };
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "MFA-flow starten mislukt.",
+      code: "unknown",
+    };
+  }
+}
+
+/**
+ * Return access+refresh for temporary MFA `setSession` — requires active MFA-flow capability.
+ */
+export async function ensureMfaBrowserSession(input: {
+  purpose: AdminMfaBrowserPurpose;
+}): Promise<
+  | { ok: true; hydration: MfaBrowserSessionHydration }
+  | {
+      ok: false;
+      error: string;
+      code?:
+        | "unauthorized"
+        | "invalid_purpose"
+        | "missing_flow"
+        | "flow_mismatch"
+        | "missing_session"
+        | "unknown";
+    }
+> {
+  try {
+    assertAdminSameOriginMutation();
+    if (!isAdminMfaBrowserPurpose(input.purpose)) {
+      return { ok: false, error: "Ongeldig MFA-doel.", code: "invalid_purpose" };
+    }
+
+    const flow = readAdminMfaFlowCookie();
+    if (!flow) {
+      return {
+        ok: false,
+        error: "Geen actieve MFA-flow. Start MFA opnieuw.",
+        code: "missing_flow",
+      };
+    }
+    if (flow.purpose !== input.purpose) {
+      return {
+        ok: false,
+        error: "MFA-flow past niet bij dit doel.",
+        code: "flow_mismatch",
+      };
+    }
+
+    const access = await refreshAccessTokenIfNeeded();
+    const refresh = readSupabaseRefreshToken();
+    if (!access || !refresh) {
+      return {
+        ok: false,
+        error: "Niet geautoriseerd. Log opnieuw in.",
+        code: "missing_session",
+      };
+    }
+
+    const { principal } = await resolveSupabasePrincipal(access, {
+      allowMfaEnrollment: true,
+    });
+    if (!principal.userId || principal.userId !== flow.userId) {
+      return {
+        ok: false,
+        error: "MFA-flow hoort niet bij deze sessie.",
+        code: "flow_mismatch",
+      };
+    }
+
+    const sessionId = readSessionId(access);
+    if (flow.sessionId && sessionId && flow.sessionId !== sessionId) {
+      return {
+        ok: false,
+        error: "MFA-flow hoort niet bij deze sessie.",
+        code: "flow_mismatch",
+      };
+    }
+
+    return {
+      ok: true,
+      hydration: {
+        accessToken: access,
+        refreshToken: refresh,
+      },
+    };
+  } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return { ok: false, error: error.message, code: "unauthorized" };
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "MFA-sessie kon niet worden geladen.",
+      code: "unknown",
+    };
+  }
+}
+
+/** Clear MFA-flow capability after successful AAL2 cookie sync (or abandon). */
+export function completeMfaBrowserFlow(): void {
+  clearAdminMfaFlowCookie();
+}
+
 export async function establishStaffSessionFromTokens(input: {
   accessToken: string;
   refreshToken: string;
   clientKey?: string;
   /** When true, skip login rate-limit (caller already limited). */
   skipRateLimit?: boolean;
+  /**
+   * MFA cookie synchronization: require server-validated AAL2.
+   * Rejects without modifying durable cookies when assurance is still AAL1.
+   */
+  requireAal2?: boolean;
 }): Promise<EstablishStaffSessionResult> {
   if (!isSupabaseStaffAuthReady()) {
     return {
@@ -608,6 +842,14 @@ export async function establishStaffSessionFromTokens(input: {
       allowMfaEnrollment: true,
     });
 
+    if (input.requireAal2 && principal.aal !== "aal2") {
+      return {
+        ok: false,
+        error: "MFA is niet afgerond (aal2 vereist). Cookies zijn niet bijgewerkt.",
+        code: "unknown",
+      };
+    }
+
     clearAllAdminAuthCookies();
     issueSupabaseAuthCookies({
       accessToken: input.accessToken,
@@ -624,6 +866,10 @@ export async function establishStaffSessionFromTokens(input: {
       status: principal.status,
       mfaRequired: principal.mfaRequired,
     });
+
+    if (input.requireAal2 && principal.aal === "aal2") {
+      clearAdminMfaFlowCookie();
+    }
 
     return {
       ok: true,

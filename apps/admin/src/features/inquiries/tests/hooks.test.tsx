@@ -518,9 +518,11 @@ describe("useInquiryReply", () => {
     });
 
     expect((probe.latest as ReturnType<typeof useInquiryReply>).replyError).toBe("SMTP down");
-    expect(setReply).not.toHaveBeenCalled();
+    // Failure path clears then restores the draft so the textarea keeps the user's text.
+    expect(setReply).toHaveBeenCalledWith("");
+    expect(setReply).toHaveBeenCalledWith("Dit is mijn antwoord");
     expect(reply).toBe("Dit is mijn antwoord");
-    expect(onAppendReply).not.toHaveBeenCalled();
+    expect(onAppendReply).toHaveBeenCalled();
   });
 
   it("clears reply on success", async () => {

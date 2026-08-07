@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createItemId } from "../content";
+import { createItemId } from "../ids";
 import { cmsLinkSchema, isActionableCmsLink, linkFromLegacyHref, parseCmsLink } from "../links";
 import { newBlockLayoutItem, ensureLastLocked } from "../layout";
 import type { Block, BuiltinCmsPage, CmsLink, CmsPage } from "../types";

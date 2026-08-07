@@ -5,10 +5,11 @@ import {
   type FormScopeSnapshot,
 } from "@mccoy/domain";
 import type { CmsPage } from "./types";
-import type {
-  ContactFormContent,
-  VacaturesApplicationContent,
-  VacaturesMainContent,
+import {
+  normalizeContactFormContent,
+  type ContactFormContent,
+  type VacaturesApplicationContent,
+  type VacaturesMainContent,
 } from "./content";
 import { isLayoutItemHidden, type LayoutItem } from "./layout";
 import { fixedLayoutId } from "./sections";
@@ -364,7 +365,7 @@ export type ResolvePublishedContactFormFieldsResult =
 
 /**
  * Resolve typed contact-form fields from a published CMS page for server validation.
- * Returns fields for contactForm blocks; fixed legacy sections use storefront i18n fields.
+ * Supports contactForm catalog blocks and the fixed contact.form section.
  */
 export function resolvePublishedContactFormFields(
   page: CmsPage | null | undefined,
@@ -374,6 +375,37 @@ export function resolvePublishedContactFormFields(
   if (!page || !id) return { ok: false };
 
   const normalized = normalizeCmsPage(page);
+
+  if (
+    id === FIXED_FORM_SOURCE_IDS.contactForm ||
+    resolveCanonicalFormSourceKey(id) === CANONICAL_FORM_SOURCE_KEYS.contact
+  ) {
+    if (!isContactPage(normalized)) return { ok: false };
+    const layoutId = fixedLayoutId("contact.form");
+    const fixedItem =
+      findLayoutItem(normalized, layoutId) ??
+      findLayoutItem(normalized, FIXED_FORM_SOURCE_IDS.contactForm);
+    const migrated = findFormBlockByType(normalized, "contactForm");
+    if (fixedItem && isLayoutItemHidden(fixedItem)) return { ok: false };
+    if (migrated) {
+      const layoutItem =
+        normalized.layout.find(
+          (item) => item.kind === "block" && item.blockId === migrated.blockId,
+        ) ?? null;
+      if (layoutItem && isLayoutItemHidden(layoutItem)) return { ok: false };
+      const block = normalized.blocks.find((b) => b.id === migrated.blockId);
+      if (block?.type === "contactForm") {
+        const def = getBlockDataDefinition("contactForm");
+        const data = def.normalize(block.data) as ContactFormBlockData;
+        return { ok: true, fields: resolveContactFormFields(data.fields) };
+      }
+    }
+    const content = normalizeContactFormContent(
+      normalized.sectionContent?.["contact.form"],
+    );
+    return { ok: true, fields: resolveContactFormFields(content.fields) };
+  }
+
   const block = normalized.blocks.find((entry) => entry.id === id);
   if (block?.type !== "contactForm") return { ok: false };
 

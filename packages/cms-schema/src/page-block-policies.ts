@@ -1,3 +1,4 @@
+import type { FixedSectionKey } from "./sections";
 import type { BlockType, CmsPage } from "./types";
 
 /**
@@ -47,6 +48,22 @@ export const pageBlockPolicies: Record<
   },
 };
 
+/**
+ * Hybrid layouts still ship required forms as fixed sections while page policies
+ * name the post-migration block types. Credit the fixed key toward instance limits
+ * so normalize/publish does not false-fail before Gate 5 blocks-only migration.
+ *
+ * Catalog add of the block type replaces the fixed equivalent (see layout-ops);
+ * fixed alone must not block the picker.
+ */
+const POLICY_FIXED_EQUIVALENTS: Record<
+  string,
+  Partial<Record<BlockType, FixedSectionKey>>
+> = {
+  page_contact: { contactForm: "contact.form" },
+  page_offerte: { quoteRequestForm: "offerte.form" },
+};
+
 /** Privileged form blocks disallowed outside their builtin page. */
 const PRIVILEGED_FORM_BLOCKS: Partial<
   Record<BlockType, { allowedPageIds: readonly string[] }>
@@ -65,7 +82,54 @@ export function countBlocksOfType(page: CmsPage, blockType: BlockType): number {
   return page.blocks.filter((b) => b.type === blockType).length;
 }
 
-/** Whether the page may add another instance of this block type. */
+export function policyFixedEquivalentForBlock(
+  pageId: string,
+  blockType: BlockType,
+): FixedSectionKey | null {
+  return POLICY_FIXED_EQUIVALENTS[pageId]?.[blockType] ?? null;
+}
+
+export function blockTypeSatisfyingFixedKey(
+  pageId: string,
+  fixedKey: FixedSectionKey,
+): BlockType | null {
+  const map = POLICY_FIXED_EQUIVALENTS[pageId];
+  if (!map) return null;
+  for (const [bt, key] of Object.entries(map)) {
+    if (key === fixedKey) return bt as BlockType;
+  }
+  return null;
+}
+
+/** True when a policy-equivalent CMS block already covers a required fixed form slot. */
+export function isRequiredFixedSatisfiedByBlock(
+  page: CmsPage,
+  fixedKey: FixedSectionKey,
+): boolean {
+  const blockType = blockTypeSatisfyingFixedKey(page.id, fixedKey);
+  if (!blockType) return false;
+  return countBlocksOfType(page, blockType) > 0;
+}
+
+function hasPolicyFixedEquivalent(page: CmsPage, blockType: BlockType): boolean {
+  const fixedKey = POLICY_FIXED_EQUIVALENTS[page.id]?.[blockType];
+  if (!fixedKey) return false;
+  return page.layout.some((item) => item.kind === "fixed" && item.key === fixedKey);
+}
+
+/**
+ * Block instances plus at most one matching required fixed section (hybrid era).
+ * Used for page policy min/max publish checks.
+ */
+export function countPolicyInstances(page: CmsPage, blockType: BlockType): number {
+  return countBlocksOfType(page, blockType) + (hasPolicyFixedEquivalent(page, blockType) ? 1 : 0);
+}
+
+/**
+ * Whether the page may add another instance of this block type.
+ * Counts real blocks only — a fixed equivalent does not block catalog add
+ * (adding replaces the fixed slot via layout-ops).
+ */
 export function canAddBlockType(page: CmsPage, blockType: BlockType): boolean {
   const privileged = PRIVILEGED_FORM_BLOCKS[blockType];
   if (privileged && !privileged.allowedPageIds.includes(page.id)) {
@@ -73,10 +137,11 @@ export function canAddBlockType(page: CmsPage, blockType: BlockType): boolean {
   }
   const policy = getPageBlockPolicy(page.id, blockType);
   if (!policy) return true;
-  if (policy.duplicable === false && countBlocksOfType(page, blockType) >= 1) {
+  const blockCount = countBlocksOfType(page, blockType);
+  if (policy.duplicable === false && blockCount >= 1) {
     return false;
   }
-  return countBlocksOfType(page, blockType) < policy.maxInstances;
+  return blockCount < policy.maxInstances;
 }
 
 /** Whether a specific block instance may be removed under page policy. */
@@ -84,7 +149,7 @@ export function canRemoveBlockType(page: CmsPage, blockType: BlockType): boolean
   const policy = getPageBlockPolicy(page.id, blockType);
   if (!policy) return true;
   if (!policy.removable) return false;
-  return countBlocksOfType(page, blockType) > policy.minInstances;
+  return countPolicyInstances(page, blockType) > policy.minInstances;
 }
 
 /** Block types that have hit their max instance count on this page. */
@@ -94,7 +159,7 @@ export function blockedBlockTypesForPage(page: CmsPage): BlockType[] {
   if (policies) {
     for (const [type, policy] of Object.entries(policies)) {
       if (!policy) continue;
-      if (countBlocksOfType(page, type as BlockType) >= policy.maxInstances) {
+      if (!canAddBlockType(page, type as BlockType)) {
         blocked.push(type as BlockType);
       }
     }
@@ -118,17 +183,13 @@ export type PageBlockPolicyIssue = {
 export function validatePageBlockPolicies(page: CmsPage): PageBlockPolicyIssue[] {
   const issues: PageBlockPolicyIssue[] = [];
   const policies = pageBlockPolicies[page.id];
-  // Until pages are blocks-only (layoutVersion >= 7), skip min checks that
-  // would false-fail hybrid fixed+block layouts (contact form still fixed).
-  const enforceMins =
-    typeof page.layoutVersion === "number" && page.layoutVersion >= 7;
 
   if (policies) {
     for (const [type, policy] of Object.entries(policies)) {
       if (!policy) continue;
       const blockType = type as BlockType;
-      const count = countBlocksOfType(page, blockType);
-      if (enforceMins && count < policy.minInstances) {
+      const count = countPolicyInstances(page, blockType);
+      if (count < policy.minInstances) {
         issues.push({
           code: "BLOCK_POLICY_MIN",
           blockType,

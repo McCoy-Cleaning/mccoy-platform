@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   createFormFieldItem,
   formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
   normalizeFormFields,
+  orderContactFormFieldsForDisplay,
   resolveContactFormFields,
+  seedDefaultContactFormFields,
   validateContactFormSubmission,
 } from "./form-fields";
 
@@ -61,10 +65,43 @@ describe("resolveContactFormFields", () => {
   });
 });
 
+describe("seedDefaultContactFormFields", () => {
+  it("defaults to company, phone, and message with live placeholders", () => {
+    const fields = seedDefaultContactFormFields();
+    expect(fields.map((f) => formFieldPayloadKey(f))).toEqual(["company", "phone", "message"]);
+    expect(fields.find((f) => f.type === "company")?.placeholder).toBe("Optioneel");
+    expect(fields.find((f) => formFieldPayloadKey(f) === "message")?.label).toBe("Uw bericht");
+  });
+
+  it("applies legacy label/placeholder overrides", () => {
+    const fields = seedDefaultContactFormFields({
+      labels: { company: "Firma" },
+      placeholders: { message: "Schrijf hier…" },
+    });
+    expect(fields[0]?.label).toBe("Firma");
+    expect(fields.find((f) => formFieldPayloadKey(f) === "message")?.placeholder).toBe(
+      "Schrijf hier…",
+    );
+  });
+});
+
+describe("orderContactFormFieldsForDisplay", () => {
+  it("orders name, company, phone, email, message like the live Contact form", () => {
+    const fields = orderContactFormFieldsForDisplay(
+      resolveContactFormFields(seedDefaultContactFormFields()),
+    );
+    expect(fields.map((f) => formFieldPayloadKey(f))).toEqual([
+      "name",
+      "company",
+      "phone",
+      "email",
+      "message",
+    ]);
+  });
+});
+
 describe("validateContactFormSubmission", () => {
-  const fields = resolveContactFormFields([
-    createFormFieldItem("Bericht", "textarea"),
-  ]);
+  const fields = resolveContactFormFields(seedDefaultContactFormFields());
 
   it("requires name and email", () => {
     expect(validateContactFormSubmission(fields, { name: "", email: "" }).ok).toBe(false);
@@ -76,6 +113,26 @@ describe("validateContactFormSubmission", () => {
     if (result.ok) {
       expect(result.sanitized.name).toBe("Maria");
       expect(result.sanitized.email).toBe("maria@example.com");
+    }
+  });
+
+  it("accepts the default contact field set including company/phone/message", () => {
+    const result = validateContactFormSubmission(fields, {
+      name: "Maria",
+      email: "maria@example.com",
+      company: "Acme",
+      phone: "0612345678",
+      message: "Hallo",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.sanitized).toMatchObject({
+        name: "Maria",
+        email: "maria@example.com",
+        company: "Acme",
+        phone: "0612345678",
+        message: "Hallo",
+      });
     }
   });
 
@@ -94,5 +151,27 @@ describe("validateContactFormSubmission", () => {
         onderwerp: "spam",
       }).ok,
     ).toBe(false);
+  });
+});
+
+describe("normalizeContactFormTextPlacement", () => {
+  it("defaults to left and maps above→top", () => {
+    expect(normalizeContactFormTextPlacement(undefined)).toBe("left");
+    expect(normalizeContactFormTextPlacement("top")).toBe("top");
+    expect(normalizeContactFormTextPlacement("above")).toBe("top");
+    expect(normalizeContactFormTextPlacement("right")).toBe("right");
+    expect(normalizeContactFormTextPlacement("left")).toBe("left");
+    expect(normalizeContactFormTextPlacement("below")).toBe("left");
+  });
+});
+
+describe("normalizeContactFormColumnsDesktop", () => {
+  it("defaults to 2 and accepts 1", () => {
+    expect(normalizeContactFormColumnsDesktop(undefined)).toBe(2);
+    expect(normalizeContactFormColumnsDesktop(2)).toBe(2);
+    expect(normalizeContactFormColumnsDesktop("2")).toBe(2);
+    expect(normalizeContactFormColumnsDesktop(1)).toBe(1);
+    expect(normalizeContactFormColumnsDesktop("1")).toBe(1);
+    expect(normalizeContactFormColumnsDesktop(3)).toBe(2);
   });
 });

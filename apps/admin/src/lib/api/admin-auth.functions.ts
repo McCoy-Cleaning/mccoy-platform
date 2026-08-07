@@ -1,24 +1,35 @@
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 
 import {
+  completeMfaBrowserFlow,
   completeStaffMfaOnboarding,
+  ensureMfaBrowserSession,
   establishLegacyAdminSession,
   establishStaffSessionFromEmailAuthCallback,
   establishStaffSessionFromTokens,
   establishStaffSessionWithPassword,
-  hydrateBrowserStaffAuthFromCookies,
+  hydrateRealtimeAccessToken,
   isStaffSupabaseAuthEnabled,
   readAdminSession,
   signOutAdminSessions,
+  startMfaBrowserFlow,
 } from "@mccoy/database/server";
 import { getSupabaseAdminEnvDiagnostics } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
   adminAuthCallbackExchangeSchema,
   adminEmailLoginSchema,
+  adminEnsureMfaBrowserSessionSchema,
   adminEstablishSessionSchema,
   adminLoginSchema,
+  adminStartMfaBrowserFlowSchema,
 } from "@mccoy/validation";
+
+function setNoStoreHeaders(): void {
+  setResponseHeader("Cache-Control", "no-store");
+  setResponseHeader("Pragma", "no-cache");
+}
 
 export const getAdminAuthMode = createServerFn({ method: "POST" }).handler(async () => {
   ensureMonorepoEnvLoaded();
@@ -47,10 +58,12 @@ export const adminEstablishSession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
       return await establishStaffSessionFromTokens({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         clientKey: data.clientKey,
+        requireAal2: data.requireAal2 === true,
       });
     } catch (error) {
       return {
@@ -61,12 +74,13 @@ export const adminEstablishSession = createServerFn({ method: "POST" })
     }
   });
 
-/** Verify invite/recovery link server-side → HttpOnly cookies (+ one-shot browser hydration). */
+/** Verify invite/recovery link server-side → HttpOnly cookies (+ optional one-shot hydration unused by UI). */
 export const adminExchangeAuthCallback = createServerFn({ method: "POST" })
   .validator(adminAuthCallbackExchangeSchema)
   .handler(async ({ data }) => {
     try {
       ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
       return await establishStaffSessionFromEmailAuthCallback({
         tokenHash: data.tokenHash,
         type: data.type,
@@ -84,12 +98,77 @@ export const adminExchangeAuthCallback = createServerFn({ method: "POST" })
     }
   });
 
-/** Reload-safe: read HttpOnly cookies and hydrate supabase-js for MFA (no sessionStorage). */
+/** Access-token-only Realtime hydrate — never returns refreshToken. */
+export const adminHydrateRealtimeAccessToken = createServerFn({ method: "POST" }).handler(
+  async () => {
+    try {
+      ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
+      return await hydrateRealtimeAccessToken();
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Realtime-token kon niet worden geladen.",
+        code: "unknown" as const,
+      };
+    }
+  },
+);
+
+export const adminStartMfaBrowserFlow = createServerFn({ method: "POST" })
+  .validator(adminStartMfaBrowserFlowSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
+      return await startMfaBrowserFlow({ purpose: data.purpose });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "MFA-flow starten mislukt.",
+        code: "unknown" as const,
+      };
+    }
+  });
+
+export const adminEnsureMfaBrowserSession = createServerFn({ method: "POST" })
+  .validator(adminEnsureMfaBrowserSessionSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
+      return await ensureMfaBrowserSession({ purpose: data.purpose });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "MFA-sessie kon niet worden geladen.",
+        code: "unknown" as const,
+      };
+    }
+  });
+
+export const adminCompleteMfaBrowserFlow = createServerFn({ method: "POST" }).handler(async () => {
+  ensureMonorepoEnvLoaded();
+  setNoStoreHeaders();
+  completeMfaBrowserFlow();
+  return { ok: true as const };
+});
+
+/**
+ * @deprecated Prefer adminStartMfaBrowserFlow + adminEnsureMfaBrowserSession.
+ * Kept briefly for residual invite edges; does not purpose-gate refresh handoff.
+ */
 export const adminHydrateBrowserAuthFromCookies = createServerFn({ method: "POST" }).handler(
   async () => {
     try {
       ensureMonorepoEnvLoaded();
-      return await hydrateBrowserStaffAuthFromCookies();
+      setNoStoreHeaders();
+      // Hardened: refuse broad dual-token hydrate — force MFA flow capability path.
+      return {
+        ok: false as const,
+        error: "Gebruik de MFA-flow (start + ensure) in plaats van cookie-hydrate.",
+        code: "unknown" as const,
+      };
     } catch (error) {
       return {
         ok: false as const,
@@ -105,6 +184,7 @@ export const adminSignInWithEmail = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       ensureMonorepoEnvLoaded();
+      setNoStoreHeaders();
       return await establishStaffSessionWithPassword({
         email: data.email,
         password: data.password,

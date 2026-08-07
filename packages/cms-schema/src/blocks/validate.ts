@@ -1,9 +1,9 @@
 import {
   cmsButtonSchema,
   validateCmsButtonForPublish,
-  type CmsImage,
   type PopupContentBlockType,
-} from "../content";
+} from "../button";
+import type { CmsImage } from "../cms-image";
 import type { Block } from "../types";
 import type {
   BeforeAfterBlockData,

@@ -1,8 +1,13 @@
 import * as React from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { refreshAdminSessionClient } from "@/lib/admin-auth";
+import { adminCompleteMfaBrowserFlow } from "@/lib/api/admin-auth.functions";
 import { finalizeStaffAuthenticatorReplaceFn } from "@/lib/api/staff-settings.functions";
-import { getAdminBrowserSupabase } from "@/lib/supabase-browser";
+import {
+  destroyMfaBrowserSessionLocally,
+  ensureMfaBrowserSessionForPurpose,
+} from "@/lib/hydrate-browser-supabase-session";
+import { getAdminMfaSupabase } from "@/lib/supabase-browser";
 
 type Phase = "idle" | "enrolling" | "ready" | "submitting" | "success" | "error";
 
@@ -34,7 +39,14 @@ export function StaffAuthenticatorReplacePanel({ aal, onRequireMfa }: Props) {
     setSecret(null);
     enrollAttempted.current = false;
 
-    const supabase = getAdminBrowserSupabase();
+    const hydrated = await ensureMfaBrowserSessionForPurpose("authenticator_replace");
+    if (!hydrated.ok) {
+      setPhase("error");
+      setMessage(hydrated.error);
+      return;
+    }
+
+    const supabase = getAdminMfaSupabase();
     if (!supabase) {
       setPhase("error");
       setMessage("Supabase browserconfig ontbreekt.");
@@ -81,7 +93,7 @@ export function StaffAuthenticatorReplacePanel({ aal, onRequireMfa }: Props) {
     setPhase("submitting");
     setMessage(null);
 
-    const supabase = getAdminBrowserSupabase();
+    const supabase = getAdminMfaSupabase();
     if (!supabase) {
       setPhase("error");
       setMessage("Supabase browserconfig ontbreekt.");
@@ -115,6 +127,8 @@ export function StaffAuthenticatorReplacePanel({ aal, onRequireMfa }: Props) {
       return;
     }
 
+    destroyMfaBrowserSessionLocally();
+    await adminCompleteMfaBrowserFlow().catch(() => undefined);
     refreshAdminSessionClient();
     setPhase("success");
     setMessage("Je authenticator is opnieuw gekoppeld.");
@@ -126,6 +140,8 @@ export function StaffAuthenticatorReplacePanel({ aal, onRequireMfa }: Props) {
   };
 
   const cancel = () => {
+    destroyMfaBrowserSessionLocally();
+    void adminCompleteMfaBrowserFlow().catch(() => undefined);
     setPhase("idle");
     setMessage(null);
     setCode("");

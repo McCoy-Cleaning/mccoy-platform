@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import {
   createDefaultBlock,
   defaultSectionContent,
+  type ContactFormContent,
   type PartnersContent,
   type StatsContent,
   type WorkGalleryContent,
@@ -16,6 +17,7 @@ import {
 } from "../ai-assist";
 import { RegisteredBlockEditor } from "./RegisteredBlockEditor";
 import { blockEnPath } from "./en-draft-fields";
+import { ContactFormInspector } from "../inspectors/ContactFormInspector";
 import { PartnersInspector } from "../inspectors/PartnersInspector";
 import { StatsInspector } from "../inspectors/StatsInspector";
 import { WorkGalleryInspector } from "../inspectors/WorkGalleryInspector";
@@ -157,5 +159,22 @@ describe("isTranslatableFieldKey non-copy skips", () => {
     expect(isTranslatableFieldKey("icon")).toBe(false);
     expect(isTranslatableFieldKey("size")).toBe(false);
     expect(isTranslatableFieldKey("slug")).toBe(false);
+  });
+});
+
+describe("ContactFormInspector EN drafts", () => {
+  it("exposes EN · controls for custom field labels/placeholders and submit copy", () => {
+    const content = defaultSectionContent("contact.form") as ContactFormContent;
+    const container = mount(
+      <CmsAiAssistProvider value={mockAi()}>
+        <ContactFormInspector content={content} onPatch={vi.fn()} />
+      </CmsAiAssistProvider>,
+    );
+    expect(container.textContent).not.toMatch(/Formulierlabels & placeholders/);
+    expect(container.textContent).toMatch(/Formuliervelden/);
+    expect(container.textContent).toMatch(/EN · Label/);
+    expect(container.textContent).toMatch(/EN · Placeholder/);
+    expect(container.textContent).toMatch(/EN · Knoptekst/);
+    expect(container.textContent).toMatch(/EN · Succeskop/);
   });
 });

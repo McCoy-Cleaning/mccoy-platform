@@ -5,6 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server
 
 import { readServerEnv } from "./env";
 import { ensureMonorepoEnvLoaded } from "./load-monorepo-env.server";
+import { clearAdminMfaFlowCookie } from "./mfa-flow";
 import { assertRateLimit, RateLimitError } from "./rate-limit";
 
 const LEGACY_COOKIE_NAME = "mccoy_admin_session";
@@ -231,6 +232,7 @@ export function readSupabaseRefreshToken(): string | null {
 export function clearAllAdminAuthCookies(): void {
   clearAdminSessionCookie();
   clearSupabaseAuthCookies();
+  clearAdminMfaFlowCookie();
 }
 
 /**

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createItemId, type CmsImage } from "../content";
+import type { CmsImage } from "../cms-image";
+import { createItemId } from "../ids";
 import type { BlockType } from "../types";
 import type { CmsBlockDataDefinition } from "./definition";
 import { normalizeCmsImage } from "./image-normalize";

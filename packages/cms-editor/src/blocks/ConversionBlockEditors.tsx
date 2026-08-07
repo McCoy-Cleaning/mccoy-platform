@@ -1,22 +1,41 @@
 import * as React from "react";
 import {
-  CONTACT_FORM_CUSTOM_FIELD_TYPES,
-  createFormFieldItem,
-  createFormFieldOption,
-  FORM_FIELD_TYPE_LABELS_NL,
+  defaultContactFormHighlights,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
+  seedDefaultContactFormFields,
   type BlockEditorPresentation,
   type ContactFormBlockData,
-  type FormFieldItem,
-  type FormFieldOption,
-  type FormFieldType,
+  type ContactFormColumnsDesktop,
+  type ContactFormTextPlacement,
   type NewsletterBlockData,
   type PopupBlockData,
 } from "@mccoy/cms-schema";
-import { blockEnPath, EnDraftFor, NlEnField } from "./en-draft-fields";
-import { ObjectListEditor } from "./ObjectListEditor";
+import { blockEnPath, NlEnField } from "./en-draft-fields";
+import { ContactFormFieldsEditor } from "./ContactFormFieldsEditor";
+import { StringListEditor } from "./StringListEditor";
 import { TitleBodyCtaBlockEditor } from "./TitleBodyCtaBlockEditor";
 import { Field, Section, inputClass } from "./shared-fields";
 import { FormScopeField } from "./FormScopeField";
+
+const CONTACT_TEXT_PLACEMENT_OPTIONS: Array<{
+  id: ContactFormTextPlacement;
+  label: string;
+  hint: string;
+}> = [
+  { id: "top", label: "Boven", hint: "Tekst boven het formulier" },
+  { id: "left", label: "Links", hint: "Tekst links, formulier rechts" },
+  { id: "right", label: "Rechts", hint: "Formulier links, tekst rechts" },
+];
+
+const CONTACT_COLUMNS_OPTIONS: Array<{
+  id: ContactFormColumnsDesktop;
+  label: string;
+  hint: string;
+}> = [
+  { id: 1, label: "1 kolom", hint: "Velden onder elkaar" },
+  { id: 2, label: "2 kolommen", hint: "Velden naast elkaar op desktop" },
+];
 
 export function NewsletterBlockEditor({
   value,
@@ -74,67 +93,6 @@ export function NewsletterBlockEditor({
   );
 }
 
-function FormFieldOptionsEditor({
-  options,
-  onChange,
-  blockId,
-  fieldIndex,
-}: {
-  options: FormFieldOption[];
-  onChange: (next: FormFieldOption[]) => void;
-  blockId?: string;
-  fieldIndex: number;
-}) {
-  return (
-    <ObjectListEditor<FormFieldOption>
-      items={options}
-      onChange={onChange}
-      createItem={() => createFormFieldOption("Optie")}
-      cloneItem={(item) => ({ ...item, id: createFormFieldOption(item.label).id })}
-      addLabel="Optie toevoegen"
-      renderItem={(option, actions, optionIndex) => (
-        <div className="rounded-lg border border-white/10 bg-black/10 p-2">
-          <Field label="Label">
-            <input
-              className={inputClass}
-              value={option.label}
-              onChange={(e) => actions.update({ ...option, label: e.target.value })}
-            />
-          </Field>
-          <EnDraftFor
-            fieldPath={blockEnPath(blockId, `fields.${fieldIndex}.options.${optionIndex}.label`)}
-            label="Label"
-          />
-          <Field label="Waarde (optioneel)" hint="Stabiele sleutel; leeg = afgeleid uit label.">
-            <input
-              className={inputClass}
-              value={option.value ?? ""}
-              onChange={(e) =>
-                actions.update({ ...option, value: e.target.value.trim() || undefined })
-              }
-            />
-          </Field>
-          <div className="mt-2 flex gap-2">
-            <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveUp}>
-              Omhoog
-            </button>
-            <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveDown}>
-              Omlaag
-            </button>
-            <button
-              type="button"
-              className="text-xs text-rose-300/80 hover:text-rose-200"
-              onClick={actions.remove}
-            >
-              Verwijderen
-            </button>
-          </div>
-        </div>
-      )}
-    />
-  );
-}
-
 export function ContactFormBlockEditor({
   value,
   onChange,
@@ -147,133 +105,172 @@ export function ContactFormBlockEditor({
   blockId?: string;
 }) {
   void presentation;
+  const patch = (partial: Partial<ContactFormBlockData>) => onChange({ ...value, ...partial });
+  const textPlacement = normalizeContactFormTextPlacement(value.textPlacement);
+  const formColumnsDesktop = normalizeContactFormColumnsDesktop(value.formColumnsDesktop);
+  const highlights = value.highlights ?? defaultContactFormHighlights();
+  const fields =
+    value.fields?.length > 0
+      ? value.fields
+      : seedDefaultContactFormFields({
+          labels: value.labels,
+          placeholders: value.placeholders,
+        });
+
   return (
     <div className="space-y-6">
-      <Section title="Contactformulier">
-        <NlEnField label="Titel" enPath={blockEnPath(blockId, "title")}>
+      <Section title="Kop & tekst">
+        <NlEnField label="Eyebrow" enPath={blockEnPath(blockId, "eyebrow")}>
+          <input
+            className={inputClass}
+            value={value.eyebrow ?? ""}
+            onChange={(e) => patch({ eyebrow: e.target.value || undefined })}
+            placeholder="Contact"
+          />
+        </NlEnField>
+        <NlEnField label="Kop" enPath={blockEnPath(blockId, "title")}>
           <input
             className={inputClass}
             value={value.title}
-            onChange={(e) => onChange({ ...value, title: e.target.value })}
+            onChange={(e) => patch({ title: e.target.value })}
+            placeholder="Laten we praten over uw pand."
           />
         </NlEnField>
         <NlEnField label="Introductietekst" enPath={blockEnPath(blockId, "body")} multiline>
           <textarea
             className={`${inputClass} min-h-[4rem]`}
             value={value.body ?? ""}
-            onChange={(e) => onChange({ ...value, body: e.target.value || undefined })}
-            placeholder="Tekst naast het formulier (links)."
+            onChange={(e) => patch({ body: e.target.value || undefined })}
+            placeholder="Tekst naast of boven het formulier."
           />
         </NlEnField>
+        <Field
+          label="Positie van de tekst"
+          hint="Boven: gestapeld. Links/rechts: tekst en formulier naast elkaar."
+        >
+          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Positie van de tekst">
+            {CONTACT_TEXT_PLACEMENT_OPTIONS.map((opt) => {
+              const selected = textPlacement === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => patch({ textPlacement: opt.id })}
+                  className={
+                    selected
+                      ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-3 py-3 text-left"
+                      : "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left hover:border-white/25"
+                  }
+                >
+                  <span className="block text-sm font-semibold text-white">{opt.label}</span>
+                  <span className="mt-0.5 block text-xs text-white/45">{opt.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field
+          label="Kolommen op desktop"
+          hint="Mobiel blijft altijd één kolom. Geldt voor de formuliervelden."
+        >
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Kolommen op desktop">
+            {CONTACT_COLUMNS_OPTIONS.map((opt) => {
+              const selected = formColumnsDesktop === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => patch({ formColumnsDesktop: opt.id })}
+                  className={
+                    selected
+                      ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-3 py-3 text-left"
+                      : "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left hover:border-white/25"
+                  }
+                >
+                  <span className="block text-sm font-semibold text-white">{opt.label}</span>
+                  <span className="mt-0.5 block text-xs text-white/45">{opt.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
         <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/55">
           Ontvanger wordt server-side bepaald via <code className="text-white/70">FORM_TO_EMAIL</code>.
           Een eventueel oud &quot;recipient&quot;-veld in de data wordt genegeerd.
         </p>
-        <FormScopeField
-          value={value.scope}
-          onChange={(scope) => onChange({ ...value, scope })}
-        />
       </Section>
-      <Section title="Velden">
-        <p className="text-[11px] text-white/50">
-          <span className="text-white/70">Naam</span> en{" "}
-          <span className="text-white/70">E-mail</span> staan standaard op het formulier (verplicht
-          voor verzending). Voeg hier extra velden toe — telefoon, bedrijf, tekst, tekstvak of
-          keuzelijst. Het <span className="text-white/70">label</span> is wat de bezoeker ziet; het
-          veldtype bepaalt invoercontrole.
+
+      <Section title="Punten naast het formulier">
+        <p className="mb-2 text-[11px] text-white/45">
+          Korte beloften of USP’s bij de tekstkolom. Leeg = standaardpunten.
         </p>
-        <ObjectListEditor<FormFieldItem>
-          items={value.fields}
-          onChange={(fields) => onChange({ ...value, fields })}
-          createItem={() => createFormFieldItem("Nieuw veld", "text")}
-          cloneItem={(item) => ({
-            ...item,
-            id: createFormFieldItem(item.label, item.type).id,
-            options: item.options?.map((option) => ({
-              ...option,
-              id: createFormFieldOption(option.label, option.value).id,
-            })),
-          })}
-          addLabel="Veld toevoegen"
-          renderItem={(item, actions, index) => {
-            return (
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <Field label="Label">
-                  <input
-                    className={inputClass}
-                    value={item.label}
-                    onChange={(e) => actions.update({ ...item, label: e.target.value })}
-                  />
-                </Field>
-                <EnDraftFor fieldPath={blockEnPath(blockId, `fields.${index}.label`)} label="Label" />
-                <Field
-                  label="Veldtype"
-                  hint="Bepaalt opslag en invoercontrole — niet hetzelfde als het zichtbare label."
-                >
-                  <select
-                    className={inputClass}
-                    value={item.type}
-                    onChange={(e) => {
-                      const type = e.target.value as FormFieldType;
-                      const next: FormFieldItem = {
-                        ...item,
-                        type,
-                        options:
-                          type === "select"
-                            ? item.options?.length
-                              ? item.options
-                              : [createFormFieldOption("Optie 1"), createFormFieldOption("Optie 2")]
-                            : undefined,
-                      };
-                      actions.update(next);
-                    }}
-                  >
-                    {CONTACT_FORM_CUSTOM_FIELD_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {FORM_FIELD_TYPE_LABELS_NL[type]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <label className="mt-2 flex items-center gap-2 text-xs text-white/70">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(item.required)}
-                    onChange={(e) => actions.update({ ...item, required: e.target.checked })}
-                  />
-                  Verplicht
-                </label>
-                {item.type === "select" ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-[11px] font-medium text-white/55">Keuzeopties</p>
-                    <FormFieldOptionsEditor
-                      options={item.options ?? []}
-                      onChange={(options) => actions.update({ ...item, options })}
-                      blockId={blockId}
-                      fieldIndex={index}
-                    />
-                  </div>
-                ) : null}
-                <div className="mt-2 flex gap-2">
-                  <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveUp}>
-                    Omhoog
-                  </button>
-                  <button type="button" className="text-xs text-white/50 hover:text-white" onClick={actions.moveDown}>
-                    Omlaag
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs text-rose-300/80 hover:text-rose-200"
-                    onClick={actions.remove}
-                  >
-                    Verwijderen
-                  </button>
-                </div>
-              </div>
-            );
-          }}
+        <StringListEditor
+          value={highlights}
+          onChange={(next) => patch({ highlights: next })}
+          addLabel="Punt toevoegen"
+          enPathPrefix={blockId ? `block:${blockId}:highlights` : undefined}
         />
+        {value.highlights == null ? (
+          <button
+            type="button"
+            className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
+            onClick={() => patch({ highlights: defaultContactFormHighlights() })}
+          >
+            Standaardpunten vastleggen in CMS
+          </button>
+        ) : value.highlights.length === 0 ? (
+          <button
+            type="button"
+            className="mt-2 text-[11px] text-sky-300/90 underline-offset-2 hover:underline"
+            onClick={() => patch({ highlights: defaultContactFormHighlights() })}
+          >
+            Standaardpunten herstellen
+          </button>
+        ) : null}
       </Section>
+
+      <Section title="Versturen & bevestiging">
+        <NlEnField label="Knoptekst" enPath={blockEnPath(blockId, "submitLabel")}>
+          <input
+            className={inputClass}
+            value={value.submitLabel ?? ""}
+            onChange={(e) => patch({ submitLabel: e.target.value || undefined })}
+            placeholder="Verstuur aanvraag"
+          />
+        </NlEnField>
+        <NlEnField label="Toestemmingstekst" enPath={blockEnPath(blockId, "consent")} multiline>
+          <textarea
+            className={`${inputClass} min-h-[3rem]`}
+            value={value.consent ?? ""}
+            onChange={(e) => patch({ consent: e.target.value || undefined })}
+          />
+        </NlEnField>
+        <NlEnField label="Succeskop" enPath={blockEnPath(blockId, "successMessage")}>
+          <input
+            className={inputClass}
+            value={value.successMessage ?? ""}
+            onChange={(e) => patch({ successMessage: e.target.value || undefined })}
+          />
+        </NlEnField>
+        <NlEnField label="Succes-subtekst" enPath={blockEnPath(blockId, "successDetail")} multiline>
+          <textarea
+            className={`${inputClass} min-h-[3rem]`}
+            value={value.successDetail ?? ""}
+            onChange={(e) => patch({ successDetail: e.target.value || undefined })}
+          />
+        </NlEnField>
+        <FormScopeField value={value.scope} onChange={(scope) => patch({ scope })} />
+      </Section>
+
+      <ContactFormFieldsEditor
+        fields={fields}
+        onChange={(next) => patch({ fields: next })}
+        blockId={blockId}
+      />
     </div>
   );
 }

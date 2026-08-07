@@ -37,6 +37,8 @@ export type FormFieldItem = {
   label: string;
   type: FormFieldType;
   required?: boolean;
+  /** Optional input placeholder shown on the storefront. */
+  placeholder?: string;
   options?: FormFieldOption[];
 };
 
@@ -51,6 +53,7 @@ export const formFieldItemSchema: z.ZodType<FormFieldItem> = z.object({
   label: z.string(),
   type: z.enum(FORM_FIELD_TYPES),
   required: z.boolean().optional(),
+  placeholder: z.string().optional(),
   options: z.array(formFieldOptionSchema).optional(),
 });
 
@@ -65,11 +68,16 @@ export function createFormFieldItem(
 ): FormFieldItem {
   const required =
     partial?.required ?? (type === "name" || type === "email" ? true : undefined);
+  const placeholder =
+    typeof partial?.placeholder === "string" && partial.placeholder.trim()
+      ? partial.placeholder
+      : undefined;
   return {
     id: createItemId("fld"),
     label,
     type,
     required,
+    placeholder,
     options: partial?.options,
   };
 }
@@ -102,10 +110,98 @@ export const JOB_APPLICATION_CUSTOM_FIELD_TYPES = FORM_FIELD_TYPES.filter(
   (type) => type !== "name" && type !== "email",
 );
 
-/** Default CMS fields for new contact forms — name/email are always built-in on the storefront. */
+/** Text column placement relative to the contact form (matches live Contact section). */
+export type ContactFormTextPlacement = "top" | "left" | "right";
+
+/** Default: text left / form right (storefront Contact screenshot layout). */
+export function normalizeContactFormTextPlacement(raw: unknown): ContactFormTextPlacement {
+  if (raw === "top" || raw === "above") return "top";
+  if (raw === "right") return "right";
+  return "left";
+}
+
+/**
+ * Field grid columns on desktop (sm+). Mobile stays one column via CSS.
+ * Default `2` matches the live Contact form layout.
+ */
+export type ContactFormColumnsDesktop = 1 | 2;
+
+export function normalizeContactFormColumnsDesktop(raw: unknown): ContactFormColumnsDesktop {
+  if (raw === 1 || raw === "1") return 1;
+  return 2;
+}
+
+/** Stable ids for default contact custom fields (company / phone / message). */
+export const BUILTIN_CONTACT_COMPANY_ID = "builtin-contact-company";
+export const BUILTIN_CONTACT_PHONE_ID = "builtin-contact-phone";
+export const BUILTIN_CONTACT_MESSAGE_ID = "builtin-contact-message";
+
+/**
+ * Default CMS custom fields for contact forms — name/email stay built-in via
+ * {@link resolveContactFormFields}. Labels/placeholders match the live Contact form.
+ */
 export const DEFAULT_CONTACT_FORM_FIELDS: FormFieldItem[] = [
-  createFormFieldItem("Bericht", "textarea"),
+  {
+    id: BUILTIN_CONTACT_COMPANY_ID,
+    label: "Bedrijfsnaam",
+    type: "company",
+    placeholder: "Optioneel",
+  },
+  {
+    id: BUILTIN_CONTACT_PHONE_ID,
+    label: "Telefoon",
+    type: "phone",
+    placeholder: "06 …",
+  },
+  {
+    id: BUILTIN_CONTACT_MESSAGE_ID,
+    label: "Uw bericht",
+    type: "textarea",
+    placeholder: "Waar kunnen we u mee helpen?",
+  },
 ];
+
+/** Legacy label/placeholder maps from older contact.form / contactForm JSON. */
+export type ContactFormLegacyFieldCopy = {
+  labels?: Partial<Record<"name" | "company" | "phone" | "email" | "message", string>>;
+  placeholders?: Partial<
+    Record<"name" | "company" | "phone" | "email" | "message", string>
+  >;
+};
+
+/**
+ * Seed default custom fields, applying legacy labels/placeholders when present so
+ * published content without `fields` still matches the previous built-in copy.
+ */
+function legacyCopyKeyForDefaultField(
+  field: FormFieldItem,
+): "company" | "phone" | "message" | null {
+  if (field.id === BUILTIN_CONTACT_COMPANY_ID || field.type === "company") return "company";
+  if (field.id === BUILTIN_CONTACT_PHONE_ID || field.type === "phone") return "phone";
+  if (field.id === BUILTIN_CONTACT_MESSAGE_ID || field.type === "textarea") return "message";
+  return null;
+}
+
+/**
+ * Seed default custom fields, applying legacy labels/placeholders when present so
+ * published content without `fields` still matches the previous built-in copy.
+ */
+export function seedDefaultContactFormFields(
+  legacy?: ContactFormLegacyFieldCopy,
+): FormFieldItem[] {
+  const labels = legacy?.labels;
+  const placeholders = legacy?.placeholders;
+  return DEFAULT_CONTACT_FORM_FIELDS.map((field) => {
+    const key = legacyCopyKeyForDefaultField(field);
+    const labelOverride = key ? labels?.[key]?.trim() : undefined;
+    const placeholderOverride = key ? placeholders?.[key]?.trim() : undefined;
+    return {
+      ...field,
+      label: labelOverride || field.label,
+      placeholder: placeholderOverride || field.placeholder,
+    };
+  });
+}
 
 /** Stable ids for default job-application upload / motivation fields. */
 export const BUILTIN_JOB_CV_ID = "builtin-job-cv";
@@ -228,12 +324,17 @@ export function normalizeFormFields(value: unknown): FormFieldItem[] {
         : type === "name" || type === "email"
           ? true
           : undefined;
+    const placeholder =
+      typeof rec.placeholder === "string" && rec.placeholder.trim()
+        ? rec.placeholder
+        : undefined;
     const options = type === "select" ? normalizeFieldOptions(rec.options) : undefined;
     out.push({
       id,
       label: label || "Veld",
       type,
       required,
+      placeholder,
       options,
     });
   }
@@ -273,19 +374,47 @@ export function formFieldPayloadKey(field: FormFieldItem): string {
   if (field.type === "email") return "email";
   if (field.type === "phone") return "phone";
   if (field.type === "company") return "company";
+  if (field.id === BUILTIN_CONTACT_MESSAGE_ID) return "message";
+  if (field.id === BUILTIN_CONTACT_COMPANY_ID) return "company";
+  if (field.id === BUILTIN_CONTACT_PHONE_ID) return "phone";
   if (field.id === BUILTIN_JOB_CV_ID) return "cv";
   if (field.id === BUILTIN_JOB_LETTER_ID) return "letter";
   if (field.id === BUILTIN_JOB_MOTIVATION_ID) return "motivation";
   const lower = field.label.trim().toLowerCase();
   if (/^(naam|name)$/i.test(lower)) return "name";
   if (/^(e-?mail|email)$/i.test(lower)) return "email";
-  if (/^(bericht|message|opmerking)$/i.test(lower)) return "message";
+  if (/^(uw\s+)?(bericht|message|opmerking)$/i.test(lower)) return "message";
   if (/^(motivatie|motivation|korte motivatie)$/i.test(lower)) return "motivation";
   if (/^(telefoon|phone|tel|mobiel)$/i.test(lower)) return "phone";
-  if (/^(bedrijf|company|organisatie)$/i.test(lower)) return "company";
+  if (/^(bedrijf|bedrijfsnaam|company|organisatie)$/i.test(lower)) return "company";
   if (/^(cv|curriculum|resumé|resume)(\b|\/|\s|$)/i.test(lower)) return "cv";
   if (/^(motivatiebrief|letter|cover\s*letter)$/i.test(lower)) return "letter";
   return slugFromLabel(field.label, field.id);
+}
+
+/** Storefront field order for the fixed Contact form (matches historical layout). */
+const CONTACT_FORM_DISPLAY_ORDER = ["name", "company", "phone", "email", "message"] as const;
+
+/**
+ * Order resolved contact fields as on the live Contact page, then any extras.
+ */
+export function orderContactFormFieldsForDisplay(fields: FormFieldItem[]): FormFieldItem[] {
+  const byKey = new Map<string, FormFieldItem>();
+  for (const field of fields) {
+    byKey.set(formFieldPayloadKey(field), field);
+  }
+  const ordered: FormFieldItem[] = [];
+  const used = new Set<string>();
+  for (const key of CONTACT_FORM_DISPLAY_ORDER) {
+    const field = byKey.get(key);
+    if (!field) continue;
+    ordered.push(field);
+    used.add(field.id);
+  }
+  for (const field of fields) {
+    if (!used.has(field.id)) ordered.push(field);
+  }
+  return ordered;
 }
 
 export function optionPayloadValue(option: FormFieldOption): string {

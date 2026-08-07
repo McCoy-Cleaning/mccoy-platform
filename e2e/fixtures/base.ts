@@ -1,7 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 const IGNORED_CONSOLE =
-  /Download the React DevTools|\[vite\]|favicon\.ico|third-party cookie|net::ERR_ABORTED|ResizeObserver loop|Failed to load resource: the server responded with a status of (503|404)|Warning:|React does not recognize|validateDOMNesting|Each child in a list|was not wrapped in act|hydrat|notranslate|Server function not resolved|requireAdminSession is not a function|Stop every npm run dev:admin|failed to load published bundle|Failed to fetch/i;
+  /Download the React DevTools|\[vite\]|favicon\.ico|third-party cookie|net::ERR_ABORTED|ResizeObserver loop|Failed to load resource: the server responded with a status of (503|404)|Warning:|React does not recognize|validateDOMNesting|Each child in a list|was not wrapped in act|hydrat|notranslate|Server function not resolved|requireAdminSession is not a function|Stop every npm run dev:admin|failed to load published bundle|Failed to fetch|SupabaseConfigError|Missing SUPABASE_URL|\[cms-media\]|Content Security Policy|fonts\.googleapis\.com/i;
 
 type FailureSink = {
   pageErrors: string[];

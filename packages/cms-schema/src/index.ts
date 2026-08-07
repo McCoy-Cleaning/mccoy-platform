@@ -21,6 +21,7 @@ export * from "./editor-session";
 export * from "./preview-status";
 export * from "./sections";
 export * from "./composite-sections";
+export * from "./e2e-inventory";
 export * from "./layout";
 export * from "./layout-presentation";
 export * from "./layout-ops";

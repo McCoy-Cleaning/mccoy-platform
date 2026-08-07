@@ -3,8 +3,11 @@ import {
   type ContactFormBlockData,
   DEFAULT_CONTACT_FORM_INTRO_NL,
   formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
   optionPayloadValue,
   resolveContactFormFields,
+  resolveContactFormHighlights,
   type FormFieldItem,
   type NewsletterBlockData,
   type PopupBlockData,
@@ -174,12 +177,14 @@ function ContactFormFieldInput({
   value,
   onChange,
   disabled,
+  placeholder,
 }: {
   field: FormFieldItem;
   blockId: string;
   value: string;
   onChange: (next: string) => void;
   disabled: boolean;
+  placeholder?: string;
 }) {
   const fieldId = `cf-${blockId}-${field.id}`;
   const key = formFieldPayloadKey(field);
@@ -194,6 +199,7 @@ function ContactFormFieldInput({
         required={required}
         disabled={disabled}
         value={value}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         className={`${FIELD_INPUT_CLASS} resize-y`}
       />
@@ -244,10 +250,38 @@ function ContactFormFieldInput({
       autoComplete={autoComplete}
       disabled={disabled}
       value={value}
+      placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
       className={FIELD_INPUT_CLASS}
     />
   );
+}
+
+function contactFieldLabel(
+  field: FormFieldItem,
+  labels: ContactFormBlockData["labels"],
+): string {
+  const key = formFieldPayloadKey(field);
+  if (key === "name" && labels?.name) return labels.name;
+  if (key === "company" && labels?.company) return labels.company;
+  if (key === "phone" && labels?.phone) return labels.phone;
+  if (key === "email" && labels?.email) return labels.email;
+  if (key === "message" && labels?.message) return labels.message;
+  return field.label;
+}
+
+function contactFieldPlaceholder(
+  field: FormFieldItem,
+  placeholders: ContactFormBlockData["placeholders"],
+): string | undefined {
+  if (field.placeholder?.trim()) return field.placeholder;
+  const key = formFieldPayloadKey(field);
+  if (key === "name") return placeholders?.name;
+  if (key === "company") return placeholders?.company;
+  if (key === "phone") return placeholders?.phone;
+  if (key === "email") return placeholders?.email;
+  if (key === "message") return placeholders?.message;
+  return undefined;
 }
 
 export function ContactFormSectionView({
@@ -268,6 +302,26 @@ export function ContactFormSectionView({
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
   const preview = mode === "preview";
+  const textPlacement = normalizeContactFormTextPlacement(d.textPlacement);
+  const formColumnsDesktop = normalizeContactFormColumnsDesktop(d.formColumnsDesktop);
+  const twoCol = formColumnsDesktop === 2;
+  const sideBySide = textPlacement === "left" || textPlacement === "right";
+  const copyFirst = textPlacement === "top" || textPlacement === "left";
+  const highlights = resolveContactFormHighlights(
+    { highlights: d.highlights },
+    [
+      "Persoonlijk antwoord binnen één werkdag",
+      "Aanvragen verschijnen in het admin-portaal",
+    ],
+  );
+  const submitLabel = d.submitLabel?.trim() || "Verstuur aanvraag";
+  const successMessage =
+    d.successMessage?.trim() || d.confirmation?.trim() || CONTACT_FORM_SUCCESS_NL;
+  const successDetail =
+    d.successDetail?.trim() || "We hebben uw bericht ontvangen en nemen zo snel mogelijk contact op.";
+  const consent =
+    d.consent?.trim() ||
+    "Door te versturen stemt u in met verwerking van uw gegevens voor deze aanvraag.";
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,76 +363,138 @@ export function ContactFormSectionView({
     setValues({});
   };
 
+  const copyColumn = (
+    <aside className={cn(sideBySide && "lg:col-span-5", textPlacement === "top" && "max-w-3xl")}>
+      <SectionEyebrow>{d.eyebrow?.trim() || "Contact"}</SectionEyebrow>
+      <h2 className="font-display mt-4 text-3xl leading-tight text-foreground md:text-4xl lg:text-[2.75rem]">
+        {d.title}
+      </h2>
+      <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
+        {d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
+      </p>
+      {highlights.length > 0 ? (
+        <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
+          {highlights.map((text, index) => (
+            <li key={`${index}-${text}`} className="flex items-start gap-3">
+              <span
+                className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary"
+                aria-hidden
+              >
+                ✓
+              </span>
+              {text}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </aside>
+  );
+
+  const formColumn = (
+    <SectionSurface variant="form" className={cn(sideBySide && "lg:col-span-7")}>
+      {status === "success" ? (
+        <div className="flex flex-col items-center gap-4 py-14 text-center" role="status">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-2xl text-primary ring-1 ring-primary/30">
+            ✓
+          </div>
+          <p className="font-display text-2xl text-foreground md:text-3xl">{successMessage}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">{successDetail}</p>
+        </div>
+      ) : (
+        <form
+          className={cn("relative grid gap-5", twoCol && "sm:grid-cols-2")}
+          onSubmit={(e) => void onSubmit(e)}
+          noValidate
+          data-form-columns={formColumnsDesktop}
+        >
+          <div className="sr-only" aria-hidden="true">
+            <label>
+              Website
+              <input
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </label>
+          </div>
+          {fields.map((field) => {
+            const key = formFieldPayloadKey(field);
+            const required = isFieldRequired(field);
+            const spanFull = twoCol && (field.type === "textarea" || field.type === "select");
+            return (
+              <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
+                <label htmlFor={`cf-${blockId}-${field.id}`} className={FIELD_LABEL_CLASS}>
+                  {contactFieldLabel(field, d.labels)}
+                  {required ? <span className="ml-1 text-primary">*</span> : null}
+                </label>
+                <ContactFormFieldInput
+                  field={field}
+                  blockId={blockId}
+                  value={values[key] ?? ""}
+                  onChange={(next) => setValues((current) => ({ ...current, [key]: next }))}
+                  disabled={preview || status === "loading"}
+                  placeholder={contactFieldPlaceholder(field, d.placeholders)}
+                />
+              </div>
+            );
+          })}
+          {error ? (
+            <p
+              className={cn(
+                "rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200",
+                twoCol && "sm:col-span-2",
+              )}
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
+          <div
+            className={cn(
+              "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+              twoCol && "sm:col-span-2",
+            )}
+          >
+            <p className="text-xs leading-relaxed text-muted-foreground">{consent}</p>
+            <button
+              type="submit"
+              disabled={preview || status === "loading"}
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60"
+            >
+              {status === "loading" ? "Bezig…" : submitLabel}
+            </button>
+          </div>
+          {preview ? (
+            <p className={cn("text-xs text-muted-foreground", twoCol && "sm:col-span-2")}>
+              Preview — verzenden is uitgeschakeld.
+            </p>
+          ) : null}
+        </form>
+      )}
+    </SectionSurface>
+  );
+
   return (
     <SectionShell blockType="contactForm">
-      <div className="mx-auto grid max-w-5xl items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
-        <div>
-          <SectionEyebrow>Contact</SectionEyebrow>
-          <h2 className="font-display mt-3 text-3xl text-foreground md:text-4xl">{d.title}</h2>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
-            {d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
-          </p>
-        </div>
-
-        <SectionSurface variant="form">
-          {status === "success" ? (
-            <div className="py-10 text-center" role="status">
-              <p className="font-display text-2xl text-foreground">{CONTACT_FORM_SUCCESS_NL}</p>
-              <p className="mt-2 text-sm text-muted-foreground">We nemen zo snel mogelijk contact op.</p>
-            </div>
-          ) : (
-            <form className="space-y-5" onSubmit={(e) => void onSubmit(e)} noValidate>
-              <div className="sr-only" aria-hidden="true">
-                <label>
-                  Website
-                  <input
-                    tabIndex={-1}
-                    autoComplete="off"
-                    value={honeypot}
-                    onChange={(e) => setHoneypot(e.target.value)}
-                  />
-                </label>
-              </div>
-              {fields.map((field) => {
-                const key = formFieldPayloadKey(field);
-                const required = isFieldRequired(field);
-                return (
-                  <div key={field.id}>
-                    <label htmlFor={`cf-${blockId}-${field.id}`} className={FIELD_LABEL_CLASS}>
-                      {field.label}
-                      {required ? <span className="ml-1 text-primary">*</span> : null}
-                    </label>
-                    <ContactFormFieldInput
-                      field={field}
-                      blockId={blockId}
-                      value={values[key] ?? ""}
-                      onChange={(next) => setValues((current) => ({ ...current, [key]: next }))}
-                      disabled={preview || status === "loading"}
-                    />
-                  </div>
-                );
-              })}
-              {error ? (
-                <p
-                  className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
-                  role="alert"
-                >
-                  {error}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={preview || status === "loading"}
-                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60 sm:w-auto"
-              >
-                {status === "loading" ? "Bezig…" : "Versturen"}
-              </button>
-              {preview ? (
-                <p className="text-xs text-muted-foreground">Preview — verzenden is uitgeschakeld.</p>
-              ) : null}
-            </form>
-          )}
-        </SectionSurface>
+      <div
+        className={cn(
+          "mx-auto grid w-full items-start gap-10",
+          sideBySide && "lg:grid-cols-12 lg:gap-14",
+        )}
+        data-text-placement={textPlacement}
+      >
+        {copyFirst ? (
+          <>
+            {copyColumn}
+            {formColumn}
+          </>
+        ) : (
+          <>
+            {formColumn}
+            {copyColumn}
+          </>
+        )}
       </div>
     </SectionShell>
   );

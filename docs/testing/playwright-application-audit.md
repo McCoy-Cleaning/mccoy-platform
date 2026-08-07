@@ -170,7 +170,7 @@ Plus CMS block ids for `contactForm` / `newsletter` when published.
 | npm scripts | `test:e2e`, `test:e2e:ui`, `test:e2e:update-snapshots`, `test:e2e:brave` |
 | CI | `.github/workflows/cms-e2e.yml` (`E2E_USE_DEV=1`) |
 
-**Coverage gaps vs Phase 0–23:** P0 smoke matrix incomplete; block inventory not exhaustive in E2E; forms/Aanvragen/cross-app journey missing; a11y/responsive/resilience/security-browser/visual only partially via screenshots; no provider-strategy docs/suites yet.
+**Coverage gaps vs Phase 0–23:** P0 smoke matrix incomplete; forms/Aanvragen/cross-app journey incomplete; a11y/responsive/resilience/security-browser/visual only partially via screenshots; no provider-strategy docs/suites yet. Fixed/block inventory (M5) is covered by `e2e/cms-loading-inventory.spec.ts`.
 
 ---
 
@@ -186,7 +186,7 @@ Plus CMS block ids for `contactForm` / `newsletter` when published.
 ## 8. Gaps summary (pre-implementation)
 
 1. **Deterministic E2E form inbox adapter** (critical for Phase 13–15).  
-2. **Exhaustive section/block E2E inventory** beyond gallery/roadmap/plans/fixed.  
+2. **Exhaustive section/block E2E inventory** — **done (M5):** `e2e/cms-loading-inventory.spec.ts` + schema catalog `packages/cms-schema/src/e2e-inventory.ts`. 
 3. **Public NL/EN publish verification** suite incomplete.  
 4. **Form coverage** for all five kinds + scoped CMS forms.  
 5. **Global pageerror / console fail harness** may need strengthening.  

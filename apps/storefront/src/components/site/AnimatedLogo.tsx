@@ -25,6 +25,7 @@ export function AnimatedLogo({ className = "h-12 md:h-16 w-auto", style }: Props
           decoding="async"
           fetchPriority="low"
           className="h-full w-auto object-contain"
+          style={{ aspectRatio: "auto" }}
           draggable={false}
         />
       </picture>

@@ -10,9 +10,10 @@ import {
   Layers,
   X,
 } from "lucide-react";
-import { type CmsPage } from "@mccoy/cms-schema";
+import { type CmsPage, type Locale } from "@mccoy/cms-schema";
 import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { useCmsEditParentBridge } from "@/lib/cms/edit-bridge";
+import { buildStorefrontEditCanvasUrl } from "@/lib/cms/edit-canvas-url";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
 import {
   BuiltinLayoutEditor,
@@ -163,11 +164,53 @@ function EditCanvasIframe({
   );
 }
 
-function storefrontPageUrl(slug: string, query?: string) {
-  const origin = storefrontOrigin();
-  const path = slug === "/" ? "/" : slug.startsWith("/") ? slug : `/${slug}`;
-  if (!query) return `${origin}${path}`;
-  return `${origin}${path}?${query.replace(/^\?/, "")}`;
+function storefrontEditUrl(slug: string, pageId: string, locale: Locale) {
+  return buildStorefrontEditCanvasUrl({
+    origin: storefrontOrigin(),
+    slug,
+    pageId,
+    locale,
+  });
+}
+
+/** NL/EN switch for the website preview iframe (not inspector EN draft fields). */
+function PreviewLocaleToggle({
+  locale,
+  onLocale,
+  className,
+}: {
+  locale: Locale;
+  onLocale: (l: Locale) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex rounded-xl border border-white/10 bg-white/5 p-1",
+        className,
+      )}
+      role="group"
+      aria-label="Voorbeeldtaal"
+      data-cms-toolbar="preview-locale"
+    >
+      {(["nl", "en"] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => onLocale(l)}
+          aria-pressed={locale === l}
+          className={cn(
+            "rounded-lg px-3 py-1.5 text-xs font-semibold uppercase transition",
+            locale === l
+              ? "bg-[#1e88e5] text-white shadow"
+              : "text-white/55 hover:text-white",
+          )}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function PageEditorRoute() {
@@ -205,6 +248,7 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   const state = useCms();
   const hasDraft = cms.hasDraft(pageId);
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
+  const [previewLocale, setPreviewLocale] = React.useState<Locale>("nl");
   const [sectionsOpen, setSectionsOpen] = React.useState(false);
   const editRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
@@ -238,7 +282,7 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
     };
   }, [pageId, bridge.bump]);
 
-  const editUrl = storefrontPageUrl(slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
+  const editUrl = storefrontEditUrl(slug, pageId, previewLocale);
   const page = cms.getEditablePage(pageId) ?? state.pages.find((p) => p.id === pageId);
   const publishedUpdatedAt = state.pages.find((p) => p.id === pageId)?.updatedAt;
 
@@ -333,6 +377,8 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
         onDiscard={onDiscard}
         device={device}
         onDevice={setDevice}
+        previewLocale={previewLocale}
+        onPreviewLocale={setPreviewLocale}
         saveLabel="Opslaan & publiceren"
       />
 
@@ -365,6 +411,11 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
               <span className="hidden text-sm font-semibold text-sky-200/80 xl:inline">Secties</span>
             </>
           ) : null}
+          <PreviewLocaleToggle
+            locale={previewLocale}
+            onLocale={setPreviewLocale}
+            className="ml-auto"
+          />
         </div>
 
         <div
@@ -429,11 +480,12 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   const editablePage = useEditablePage(pageId);
   const page = editablePage ?? published;
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [previewLocale, setPreviewLocale] = React.useState<Locale>("nl");
   const editRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
   const hasDraft = cms.hasDraft(pageId) || page.isDraftOnly;
-  const editUrl = storefrontPageUrl(page.slug, `_cmsMode=edit&_cmsPage=${encodeURIComponent(pageId)}`);
+  const editUrl = storefrontEditUrl(page.slug, pageId, previewLocale);
 
   React.useEffect(() => {
     const refreshFromServer = () => {
@@ -550,6 +602,8 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
         device="desktop"
         onDevice={() => {}}
         showDevice={false}
+        previewLocale={previewLocale}
+        onPreviewLocale={setPreviewLocale}
         saveLabel={page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}
       />
 
@@ -570,7 +624,14 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       </div>
 
       <div className="flex-1 min-h-0 grid gap-3 mt-3 lg:grid-cols-1">
-        <PaneShell label="Voorbeeld van uw website" tone="edit" hidden={false}>
+        <PaneShell
+          label="Voorbeeld van uw website"
+          tone="edit"
+          hidden={false}
+          headerEnd={
+            <PreviewLocaleToggle locale={previewLocale} onLocale={setPreviewLocale} />
+          }
+        >
           <div className="relative h-full min-h-0">
             <EditCanvasIframe
               iframeRef={editRef}
@@ -830,6 +891,8 @@ function SplitToolbar({
   device,
   onDevice,
   showDevice = true,
+  previewLocale,
+  onPreviewLocale,
   saveLabel = "Opslaan & publiceren",
 }: {
   title: string;
@@ -840,6 +903,8 @@ function SplitToolbar({
   device: "desktop" | "mobile";
   onDevice: (d: "desktop" | "mobile") => void;
   showDevice?: boolean;
+  previewLocale: Locale;
+  onPreviewLocale: (l: Locale) => void;
   saveLabel?: string;
 }) {
   const navigate = useNavigate();
@@ -889,6 +954,8 @@ function SplitToolbar({
           </div>
           <div className="mt-0.5 truncate text-sm text-white/40 font-mono">{slug}</div>
         </div>
+
+        <PreviewLocaleToggle locale={previewLocale} onLocale={onPreviewLocale} />
 
         {showDevice && (
           <div
@@ -959,6 +1026,7 @@ function PaneShell({
   children,
   scroll = false,
   className,
+  headerEnd,
 }: {
   label: string;
   tone: "edit" | "preview";
@@ -966,12 +1034,14 @@ function PaneShell({
   children: React.ReactNode;
   scroll?: boolean;
   className?: string;
+  headerEnd?: React.ReactNode;
 }) {
   return (
     <div className={cn("min-h-0 rounded-3xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex", className)}>
       <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
         <span className={cn("h-2 w-2 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")} />
         <span className="text-sm font-semibold text-white/70">{label}</span>
+        {headerEnd ? <div className="ml-auto">{headerEnd}</div> : null}
       </div>
       <div className={cn("flex-1 min-h-0", scroll && "overflow-auto")}>{children}</div>
     </div>

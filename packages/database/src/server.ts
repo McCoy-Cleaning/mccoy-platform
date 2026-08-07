@@ -111,6 +111,11 @@ export {
   establishStaffSessionFromTokens,
   establishStaffSessionFromEmailAuthCallback,
   hydrateBrowserStaffAuthFromCookies,
+  hydrateRealtimeAccessToken,
+  startMfaBrowserFlow,
+  ensureMfaBrowserSession,
+  completeMfaBrowserFlow,
+  buildRealtimeAccessHydration,
   reestablishStaffSessionAfterPasswordSet,
   establishStaffSessionWithPassword,
   establishLegacyAdminSession,
@@ -122,6 +127,8 @@ export {
   type StaffAuthNextStep,
   type EstablishStaffSessionResult,
   type StaffSessionBrowserHydration,
+  type RealtimeAccessHydration,
+  type MfaBrowserSessionHydration,
 } from "./staff-auth";
 
 export {

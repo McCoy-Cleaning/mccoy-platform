@@ -1,4 +1,8 @@
 import { expect, type FrameLocator, type Locator, type Page } from "@playwright/test";
+import {
+  INVENTORY_PUBLISHABLE_BLOCK_TYPES,
+  type BlockType,
+} from "@mccoy/cms-schema";
 
 export const ADMIN_ORIGIN = process.env.E2E_ADMIN_ORIGIN ?? "http://localhost:5174";
 export const STOREFRONT_ORIGIN = process.env.E2E_STOREFRONT_ORIGIN ?? "http://localhost:5173";
@@ -54,38 +58,54 @@ export const TEMPLATE_TYPE: Record<string, string> = {
   Aanbiedingen: "offers",
 };
 
-/** Every publishable picker entry for coverage gates. */
-export const ALL_PUBLISHABLE_TEMPLATES: Array<{ template: string; type: string }> = [
-  { template: "Hero", type: "hero" },
-  { template: "Rich text", type: "richText" },
-  { template: "Gecentreerde tekst", type: "centered" },
-  { template: "Tekst met afbeelding", type: "textImage" },
-  { template: "Tekst kolommen", type: "columns" },
-  { template: "Voordelen (checklist)", type: "benefits" },
-  { template: "Quote / testimonial", type: "quote" },
-  { template: "Werkgalerij", type: "gallery" },
-  { template: "Video sectie", type: "video" },
-  { template: "Voor & na", type: "beforeAfter" },
-  { template: "Carrousel", type: "carousel" },
-  { template: "Proces / stappen", type: "steps" },
-  { template: "Vergelijkingstabel", type: "comparisonTable" },
-  { template: "Kenmerkenraster", type: "featureGrid" },
-  { template: "Spacer / divider", type: "spacer" },
-  { template: "Team grid", type: "teamGrid" },
-  { template: "Team profiel", type: "teamProfile" },
-  { template: "Waarden", type: "values" },
-  { template: "Tijdlijn / historie", type: "timeline" },
-  { template: "Roadmap", type: "roadmap" },
-  { template: "Pakketten", type: "plans" },
-  { template: "Call-to-action banner", type: "cta" },
-  { template: "Announcement bar", type: "announcement" },
-  { template: "Nieuwsbrief", type: "newsletter" },
-  { template: "Contactformulier", type: "contactForm" },
-  { template: "Popup CTA", type: "popup" },
-  { template: "Portfolio / projecten", type: "portfolio" },
-  { template: "Vacatures", type: "jobs" },
-  { template: "Uitgelichte artikelen", type: "latestPosts" },
-];
+/**
+ * Canonical Dutch picker label per publishable block type (primary starter).
+ * Synced to {@link INVENTORY_PUBLISHABLE_BLOCK_TYPES} below — missing names fail the coverage gate.
+ */
+export const BLOCK_TYPE_TEMPLATE_NAME: Record<BlockType, string> = {
+  hero: "Hero",
+  richText: "Rich text",
+  centered: "Gecentreerde tekst",
+  textImage: "Tekst met afbeelding",
+  columns: "Tekst kolommen",
+  benefits: "Voordelen (checklist)",
+  quote: "Quote / testimonial",
+  gallery: "Werkgalerij",
+  video: "Video sectie",
+  beforeAfter: "Voor & na",
+  carousel: "Carrousel",
+  steps: "Proces / stappen",
+  comparisonTable: "Vergelijkingstabel",
+  featureGrid: "Kenmerkenraster",
+  spacer: "Spacer / divider",
+  teamGrid: "Team grid",
+  teamProfile: "Team profiel",
+  values: "Waarden",
+  timeline: "Tijdlijn / historie",
+  roadmap: "Roadmap",
+  plans: "Pakketten",
+  cta: "Call-to-action banner",
+  announcement: "Announcement bar",
+  newsletter: "Nieuwsbrief",
+  contactForm: "Contactformulier",
+  popup: "Popup CTA",
+  portfolio: "Portfolio / projecten",
+  jobs: "Vacatures",
+  latestPosts: "Uitgelichte artikelen",
+  partnersMarquee: "Partners",
+  statsCounters: "Statistieken",
+  contactInfoCards: "Contactkaarten",
+  quoteRequestForm: "Offerteformulier",
+  legalArticles: "Juridische artikelen",
+  offers: "Aanbiedingen",
+};
+
+/** Every publishable picker entry — derived from schema registry, not a stale hand list. */
+export const ALL_PUBLISHABLE_TEMPLATES: Array<{ template: string; type: BlockType }> =
+  INVENTORY_PUBLISHABLE_BLOCK_TYPES.map((type) => ({
+    type,
+    template: BLOCK_TYPE_TEMPLATE_NAME[type],
+  }));
 
 export function editFrame(page: Page): FrameLocator {
   return page.frameLocator('iframe[title="edit"]');

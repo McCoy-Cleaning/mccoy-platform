@@ -1,4 +1,3 @@
-import type { Block } from "./types";
 import {
   canDeleteItem,
   canHideItem,
@@ -16,9 +15,11 @@ import {
   normalizeContentAlign,
   type ContentAlign,
 } from "./layout-presentation";
-import { canAddBlockType, canRemoveBlockType } from "./page-block-policies";
+import { canAddBlockType, canRemoveBlockType, policyFixedEquivalentForBlock } from "./page-block-policies";
+import { getBlockDataDefinition } from "./blocks/registry";
+import type { ContactFormContent } from "./content";
 import { FIXED_SECTION_DEFS, FIXED_SECTIONS_BY_PAGE, type BuiltinPageKey, type FixedSectionKey } from "./sections";
-import type { BuiltinCmsPage, CmsPage, CustomCmsPage } from "./types";
+import type { Block, BuiltinCmsPage, CmsPage, CustomCmsPage } from "./types";
 
 export type LayoutOperationCode =
   | "INVALID_INDEX"
@@ -44,6 +45,49 @@ function clonePage<T extends CmsPage>(page: T): T {
 
 function findIndex(layout: LayoutItem[], itemId: string): number {
   return layout.findIndex((i) => i.id === itemId);
+}
+
+/**
+ * When adding a policy form block on a page that still has the hybrid fixed
+ * section, drop the fixed slot and seed block data from sectionContent so the
+ * catalog item becomes the live form (max-1 preserved).
+ */
+function replacePolicyFixedWithBlock(page: CmsPage, block: Block): void {
+  const fixedKey = policyFixedEquivalentForBlock(page.id, block.type);
+  if (!fixedKey) return;
+  if (!page.layout.some((item) => item.kind === "fixed" && item.key === fixedKey)) return;
+
+  page.layout = page.layout.filter(
+    (item) => !(item.kind === "fixed" && item.key === fixedKey),
+  );
+
+  if (page.kind !== "builtin" || fixedKey !== "contact.form" || block.type !== "contactForm") {
+    return;
+  }
+  const builtin = page as BuiltinCmsPage;
+  const content = builtin.sectionContent?.["contact.form"] as ContactFormContent | undefined;
+  if (!content) return;
+
+  const def = getBlockDataDefinition("contactForm");
+  const seeded = def.normalize({
+    ...block.data,
+    title: content.heading ?? (typeof block.data.title === "string" ? block.data.title : "Contact"),
+    eyebrow: content.eyebrow,
+    body: content.body,
+    highlights: content.highlights,
+    textPlacement: content.textPlacement ?? "left",
+    formColumnsDesktop: content.formColumnsDesktop ?? 2,
+    submitLabel: content.submitLabel,
+    successMessage: content.successMessage,
+    successDetail: content.successDetail,
+    consent: content.consent,
+    labels: content.labels,
+    placeholders: content.placeholders,
+    scope: content.scope,
+    fields: content.fields ?? block.data.fields,
+  });
+  block.data = seeded as Block["data"];
+  block.dataVersion = def.dataVersion;
 }
 
 function wouldViolateFirstLock(
@@ -113,15 +157,32 @@ export function addLayoutBlock(
     return { ok: false, code: "POLICY_BLOCKED" };
   }
 
+  const fixedKey = policyFixedEquivalentForBlock(next.id, block.type);
+  const fixedIdx =
+    fixedKey == null
+      ? -1
+      : next.layout.findIndex((item) => item.kind === "fixed" && item.key === fixedKey);
+
+  replacePolicyFixedWithBlock(next, block);
+
+  // After dropping a policy-equivalent fixed slot, remap the insert index so
+  // append (layout.length) and positions after the removed slot stay valid.
+  let insertAt = atIndex;
+  if (fixedIdx >= 0) {
+    if (insertAt > fixedIdx) insertAt -= 1;
+    // Prefer the vacated fixed slot when the caller asked to append.
+    if (atIndex >= page.layout.length) insertAt = fixedIdx;
+  }
+
   const min = next.kind === "builtin" && next.pageKey ? minInsertIndex(next.pageKey) : 0;
-  if (atIndex < min) return { ok: false, code: "LOCKED_POSITION" };
-  if (atIndex < 0 || atIndex > next.layout.length) {
+  if (insertAt < min) return { ok: false, code: "LOCKED_POSITION" };
+  if (insertAt < 0 || insertAt > next.layout.length) {
     return { ok: false, code: "INVALID_INDEX" };
   }
 
   const layoutItem = newBlockLayoutItem(block.id);
   const layout = next.layout.slice();
-  layout.splice(atIndex, 0, layoutItem);
+  layout.splice(insertAt, 0, layoutItem);
   next.layout = layout;
   next.blocks = [...next.blocks, structuredClone(block)];
   return { ok: true, page: next };

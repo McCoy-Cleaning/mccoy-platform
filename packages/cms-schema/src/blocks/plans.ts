@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { cmsButtonSchema, createItemId, type CmsButton } from "../content";
+import { cmsButtonSchema, type CmsButton } from "../button";
+import { createItemId } from "../ids";
 import { linkFromLegacyHref } from "../links";
 import type { CmsBlockDataDefinition } from "./definition";
 import { reorderByIds } from "./text-list";

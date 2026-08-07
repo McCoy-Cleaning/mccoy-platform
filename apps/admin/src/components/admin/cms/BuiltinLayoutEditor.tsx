@@ -169,9 +169,12 @@ export function BuiltinLayoutEditor({
     let summary: string | undefined;
     let canDuplicate = false;
     let canDelete = r.canDelete;
+    let fixedKey: string | undefined;
+    let blockType: string | undefined;
     if (layoutItem?.kind === "block") {
       const block = page.blocks.find((b) => b.id === layoutItem.blockId);
       if (block) {
+        blockType = block.type;
         try {
           const def = getBlockDataDefinition(block.type);
           summary = def.getSummary?.(block.data);
@@ -181,8 +184,16 @@ export function BuiltinLayoutEditor({
           /* ignore */
         }
       }
-    } else if (layoutItem?.kind === "fixed" && layoutItem.key === "vacatures.application") {
-      summary = r.hidden ? undefined : "Formulier en video/foto";
+    } else if (layoutItem?.kind === "fixed") {
+      fixedKey = layoutItem.key;
+      if (layoutItem.key === "vacatures.application") {
+        summary = r.hidden ? undefined : "Formulier en video/foto";
+      } else if (!r.hidden) {
+        summary = "Zichtbaar";
+      }
+    } else if (r.composite?.sectionKey) {
+      fixedKey = r.composite.sectionKey;
+      if (!r.hidden) summary = "Zichtbaar";
     } else if (!r.hidden) {
       summary = "Zichtbaar";
     }
@@ -198,6 +209,8 @@ export function BuiltinLayoutEditor({
       canDelete,
       canEdit: r.canEdit,
       canDuplicate,
+      fixedKey,
+      blockType,
     };
   });
 

@@ -10,7 +10,13 @@ import {
   getAdminSession,
 } from "@/lib/api/admin-auth.functions";
 import { disposeAllAdminNotificationServices } from "@/lib/notifications/notification-service";
-import { getAdminBrowserSupabase, hasBrowserSupabaseConfig } from "@/lib/supabase-browser";
+import {
+  clearMfaBrowserMemory,
+  clearRealtimeBrowserMemory,
+  getAdminMfaSupabase,
+  hasBrowserSupabaseConfig,
+  purgeAllowlistedLegacyAuthKeys,
+} from "@/lib/supabase-browser";
 
 export { adminEstablishSession };
 
@@ -61,7 +67,8 @@ export async function fetchAdminAuthMode(): Promise<{
 
 /**
  * Prefer server-side Supabase email/password (sets HttpOnly cookies in one hop).
- * Browser sign-in is a fallback when the server path is unavailable.
+ * Does not dual-write a browser signInWithPassword after success.
+ * Browser sign-in is a rare fallback when the server path is unavailable.
  */
 export async function signInAdmin(identifier: string, password: string): Promise<AdminSignInResult> {
   const trimmed = identifier.trim();
@@ -91,17 +98,7 @@ export async function signInAdmin(identifier: string, password: string): Promise
         return { ok: false, error: established.error };
       }
 
-      // Keep browser client in sync for MFA enroll/verify APIs.
-      const browserSupabase = getAdminBrowserSupabase();
-      if (browserSupabase) {
-        await browserSupabase.auth
-          .signInWithPassword({
-            email: trimmed.toLowerCase(),
-            password,
-          })
-          .catch(() => undefined);
-      }
-
+      purgeAllowlistedLegacyAuthKeys();
       return {
         ok: true,
         session: established.session,
@@ -130,7 +127,7 @@ export async function signInAdmin(identifier: string, password: string): Promise
 }
 
 function browserPathAvailable(looksLikeEmail: boolean): boolean {
-  return Boolean(getAdminBrowserSupabase() && hasBrowserSupabaseConfig() && looksLikeEmail);
+  return Boolean(getAdminMfaSupabase() && hasBrowserSupabaseConfig() && looksLikeEmail);
 }
 
 async function signInViaBrowserThenEstablish(
@@ -146,7 +143,7 @@ async function signInViaBrowserThenEstablish(
     };
   }
 
-  const browserSupabase = getAdminBrowserSupabase();
+  const browserSupabase = getAdminMfaSupabase();
   if (!browserSupabase) {
     return { ok: false, error: "Supabase browserconfig ontbreekt." };
   }
@@ -157,6 +154,7 @@ async function signInViaBrowserThenEstablish(
   });
 
   if (error || !data.session) {
+    clearMfaBrowserMemory();
     return { ok: false, error: "Onjuiste e-mail of wachtwoord." };
   }
 
@@ -171,9 +169,16 @@ async function signInViaBrowserThenEstablish(
   notify();
 
   if (!established.ok) {
-    await browserSupabase.auth.signOut().catch(() => undefined);
+    // Local teardown only — do not revoke via global signOut.
+    clearMfaBrowserMemory();
     return { ok: false, error: established.error };
   }
+
+  // Durable cookies are authoritative. Keep MFA memory only when MFA is still required.
+  if (established.nextStep === "none") {
+    clearMfaBrowserMemory();
+  }
+  purgeAllowlistedLegacyAuthKeys();
 
   return {
     ok: true,
@@ -197,10 +202,9 @@ export async function completeAdminMfa(): Promise<AdminSignInResult> {
 
 export async function signOutAdmin(): Promise<void> {
   disposeAllAdminNotificationServices();
-  const browserSupabase = getAdminBrowserSupabase();
-  if (browserSupabase) {
-    await browserSupabase.auth.signOut().catch(() => undefined);
-  }
+  clearRealtimeBrowserMemory();
+  clearMfaBrowserMemory();
+  purgeAllowlistedLegacyAuthKeys();
   await adminSignOut();
   notify();
 }

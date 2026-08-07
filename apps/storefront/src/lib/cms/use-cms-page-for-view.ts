@@ -36,8 +36,9 @@ export function useCmsPageForView(pageId: string): CmsPage | undefined {
   if (snapshot?.pageId === pageId) {
     page = snapshot.page;
   } else if (isEdit) {
-    if (live?.pageId === pageId) return live.page;
-    return editable ?? published;
+    // Still localize — Admin preview chrome `?_cmsLocale=` must show EN overlays
+    // in the edit iframe (LanguageToggle is blocked by EditInteractionGuard).
+    page = live?.pageId === pageId ? live.page : (editable ?? published);
   } else if (routePage?.id === pageId) {
     if (
       bundleHydrated &&
@@ -57,9 +58,7 @@ export function useCmsPageForView(pageId: string): CmsPage | undefined {
 }
 
 export function useSectionContentMap(pageId: string): PageSectionContent {
-  const live = useLiveEditDraft();
   const page = useCmsPageForView(pageId);
-  if (live?.pageId === pageId) return live.sectionContent;
   if (page?.kind === "builtin") return page.sectionContent ?? {};
   return {};
 }

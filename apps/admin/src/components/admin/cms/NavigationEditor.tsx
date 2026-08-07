@@ -166,7 +166,7 @@ export function NavigationEditor() {
               className="w-full accent-sky-400"
               aria-label="Logohoogte desktopnavigatie"
             />
-            <p className="text-[10px] text-white/35">Bovenste balk (desktop)</p>
+            <p className="text-[10px] text-white/35">Bovenste balk vanaf tablet/desktop</p>
           </label>
           <label className="block space-y-1.5">
             <span className="flex items-center justify-between text-[11px] uppercase tracking-wider text-white/45">
@@ -182,7 +182,7 @@ export function NavigationEditor() {
               className="w-full accent-sky-400"
               aria-label="Logohoogte mobiele navigatie"
             />
-            <p className="text-[10px] text-white/35">Mobiel / tablet-menu</p>
+            <p className="text-[10px] text-white/35">Bovenste balk op mobiel én in het menu</p>
           </label>
         </div>
       </section>

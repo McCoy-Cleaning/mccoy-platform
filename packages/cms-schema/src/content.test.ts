@@ -15,9 +15,11 @@ import {
   migrateOriginalServicesImages,
   migrateOriginalWorkGalleryImages,
   migrateOriginalHeroImage,
+  normalizeContactFormContent,
   parseCmsEditMessage,
   parseSectionContent,
   ensureBuiltinSectionContent,
+  resolveContactFormHighlights,
   shouldApplyDraft,
   CMS_EDIT_CHANNEL,
   uploadedImage,
@@ -27,9 +29,28 @@ import {
   isLegacyEmbeddedCmsImage,
   collectLegacyEmbeddedImages,
   replaceCmsImagesInTree,
+  SECTION_CONTENT_SCHEMAS,
 } from "./index";
+import type { FixedSectionKey } from "./sections";
+import { FIXED_SECTION_DEFS } from "./sections";
 
 describe("section content", () => {
+  it("SECTION_CONTENT_SCHEMAS safeParse defaults without throwing (no circular Zod init)", () => {
+    const keys = Object.keys(FIXED_SECTION_DEFS) as FixedSectionKey[];
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) {
+      const schema = SECTION_CONTENT_SCHEMAS[key];
+      expect(schema, `missing schema for ${key}`).toBeDefined();
+      expect(typeof schema.safeParse, `${key} schema.safeParse`).toBe("function");
+      const result = schema.safeParse(defaultSectionContent(key));
+      expect(result.success, `${key} default should parse`).toBe(true);
+    }
+    // Builtins used by resolvePublishedFormScope must be present and healthy.
+    for (const key of ["contact.form", "offerte.form", "vacatures.application"] as const) {
+      expect(SECTION_CONTENT_SCHEMAS[key].safeParse(defaultSectionContent(key)).success).toBe(true);
+    }
+  });
+
   it("parses default home hero matching the original copy without primary Offerte CTA", () => {
     const raw = defaultSectionContent("home.hero") as {
       eyebrow: string;
@@ -657,5 +678,65 @@ describe("uploadedImage", () => {
     ) as typeof tree;
     expect(replaced.section.image.assetId.startsWith("storage:")).toBe(true);
     expect(collectLegacyEmbeddedImages(replaced)).toHaveLength(0);
+  });
+
+  it("default contact.form is public-safe and editable", () => {
+    const form = defaultSectionContent("contact.form") as {
+      highlights?: Array<{ text: string }>;
+      submitLabel?: string;
+      body?: string;
+      textPlacement?: string;
+      heading?: string;
+      fields?: Array<{ label: string; type: string; placeholder?: string }>;
+    };
+    expect(form.submitLabel).toBe("Verstuur aanvraag");
+    expect(form.heading).toBe("Laten we praten over uw pand.");
+    expect(form.body).toBe(
+      "Of het nu gaat om het aanvragen van reguliere schoonmaak, specialistische reiniging of een algemene vraag, wij staan voor u klaar.",
+    );
+    expect(form.highlights?.map((h) => h.text)).toEqual([
+      "Persoonlijk antwoord binnen één werkdag",
+      "Aanvragen verschijnen in het admin-portaal",
+    ]);
+    expect(form.textPlacement).toBe("left");
+    expect((form as { formColumnsDesktop?: number }).formColumnsDesktop).toBe(2);
+    expect(form.fields?.map((f) => f.type)).toEqual(["company", "phone", "textarea"]);
+    expect(form.fields?.find((f) => f.type === "company")?.placeholder).toBe("Optioneel");
+
+    const parsed = parseSectionContent("contact.form", {
+      heading: "Custom",
+      textPlacement: "right",
+      formColumnsDesktop: 1,
+      highlights: [{ id: "h1", text: "Bel ons vandaag" }],
+      labels: { name: "Uw naam" },
+    });
+    expect(parsed).toMatchObject({
+      heading: "Custom",
+      textPlacement: "right",
+      formColumnsDesktop: 1,
+      labels: { name: "Uw naam" },
+    });
+  });
+
+  it("normalizeContactFormContent seeds fields from legacy labels/placeholders", () => {
+    const normalized = normalizeContactFormContent({
+      heading: "Hallo",
+      labels: { company: "Organisatie", message: "Vraag" },
+      placeholders: { phone: "Bel ons" },
+    });
+    expect(normalized.fields?.map((f) => f.label)).toEqual([
+      "Organisatie",
+      "Telefoon",
+      "Vraag",
+    ]);
+    expect(normalized.fields?.find((f) => f.type === "phone")?.placeholder).toBe("Bel ons");
+  });
+
+  it("resolveContactFormHighlights respects omit vs empty list", () => {
+    expect(resolveContactFormHighlights({}, ["A", "B"])).toEqual(["A", "B"]);
+    expect(resolveContactFormHighlights({ highlights: [] }, ["A", "B"])).toEqual([]);
+    expect(
+      resolveContactFormHighlights({ highlights: [{ id: "1", text: " Custom " }] }, ["A"]),
+    ).toEqual(["Custom"]);
   });
 });

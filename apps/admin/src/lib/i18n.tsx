@@ -168,7 +168,7 @@ const translations = {
       photosHelp: "JPG, PNG of PDF — meerdere bestanden toegestaan",
       sections: {
         general: {
-          tag: "01 — Reguliere schoonmaak",
+          tag: "Reguliere schoonmaak",
           title: "Regulier, horeca & opleveringen",
           desc: "Vaste schoonmaakprogramma's voor kantoren en bedrijfspanden, hospitality cleaning voor restaurants en hotels, en stof- en bouwafvalvrije opleveringschoonmaak na een verbouwing.",
           typeLabel: "Type opdracht",
@@ -179,7 +179,7 @@ const translations = {
           start: "Gewenste startdatum",
         },
         window: {
-          tag: "02 — Glasbewassing",
+          tag: "Glasbewassing",
           title: "Glasbewassing & gevelreiniging",
           desc: "Streep­vrij schone ramen binnen én buiten — van pui op straatniveau tot hoogwerkers en gondels. Vertel ons zo veel mogelijk over het pand, dan rekenen wij u direct een eerlijke prijs voor.",
           floors: "Aantal verdiepingen",
@@ -193,7 +193,7 @@ const translations = {
           frequencyOptions: ["4× per jaar", "6× per jaar", "Maandelijks", "Eenmalig"],
         },
         furniture: {
-          tag: "03 — Vloer- & meubelreiniging",
+          tag: "Vloer- & meubelreiniging",
           title: "Vloer- & meubelonderhoud",
           desc: "Diepe reiniging en bescherming van stoffen meubilair, lederen banken, tapijten en harde vloeren. Wij werken met professionele extractie-apparatuur en pH-neutrale middelen die de vezel sparen.",
           itemType: "Type meubel / vloer",
@@ -410,7 +410,7 @@ const translations = {
       photosHelp: "JPG, PNG or PDF — multiple files allowed",
       sections: {
         general: {
-          tag: "01 — Recurring cleaning",
+          tag: "Recurring cleaning",
           title: "Regular, hospitality & post-construction",
           desc: "Recurring cleaning programmes for offices and commercial buildings, hospitality cleaning for restaurants and hotels, and dust-free post-construction cleaning after renovations.",
           typeLabel: "Type of work",
@@ -421,7 +421,7 @@ const translations = {
           start: "Preferred start date",
         },
         window: {
-          tag: "02 — Window cleaning",
+          tag: "Window cleaning",
           title: "Window & façade cleaning",
           desc: "Streak-free clean glass inside and out — from street-level frontage to cherry pickers and gondolas. Tell us as much as possible about the building so we can quote you fairly straight away.",
           floors: "Number of floors",
@@ -435,7 +435,7 @@ const translations = {
           frequencyOptions: ["4× per year", "6× per year", "Monthly", "One-off"],
         },
         furniture: {
-          tag: "03 — Floor & furniture care",
+          tag: "Floor & furniture care",
           title: "Floor & furniture cleaning",
           desc: "Deep cleaning and protection of fabric furniture, leather sofas, carpets and hard floors. We work with professional extraction equipment and pH-neutral products that protect the fibre.",
           itemType: "Type of furniture / floor",
