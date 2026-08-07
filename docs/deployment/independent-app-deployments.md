@@ -152,6 +152,7 @@ Require these job names (plus CMS E2E as appropriate) on branch protection.
 | `ADMIN_HOST` / `PUBLIC_HOST` / `HOST_ENFORCE` | Y | Y |
 | `ADMIN_*` session / legacy auth | Y | N |
 | `GROQ_*` / `STAFF_INVITE_*` | Y | N |
+| `VERCEL_TOKEN` / `VERCEL_WEB_ANALYTICS_PROJECT_ID` / optional `VERCEL_TEAM_ID` | Y (overview visitors) | N — enable Web Analytics on storefront; put `prj_…` of **storefront** in admin env |
 | `SMTP_*` / `FORM_*` | Inbox/reply as needed | Form notify as needed |
 
 Never put secrets in `VITE_*`.

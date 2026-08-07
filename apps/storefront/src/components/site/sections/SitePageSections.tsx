@@ -21,16 +21,9 @@ import {
   X,
 } from "lucide-react";
 import { ProductsAssortmentView, ProductsIntroView } from "./ProductsBlockViews";
-import wHoreca from "@/assets/work-horeca-new.jpg";
-import wRegular from "@/assets/work-regular.jpg";
-import serviceGlass from "@/assets/mccoy-service-glass-van.jpg";
 import aboutMission from "@/assets/mccoy-mission-before-after.png";
 import aboutVisionChurch from "@/assets/mccoy-vision-church.jpg";
 import aboutHistory from "@/assets/mccoy-about-history-new.jpg";
-import svcRegular from "@/assets/mccoy-regular-sander.png";
-import svcOplevering from "@/assets/mccoy-oplevering-hal.png";
-import svcFloor from "@/assets/mccoy-floor-scrubber.jpg";
-import svcFurniture from "@/assets/mccoy-furniture-bank.jpg";
 import { useMobileLiteMotion } from "@/lib/use-mobile-lite-motion";
 import { useI18n } from "@/lib/i18n";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
@@ -56,6 +49,7 @@ import {
   SectionSurface,
 } from "@mccoy/cms-renderer";
 import { DeliveryImage } from "@/components/site/DeliveryImage";
+import { SERVICES_CARD_IMAGE_SIZES } from "@/lib/image-delivery";
 import { cn } from "@/lib/utils";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
@@ -74,15 +68,19 @@ const fadeUp = {
 
 /* ============= SERVICES ============= */
 const serviceIcons = [Wind, UtensilsCrossed, Hammer, Building2, Sofa, GlassWater];
-/** Exact order from the legacy Sections.tsx */
-const serviceImages = [
-  svcRegular,
-  wHoreca,
-  svcOplevering,
-  svcFloor,
-  svcFurniture,
-  serviceGlass,
-];
+/**
+ * Public CMS delivery paths (not Vite-bundled masters). DeliveryImage can then
+ * serve allowlisted WebP siblings instead of 150–470KB PNG/JPEG chunk assets.
+ * Order matches cms-schema ORIGINAL_SERVICE_IMAGE_BY_ID / defaultServiceCards.
+ */
+const SERVICE_CARD_FALLBACK_SRCS = [
+  "/images/cms/work-regular-sander.png",
+  "/images/cms/work-horeca.jpg",
+  "/images/cms/work-oplevering-hal.png",
+  "/images/cms/work-floor-scrubber.jpg",
+  "/images/cms/work-furniture-bank.jpg",
+  "/images/cms/work-glass-van.jpg",
+] as const;
 
 function useLocalizedServiceCards() {
   const { t, lang } = useI18n();
@@ -94,7 +92,9 @@ function useLocalizedServiceCards() {
   const cards = localized.cards.map((card, i) => {
     const i18nItem = t.work.items[i];
     const usedFallback = isCmsPlaceholderSrc(card.image.src);
-    const imageSrc = usedFallback ? serviceImages[i] || wRegular : card.image.src;
+    const imageSrc = usedFallback
+      ? SERVICE_CARD_FALLBACK_SRCS[i] ?? SERVICE_CARD_FALLBACK_SRCS[0]
+      : card.image.src;
     const factory = defCards.cards.find((c) => c.id === card.id);
     const linkHint = card.cta?.link ?? card.link;
     const routeDefaultNl =
@@ -191,10 +191,10 @@ export function ServicesCards() {
                     variant="gallery"
                     width={600}
                     height={360}
-                    // First row is usually in view on desktop; avoid lazy delay there.
+                    // First desktop row is above/near fold; keep below-fold lazy.
                     loading={i < 3 ? "eager" : "lazy"}
-                    fetchPriority={i === 0 ? "high" : undefined}
-                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    fetchPriority={i === 0 ? "high" : i < 3 ? "low" : undefined}
+                    sizes={SERVICES_CARD_IMAGE_SIZES}
                     className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
@@ -256,7 +256,10 @@ export function ServicesCards() {
                           src={card.imageSrc}
                           alt={card.title}
                           variant="gallery"
+                          width={800}
+                          height={1000}
                           loading="eager"
+                          sizes="(min-width: 768px) 50vw, 100vw"
                           className="h-full w-full object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent md:bg-gradient-to-r" />

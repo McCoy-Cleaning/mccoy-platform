@@ -60,10 +60,25 @@ async function fetchVisitsCount(sinceIso: string, untilIso: string): Promise<num
       },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Safe diagnostics only — no token/project secrets.
+      console.warn("[vercel-web-analytics] visits/count HTTP error", {
+        status: res.status,
+        hasTeamId: Boolean(teamId),
+      });
+      return null;
+    }
     const json: unknown = await res.json();
-    return parseVisitorCount(json);
-  } catch {
+    const visitors = parseVisitorCount(json);
+    if (visitors === null) {
+      console.warn("[vercel-web-analytics] visits/count unexpected payload shape");
+    }
+    return visitors;
+  } catch (error) {
+    console.warn("[vercel-web-analytics] visits/count request failed", {
+      name: error instanceof Error ? error.name : "unknown",
+      hasTeamId: Boolean(teamId),
+    });
     return null;
   }
 }

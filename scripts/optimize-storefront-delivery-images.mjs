@@ -171,6 +171,7 @@ async function main() {
     "work-regular-sander.png",
     "work-floor-scrubber.jpg",
     "work-furniture-bank.jpg",
+    "work-glass-van.jpg",
     "about-mission.png",
   ];
   for (const name of cmsPhotos) {

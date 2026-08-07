@@ -3,12 +3,15 @@ import {
   GALLERY_IMAGE_SIZES,
   HERO_IMAGE_PRELOAD_MEDIA,
   HERO_IMAGE_SIZES,
+  SERVICES_CARD_IMAGE_SIZES,
+  SERVICES_CARD_ROW_PRELOAD_MEDIA,
   heroWebpSrcSet,
   homeHeroPreloadLink,
   isLocalPublicImageSrc,
   localCmsPhotoWebpSrcSet,
   localWebpSibling,
   partnerLogoWebpSrc,
+  servicesCardsPreloadLinks,
 } from "./image-delivery";
 
 describe("image-delivery", () => {
@@ -34,6 +37,9 @@ describe("image-delivery", () => {
     expect(localCmsPhotoWebpSrcSet("/images/cms/work-horeca.jpg")).toBe(
       "/images/cms/work-horeca.webp 1200w",
     );
+    expect(localWebpSibling("/images/cms/work-glass-van.jpg")).toBe(
+      "/images/cms/work-glass-van.webp",
+    );
     expect(localWebpSibling("/images/cms/unknown-photo.jpg")).toBeUndefined();
   });
 
@@ -41,6 +47,7 @@ describe("image-delivery", () => {
     expect(isLocalPublicImageSrc("/images/cms/hero-cleaning.jpg")).toBe(true);
     expect(HERO_IMAGE_SIZES).toContain("28rem");
     expect(GALLERY_IMAGE_SIZES).toContain("100vw");
+    expect(SERVICES_CARD_IMAGE_SIZES).toContain("33vw");
   });
 
   it("builds a desktop-only hero preload link for home head", () => {
@@ -65,5 +72,38 @@ describe("image-delivery", () => {
     expect(link.href).toContain("format=webp");
     expect(link.href).toContain("resize=contain");
     expect(link.imageSrcSet).toContain("resize=contain");
+  });
+
+  it("preloads first service card on all viewports and row peers on desktop", () => {
+    const links = servicesCardsPreloadLinks([
+      "/images/cms/work-regular-sander.png",
+      "/images/cms/work-horeca.jpg",
+      "/images/cms/work-oplevering-hal.png",
+      "/images/cms/work-floor-scrubber.jpg",
+    ]);
+    expect(links).toHaveLength(3);
+    expect(links[0]).toMatchObject({
+      rel: "preload",
+      as: "image",
+      type: "image/webp",
+      href: "/images/cms/work-regular-sander.webp",
+      fetchPriority: "high",
+      imageSizes: SERVICES_CARD_IMAGE_SIZES,
+    });
+    expect(links[0]?.media).toBeUndefined();
+    expect(links[1]?.media).toBe(SERVICES_CARD_ROW_PRELOAD_MEDIA);
+    expect(links[1]?.fetchPriority).toBe("auto");
+    expect(links[2]?.href).toBe("/images/cms/work-oplevering-hal.webp");
+  });
+
+  it("matches DeliveryImage gallery transforms for Supabase service preloads", () => {
+    const src =
+      "https://bwrktdwnnlgxdpefecmv.supabase.co/storage/v1/object/public/cms-media/media/svc.jpg";
+    const [link] = servicesCardsPreloadLinks([src]);
+    expect(link?.href).toContain("width=480");
+    expect(link?.href).toContain("format=webp");
+    expect(link?.href).toContain("resize=contain");
+    expect(link?.imageSrcSet).toContain("480w");
+    expect(link?.imageSrcSet).toContain("1200w");
   });
 });
