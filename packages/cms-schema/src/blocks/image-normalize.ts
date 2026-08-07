@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cmsImageSchema, type CmsImage } from "../content";
+import { cmsImageSchema, type CmsImage } from "../cms-image";
 
 /** Accept legacy string URLs or partial objects into CmsImage. */
 export function normalizeCmsImage(value: unknown, fallbackAlt = ""): CmsImage | undefined {

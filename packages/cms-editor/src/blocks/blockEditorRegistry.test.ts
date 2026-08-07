@@ -37,7 +37,17 @@ const EXPECTED_PATH_MAP: Partial<Record<string, readonly string[]>> = {
   ],
   announcement: ["message", "linkLabel", "link"],
   newsletter: ["title", "body", "buttonLabel", "consent"],
-  contactForm: ["title", "body", "fields", "fields.id", "fields.label", "fields.type"],
+  contactForm: [
+    "title",
+    "body",
+    "eyebrow",
+    "textPlacement",
+    "fields",
+    "fields.id",
+    "fields.label",
+    "fields.placeholder",
+    "fields.type",
+  ],
   popup: ["title", "body", ...CTA_SUPPORTED_PATHS],
 };
 

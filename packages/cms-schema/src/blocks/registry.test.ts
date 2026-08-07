@@ -133,8 +133,39 @@ describe("block data registry", () => {
       expect.objectContaining({ type: "textarea", label: "Bericht" }),
     ]);
     expect(def.normalize({ title: "Contact", fields: [{ id: "f1", text: "Naam" }] })).toEqual(
-      expect.objectContaining({ body: undefined, fields: DEFAULT_CONTACT_FORM_FIELDS }),
+      expect.objectContaining({
+        body: undefined,
+        textPlacement: "left",
+        fields: DEFAULT_CONTACT_FORM_FIELDS,
+      }),
     );
+  });
+
+  it("contactForm normalize accepts textPlacement top|left|right", () => {
+    const def = blockDataRegistry.contactForm;
+    expect(
+      (def.normalize({ title: "X", textPlacement: "right", fields: [] }) as { textPlacement: string })
+        .textPlacement,
+    ).toBe("right");
+    expect(
+      (def.normalize({ title: "X", textPlacement: "above", fields: [] }) as { textPlacement: string })
+        .textPlacement,
+    ).toBe("top");
+    expect(
+      (def.normalize({ title: "X", fields: [] }) as { textPlacement: string }).textPlacement,
+    ).toBe("left");
+  });
+
+  it("contactForm normalize defaults formColumnsDesktop to 2", () => {
+    const def = blockDataRegistry.contactForm;
+    expect(
+      (def.normalize({ title: "X", fields: [] }) as { formColumnsDesktop: number }).formColumnsDesktop,
+    ).toBe(2);
+    expect(
+      (def.normalize({ title: "X", formColumnsDesktop: 1, fields: [] }) as {
+        formColumnsDesktop: number;
+      }).formColumnsDesktop,
+    ).toBe(1);
   });
 
   it("assertPickerTypesMatchRegistry accepts PUBLISHABLE_BLOCK_TYPES and rejects gaps", () => {

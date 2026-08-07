@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createItemId, type ContactInfoContent, type ContactInfoItem } from "@mccoy/cms-schema";
 import { cn } from "@mccoy/ui";
+import { ManualEnDraftField } from "../ai-assist";
 import {
   Field,
   inputClass,
@@ -60,6 +61,10 @@ export function ContactInfoInspector({
               onChange={(e) => updateItem(item.id, { label: e.target.value })}
             />
           </Field>
+          <ManualEnDraftField
+            fieldPath={`section:contact.info:items.${index}.label`}
+            label="Label"
+          />
           <Field label="Waarde">
             <textarea
               className={cn(inputClass, "min-h-[56px]")}
@@ -67,6 +72,11 @@ export function ContactInfoInspector({
               onChange={(e) => updateItem(item.id, { value: e.target.value })}
             />
           </Field>
+          <ManualEnDraftField
+            fieldPath={`section:contact.info:items.${index}.value`}
+            label="Waarde"
+            multiline
+          />
           <Field label="Link (optioneel)">
             <input
               className={inputClass}

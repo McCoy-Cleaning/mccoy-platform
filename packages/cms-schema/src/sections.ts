@@ -69,7 +69,8 @@ export const FIXED_SECTIONS_BY_PAGE: Record<BuiltinPageKey, readonly FixedSectio
 /**
  * Fixed section capabilities — all hideable/removable so existing page chrome
  * can be managed like flexible blocks, except contact.form / offerte.form
- * (required, hide-only). Vacatures application is required + last-locked so it
+ * (required, hide-only) until replaced by a catalog contactForm / quoteRequestForm
+ * block (policy equivalent). Vacatures application is required + last-locked so it
  * stays below jobs listing chrome. Vacatures jobs block policy remains separate
  * (`page-block-policies`: minInstances 1).
  */

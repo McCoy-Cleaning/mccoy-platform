@@ -40,6 +40,8 @@ describe("site footer", () => {
     const base = defaultSiteFooter();
     expect(mergeFooterPatch(base, { logoHeight: 999 }).logoHeight).toBe(96);
     expect(mergeFooterPatch(base, { logoHeight: 1 }).logoHeight).toBe(24);
+    expect(mergeFooterPatch(base, { logoHeightMobile: 999 }).logoHeightMobile).toBe(72);
+    expect(mergeFooterPatch(base, { logoHeightMobile: 1 }).logoHeightMobile).toBe(20);
   });
 
   it("detects dirty draft footer", () => {

@@ -529,6 +529,7 @@ export const PAGE_PARITY_BLOCK_TYPES: BlockType[] = [
   "gallery",
   "featureGrid",
   "cta",
+  "contactForm",
   "roadmap",
   "plans",
   "timeline",

@@ -3,11 +3,7 @@ import { CountUp } from "../CountUp";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { localizedStatsCopy } from "@/lib/cms-i18n";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
-import {
-  SectionAmbient,
-  SectionEyebrow,
-  SectionSurface,
-} from "@mccoy/cms-renderer";
+import { SectionAmbient, SectionEyebrow, SectionSurface } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,7 +41,10 @@ export function Stats() {
         <div className="grid grid-cols-1 gap-4 self-center sm:grid-cols-3">
           {items.map((s, i) => (
             <div key={`${s.value}-${s.label}-${i}`}>
-              <SectionSurface variant="outlined" className="h-full p-6 transition hover:border-primary/40">
+              <SectionSurface
+                variant="outlined"
+                className="h-full p-6 text-center transition hover:border-primary/40 sm:text-left"
+              >
                 <div className="font-display text-5xl text-primary md:text-6xl">
                   <CountUp value={s.value} duration={2.0 + i * 0.15} />
                 </div>

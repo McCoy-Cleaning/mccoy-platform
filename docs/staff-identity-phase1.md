@@ -26,11 +26,26 @@ Or apply SQL via the owning account’s MCP / SQL editor in order of migration f
 
 When Supabase URL + publishable + secret keys are configured, `/admin/login` uses **Supabase Auth**:
 
-1. Prefer browser `signInWithPassword` (publishable key via `VITE_SUPABASE_*`); if those are missing, the server signs in with the same publishable key
-2. Server validates the JWT (`getUser`), loads `public.users`, enforces staff rules
-3. HttpOnly cookies store access/refresh tokens (`mccoy_sb_*`); APIs call `requireAdminSession()` from `@mccoy/database`
-4. If JWT `aal` is `aal1`, user is sent to `/admin/mfa` to enroll or verify TOTP (**requires `VITE_SUPABASE_*`** for the browser MFA client)
-5. After `aal2`, invited staff are activated (`status = active`); audit best-effort
+1. Server signs in with the publishable key and sets **HttpOnly** `mccoy_sb_access_token` / `mccoy_sb_refresh_token` (durable session authority)
+2. Server validates the JWT (`getUser`), loads `public.users`, enforces staff rules; APIs call `requireAdminSession()` from `@mccoy/database`
+3. Ordinary Admin browser runtime does **not** persist JWTs in `localStorage` / `sessionStorage` / IndexedDB
+4. **Realtime** obtains only `{ accessToken, expiresAt }` via a cookie-authenticated hydrate and uses `supabase.realtime.setAuth(accessToken)` (`autoRefreshToken: false`; server is the sole refresh authority)
+5. If JWT `aal` is `aal1`, user is sent to `/admin/mfa`. MFA uses a separate in-memory client after `startMfaBrowserFlow` + `ensureMfaBrowserSession` (purpose-gated HttpOnly flow cookie). Temporary access+refresh exist in JS memory only for enroll/challenge/verify
+6. After verify, server independently proves **AAL2**, replaces HttpOnly cookies, then the browser clears MFA memory **without** `auth.signOut()` (which would revoke the durable session)
+7. Invited staff are activated (`status = active`); audit best-effort
+
+### Residual XSS risk (honest)
+
+- Durable authentication is HttpOnly-cookie authoritative.
+- Ordinary Admin browser runtime receives only a short-lived access JWT for Realtime.
+- MFA still temporarily exposes access + refresh credentials to same-origin JavaScript because the current Supabase browser MFA API requires a browser Auth session.
+- A sufficiently powerful same-origin XSS **during an authorized MFA flow** can still potentially access temporary token material.
+- This is materially safer than persistent `localStorage` tokens (`mccoy-admin-auth`) but is **not** the same as fully server-side MFA.
+- Fully server-proxied MFA remains a future hardening option.
+
+Do **not** describe the system as eliminating all JavaScript token exposure.
+
+Production acceptance closeout (gates, classification, operator DevTools checklist): [`docs/staff-identity-cookie-auth-acceptance.md`](./staff-identity-cookie-auth-acceptance.md).
 
 ### Access rule (full admin APIs)
 
@@ -115,12 +130,12 @@ Compensation if Auth succeeds but profile/email fails: mark invitation `failed`,
 ### Invitee registration + MFA
 
 1. Invitee opens the CTA → lands on `/admin/invite` with Auth invite tokens (`#access_token` / `type=invite` or `?code=`)
-2. Browser establishes session; server cookies via `adminEstablishSession` (aal1 allowed)
+2. Server exchanges the link and sets HttpOnly cookies via `adminExchangeAuthCallback` (aal1 allowed)
 3. Registration form: full name (if missing), password + confirm (min 8)
-4. Password is set with authenticated `updateUser` (own account only — never trust client prices/roles)
+4. Password is set server-side (own account only — never trust client prices/roles)
 5. Server marks invitation `accepted`, audits `staff.invite_password_set` + `staff.invitation_accepted`
-6. Redirect to `/admin/mfa` for TOTP enroll/verify
-7. After aal2, staff is activated (`staff.mfa_onboarding_completed`); full `/admin` access requires active + aal2
+6. Redirect to `/admin/mfa`; that page starts a purpose-gated MFA browser flow and hydrates an in-memory MFA client
+7. After aal2 cookie sync + local MFA memory teardown, staff is activated (`staff.mfa_onboarding_completed`); full `/admin` access requires active + aal2
 
 ### Env
 

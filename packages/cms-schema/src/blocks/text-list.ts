@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createItemId } from "../content";
+import { createItemId } from "../ids";
 
 export type TextListItem = {
   id: string;

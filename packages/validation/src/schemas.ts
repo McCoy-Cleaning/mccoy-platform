@@ -65,6 +65,22 @@ export const adminEstablishSessionSchema = z.object({
   accessToken: z.string().min(20).max(32_000),
   refreshToken: z.string().min(10).max(32_000),
   clientKey: z.string().trim().max(80).optional(),
+  /** MFA cookie sync: server must prove AAL2 before replacing durable cookies. */
+  requireAal2: z.boolean().optional(),
+});
+
+export const adminMfaBrowserPurposeSchema = z.enum([
+  "mfa_setup",
+  "mfa_challenge",
+  "authenticator_replace",
+]);
+
+export const adminStartMfaBrowserFlowSchema = z.object({
+  purpose: adminMfaBrowserPurposeSchema,
+});
+
+export const adminEnsureMfaBrowserSessionSchema = z.object({
+  purpose: adminMfaBrowserPurposeSchema,
 });
 
 /**

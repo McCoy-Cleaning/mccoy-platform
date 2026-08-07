@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { cmsLinkSchema } from "./links";
 import type { CmsLink } from "./cms-link-model";
-import type { CmsImage } from "./cms-image";
+import { cmsImageSchema, type CmsImage } from "./cms-image";
 import { createItemId } from "./ids";
 import type { FixedSectionKey } from "./sections";
 import { defaultPartnerCmsItems, defaultPartnerResolvedBackdrop, getPartnerBackdropOverride } from "./default-partners";
@@ -26,11 +26,41 @@ import {
   vacaturesApplicationContentSchema,
   type VacaturesApplicationContent,
 } from "./vacatures-application";
+import {
+  createTextListItem,
+  textListItemSchema,
+  type TextListItem,
+} from "./blocks/text-list";
+import {
+  formFieldItemSchema,
+  formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
+  normalizeFormFields,
+  seedDefaultContactFormFields,
+  type ContactFormColumnsDesktop,
+  type ContactFormTextPlacement,
+  type FormFieldItem,
+} from "./blocks/form-fields";
 
 export type { VacaturesApplicationContent } from "./vacatures-application";
 export type { CmsImage } from "./cms-image";
+export { cmsImageSchema } from "./cms-image";
 export type { LegalArticle, LegalMainContent } from "./legal-defaults";
 export { createItemId } from "./ids";
+export type { TextListItem } from "./blocks/text-list";
+export type {
+  ContactFormColumnsDesktop,
+  ContactFormTextPlacement,
+} from "./blocks/form-fields";
+/** Re-export early (before `./blocks`) so consumers never see a circular undefined binding. */
+export {
+  formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
+  normalizeFormFields,
+  seedDefaultContactFormFields,
+} from "./blocks/form-fields";
 
 export {
   CMS_BUTTON_ACTIONS,
@@ -212,22 +242,124 @@ export type ContactInfoContent = {
   items: ContactInfoItem[];
 };
 
-/** Default intro beside the contact form (NL) when CMS `body` is unset. */
+/**
+ * Default intro beside the contact form (NL) when CMS `body` is unset.
+ * Must match storefront i18n `contact.sub` — do not rewrite marketing copy casually.
+ */
 export const DEFAULT_CONTACT_FORM_INTRO_NL =
-  "Vul het formulier in. Uw aanvraag wordt opgeslagen en per e-mail doorgestuurd naar info@mccoy.nl.";
+  "Of het nu gaat om het aanvragen van reguliere schoonmaak, specialistische reiniging of een algemene vraag, wij staan voor u klaar.";
+
+/**
+ * @deprecated No longer seeded on contact forms. Kept for editor “restore” helpers only.
+ * Storefront must not inject these when CMS highlights are omitted.
+ */
+export const DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL: readonly string[] = [
+  "Persoonlijk antwoord binnen één werkdag",
+  "Aanvragen verschijnen in het admin-portaal",
+];
+
+export type ContactFormFieldLabels = {
+  name?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  message?: string;
+};
+
+export type ContactFormFieldPlaceholders = {
+  name?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  message?: string;
+};
 
 /**
  * App-controlled inquiry / offerte forms; section exists so it can be hidden (not deleted).
  * Contact uses `scope`; offerte uses `glassScope` / `furnitureScope`.
  */
 export type ContactFormContent = {
+  /** Eyebrow above the form heading (copy column). */
+  eyebrow?: string;
   heading?: string;
-  /** Plain-text intro beside the form (left column). */
+  /** Plain-text intro in the copy column. */
   body?: string;
+  /** Bullet points in the copy column. Omit or `[]` = none (no hard-coded storefront fallbacks). */
+  highlights?: TextListItem[];
+  /**
+   * Where copy sits relative to the form.
+   * `top` | `left` | `right` — default `left` (text left, form right).
+   */
+  textPlacement?: ContactFormTextPlacement;
+  /**
+   * Form field grid columns on desktop (sm+). Mobile is always 1 column.
+   * Default `2` matches the live Contact form.
+   */
+  formColumnsDesktop?: ContactFormColumnsDesktop;
+  submitLabel?: string;
+  successMessage?: string;
+  /** Secondary line under the success heading. */
+  successDetail?: string;
+  consent?: string;
+  /**
+   * Custom form fields (company / phone / message by default).
+   * Name and e-mail remain built-in via {@link resolveContactFormFields}.
+   */
+  fields?: FormFieldItem[];
+  /** @deprecated Prefer field labels on `fields`; kept for legacy published content. */
+  labels?: ContactFormFieldLabels;
+  /** @deprecated Prefer `fields[].placeholder`; kept for legacy published content. */
+  placeholders?: ContactFormFieldPlaceholders;
   scope?: FormScopeSnapshot;
   glassScope?: FormScopeSnapshot;
   furnitureScope?: FormScopeSnapshot;
 };
+
+export function defaultContactFormHighlights(): TextListItem[] {
+  return DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL.map((text) => createTextListItem(text));
+}
+
+const LEGACY_HARDCODED_HIGHLIGHT_SETS: readonly (readonly string[])[] = [
+  DEFAULT_CONTACT_FORM_HIGHLIGHTS_NL,
+  [
+    "Personal reply within one working day",
+    "Requests appear in the admin portal",
+  ],
+];
+
+/** Drop the old hard-coded trust bullets if they were seeded into CMS. */
+export function stripLegacyHardcodedContactHighlights(
+  highlights: TextListItem[] | undefined,
+): TextListItem[] | undefined {
+  if (!highlights?.length) return highlights;
+  const texts = highlights.map((h) => h.text.trim());
+  for (const legacy of LEGACY_HARDCODED_HIGHLIGHT_SETS) {
+    if (
+      texts.length === legacy.length &&
+      texts.every((text, index) => text === legacy[index])
+    ) {
+      return [];
+    }
+  }
+  return highlights;
+}
+
+/**
+ * Resolve contact-form highlight bullets for the storefront.
+ * - `undefined` or `[]` → no bullets (do not inject hard-coded copy)
+ * - otherwise → trimmed non-empty CMS texts
+ *
+ * `localeFallbacks` is ignored (kept for call-site compatibility).
+ */
+export function resolveContactFormHighlights(
+  content: Pick<ContactFormContent, "highlights">,
+  _localeFallbacks: readonly string[] = [],
+): string[] {
+  void _localeFallbacks;
+  const highlights = stripLegacyHardcodedContactHighlights(content.highlights);
+  if (!highlights?.length) return [];
+  return highlights.map((h) => h.text.trim()).filter(Boolean);
+}
 
 /** Shared shape for privacy / terms pages — header + ordered text blocks. */
 export type SectionContentMap = {
@@ -368,21 +500,6 @@ function defaultProductCards(): ProductCard[] {
     },
   ];
 }
-
-export const cmsImageSchema: z.ZodType<CmsImage> = z.object({
-  assetId: z.string().min(1),
-  src: z.string().min(1),
-  alt: z.string(),
-  decorative: z.boolean(),
-  width: z.number().positive().optional(),
-  height: z.number().positive().optional(),
-  focalPoint: z
-    .object({
-      x: z.number().min(0).max(1),
-      y: z.number().min(0).max(1),
-    })
-    .optional(),
-});
 
 const statItemSchema = z.object({
   id: z.string().min(1),
@@ -528,13 +645,134 @@ export const contactInfoContentSchema: z.ZodType<ContactInfoContent> = z.object(
   items: z.array(contactInfoItemSchema),
 });
 
+const contactFormFieldLabelsSchema: z.ZodType<ContactFormFieldLabels> = z.object({
+  name: z.string().optional(),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  message: z.string().optional(),
+});
+
+const contactFormFieldPlaceholdersSchema: z.ZodType<ContactFormFieldPlaceholders> = z.object({
+  name: z.string().optional(),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  message: z.string().optional(),
+});
+
 export const contactFormContentSchema: z.ZodType<ContactFormContent> = z.object({
+  eyebrow: z.string().optional(),
   heading: z.string().optional(),
   body: z.string().optional(),
+  highlights: z.array(textListItemSchema).optional(),
+  textPlacement: z.enum(["top", "left", "right"]).optional(),
+  formColumnsDesktop: z.union([z.literal(1), z.literal(2)]).optional(),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  successDetail: z.string().optional(),
+  consent: z.string().optional(),
+  fields: z.array(formFieldItemSchema).optional(),
+  labels: contactFormFieldLabelsSchema.optional(),
+  placeholders: contactFormFieldPlaceholdersSchema.optional(),
   scope: formScopeSnapshotSchema.optional(),
   glassScope: formScopeSnapshotSchema.optional(),
   furnitureScope: formScopeSnapshotSchema.optional(),
 });
+
+function optLegacyFieldString(
+  row: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const v = row?.[key];
+  return typeof v === "string" && v.trim() ? v : undefined;
+}
+
+/**
+ * Normalize contact/offerte.form section content and seed default custom fields
+ * when missing (including from legacy labels/placeholders-only JSON).
+ */
+export function normalizeContactFormContent(raw: unknown): ContactFormContent {
+  const rec = raw && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : {};
+  const labelsRaw =
+    rec.labels && typeof rec.labels === "object"
+      ? (rec.labels as Record<string, unknown>)
+      : undefined;
+  const placeholdersRaw =
+    rec.placeholders && typeof rec.placeholders === "object"
+      ? (rec.placeholders as Record<string, unknown>)
+      : undefined;
+  const labels: ContactFormFieldLabels | undefined = labelsRaw
+    ? {
+        name: optLegacyFieldString(labelsRaw, "name"),
+        company: optLegacyFieldString(labelsRaw, "company"),
+        phone: optLegacyFieldString(labelsRaw, "phone"),
+        email: optLegacyFieldString(labelsRaw, "email"),
+        message: optLegacyFieldString(labelsRaw, "message"),
+      }
+    : undefined;
+  const placeholders: ContactFormFieldPlaceholders | undefined = placeholdersRaw
+    ? {
+        name: optLegacyFieldString(placeholdersRaw, "name"),
+        company: optLegacyFieldString(placeholdersRaw, "company"),
+        phone: optLegacyFieldString(placeholdersRaw, "phone"),
+        email: optLegacyFieldString(placeholdersRaw, "email"),
+        message: optLegacyFieldString(placeholdersRaw, "message"),
+      }
+    : undefined;
+  const normalizedFields = normalizeFormFields(rec.fields).filter((field) => {
+    if (field.type === "name" || field.type === "email") return false;
+    const key = formFieldPayloadKey(field);
+    return key !== "name" && key !== "email";
+  });
+  const fields =
+    normalizedFields.length > 0
+      ? normalizedFields
+      : seedDefaultContactFormFields({ labels, placeholders });
+  const highlightsRaw =
+    rec.highlights === undefined ? undefined : (
+      Array.isArray(rec.highlights)
+        ? rec.highlights
+            .map((entry) => {
+              if (!entry || typeof entry !== "object") return null;
+              const row = entry as Record<string, unknown>;
+              const id = typeof row.id === "string" && row.id ? row.id : createItemId("txt");
+              const text =
+                typeof row.text === "string"
+                  ? row.text
+                  : typeof row.label === "string"
+                    ? row.label
+                    : "";
+              return { id, text };
+            })
+            .filter((item): item is TextListItem => Boolean(item && item.text.trim()))
+        : undefined
+    );
+  const highlights = stripLegacyHardcodedContactHighlights(highlightsRaw);
+
+  return {
+    eyebrow: typeof rec.eyebrow === "string" ? rec.eyebrow || undefined : undefined,
+    heading: typeof rec.heading === "string" ? rec.heading || undefined : undefined,
+    body: typeof rec.body === "string" ? rec.body || undefined : undefined,
+    highlights,
+    textPlacement: normalizeContactFormTextPlacement(rec.textPlacement),
+    formColumnsDesktop: normalizeContactFormColumnsDesktop(rec.formColumnsDesktop),
+    submitLabel: typeof rec.submitLabel === "string" ? rec.submitLabel || undefined : undefined,
+    successMessage:
+      typeof rec.successMessage === "string" ? rec.successMessage || undefined : undefined,
+    successDetail:
+      typeof rec.successDetail === "string" ? rec.successDetail || undefined : undefined,
+    consent: typeof rec.consent === "string" ? rec.consent || undefined : undefined,
+    fields,
+    labels,
+    placeholders,
+    scope: normalizeFormScopeSnapshot(rec.scope),
+    glassScope: normalizeFormScopeSnapshot(rec.glassScope),
+    furnitureScope: normalizeFormScopeSnapshot(rec.furnitureScope),
+  };
+}
 
 export const legalArticleSchema: z.ZodType<LegalArticle> = z.object({
   id: z.string().min(1),
@@ -854,7 +1092,34 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         ],
       } satisfies ContactInfoContent;
     case "contact.form":
-      return {} satisfies ContactFormContent;
+      return {
+        eyebrow: "Contact",
+        heading: "Laten we praten over uw pand.",
+        body: DEFAULT_CONTACT_FORM_INTRO_NL,
+        highlights: [],
+        textPlacement: "left",
+        formColumnsDesktop: 2,
+        submitLabel: "Verstuur aanvraag",
+        successMessage: "Bedankt! We nemen zo snel mogelijk contact op.",
+        successDetail: "We hebben uw bericht ontvangen en nemen zo snel mogelijk contact op.",
+        consent: "Door te versturen stemt u in met verwerking van uw gegevens voor deze aanvraag.",
+        fields: seedDefaultContactFormFields(),
+        // Legacy maps kept so older render paths / EN drafts keep name+email placeholders.
+        labels: {
+          name: "Naam",
+          company: "Bedrijfsnaam",
+          phone: "Telefoon",
+          email: "E-mail",
+          message: "Uw bericht",
+        },
+        placeholders: {
+          name: "Uw naam",
+          company: "Optioneel",
+          phone: "06 …",
+          email: "naam@bedrijf.nl",
+          message: "Waar kunnen we u mee helpen?",
+        },
+      } satisfies ContactFormContent;
     case "vacatures.main":
       return {
         eyebrow: "Vacatures",

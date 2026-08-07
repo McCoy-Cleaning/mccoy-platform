@@ -8,10 +8,13 @@ import {
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
-import { adminHydrateBrowserAuthFromCookies } from "@/lib/api/admin-auth.functions";
 import { completeStaffMfaRecoveryFn } from "@/lib/api/staff-identity.functions";
-import { hydrateBrowserSupabaseSession } from "@/lib/hydrate-browser-supabase-session";
-import { getAdminBrowserSupabase } from "@/lib/supabase-browser";
+import { adminCompleteMfaBrowserFlow } from "@/lib/api/admin-auth.functions";
+import {
+  destroyMfaBrowserSessionLocally,
+  ensureMfaBrowserSessionForPurpose,
+} from "@/lib/hydrate-browser-supabase-session";
+import { getAdminMfaSupabase } from "@/lib/supabase-browser";
 import logoUrl from "@/assets/logo-mccoy.png";
 
 type MfaSearch = {
@@ -46,57 +49,42 @@ function AdminMfaPage() {
   const [mode, setMode] = React.useState<"enroll" | "verify">("enroll");
   const codeInputRef = React.useRef<HTMLInputElement>(null);
   const enrollAttemptedForUser = React.useRef<string | null>(null);
+  const mfaHydratedForUser = React.useRef<string | null>(null);
 
   const nextStep = session?.nextStep;
   const userId = session?.userId ?? session?.username ?? null;
+  const mfaPurpose = nextStep === "mfa_verify" ? "mfa_challenge" : "mfa_setup";
 
   React.useEffect(() => {
     if (!ready) return;
     if (!session) {
-      let cancelled = false;
-      const recover = async () => {
-        // Prefer HttpOnly cookies from server-side invite exchange (mobile-safe).
-        const fromCookies = await adminHydrateBrowserAuthFromCookies();
-        if (cancelled) return;
-        if (fromCookies.ok) {
-          await hydrateBrowserSupabaseSession({
-            accessToken: fromCookies.accessToken,
-            refreshToken: fromCookies.refreshToken,
-          });
-          refreshAdminSessionClient();
-          return;
-        }
-
-        const supabase = getAdminBrowserSupabase();
-        const browserSession = supabase
-          ? (await supabase.auth.getSession()).data.session
-          : null;
-        if (cancelled) return;
-        if (browserSession) {
-          const established = await adminEstablishSession({
-            data: {
-              accessToken: browserSession.access_token,
-              refreshToken: browserSession.refresh_token,
-              clientKey: browserSession.user.email ?? undefined,
-            },
-          });
-          if (cancelled) return;
-          if (established.ok) {
-            refreshAdminSessionClient();
-            return;
-          }
-        }
-        navigate({ to: "/admin/login", replace: true });
-      };
-      void recover();
-      return () => {
-        cancelled = true;
-      };
+      navigate({ to: "/admin/login", replace: true });
+      return;
     }
     if (!session.mfaRequired && session.nextStep === "none" && session.aal === "aal2") {
       navigate({ to: "/admin", replace: true });
     }
   }, [ready, session, navigate]);
+
+  React.useEffect(() => {
+    if (!ready || !session || !userId) return;
+    if (mfaHydratedForUser.current === userId) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      const purpose = session.nextStep === "mfa_verify" ? "mfa_challenge" : "mfa_setup";
+      const result = await ensureMfaBrowserSessionForPurpose(purpose);
+      if (cancelled) return;
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      mfaHydratedForUser.current = userId;
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, session, userId]);
 
   React.useEffect(() => {
     if (!ready || !session) return;
@@ -113,8 +101,6 @@ function AdminMfaPage() {
     setMode(next);
     if (next !== "enroll") return;
 
-    // Only one enroll attempt per user on this page — re-running cancels in-flight
-    // enroll and leaves orphan unverified factors (infinite spinner / disabled button).
     if (enrollAttemptedForUser.current === userId) return;
     enrollAttemptedForUser.current = userId;
 
@@ -123,24 +109,22 @@ function AdminMfaPage() {
     const startEnroll = async () => {
       setEnrollBusy(true);
       setError(null);
-      const supabase = getAdminBrowserSupabase();
+      const supabase = getAdminMfaSupabase();
       if (!supabase) {
         setError("Supabase browserconfig ontbreekt.");
         setEnrollBusy(false);
         return;
       }
 
-      // Invite exchange sets HttpOnly cookies; hydrate supabase-js for MFA enroll APIs.
       let { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        const fromCookies = await adminHydrateBrowserAuthFromCookies();
-        if (fromCookies.ok) {
-          await hydrateBrowserSupabaseSession({
-            accessToken: fromCookies.accessToken,
-            refreshToken: fromCookies.refreshToken,
-          });
-          sessionData = (await supabase.auth.getSession()).data;
+        const hydrated = await ensureMfaBrowserSessionForPurpose("mfa_setup");
+        if (!hydrated.ok) {
+          setError(hydrated.error);
+          setEnrollBusy(false);
+          return;
         }
+        sessionData = (await supabase.auth.getSession()).data;
       }
       if (!sessionData.session) {
         setError(
@@ -150,7 +134,6 @@ function AdminMfaPage() {
         return;
       }
 
-      // Remove incomplete enrollments so a fresh QR can be issued.
       const listed = await supabase.auth.mfa.listFactors();
       const pending = [
         ...(listed.data?.all ?? []),
@@ -187,8 +170,6 @@ function AdminMfaPage() {
     void startEnroll();
     return () => {
       cancelled = true;
-      // React Strict Mode runs effect → cleanup → effect. Reset so the second
-      // run can enroll; otherwise the first attempt is cancelled and never retried.
       if (enrollAttemptedForUser.current === userId) {
         enrollAttemptedForUser.current = null;
       }
@@ -196,7 +177,7 @@ function AdminMfaPage() {
   }, [ready, userId, nextStep]);
 
   const syncCookiesFromBrowserSession = async () => {
-    const supabase = getAdminBrowserSupabase();
+    const supabase = getAdminMfaSupabase();
     if (!supabase) return false;
     const { data } = await supabase.auth.getSession();
     if (!data.session) return false;
@@ -205,6 +186,7 @@ function AdminMfaPage() {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
         clientKey: session?.username,
+        requireAal2: true,
       },
     });
     return established.ok && established.nextStep === "none";
@@ -215,7 +197,7 @@ function AdminMfaPage() {
     setBusy(true);
     setError(null);
     try {
-      const supabase = getAdminBrowserSupabase();
+      const supabase = getAdminMfaSupabase();
       if (!supabase) {
         setError("Supabase browserconfig ontbreekt.");
         setBusy(false);
@@ -224,6 +206,14 @@ function AdminMfaPage() {
 
       let activeFactorId = factorId;
       if (mode === "verify" && !activeFactorId) {
+        if (!(await supabase.auth.getSession()).data.session) {
+          const hydrated = await ensureMfaBrowserSessionForPurpose(mfaPurpose);
+          if (!hydrated.ok) {
+            setError(hydrated.error);
+            setBusy(false);
+            return;
+          }
+        }
         const { data: factors } = await supabase.auth.mfa.listFactors();
         activeFactorId = factors?.totp.find((f) => f.status === "verified")?.id ?? null;
       }
@@ -277,6 +267,9 @@ function AdminMfaPage() {
         await completeAdminMfa().catch(() => undefined);
       }
 
+      // Local MFA memory teardown — must not revoke durable cookie session.
+      destroyMfaBrowserSessionLocally();
+      await adminCompleteMfaBrowserFlow().catch(() => undefined);
       refreshAdminSessionClient();
       navigate({ to: "/admin", replace: true });
     } catch {

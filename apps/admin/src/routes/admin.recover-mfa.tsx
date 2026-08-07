@@ -6,12 +6,8 @@ import {
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
-import {
-  adminExchangeAuthCallback,
-  adminHydrateBrowserAuthFromCookies,
-} from "@/lib/api/admin-auth.functions";
+import { adminExchangeAuthCallback } from "@/lib/api/admin-auth.functions";
 import { getStaffMfaRecoveryContextFn } from "@/lib/api/staff-identity.functions";
-import { hydrateBrowserSupabaseSession } from "@/lib/hydrate-browser-supabase-session";
 import {
   clearStaffInviteAuthCallbackFromUrl,
 } from "@/lib/staff-invite-callback";
@@ -87,9 +83,6 @@ function AdminRecoverMfaPage() {
           return;
         }
 
-        if (exchanged.browserHydration) {
-          await hydrateBrowserSupabaseSession(exchanged.browserHydration);
-        }
         refreshAdminSessionClient();
 
         if (!cancelled) await proceedToMfaEnroll();
@@ -98,13 +91,6 @@ function AdminRecoverMfaPage() {
 
       const existing = await fetchAdminSession().catch(() => null);
       if (existing?.userId) {
-        const hydrated = await adminHydrateBrowserAuthFromCookies();
-        if (hydrated.ok) {
-          await hydrateBrowserSupabaseSession({
-            accessToken: hydrated.accessToken,
-            refreshToken: hydrated.refreshToken,
-          });
-        }
         refreshAdminSessionClient();
         if (!cancelled) await proceedToMfaEnroll();
         return;

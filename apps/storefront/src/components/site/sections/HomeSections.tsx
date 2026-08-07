@@ -239,8 +239,8 @@ export function Hero() {
             ) : null}
           </div>
 
-          {/* Trust strip */}
-          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-xs uppercase tracking-[0.2em] text-white/55">
+          {/* Trust strip — centered on mobile; left-aligned from lg with the hero copy */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs uppercase tracking-[0.2em] text-white/55 lg:justify-start">
             {t.stats.items.map((it) => (
               <span key={it.label} className="flex items-center gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> {it.value} {it.label}

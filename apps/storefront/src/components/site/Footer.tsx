@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Facebook, Instagram, Linkedin, Phone, Mail, MapPin, ShieldCheck } from "lucide-react";
 import logoUrl from "@/assets/logo-mccoy.png";
 import logoWebpUrl from "@/assets/logo-mccoy.webp";
@@ -5,7 +6,11 @@ import { CmsLinkAnchor } from "@/components/site/CmsLinkAnchor";
 import { useSiteFooter } from "@/lib/cms/store";
 import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
-import { DEFAULT_FOOTER_LOGO, resolveFooterLogoHeight } from "@mccoy/cms-schema";
+import {
+  DEFAULT_FOOTER_LOGO,
+  resolveFooterLogoHeight,
+  resolveFooterLogoHeightMobile,
+} from "@mccoy/cms-schema";
 import { cn } from "@/lib/utils";
 
 function SocialIcon({ network }: { network: string }) {
@@ -22,15 +27,31 @@ function ContactIcon({ kind }: { kind: string }) {
   return <MapPin className="mt-0.5 h-4 w-4 text-primary" />;
 }
 
+function footerLogoVars(mobilePx: number, desktopPx: number): CSSProperties {
+  return {
+    ["--footer-logo-h" as string]: `${mobilePx}px`,
+    ["--footer-logo-h-md" as string]: `${desktopPx}px`,
+    width: "auto",
+    aspectRatio: "auto",
+  };
+}
+
+const FOOTER_LOGO_HEIGHT_CLASS =
+  "h-[length:var(--footer-logo-h)] w-auto object-contain md:h-[length:var(--footer-logo-h-md)]";
+
 export function Footer() {
   const footer = useSiteFooter();
   const logo = footer.logo ?? DEFAULT_FOOTER_LOGO;
-  const logoHeight = resolveFooterLogoHeight(footer);
+  const logoHeightDesktop = resolveFooterLogoHeight(footer);
+  const logoHeightMobile = resolveFooterLogoHeightMobile(footer);
+  const logoStyle = footerLogoVars(logoHeightMobile, logoHeightDesktop);
   const logoSrc = logo.src?.startsWith("/") || logo.src?.startsWith("http") ? logo.src : logoUrl;
   const useBundledWebp =
     !footer.logo ||
     logo.src === DEFAULT_FOOTER_LOGO.src ||
     logo.src.includes("logo-mccoy");
+  const logoWidthAttr = logo.width ?? NAV_LOGO_WIDTH;
+  const logoHeightAttr = logo.height ?? NAV_LOGO_HEIGHT;
 
   return (
     <footer className="relative border-t border-white/10 bg-card/50">
@@ -43,24 +64,24 @@ export function Footer() {
                 <img
                   src={logoUrl}
                   alt={logo.alt || "McCoy Cleaning"}
-                  width={NAV_LOGO_WIDTH}
-                  height={NAV_LOGO_HEIGHT}
+                  width={logoWidthAttr}
+                  height={logoHeightAttr}
                   loading="lazy"
                   decoding="async"
-                  style={{ height: logoHeight }}
-                  className="w-auto"
+                  style={logoStyle}
+                  className={FOOTER_LOGO_HEIGHT_CLASS}
                 />
               </picture>
             ) : (
               <img
                 src={logoSrc}
                 alt={logo.decorative ? "" : logo.alt || "McCoy Cleaning"}
-                width={NAV_LOGO_WIDTH}
-                height={NAV_LOGO_HEIGHT}
+                width={logoWidthAttr}
+                height={logoHeightAttr}
                 loading="lazy"
                 decoding="async"
-                style={{ height: logoHeight }}
-                className="w-auto"
+                style={logoStyle}
+                className={FOOTER_LOGO_HEIGHT_CLASS}
               />
             )}
             {footer.tagline ? (

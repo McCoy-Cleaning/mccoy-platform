@@ -159,6 +159,31 @@ describe("localizeCmsPageForLocale", () => {
     });
   });
 
+  it("overlays contact form labels/placeholders even when leaf is email|phone", () => {
+    const page = builtin();
+    page.sectionContent = {
+      ...page.sectionContent,
+      "contact.form": {
+        labels: { name: "Naam", email: "E-mail", phone: "Telefoon" },
+        placeholders: { email: "naam@bedrijf.nl", phone: "06 …" },
+        submitLabel: "Verstuur aanvraag",
+      },
+    };
+    page.enFieldDrafts = {
+      ...(page.enFieldDrafts ?? {}),
+      "section:contact.form:labels.email": "Email",
+      "section:contact.form:labels.phone": "Phone",
+      "section:contact.form:placeholders.email": "name@company.com",
+      "section:contact.form:submitLabel": "Send request",
+    };
+    const localized = localizeCmsPageForLocale(page, "en");
+    expect(localized.kind === "builtin" && localized.sectionContent?.["contact.form"]).toMatchObject({
+      labels: { name: "Naam", email: "Email", phone: "Phone" },
+      placeholders: { email: "name@company.com", phone: "06 …" },
+      submitLabel: "Send request",
+    });
+  });
+
   it("mirrors NL blank-line paragraph structure onto EN drafts", () => {
     const page = builtin();
     page.sectionContent = {

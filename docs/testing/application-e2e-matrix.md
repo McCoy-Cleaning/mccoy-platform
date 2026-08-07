@@ -24,9 +24,9 @@
 |----------|------:|-------|
 | Admin routes inventoried | 13 | See §1 |
 | Storefront routes inventoried | 18 | See §2 |
-| Builtin CMS pages | 7 | home…offerte |
-| Fixed section keys | 14 | See audit |
-| Publishable block types | 29 | All publishable |
+| Builtin CMS pages | 9 | home…terms (incl. privacy/terms) |
+| Fixed section keys | 19 | `ALL_FIXED_SECTION_KEYS` in `@mccoy/cms-schema` |
+| Publishable block types | 35 | `PUBLISHABLE_BLOCK_TYPES` / `INVENTORY_PUBLISHABLE_BLOCK_TYPES` |
 | Form kinds | 5 | inquiry…newsletter |
 | Dispositions: P0 / full / partial | — | Filled as suites land |
 | Exclude (commerce stubs) | 2 | products, users admin |
@@ -82,10 +82,10 @@
 
 | Workflow | Disposition | Phase |
 |----------|-------------|-------|
-| Editor loads for each builtin page | full E2E | 4 |
-| Section inventory (fixed + blocks) | full E2E | 5 |
-| Add section from picker (publishable set) | full E2E | 6 |
-| Field coverage (representative per type) | full E2E | 7 |
+| Editor loads for each builtin page | full E2E | 4 — `e2e/cms-loading-inventory.spec.ts` |
+| Section inventory (fixed + blocks) | **full E2E (M5 implemented)** | 5 — `e2e/cms-loading-inventory.spec.ts` + `packages/cms-schema/src/e2e-inventory.ts` + `e2e/helpers/cms-inventory.ts` |
+| Add section from picker (publishable set) | full E2E | 6 — representative add in `e2e/cms-add-sections.spec.ts`; exhaustive picker presence is M5 |
+| Field coverage (representative per type) | full E2E | 7 — `e2e/cms-field-coverage.spec.ts` (metadata + representative edit; not deep per-type) |
 | Reorder / hide / duplicate / remove | full E2E | 8 |
 | Canvas + device frame + preview | full E2E | 9 |
 | Publish / discard / unsaved | full E2E | 10 |
@@ -129,8 +129,14 @@
 | portfolio | partial | |
 | jobs | full E2E | Vacatures |
 | latestPosts | partial | |
+| partnersMarquee | partial | Inventory M5 |
+| statsCounters | partial | Inventory M5 |
+| contactInfoCards | partial | Inventory M5 |
+| quoteRequestForm | partial | Inventory M5 (picker on Offerte) |
+| legalArticles | partial | Inventory M5 |
+| offers | partial | Inventory M5 |
 
-*Rule:* every type appears at least once in inventory (Phase 5). Deep field coverage prioritizes high-risk / conversion types; others get add→publish→public smoke.
+*Rule:* every type appears at least once in inventory (**Phase 5 / M5 — implemented** via `e2e/cms-loading-inventory.spec.ts`, catalog in `packages/cms-schema/src/e2e-inventory.ts`). Deep field coverage prioritizes high-risk / conversion types; others get add→publish→public smoke.
 
 ---
 

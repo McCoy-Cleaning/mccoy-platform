@@ -8,10 +8,7 @@ import {
   signOutAdmin,
   useAdminSession,
 } from "@/lib/admin-auth";
-import {
-  adminExchangeAuthCallback,
-  adminHydrateBrowserAuthFromCookies,
-} from "@/lib/api/admin-auth.functions";
+import { adminExchangeAuthCallback } from "@/lib/api/admin-auth.functions";
 import {
   completeStaffInviteRegistrationFn,
   completeStaffPasswordRecoveryFn,
@@ -19,7 +16,6 @@ import {
   getStaffMfaRecoveryContextFn,
   getStaffPasswordRecoveryContextFn,
 } from "@/lib/api/staff-identity.functions";
-import { hydrateBrowserSupabaseSession } from "@/lib/hydrate-browser-supabase-session";
 import {
   clearStaffInviteAuthCallbackFromUrl,
   readStaffAuthCallbackTypeFromLocation,
@@ -167,9 +163,7 @@ function AdminInvitePage() {
           return;
         }
 
-        if (exchanged.browserHydration) {
-          await hydrateBrowserSupabaseSession(exchanged.browserHydration);
-        }
+        // Durable HttpOnly cookies are authoritative; MFA page purpose-gates browser tokens.
         refreshAdminSessionClient();
 
         if (
@@ -188,13 +182,6 @@ function AdminInvitePage() {
       // Clean URL / reload: recover from HttpOnly cookies (mobile-safe).
       const existing = await fetchAdminSession().catch(() => null);
       if (existing?.userId) {
-        const hydrated = await adminHydrateBrowserAuthFromCookies();
-        if (hydrated.ok) {
-          await hydrateBrowserSupabaseSession({
-            accessToken: hydrated.accessToken,
-            refreshToken: hydrated.refreshToken,
-          });
-        }
         refreshAdminSessionClient();
         if (!cancelled) await loadContext();
         return;
@@ -254,17 +241,6 @@ function AdminInvitePage() {
         }
 
         if (completed.nextStep === "mfa_enroll") {
-          if (completed.browserHydration) {
-            await hydrateBrowserSupabaseSession(completed.browserHydration);
-          } else {
-            const hydrated = await adminHydrateBrowserAuthFromCookies();
-            if (hydrated.ok) {
-              await hydrateBrowserSupabaseSession({
-                accessToken: hydrated.accessToken,
-                refreshToken: hydrated.refreshToken,
-              });
-            }
-          }
           refreshAdminSessionClient();
           clearStaffInviteAuthCallbackFromUrl();
           navigate({ to: "/admin/mfa", replace: true });
@@ -291,17 +267,6 @@ function AdminInvitePage() {
         return;
       }
 
-      if (completed.browserHydration) {
-        await hydrateBrowserSupabaseSession(completed.browserHydration);
-      } else {
-        const hydrated = await adminHydrateBrowserAuthFromCookies();
-        if (hydrated.ok) {
-          await hydrateBrowserSupabaseSession({
-            accessToken: hydrated.accessToken,
-            refreshToken: hydrated.refreshToken,
-          });
-        }
-      }
       refreshAdminSessionClient();
       clearStaffInviteAuthCallbackFromUrl();
       navigate({ to: "/admin/mfa", replace: true });

@@ -1,15 +1,16 @@
 import { test, expect } from "./fixtures/base";
 import {
   ALL_PUBLISHABLE_TEMPLATES,
+  BLOCK_TYPE_TEMPLATE_NAME,
   addCmsSection,
   openPageEditor,
-  openSections,
   PAGES,
 } from "./helpers/cms";
+import { INVENTORY_PUBLISHABLE_BLOCK_TYPES } from "@mccoy/cms-schema";
 
 /**
- * Phase 6–7 coverage gate — metadata + picker inventory on the custom page.
- * Deep per-type publish lives in gallery/roadmap/plans/fixed-section specs.
+ * Phase 6–7 coverage gate — metadata + representative field edit.
+ * Exhaustive picker inventory (every publishable type) is M5 / cms-loading-inventory.
  */
 export type BlockEditorCoverage = {
   blockType: string;
@@ -24,7 +25,13 @@ const COVERAGE: BlockEditorCoverage[] = ALL_PUBLISHABLE_TEMPLATES.map(({ type })
 }));
 
 test.describe("CMS field coverage gate", () => {
-  test("coverage metadata covers every publishable template", () => {
+  test("coverage metadata covers every publishable template from schema", () => {
+    expect(ALL_PUBLISHABLE_TEMPLATES.map((t) => t.type).sort()).toEqual(
+      [...INVENTORY_PUBLISHABLE_BLOCK_TYPES].sort(),
+    );
+    for (const type of INVENTORY_PUBLISHABLE_BLOCK_TYPES) {
+      expect(BLOCK_TYPE_TEMPLATE_NAME[type], `missing Dutch template name for ${type}`).toBeTruthy();
+    }
     const types = new Set(COVERAGE.map((c) => c.blockType));
     expect(types.size).toBe(ALL_PUBLISHABLE_TEMPLATES.length);
     for (const row of ALL_PUBLISHABLE_TEMPLATES) {
@@ -34,21 +41,6 @@ test.describe("CMS field coverage gate", () => {
       for (const path of row.editablePaths) {
         expect(row.testedPaths, `${row.blockType} missing test for ${path}`).toContain(path);
       }
-    }
-  });
-
-  test("picker exposes every publishable data-cms-template", async ({ page, failureSink }) => {
-    void failureSink;
-    await openPageEditor(page, PAGES.custom);
-    await openSections(page);
-    await page.getByRole("button", { name: "Sectie toevoegen" }).first().click();
-    await expect(page.getByRole("heading", { name: "Kies een sectie" })).toBeVisible();
-    await page.getByRole("button", { name: "Alle", exact: true }).click();
-
-    for (const entry of ALL_PUBLISHABLE_TEMPLATES) {
-      await expect(page.locator(`[data-cms-template="${entry.type}"]`).first()).toBeVisible({
-        timeout: 15_000,
-      });
     }
   });
 

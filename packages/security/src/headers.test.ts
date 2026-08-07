@@ -21,6 +21,50 @@ describe("security headers", () => {
     expect(csp).toContain("http://localhost:5173");
   });
 
+  it("allows admin connect-src to the same storefront origins as frame-src", () => {
+    const csp = buildContentSecurityPolicy("admin");
+    const connectSrc =
+      csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
+    const frameSrc =
+      csp.split(";").find((part) => part.trim().startsWith("frame-src")) ?? "";
+
+    expect(connectSrc).toContain("'self'");
+    expect(connectSrc.split(/\s+/)).toContain("https:");
+    expect(connectSrc.split(/\s+/)).toContain("wss:");
+    expect(connectSrc).toContain("http://localhost:5173");
+    expect(connectSrc).toContain("http://127.0.0.1:5173");
+    expect(connectSrc).toContain("https://www.mccoy.nl");
+    expect(connectSrc).toContain("https://mccoy.nl");
+
+    // Probe origins must match embed origins (shared storefront origin list).
+    for (const origin of [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://www.mccoy.nl",
+      "https://mccoy.nl",
+    ]) {
+      expect(frameSrc).toContain(origin);
+      expect(connectSrc).toContain(origin);
+    }
+  });
+
+  it("includes VITE_STOREFRONT_ORIGIN in both admin frame-src and connect-src", () => {
+    const prev = process.env.VITE_STOREFRONT_ORIGIN;
+    process.env.VITE_STOREFRONT_ORIGIN = "https://preview-storefront.example/";
+    try {
+      const csp = buildContentSecurityPolicy("admin");
+      const connectSrc =
+        csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
+      const frameSrc =
+        csp.split(";").find((part) => part.trim().startsWith("frame-src")) ?? "";
+      expect(frameSrc).toContain("https://preview-storefront.example");
+      expect(connectSrc).toContain("https://preview-storefront.example");
+    } finally {
+      if (prev === undefined) delete process.env.VITE_STOREFRONT_ORIGIN;
+      else process.env.VITE_STOREFRONT_ORIGIN = prev;
+    }
+  });
+
   it("keeps storefront embeddable by admin (no X-Frame-Options DENY)", () => {
     const headers = buildSecurityHeaders({
       app: "storefront",
@@ -48,6 +92,20 @@ describe("security headers", () => {
     );
     expect(secured.headers.get("content-type")).toBe("text/plain");
     expect(secured.headers.get("x-frame-options")).toBe("DENY");
+  });
+
+  it("allows Google Fonts stylesheets for admin (Archivo / Quicksand)", () => {
+    const csp = buildContentSecurityPolicy("admin");
+    expect(csp).toContain("https://fonts.googleapis.com");
+    expect(csp).toContain("https://fonts.gstatic.com");
+  });
+
+  it("allows Vercel preview feedback script host without opening script-src to all https", () => {
+    const csp = buildContentSecurityPolicy("admin");
+    expect(csp).toMatch(/script-src[^;]*https:\/\/vercel\.live/);
+    // Must not allow any https origin via a bare `https:` token in script-src.
+    const scriptSrc = csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";
+    expect(scriptSrc.split(/\s+/)).not.toContain("https:");
   });
 
   it("builds distinct CSPs per app", () => {

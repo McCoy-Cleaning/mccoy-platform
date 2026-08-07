@@ -60,7 +60,7 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
               width={NAV_LOGO_WIDTH}
               height={NAV_LOGO_HEIGHT}
               decoding="async"
-              style={{ height: logoHeightPx }}
+              style={{ height: logoHeightPx, width: "auto", aspectRatio: "auto" }}
               className="w-auto object-contain"
             />
           </picture>

@@ -1,16 +1,21 @@
 import { z } from "zod";
-import { cmsButtonSchema, createItemId, normalizeCmsButton, type CmsButton, type CmsImage } from "../content";
+import { cmsButtonSchema, normalizeCmsButton, type CmsButton } from "../button";
+import type { CmsImage } from "../cms-image";
+import { createItemId } from "../ids";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot, type FormScopeSnapshot } from "../form-scope";
 import { cmsLinkSchema, linkFromLegacyHref, parseCmsLink } from "../links";
 import type { BlockType, CmsLink } from "../types";
 import type { CmsBlockDataDefinition } from "./definition";
 import { normalizeCmsImage } from "./image-normalize";
 import {
-  createFormFieldItem,
-  DEFAULT_CONTACT_FORM_FIELDS,
+  seedDefaultContactFormFields,
   formFieldItemSchema,
   formFieldPayloadKey,
+  normalizeContactFormColumnsDesktop,
+  normalizeContactFormTextPlacement,
   normalizeFormFields,
+  type ContactFormColumnsDesktop,
+  type ContactFormTextPlacement,
   type FormFieldItem,
 } from "./form-fields";
 import {
@@ -598,12 +603,38 @@ export type NewsletterBlockData = {
 };
 export type ContactFormBlockData = {
   title: string;
-  /** Plain-text intro beside the form (left column). */
+  /** Eyebrow above the heading (copy column). */
+  eyebrow?: string;
+  /** Plain-text intro in the copy column. */
   body?: string;
+  /** Bullet points in the copy column. Omit for defaults; `[]` hides them. */
+  highlights?: TextListItem[];
+  /** Copy position relative to the form. Default `left`. */
+  textPlacement?: ContactFormTextPlacement;
+  /** Field grid columns on desktop (sm+). Mobile is always 1. Default `2`. */
+  formColumnsDesktop?: ContactFormColumnsDesktop;
+  submitLabel?: string;
+  successMessage?: string;
+  successDetail?: string;
+  consent?: string;
+  labels?: {
+    name?: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+    message?: string;
+  };
+  placeholders?: {
+    name?: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+    message?: string;
+  };
   /** Ignored at runtime — delivery uses server FORM_TO_EMAIL. Kept for legacy JSON. */
   recipient?: string;
   fields: FormFieldItem[];
-  /** Legacy success copy — no longer edited in CMS; storefront uses a fixed default. */
+  /** Legacy success copy — prefer successMessage. */
   confirmation?: string;
   scope?: FormScopeSnapshot;
 };
@@ -1269,24 +1300,63 @@ export const catalogDefinitions = {
     label: "Contactformulier",
     category: "Conversion",
     description:
-      "Configureerbaar contactformulier; verzending via dezelfde Aanvragen-pijplijn (FORM_TO_EMAIL, geen willekeurige ontvanger).",
-    dataVersion: 2,
+      "Contactformulier met tekst (eyebrow/kop/intro) boven, links of rechts van het formulier; verzending via Aanvragen-pijplijn (FORM_TO_EMAIL).",
+    dataVersion: 3,
     schema: z.object({
       title: z.string(),
+      eyebrow: z.string().optional(),
       body: z.string().optional(),
+      highlights: z.array(textListItemSchema).optional(),
+      textPlacement: z.enum(["top", "left", "right"]).optional(),
+      formColumnsDesktop: z.union([z.literal(1), z.literal(2)]).optional(),
+      submitLabel: z.string().optional(),
+      successMessage: z.string().optional(),
+      successDetail: z.string().optional(),
+      consent: z.string().optional(),
+      labels: z
+        .object({
+          name: z.string().optional(),
+          company: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().optional(),
+          message: z.string().optional(),
+        })
+        .optional(),
+      placeholders: z
+        .object({
+          name: z.string().optional(),
+          company: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().optional(),
+          message: z.string().optional(),
+        })
+        .optional(),
       recipient: z.string().optional(),
       fields: z.array(formFieldItemSchema),
       confirmation: z.string().optional(),
       scope: formScopeSnapshotSchema.optional(),
     }),
     createDefault: (): ContactFormBlockData => ({
-      title: "Contact",
-      fields: DEFAULT_CONTACT_FORM_FIELDS.map((field) =>
-        createFormFieldItem(field.label, field.type, {
-          required: field.required,
-          options: field.options,
-        }),
-      ),
+      title: "Laten we praten over uw pand.",
+      eyebrow: "Contact",
+      body: undefined,
+      highlights: undefined,
+      textPlacement: "left",
+      formColumnsDesktop: 2,
+      submitLabel: "Verstuur aanvraag",
+      successMessage: "Bedankt! We nemen zo snel mogelijk contact op.",
+      successDetail: "We hebben uw bericht ontvangen en nemen zo snel mogelijk contact op.",
+      consent: "Door te versturen stemt u in met verwerking van uw gegevens voor deze aanvraag.",
+      // Legacy maps for name/email copy; custom fields carry their own labels/placeholders.
+      labels: {
+        name: "Naam",
+        email: "E-mail",
+      },
+      placeholders: {
+        name: "Uw naam",
+        email: "naam@bedrijf.nl",
+      },
+      fields: seedDefaultContactFormFields(),
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -1295,12 +1365,57 @@ export const catalogDefinitions = {
         const key = formFieldPayloadKey(field);
         return key !== "name" && key !== "email";
       });
+      const labelsRaw =
+        rec.labels && typeof rec.labels === "object"
+          ? (rec.labels as Record<string, unknown>)
+          : undefined;
+      const placeholdersRaw =
+        rec.placeholders && typeof rec.placeholders === "object"
+          ? (rec.placeholders as Record<string, unknown>)
+          : undefined;
+      const optStr = (row: Record<string, unknown> | undefined, key: string) => {
+        const v = row?.[key];
+        return typeof v === "string" && v.trim() ? v : undefined;
+      };
+      const labels = labelsRaw
+        ? {
+            name: optStr(labelsRaw, "name"),
+            company: optStr(labelsRaw, "company"),
+            phone: optStr(labelsRaw, "phone"),
+            email: optStr(labelsRaw, "email"),
+            message: optStr(labelsRaw, "message"),
+          }
+        : undefined;
+      const placeholders = placeholdersRaw
+        ? {
+            name: optStr(placeholdersRaw, "name"),
+            company: optStr(placeholdersRaw, "company"),
+            phone: optStr(placeholdersRaw, "phone"),
+            email: optStr(placeholdersRaw, "email"),
+            message: optStr(placeholdersRaw, "message"),
+          }
+        : undefined;
+      const highlights =
+        rec.highlights === undefined ? undefined : normalizeTextList(rec.highlights);
       return {
-        title: str(rec, "title", "Contact"),
+        title: str(rec, "title", "Laten we praten over uw pand."),
+        eyebrow: str(rec, "eyebrow") || undefined,
         body: str(rec, "body") || undefined,
+        highlights,
+        textPlacement: normalizeContactFormTextPlacement(rec.textPlacement),
+        formColumnsDesktop: normalizeContactFormColumnsDesktop(rec.formColumnsDesktop),
+        submitLabel: str(rec, "submitLabel") || undefined,
+        successMessage: str(rec, "successMessage") || str(rec, "confirmation") || undefined,
+        successDetail: str(rec, "successDetail") || undefined,
+        consent: str(rec, "consent") || undefined,
+        labels,
+        placeholders,
         // Legacy field retained but never trusted for delivery.
         recipient: str(rec, "recipient") || undefined,
-        fields: fields.length > 0 ? fields : DEFAULT_CONTACT_FORM_FIELDS,
+        fields:
+          fields.length > 0
+            ? fields
+            : seedDefaultContactFormFields({ labels, placeholders }),
         confirmation: str(rec, "confirmation") || undefined,
         scope: normalizeFormScopeSnapshot(rec.scope),
       };

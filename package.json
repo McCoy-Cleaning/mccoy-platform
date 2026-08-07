@@ -46,6 +46,7 @@
     "test:e2e:fuller": "playwright test --project=chromium --reporter=list --grep-invert \"pixel screenshots|Brave\"",
     "test:e2e:locale": "playwright test --project=chromium e2e/cms-locale-en-publish.spec.ts e2e/public-locale.spec.ts",
     "test:e2e:coverage": "playwright test --project=chromium e2e/cms-field-coverage.spec.ts e2e/cms-add-sections.spec.ts",
+    "test:e2e:inventory": "playwright test --project=chromium e2e/cms-loading-inventory.spec.ts",
     "test:unit:email": "npm run test -w @mccoy/email",
     "guardian:doctor": "node .cursor/guardian/cli.mjs doctor",
     "guardian:verify": "node .cursor/guardian/cli.mjs verify",

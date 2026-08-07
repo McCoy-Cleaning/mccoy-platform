@@ -42,6 +42,7 @@ const NON_COPY_EN_DRAFT_LEAF_KEYS = new Set([
   "presentation",
   "contentMode",
   "textPlacement",
+  "formColumnsDesktop",
   "shape",
   "columns",
   "action",
@@ -70,7 +71,11 @@ function isCopyEnDraftField(field: string): boolean {
     ? field.split(".").filter(Boolean)
     : field.split(":").filter(Boolean);
   const leaf = segments[segments.length - 1] ?? "";
-  if (!leaf || NON_COPY_EN_DRAFT_LEAF_KEYS.has(leaf)) return false;
+  if (!leaf) return false;
+  const parent = segments.length >= 2 ? segments[segments.length - 2]! : "";
+  // Contact form UI keys (`labels.email`, `placeholders.phone`) are copy — not contact details.
+  if (parent === "labels" || parent === "placeholders") return true;
+  if (NON_COPY_EN_DRAFT_LEAF_KEYS.has(leaf)) return false;
   const lower = leaf.toLowerCase();
   if (lower.endsWith("url") || lower.endsWith("href") || lower.endsWith("src")) return false;
   return true;

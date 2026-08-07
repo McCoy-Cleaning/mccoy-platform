@@ -13,7 +13,7 @@ export function sectionEnPath(sectionKey: string, field: string): string {
   return `section:${sectionKey}:${field}`;
 }
 
-function leafKey(fieldPath: string): string {
+function fieldSegments(fieldPath: string): string[] {
   // Paths are `scope:id:dotted.field` — only inspect the field segment.
   const colonParts = fieldPath.split(":");
   const field =
@@ -21,12 +21,24 @@ function leafKey(fieldPath: string): string {
     (colonParts[0] === "block" || colonParts[0] === "section" || colonParts[0] === "page")
       ? colonParts.slice(2).join(":")
       : fieldPath;
-  const parts = field.split(".").filter(Boolean);
+  return field.split(".").filter(Boolean);
+}
+
+function leafKey(fieldPath: string): string {
+  const parts = fieldSegments(fieldPath);
   for (let i = parts.length - 1; i >= 0; i--) {
     const part = parts[i]!;
     if (!/^\d+$/.test(part)) return part;
   }
   return parts[parts.length - 1] ?? fieldPath;
+}
+
+/** True when the draft path is UI copy (incl. form `labels.email` / `placeholders.phone`). */
+function isEnDraftEligiblePath(fieldPath: string): boolean {
+  const parts = fieldSegments(fieldPath);
+  const parent = parts.length >= 2 ? parts[parts.length - 2]! : "";
+  if (parent === "labels" || parent === "placeholders") return true;
+  return isTranslatableFieldKey(leafKey(fieldPath));
 }
 
 /**
@@ -44,7 +56,7 @@ export function EnDraftFor({
   multiline?: boolean;
 }) {
   if (!fieldPath) return null;
-  if (!isTranslatableFieldKey(leafKey(fieldPath))) return null;
+  if (!isEnDraftEligiblePath(fieldPath)) return null;
   return <ManualEnDraftField fieldPath={fieldPath} label={label} multiline={multiline} />;
 }
 

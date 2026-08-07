@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
 import type { BuiltinCmsPage } from "./types";
 import { normalizeFormScopeSnapshot } from "./form-scope";
-import { resolvePublishedFormScope } from "./resolve-published-form";
+import {
+  resolvePublishedContactFormFields,
+  resolvePublishedFormScope,
+} from "./resolve-published-form";
 import { normalizeCmsPage } from "./pipeline";
+import { formFieldPayloadKey } from "./blocks/form-fields";
 
 function pageWithContactForm(scope?: { key: string; label: string }): BuiltinCmsPage {
   return {
@@ -124,5 +128,47 @@ describe("resolvePublishedFormScope", () => {
       label: "Amsterdam",
     });
     expect(normalizeFormScopeSnapshot("Bad\nLabel")).toBeUndefined();
+  });
+});
+
+describe("resolvePublishedContactFormFields", () => {
+  it("resolves default fields for the fixed contact.form section", () => {
+    const page = emptyBuiltinSeed("page_contact", "contact");
+    const result = resolvePublishedContactFormFields(
+      page,
+      FIXED_FORM_SOURCE_IDS.contactForm,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.fields.map((f) => formFieldPayloadKey(f))).toEqual([
+        "name",
+        "email",
+        "company",
+        "phone",
+        "message",
+      ]);
+    }
+  });
+
+  it("seeds fields when only legacy labels/placeholders are published", () => {
+    const page = pageWithContactForm();
+    page.sectionContent = {
+      "contact.form": {
+        heading: "Contact",
+        labels: { company: "Firma" },
+        placeholders: { phone: "06…" },
+      },
+    };
+    const result = resolvePublishedContactFormFields(
+      page,
+      FIXED_FORM_SOURCE_IDS.contactForm,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const company = result.fields.find((f) => formFieldPayloadKey(f) === "company");
+      const phone = result.fields.find((f) => formFieldPayloadKey(f) === "phone");
+      expect(company?.label).toBe("Firma");
+      expect(phone?.placeholder).toBe("06…");
+    }
   });
 });

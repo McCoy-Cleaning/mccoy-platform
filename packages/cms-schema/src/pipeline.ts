@@ -28,6 +28,7 @@ import type { Block, BuiltinCmsPage, CmsPage, CustomCmsPage } from "./types";
 import { ensureBuiltinSectionContent, migrateServicesPageSplit } from "./section-content";
 import { ensurePageLocaleFields } from "./migrate-locale";
 import { validatePageSectionContent } from "./content";
+import { isRequiredFixedSatisfiedByBlock } from "./page-block-policies";
 import { validatePageBlocksForPublish } from "./blocks/validate";
 import { ensureVacaturesJobsBlock } from "./blocks/jobs";
 import { validatePageBlockPolicies } from "./page-block-policies";
@@ -245,6 +246,8 @@ export function normalizeBuiltinLayout(page: BuiltinCmsPage): BuiltinCmsPage {
   }
   for (const key of FIXED_SECTIONS_BY_PAGE[pageKey]) {
     if (!FIXED_SECTION_DEFS[key].required || seenFixed.has(key)) continue;
+    // Hybrid: required contact.form / offerte.form may already be covered by a catalog block.
+    if (isRequiredFixedSatisfiedByBlock(next, key)) continue;
     rebuilt.push(newFixedLayoutItem(key));
     seenFixed.add(key);
   }
@@ -383,6 +386,8 @@ export function validatePublishableCmsPage(page: CmsPage): ValidateResult {
       if (!def.required) continue;
       const found = page.layout.find((i) => i.kind === "fixed" && i.key === key);
       if (!found) {
+        // Hybrid: contact.form / offerte.form may be replaced by a catalog block.
+        if (isRequiredFixedSatisfiedByBlock(page, key)) continue;
         issues.push({
           code: "MISSING_REQUIRED_SECTION",
           message: `Required section ${key} is missing.`,

@@ -1,9 +1,6 @@
 import { z } from "zod";
-import {
-  cmsImageSchema,
-  createItemId,
-  type CmsImage,
-} from "./content";
+import { cmsImageSchema, type CmsImage } from "./cms-image";
+import { createItemId } from "./ids";
 import { cmsLinkSchema } from "./links";
 import type { CmsLink } from "./cms-link-model";
 import { DEFAULT_NAV_LOGO } from "./navigation";
@@ -35,8 +32,10 @@ export type SiteFooterContactRow = {
 
 export type SiteFooterContent = {
   logo?: CmsImage;
-  /** Footer logo display height (px). */
+  /** Footer logo display height on desktop (px). */
   logoHeight?: number;
+  /** Footer logo display height on mobile (px). */
+  logoHeightMobile?: number;
   tagline: string;
   socialLinks: SiteFooterSocialLink[];
   servicesTitle: string;
@@ -51,15 +50,31 @@ export type SiteFooterContent = {
 };
 
 export const DEFAULT_FOOTER_LOGO_HEIGHT_PX = 40;
+export const DEFAULT_FOOTER_LOGO_HEIGHT_MOBILE_PX = 32;
 export const FOOTER_LOGO_HEIGHT_MIN = 24;
 export const FOOTER_LOGO_HEIGHT_MAX = 96;
+export const FOOTER_LOGO_HEIGHT_MOBILE_MIN = 20;
+export const FOOTER_LOGO_HEIGHT_MOBILE_MAX = 72;
 
 export function clampFooterLogoHeight(px: number): number {
   return Math.min(FOOTER_LOGO_HEIGHT_MAX, Math.max(FOOTER_LOGO_HEIGHT_MIN, Math.round(px)));
 }
 
+export function clampFooterLogoHeightMobile(px: number): number {
+  return Math.min(
+    FOOTER_LOGO_HEIGHT_MOBILE_MAX,
+    Math.max(FOOTER_LOGO_HEIGHT_MOBILE_MIN, Math.round(px)),
+  );
+}
+
 export function resolveFooterLogoHeight(footer: SiteFooterContent): number {
   return clampFooterLogoHeight(footer.logoHeight ?? DEFAULT_FOOTER_LOGO_HEIGHT_PX);
+}
+
+export function resolveFooterLogoHeightMobile(footer: SiteFooterContent): number {
+  return clampFooterLogoHeightMobile(
+    footer.logoHeightMobile ?? DEFAULT_FOOTER_LOGO_HEIGHT_MOBILE_PX,
+  );
 }
 
 const siteFooterLinkSchema = z.object({
@@ -90,6 +105,12 @@ export const siteFooterContentSchema: z.ZodType<SiteFooterContent> = z.object({
     .min(FOOTER_LOGO_HEIGHT_MIN)
     .max(FOOTER_LOGO_HEIGHT_MAX)
     .optional(),
+  logoHeightMobile: z
+    .number()
+    .int()
+    .min(FOOTER_LOGO_HEIGHT_MOBILE_MIN)
+    .max(FOOTER_LOGO_HEIGHT_MOBILE_MAX)
+    .optional(),
   tagline: z.string(),
   socialLinks: z.array(siteFooterSocialLinkSchema),
   servicesTitle: z.string(),
@@ -107,6 +128,7 @@ export const siteFooterContentSchema: z.ZodType<SiteFooterContent> = z.object({
 export function defaultSiteFooter(): SiteFooterContent {
   return {
     logoHeight: DEFAULT_FOOTER_LOGO_HEIGHT_PX,
+    logoHeightMobile: DEFAULT_FOOTER_LOGO_HEIGHT_MOBILE_PX,
     tagline: "Schoonmaak met karakter — zichtbare kwaliteit sinds 1998.",
     socialLinks: [
       {
@@ -256,6 +278,10 @@ export function mergeFooterPatch(
     }
     if (k === "logoHeight" && typeof v === "number") {
       out.logoHeight = clampFooterLogoHeight(v);
+      continue;
+    }
+    if (k === "logoHeightMobile" && typeof v === "number") {
+      out.logoHeightMobile = clampFooterLogoHeightMobile(v);
       continue;
     }
     (out as Record<string, unknown>)[k] = Array.isArray(v) ? [...v] : v;

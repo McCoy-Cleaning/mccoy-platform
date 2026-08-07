@@ -208,10 +208,19 @@ function seedFromLegacy(
   }
   if (fixedKey === "contact.form") {
     return {
-      title: rec.heading ?? "Contact",
+      title: rec.heading ?? "Laten we praten over uw pand.",
+      eyebrow: rec.eyebrow,
       body: rec.body,
+      highlights: rec.highlights,
+      textPlacement: rec.textPlacement ?? "left",
+      formColumnsDesktop: rec.formColumnsDesktop ?? 2,
       submitLabel: rec.submitLabel,
       successMessage: rec.successMessage,
+      successDetail: rec.successDetail,
+      consent: rec.consent,
+      labels: rec.labels,
+      placeholders: rec.placeholders,
+      fields: rec.fields,
       scope: isRecord(rec.formScope) ? rec.formScope : rec.scope,
     };
   }

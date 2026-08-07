@@ -13,19 +13,35 @@ import {
   type VacaturesApplicationContent,
   type VacaturesApplicationMedia,
 } from "@mccoy/cms-schema";
+import {
+  SectionAiToolbar,
+  collectShallowStringFields,
+} from "../ai-assist";
 import { ObjectListEditor } from "./ObjectListEditor";
 import { FormScopeField } from "./FormScopeField";
+import { EnDraftFor, NlEnField, sectionEnPath } from "./en-draft-fields";
 import { BlockImageField, Field, Section, inputClass, selectClass } from "./shared-fields";
 import type { CmsImagePickerProps } from "../image-picker-props";
+
+const VACATURES_APP_COPY_KEYS = [
+  "formEyebrow",
+  "formIntro",
+  "mediaEyebrow",
+  "mediaHeading",
+  "mediaBadge",
+  "mediaLinkLabel",
+] as const;
 
 const FALLBACK_IMAGE = localImage("/images/hero-placeholder.jpg", "Afbeelding");
 
 function FormFieldOptionsEditor({
   options,
   onChange,
+  enPathPrefix,
 }: {
   options: FormFieldOption[];
   onChange: (next: FormFieldOption[]) => void;
+  enPathPrefix?: string;
 }) {
   return (
     <ObjectListEditor<FormFieldOption>
@@ -34,7 +50,7 @@ function FormFieldOptionsEditor({
       createItem={() => createFormFieldOption("Optie")}
       cloneItem={(item) => ({ ...item, id: createFormFieldOption(item.label).id })}
       addLabel="Optie toevoegen"
-      renderItem={(option, actions) => (
+      renderItem={(option, actions, optionIndex) => (
         <div className="space-y-3">
           <Field label="Label">
             <input
@@ -43,6 +59,12 @@ function FormFieldOptionsEditor({
               onChange={(e) => actions.update({ ...option, label: e.target.value })}
             />
           </Field>
+          {enPathPrefix ? (
+            <EnDraftFor
+              fieldPath={`${enPathPrefix}.options.${optionIndex}.label`}
+              label="Label"
+            />
+          ) : null}
           <Field label="Waarde (optioneel)" hint="Stabiele sleutel; leeg = afgeleid uit label.">
             <input
               className={inputClass}
@@ -83,30 +105,63 @@ export function VacaturesApplicationInspector({
     resolveProjectImage,
   };
 
+  const pathPrefix = "section:vacatures.application";
+  const aiFields = collectShallowStringFields(
+    content as unknown as Record<string, unknown>,
+    [...VACATURES_APP_COPY_KEYS],
+    { includeEmpty: true },
+  );
+  const applyDutch = (nl: Record<string, string>) => {
+    const patch: Partial<VacaturesApplicationContent> = {};
+    for (const key of VACATURES_APP_COPY_KEYS) {
+      if (typeof nl[key] === "string") patch[key] = nl[key] || undefined;
+    }
+    onPatch(patch);
+  };
+
   return (
     <div className="space-y-6">
       <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] leading-relaxed text-white/55">
         Sollicitatieformulier (links) en media (rechts). Naam en e-mail zijn altijd verplicht op de
-        site; hier configureer je extra velden, uploads en de video of foto.
+        site; hier configureer je extra velden, uploads en de video of foto. Engelse concepten en AI
+        staan in het paneel hieronder; Opslaan vult ontbrekende EN-drafts vanuit NL.
       </p>
 
+      <SectionAiToolbar
+        pathPrefix={pathPrefix}
+        fields={aiFields}
+        fieldLabels={{
+          formEyebrow: "Formulier-eyebrow",
+          formIntro: "Formulier-intro",
+          mediaEyebrow: "Media-eyebrow",
+          mediaHeading: "Media-kop",
+          mediaBadge: "Video-badge",
+          mediaLinkLabel: "Linklabel",
+        }}
+        onApplyDutch={applyDutch}
+      />
+
       <Section title="Formulier">
-        <Field label="Eyebrow">
+        <NlEnField label="Eyebrow" enPath={sectionEnPath("vacatures.application", "formEyebrow")}>
           <input
             className={inputClass}
             value={content.formEyebrow ?? ""}
             onChange={(e) => onPatch({ formEyebrow: e.target.value || undefined })}
             placeholder="Sollicitatieformulier"
           />
-        </Field>
-        <Field label="Introductietekst">
+        </NlEnField>
+        <NlEnField
+          label="Introductietekst"
+          enPath={sectionEnPath("vacatures.application", "formIntro")}
+          multiline
+        >
           <textarea
             className={`${inputClass} min-h-[4rem]`}
             value={content.formIntro ?? ""}
             onChange={(e) => onPatch({ formIntro: e.target.value || undefined })}
             placeholder="Vul je gegevens in…"
           />
-        </Field>
+        </NlEnField>
         <FormScopeField
           label="Scope sollicitatieformulier"
           value={content.applicationScope}
@@ -135,15 +190,33 @@ export function VacaturesApplicationInspector({
             })),
           })}
           addLabel="Veld toevoegen"
-          renderItem={(item, actions) => (
+          renderItem={(item, actions, index) => (
             <div className="space-y-3">
-              <Field label="Label">
+              <NlEnField
+                label="Label"
+                enPath={sectionEnPath("vacatures.application", `fields.${index}.label`)}
+              >
                 <input
                   className={inputClass}
                   value={item.label}
                   onChange={(e) => actions.update({ ...item, label: e.target.value })}
                 />
-              </Field>
+              </NlEnField>
+              <NlEnField
+                label="Placeholder"
+                enPath={sectionEnPath("vacatures.application", `fields.${index}.placeholder`)}
+              >
+                <input
+                  className={inputClass}
+                  value={item.placeholder ?? ""}
+                  onChange={(e) =>
+                    actions.update({
+                      ...item,
+                      placeholder: e.target.value || undefined,
+                    })
+                  }
+                />
+              </NlEnField>
               <Field
                 label="Veldtype"
                 hint="Bepaalt opslag en invoercontrole — niet hetzelfde als het zichtbare label."
@@ -187,6 +260,7 @@ export function VacaturesApplicationInspector({
                   <FormFieldOptionsEditor
                     options={item.options ?? []}
                     onChange={(options) => actions.update({ ...item, options })}
+                    enPathPrefix={`section:vacatures.application:fields.${index}`}
                   />
                 </div>
               ) : null}
@@ -196,21 +270,28 @@ export function VacaturesApplicationInspector({
       </Section>
 
       <Section title="Media (rechts)">
-        <Field label="Eyebrow">
+        <NlEnField
+          label="Eyebrow"
+          enPath={sectionEnPath("vacatures.application", "mediaEyebrow")}
+        >
           <input
             className={inputClass}
             value={content.mediaEyebrow ?? ""}
             onChange={(e) => onPatch({ mediaEyebrow: e.target.value || undefined })}
             placeholder="Maak kennis met McCoy"
           />
-        </Field>
-        <Field label="Kop / intro">
+        </NlEnField>
+        <NlEnField
+          label="Kop / intro"
+          enPath={sectionEnPath("vacatures.application", "mediaHeading")}
+          multiline
+        >
           <textarea
             className={`${inputClass} min-h-[4rem]`}
             value={content.mediaHeading ?? ""}
             onChange={(e) => onPatch({ mediaHeading: e.target.value || undefined })}
           />
-        </Field>
+        </NlEnField>
         <Field label="Mediatype">
           <select
             className={selectClass}
@@ -266,22 +347,28 @@ export function VacaturesApplicationInspector({
                 placeholder="https://www.facebook.com/share/…"
               />
             </Field>
-            <Field label="Badge op video (optioneel)">
+            <NlEnField
+              label="Badge op video (optioneel)"
+              enPath={sectionEnPath("vacatures.application", "mediaBadge")}
+            >
               <input
                 className={inputClass}
                 value={content.mediaBadge ?? ""}
                 onChange={(e) => onPatch({ mediaBadge: e.target.value || undefined })}
                 placeholder="McCoy on Facebook"
               />
-            </Field>
-            <Field label="Linklabel (optioneel)">
+            </NlEnField>
+            <NlEnField
+              label="Linklabel (optioneel)"
+              enPath={sectionEnPath("vacatures.application", "mediaLinkLabel")}
+            >
               <input
                 className={inputClass}
                 value={content.mediaLinkLabel ?? ""}
                 onChange={(e) => onPatch({ mediaLinkLabel: e.target.value || undefined })}
                 placeholder="Open op Facebook"
               />
-            </Field>
+            </NlEnField>
           </>
         ) : (
           <BlockImageField

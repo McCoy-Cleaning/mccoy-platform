@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import {
   createDefaultBlock,
   defaultSectionContent,
+  type ContactFormContent,
   type PartnersContent,
   type StatsContent,
   type WorkGalleryContent,
@@ -16,6 +17,7 @@ import {
 } from "../ai-assist";
 import { RegisteredBlockEditor } from "./RegisteredBlockEditor";
 import { blockEnPath } from "./en-draft-fields";
+import { ContactFormInspector } from "../inspectors/ContactFormInspector";
 import { PartnersInspector } from "../inspectors/PartnersInspector";
 import { StatsInspector } from "../inspectors/StatsInspector";
 import { WorkGalleryInspector } from "../inspectors/WorkGalleryInspector";
@@ -79,6 +81,9 @@ describe("manual EN draft controls in editors", () => {
     ["columns", "Kolom toevoegen"],
     ["quote", "Quote"],
     ["plans", "Kenmerkenmatrix"],
+    ["contactForm", "Formuliervelden"],
+    ["jobs", "Vacature"],
+    ["featureGrid", "Kenmerk"],
   ] as const)("%s exposes EN · labels when AI assist is provided", (type, nlHint) => {
     const block = createDefaultBlock(type);
     const container = mount(
@@ -157,5 +162,25 @@ describe("isTranslatableFieldKey non-copy skips", () => {
     expect(isTranslatableFieldKey("icon")).toBe(false);
     expect(isTranslatableFieldKey("size")).toBe(false);
     expect(isTranslatableFieldKey("slug")).toBe(false);
+  });
+});
+
+describe("ContactFormInspector EN drafts", () => {
+  it("exposes AI toolbar plus EN · controls for copy and custom fields", () => {
+    const content = defaultSectionContent("contact.form") as ContactFormContent;
+    const container = mount(
+      <CmsAiAssistProvider value={mockAi()}>
+        <ContactFormInspector content={content} onPatch={vi.fn()} />
+      </CmsAiAssistProvider>,
+    );
+    expect(container.textContent).not.toMatch(/Formulierlabels & placeholders/);
+    expect(container.textContent).toMatch(/Formuliervelden/);
+    // Section AI / EN panel (same pattern as custom blocks + fixed sections)
+    expect(container.textContent).toMatch(/Engels|AI|Uitklappen|Genereer|Vertaal/i);
+    expect(container.textContent).toMatch(/EN · Eyebrow|EN · Kop|EN · Introductietekst/);
+    expect(container.textContent).toMatch(/EN · Label/);
+    expect(container.textContent).toMatch(/EN · Placeholder/);
+    expect(container.textContent).toMatch(/EN · Knoptekst/);
+    expect(container.textContent).toMatch(/EN · Succeskop/);
   });
 });

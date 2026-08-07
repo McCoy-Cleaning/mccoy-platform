@@ -1,12 +1,7 @@
 import { z } from "zod";
-import {
-  cmsImageSchema,
-  cmsButtonSchema,
-  createItemId,
-  normalizeCmsButton,
-  type CmsImage,
-  type CmsButton,
-} from "./content";
+import { cmsButtonSchema, normalizeCmsButton, type CmsButton } from "./button";
+import { cmsImageSchema, type CmsImage } from "./cms-image";
+import { createItemId } from "./ids";
 import { cmsLinkSchema } from "./links";
 import type { CmsLink } from "./cms-link-model";
 

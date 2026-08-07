@@ -14,6 +14,10 @@ export type LayoutListRow = {
   canDelete: boolean;
   canEdit?: boolean;
   canDuplicate?: boolean;
+  /** Fixed section key for E2E inventory (`data-cms-fixed-key`). */
+  fixedKey?: string;
+  /** Block type for E2E inventory (`data-cms-block-type`). */
+  blockType?: string;
 };
 
 export type LayoutListProps = {
@@ -73,6 +77,8 @@ export function LayoutList({
               key={row.id}
               data-cms-layout-row={row.id}
               data-cms-layout-label={row.label}
+              {...(row.fixedKey ? { "data-cms-fixed-key": row.fixedKey } : {})}
+              {...(row.blockType ? { "data-cms-block-type": row.blockType } : {})}
               className={cn(
                 "group relative overflow-hidden rounded-2xl border transition-all duration-200",
                 expanded
