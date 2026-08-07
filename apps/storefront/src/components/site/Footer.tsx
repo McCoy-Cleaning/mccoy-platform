@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { Facebook, Instagram, Linkedin, Phone, Mail, MapPin, ShieldCheck } from "lucide-react";
 import logoUrl from "@/assets/logo-mccoy.png";
 import logoWebpUrl from "@/assets/logo-mccoy.webp";
@@ -6,11 +5,7 @@ import { CmsLinkAnchor } from "@/components/site/CmsLinkAnchor";
 import { useSiteFooter } from "@/lib/cms/store";
 import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
-import {
-  DEFAULT_FOOTER_LOGO,
-  resolveFooterLogoHeight,
-  resolveFooterLogoHeightMobile,
-} from "@mccoy/cms-schema";
+import { DEFAULT_FOOTER_LOGO } from "@mccoy/cms-schema";
 import { cn } from "@/lib/utils";
 
 function SocialIcon({ network }: { network: string }) {
@@ -27,20 +22,9 @@ function ContactIcon({ kind }: { kind: string }) {
   return <MapPin className="mt-0.5 h-4 w-4 text-primary" />;
 }
 
-/** CSS vars for responsive logo height (`[data-cms-logo]` in styles.css). */
-function footerLogoVars(mobilePx: number, desktopPx: number): CSSProperties {
-  return {
-    ["--cms-logo-h" as string]: `${mobilePx}px`,
-    ["--cms-logo-h-md" as string]: `${desktopPx}px`,
-  };
-}
-
 export function Footer() {
   const footer = useSiteFooter();
   const logo = footer.logo ?? DEFAULT_FOOTER_LOGO;
-  const logoHeightDesktop = resolveFooterLogoHeight(footer);
-  const logoHeightMobile = resolveFooterLogoHeightMobile(footer);
-  const logoStyle = footerLogoVars(logoHeightMobile, logoHeightDesktop);
   const logoSrc = logo.src?.startsWith("/") || logo.src?.startsWith("http") ? logo.src : logoUrl;
   const useBundledWebp =
     !footer.logo ||
@@ -50,7 +34,7 @@ export function Footer() {
   const logoHeightAttr = logo.height ?? NAV_LOGO_HEIGHT;
 
   return (
-    <footer className="relative border-t border-white/10 bg-card/50">
+    <footer data-site-footer="" className="relative border-t border-white/10 bg-card/50">
       <div className={cn(SECTION_PAGE_RAIL, "py-16")}>
         <div className="grid gap-12 lg:grid-cols-4">
           <div>
@@ -65,7 +49,6 @@ export function Footer() {
                   height={logoHeightAttr}
                   loading="lazy"
                   decoding="async"
-                  style={logoStyle}
                 />
               </picture>
             ) : (
@@ -77,7 +60,6 @@ export function Footer() {
                 height={logoHeightAttr}
                 loading="lazy"
                 decoding="async"
-                style={logoStyle}
               />
             )}
             {footer.tagline ? (

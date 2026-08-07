@@ -11,9 +11,12 @@ export type SiteNavLink = {
   link: CmsLink;
 };
 
-/** Defaults match current storefront chrome (desktop ~lg logo, mobile menu logo). */
-export const DEFAULT_LOGO_HEIGHT_DESKTOP_PX = 72;
-export const DEFAULT_LOGO_HEIGHT_MOBILE_PX = 32;
+/**
+ * Legacy CMS logo-height defaults (fields still persist for publish compatibility).
+ * Storefront chrome ignores these and uses fixed CSS tokens in styles.css.
+ */
+export const DEFAULT_LOGO_HEIGHT_DESKTOP_PX = 120;
+export const DEFAULT_LOGO_HEIGHT_MOBILE_PX = 56;
 export const LOGO_HEIGHT_DESKTOP_MIN = 28;
 export const LOGO_HEIGHT_DESKTOP_MAX = 140;
 export const LOGO_HEIGHT_MOBILE_MIN = 20;

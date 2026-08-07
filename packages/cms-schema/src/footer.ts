@@ -49,8 +49,12 @@ export type SiteFooterContent = {
   legalLinks: SiteFooterLink[];
 };
 
-export const DEFAULT_FOOTER_LOGO_HEIGHT_PX = 40;
-export const DEFAULT_FOOTER_LOGO_HEIGHT_MOBILE_PX = 32;
+/**
+ * Legacy CMS footer logo-height defaults (fields still persist for publish compatibility).
+ * Storefront chrome ignores these and uses fixed CSS tokens in styles.css.
+ */
+export const DEFAULT_FOOTER_LOGO_HEIGHT_PX = 80;
+export const DEFAULT_FOOTER_LOGO_HEIGHT_MOBILE_PX = 56;
 export const FOOTER_LOGO_HEIGHT_MIN = 24;
 export const FOOTER_LOGO_HEIGHT_MAX = 96;
 export const FOOTER_LOGO_HEIGHT_MOBILE_MIN = 20;

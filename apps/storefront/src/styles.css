@@ -92,6 +92,11 @@
 
 :root {
   --radius: 0.875rem;
+  /* Fixed chrome logo heights (not CMS-editable). ~1.7–2× prior defaults. */
+  --site-nav-logo-h: 56px;
+  --site-nav-logo-h-md: 120px;
+  --site-footer-logo-h: 56px;
+  --site-footer-logo-h-md: 80px;
   /* McCoy Cleaning brand — dark navy with cyan accent */
   --background: oklch(0.16 0.045 260);
   --foreground: oklch(0.985 0.005 240);
@@ -383,10 +388,24 @@
 }
 
 /*
- * CMS-controlled logo heights (nav + footer).
+ * Fixed logo heights (nav + footer). Design tokens on :root; scoped onto chrome
+ * containers so [data-cms-logo] never depends on CMS-persisted heights.
  * Do not rely on Tailwind arbitrary `h-[length:var(...)]` — that utility often
- * fails to apply in production builds, so slider changes appeared to do nothing.
+ * fails to apply in production builds.
  */
+[data-site-header],
+[data-site-mobile-menu] {
+  --cms-logo-h: var(--site-nav-logo-h);
+  --cms-logo-h-md: var(--site-nav-logo-h-md);
+  --nav-logo-h: var(--site-nav-logo-h);
+  --nav-logo-h-md: var(--site-nav-logo-h-md);
+}
+
+[data-site-footer] {
+  --cms-logo-h: var(--site-footer-logo-h);
+  --cms-logo-h-md: var(--site-footer-logo-h-md);
+}
+
 [data-cms-logo] {
   height: var(--cms-logo-h);
   width: auto;

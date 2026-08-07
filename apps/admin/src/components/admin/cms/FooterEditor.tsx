@@ -4,12 +4,6 @@ import {
   createFooterLink,
   createFooterSocialLink,
   DEFAULT_FOOTER_LOGO,
-  FOOTER_LOGO_HEIGHT_MAX,
-  FOOTER_LOGO_HEIGHT_MIN,
-  FOOTER_LOGO_HEIGHT_MOBILE_MAX,
-  FOOTER_LOGO_HEIGHT_MOBILE_MIN,
-  resolveFooterLogoHeight,
-  resolveFooterLogoHeightMobile,
   type SiteFooterContactRow,
   type SiteFooterContent,
   type SiteFooterLink,
@@ -82,8 +76,6 @@ export function FooterEditor() {
 
   const logoValue = footer.logo ?? DEFAULT_FOOTER_LOGO;
   const usingDefaultLogo = !footer.logo;
-  const logoHeight = resolveFooterLogoHeight(footer);
-  const logoHeightMobile = resolveFooterLogoHeightMobile(footer);
 
   const updateServicesLink = (id: string, partial: Partial<SiteFooterLink>) => {
     patch({
@@ -127,7 +119,7 @@ export function FooterEditor() {
             <img
               src={cmsMediaUrl(logoValue.src, assetBaseUrl)}
               alt=""
-              style={{ height: Math.min(logoHeight, 64) }}
+              style={{ height: 48 }}
               className="max-w-full object-contain"
             />
           </div>
@@ -163,40 +155,9 @@ export function FooterEditor() {
           onChange={(logo) => patch({ logo })}
           onClear={footer.logo ? () => patch({ logo: null }) : undefined}
         />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1.5">
-            <span className="flex items-center justify-between text-[11px] uppercase tracking-wider text-white/45">
-              <span>Desktop-hoogte</span>
-              <span className="font-mono text-white/70">{logoHeight}px</span>
-            </span>
-            <input
-              type="range"
-              min={FOOTER_LOGO_HEIGHT_MIN}
-              max={FOOTER_LOGO_HEIGHT_MAX}
-              value={logoHeight}
-              onChange={(e) => patch({ logoHeight: Number(e.target.value) })}
-              className="w-full accent-sky-400"
-              aria-label="Logohoogte footer desktop"
-            />
-            <p className="text-[10px] text-white/35">Vanaf tablet/desktop</p>
-          </label>
-          <label className="block space-y-1.5">
-            <span className="flex items-center justify-between text-[11px] uppercase tracking-wider text-white/45">
-              <span>Mobiel-hoogte</span>
-              <span className="font-mono text-white/70">{logoHeightMobile}px</span>
-            </span>
-            <input
-              type="range"
-              min={FOOTER_LOGO_HEIGHT_MOBILE_MIN}
-              max={FOOTER_LOGO_HEIGHT_MOBILE_MAX}
-              value={logoHeightMobile}
-              onChange={(e) => patch({ logoHeightMobile: Number(e.target.value) })}
-              className="w-full accent-sky-400"
-              aria-label="Logohoogte footer mobiel"
-            />
-            <p className="text-[10px] text-white/35">Mobiele footer</p>
-          </label>
-        </div>
+        <p className="text-[10px] text-white/40">
+          Logoformaat is vast in de storefront (niet bewerkbaar hier).
+        </p>
         <label className="block space-y-1">
           <span className="text-[11px] uppercase tracking-wider text-white/45">Tagline</span>
           <textarea
