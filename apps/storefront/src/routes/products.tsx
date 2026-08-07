@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   localizeCmsPageForLocale,
   resolveProductsBlocksLayout,
@@ -7,14 +7,13 @@ import {
   type CmsPage,
   type Locale,
 } from "@mccoy/cms-schema";
-import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { pageSectionRenderers } from "@/components/site/pageSectionRenderers";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
+import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
 
 /** In-memory Producten fixed→blocks for public/preview — storefront does not persist. */
 function withProductsBlocksCompat(page: CmsPage, locale: Locale = "nl"): CmsPage {
@@ -26,19 +25,7 @@ function withProductsBlocksCompat(page: CmsPage, locale: Locale = "nl"): CmsPage
 
 export const Route = createFileRoute("/products")({
   loader: async () => {
-    const { loadPublishedPageForPath } = await import("@/lib/api/cms-published.functions");
-    const { resultJson } = await loadPublishedPageForPath({ data: { pathname: "/products" } });
-    const result = JSON.parse(resultJson) as Awaited<
-      ReturnType<typeof import("@/lib/cms/load-published-page.server").loadPublishedPageSnapshot>
-    >;
-    if (result.kind === "redirect") {
-      throw redirect({ href: result.toPath, statusCode: result.statusCode });
-    }
-    // Builtin page — always seeded + published; a missing snapshot means the CMS
-    // store is broken, not that the page is legitimately absent.
-    if (result.kind !== "snapshot") {
-      throw new Error("cms: products loader must return a snapshot");
-    }
+    const result = await loadMarketingPublishedPage("/products");
     const page = withProductsBlocksCompat(result.snapshot.page, result.snapshot.locale);
     return {
       snapshot: {
@@ -146,20 +133,16 @@ function ProductsPageBody() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <Navbar />
-      <main className="pt-24">
-        {page?.kind === "builtin" ? (
-          <PageLayoutRenderer
-            page={page}
-            pageKey="products"
-            renderers={pageSectionRenderers}
-            mode={editing ? "admin" : "public"}
-            respectHidden={!editing}
-          />
-        ) : null}
-      </main>
-      <Footer />
-    </div>
+    <main className="pt-24">
+      {page?.kind === "builtin" ? (
+        <PageLayoutRenderer
+          page={page}
+          pageKey="products"
+          renderers={pageSectionRenderers}
+          mode={editing ? "admin" : "public"}
+          respectHidden={!editing}
+        />
+      ) : null}
+    </main>
   );
 }

@@ -1,7 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { Sparkles, ArrowRight, CheckCircle2, MapPin } from "lucide-react";
-import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import {
   SECTION_GRID,
   SECTION_HEADER_TO_CONTENT,
@@ -18,9 +16,7 @@ export interface CityLandingProps {
 
 export function CityLanding({ city, intro, services, reasons }: CityLandingProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <Navbar />
-      <main className="pt-32">
+    <main className="pt-32">
         <section className={`${SECTION_SHELL_Y} px-4 sm:px-6 lg:px-8`}>
           <div className="pointer-events-none absolute -top-20 right-0 h-96 w-96 rounded-full bg-primary/15 blur-3xl" />
           <div className="mx-auto max-w-[96rem]">
@@ -99,9 +95,7 @@ export function CityLanding({ city, intro, services, reasons }: CityLandingProps
             </ul>
           </div>
         </section>
-      </main>
-      <Footer />
-    </div>
+    </main>
   );
 }
 

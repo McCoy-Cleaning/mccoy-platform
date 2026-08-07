@@ -55,4 +55,15 @@ describe("image-delivery", () => {
     expect(link.media).toBe(HERO_IMAGE_PRELOAD_MEDIA);
     expect(link.media).toContain("1024px");
   });
+
+  it("matches DeliveryImage contain transforms for Supabase hero preloads", () => {
+    const src =
+      "https://bwrktdwnnlgxdpefecmv.supabase.co/storage/v1/object/public/cms-media/media/hero.webp";
+    const link = homeHeroPreloadLink(src);
+    expect(link.href).toContain("width=640");
+    expect(link.href).toContain("quality=72");
+    expect(link.href).toContain("format=webp");
+    expect(link.href).toContain("resize=contain");
+    expect(link.imageSrcSet).toContain("resize=contain");
+  });
 });

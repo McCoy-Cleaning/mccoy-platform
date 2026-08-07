@@ -5,6 +5,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -18,6 +19,7 @@ import logoUrl from "@/assets/logo-mccoy.png";
 import { PublishedCmsProvider } from "@/lib/cms/published-provider";
 import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
 import { DeferredCmsEditShell } from "@/components/site/DeferredCmsEditShell";
+import { MarketingChrome } from "@/components/site/MarketingChrome";
 import {
   readIndexingEnv,
   storefrontRobotsMetaContent,
@@ -136,6 +138,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     links: [
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
       {
         // Same-origin Archivo for `.font-display` — no Google Fonts CSS chain.
         rel: "preload",
@@ -240,15 +244,33 @@ function CmsUiLocaleBridge({ children }: { children: ReactNode }) {
   return <CmsUiLocaleProvider locale={locale}>{children}</CmsUiLocaleProvider>;
 }
 
+function isCmsBridgePath(pathname: string): boolean {
+  return (
+    pathname === "/cms-preview" ||
+    pathname === "/cms-sync" ||
+    pathname.startsWith("/cms-preview/") ||
+    pathname.startsWith("/cms-sync/")
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const cmsBridge = useRouterState({
+    select: (s) => isCmsBridgePath(s.location.pathname),
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
       <PublishedCmsProvider>
         <CmsUiLocaleBridge>
           <DeferredCmsEditShell>
-            <Outlet />
+            {cmsBridge ? (
+              <Outlet />
+            ) : (
+              <MarketingChrome>
+                <Outlet />
+              </MarketingChrome>
+            )}
           </DeferredCmsEditShell>
         </CmsUiLocaleBridge>
       </PublishedCmsProvider>

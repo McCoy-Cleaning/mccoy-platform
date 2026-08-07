@@ -1,28 +1,6 @@
 import * as React from "react";
-import {
-  ensurePublishedChromeBroadcastListener,
-  hydratePublishedCmsState,
-} from "@/lib/cms/store";
-import type { CmsPage } from "@mccoy/cms-schema";
-import { clientDevError } from "@/lib/client-log";
-
-async function loadPublishedBundle(): Promise<CmsPage[] | null> {
-  try {
-    // Dynamic import keeps server-fn stubs off the homepage critical chunk;
-    // this only runs after idle / first paint.
-    const { getPublishedCmsBundle } = await import("@/lib/api/cms-published.functions");
-    const bundle = await getPublishedCmsBundle();
-    if (!bundle.ok) return null;
-    const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
-    // Durable nav = published pages with inNav (+ orphan filter in resolveStorefrontNavLinks).
-    // Admin chrome sync may update memory sooner; focus/visibility refresh re-reads the file store.
-    hydratePublishedCmsState({ pages });
-    return pages;
-  } catch (error) {
-    clientDevError("[cms] failed to load published bundle", error);
-    return null;
-  }
-}
+import { ensurePublishedChromeBroadcastListener } from "@/lib/cms/store";
+import { ensurePublishedCmsHydrated } from "@/lib/cms/published-hydrate";
 
 /**
  * B5 / Phase C — load published CMS from server (file or Supabase), not localStorage.
@@ -38,8 +16,6 @@ async function loadPublishedBundle(): Promise<CmsPage[] | null> {
  * `useCmsPageForView` (SSR snapshot cache is also keyed by site configVersion).
  */
 export function PublishedCmsProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = React.useState(false);
-
   React.useEffect(() => {
     ensurePublishedChromeBroadcastListener();
     let cancelled = false;
@@ -48,22 +24,18 @@ export function PublishedCmsProvider({ children }: { children: React.ReactNode }
 
     const run = () => {
       if (cancelled) return;
-      void (async () => {
-        await loadPublishedBundle();
-        if (cancelled) return;
-        setReady(true);
-      })();
+      void ensurePublishedCmsHydrated();
     };
 
-    // After LCP opportunity: idle when available, else short timeout.
+    // Prefer a short idle window so SPA nav can hit the client page cache sooner.
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(run, { timeout: 2500 });
+      idleId = window.requestIdleCallback(run, { timeout: 900 });
     } else {
       timeoutId = setTimeout(run, 1);
     }
 
     const refresh = () => {
-      void loadPublishedBundle();
+      void ensurePublishedCmsHydrated();
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
@@ -82,7 +54,5 @@ export function PublishedCmsProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  // Render children immediately with seed SSR snapshot; hydrate when ready.
-  void ready;
   return <>{children}</>;
 }

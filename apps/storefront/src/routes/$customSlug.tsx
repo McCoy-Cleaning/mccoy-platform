@@ -3,10 +3,12 @@ import { getPublishedCmsBundle } from "@/lib/api/cms-published.functions";
 import { useCms, hydratePublishedCmsState } from "@/lib/cms/store";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { useEdit } from "@/lib/cms/edit-context";
-import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { BlocksView } from "@/components/site/BlockView";
 import { canonicalizePublicIdentityPath, type CmsPage } from "@mccoy/cms-schema";
+
+/** Browser/static probes must not enter CMS custom-page SSR (e.g. /favicon.ico). */
+const STATIC_ASSET_SLUG_RE =
+  /\.(ico|png|jpe?g|gif|webp|svg|css|js|map|txt|xml|json|woff2?|ttf|eot|webmanifest|html?)$/i;
 
 type CustomSlugLoaderData = {
   slug: string;
@@ -17,6 +19,12 @@ type CustomSlugLoaderData = {
 };
 
 export const Route = createFileRoute("/$customSlug")({
+  beforeLoad: ({ params }) => {
+    if (STATIC_ASSET_SLUG_RE.test(params.customSlug)) {
+      // Plain Response avoids renderToReadableStream + isNotFound stream failures.
+      throw new Response(null, { status: 404, statusText: "Not Found" });
+    }
+  },
   loader: async ({ params }): Promise<CustomSlugLoaderData> => {
     const slug = `/${params.customSlug}`;
     const canonical = canonicalizePublicIdentityPath(slug);
@@ -26,7 +34,7 @@ export const Route = createFileRoute("/$customSlug")({
     try {
       const bundle = await getPublishedCmsBundle();
       if (!bundle.ok) {
-        return { slug, page: null, hydrated: false, customPageCount: 0, matchedSlug: null };
+        throw notFound();
       }
       const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
       // Hydrate before first render so refresh does not 404 on seed-only state.
@@ -34,15 +42,24 @@ export const Route = createFileRoute("/$customSlug")({
       const page =
         pages.find((p) => p.isCustom && !p.isDraftOnly && p.slug === slug) ?? null;
       const customPages = pages.filter((p) => p.isCustom && !p.isDraftOnly);
+      if (!page) {
+        throw notFound();
+      }
       return {
         slug,
         page,
         hydrated: true,
         customPageCount: customPages.length,
-        matchedSlug: page?.slug ?? null,
+        matchedSlug: page.slug,
       };
-    } catch {
-      return { slug, page: null, hydrated: false, customPageCount: 0, matchedSlug: null };
+    } catch (error) {
+      if (
+        error instanceof Response ||
+        (error && typeof error === "object" && (error as { isNotFound?: boolean }).isNotFound)
+      ) {
+        throw error;
+      }
+      throw notFound();
     }
   },
   head: ({ params }) => {
@@ -79,27 +96,6 @@ function CustomSlugPage() {
   const page = useCmsPageForView(editPageId ?? published?.id ?? "__none__") ?? (isEdit ? undefined : published ?? undefined);
 
   if (!page && !isEdit) {
-    // #region agent log
-    fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-      body: JSON.stringify({
-        sessionId: "8f1793",
-        runId: "pre-fix",
-        hypothesisId: "D",
-        location: "$customSlug.tsx:CustomSlugPage",
-        message: "throw notFound during render",
-        data: {
-          slug,
-          hydrated: loaderData.hydrated,
-          customPageCount: loaderData.customPageCount,
-          matchedSlug: loaderData.matchedSlug,
-          loaderHadPage: !!loaderData.page,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     throw notFound();
   }
 
@@ -112,12 +108,8 @@ function CustomSlugPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <Navbar />
-      <main className="pt-24 pb-16">
-        <BlocksView blocks={page.blocks} pageId={page.id} />
-      </main>
-      <Footer />
-    </div>
+    <main className="pt-24 pb-16">
+      <BlocksView blocks={page.blocks} pageId={page.id} />
+    </main>
   );
 }

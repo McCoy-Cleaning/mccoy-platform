@@ -38,25 +38,34 @@ export const ensurePublishedCmsSeeded = createServerFn({ method: "POST" }).handl
  * (block.data is Record&lt;string, unknown&gt;).
  */
 export const getPublishedCmsBundle = createServerFn({ method: "POST" }).handler(async () => {
-  const store = await ensureSeeded();
-  const site = await store.getSite();
-  const pages = await store.listPages();
-  const publishedPages = [];
-  for (const page of pages) {
-    const rev = await store.getActivePublishedRevision(page.id);
-    if (rev) publishedPages.push(rev.payload);
+  try {
+    const store = await ensureSeeded();
+    const site = await store.getSite();
+    const pages = await store.listPages();
+    const publishedPages = [];
+    for (const page of pages) {
+      const rev = await store.getActivePublishedRevision(page.id);
+      if (rev) publishedPages.push(rev.payload);
+    }
+    const localeStates = await store.listPublishedLocaleStates();
+    return {
+      ok: true as const,
+      site: {
+        id: site.id,
+        origin: site.origin,
+        configVersion: site.configVersion,
+      },
+      pagesJson: JSON.stringify(publishedPages),
+      publishedLocaleStatesJson: JSON.stringify(localeStates),
+    };
+  } catch (error) {
+    console.error("[cms] getPublishedCmsBundle failed", error);
+    // Soft-fail: optional client hydrate must not surface as h3 HTTPError 500.
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
-  const localeStates = await store.listPublishedLocaleStates();
-  return {
-    ok: true as const,
-    site: {
-      id: site.id,
-      origin: site.origin,
-      configVersion: site.configVersion,
-    },
-    pagesJson: JSON.stringify(publishedPages),
-    publishedLocaleStatesJson: JSON.stringify(localeStates),
-  };
 });
 
 const resolveSchema = z.object({

@@ -1,7 +1,5 @@
 import * as React from "react";
 import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
-import { Navbar } from "@/components/site/Navbar";
-import { Footer } from "@/components/site/Footer";
 import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
 import { pageSectionRenderers } from "@/components/site/pageSectionRenderers";
 import { BlocksView } from "@/components/site/BlockView";
@@ -40,21 +38,6 @@ export const Route = createFileRoute("/en/$")({
       throw redirect({ href: result.toPath, statusCode: result.statusCode });
     }
     if (result.kind === "not_found") {
-      // #region agent log
-      fetch("http://127.0.0.1:7637/ingest/e5fb6361-a078-4df0-a695-d0e399b9e246", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "8f1793" },
-        body: JSON.stringify({
-          sessionId: "8f1793",
-          runId: "pre-fix",
-          hypothesisId: "E",
-          location: "en.$.tsx:loader",
-          message: "en loader not_found -> notFound()",
-          data: { pathname, kind: result.kind },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       throw notFound();
     }
     const snapshot = {
@@ -87,25 +70,21 @@ function EnglishCmsPageBody() {
   const pageKey = page.kind === "builtin" ? (page.pageKey as BuiltinPageKey | null) : null;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground" lang="en">
-      <Navbar />
-      <main>
-        {page.kind === "builtin" && pageKey ? (
-          <PageLayoutRenderer
-            page={page}
-            pageKey={pageKey}
-            renderers={pageSectionRenderers}
-            mode="public"
-            respectHidden
-          />
-        ) : null}
-        {page.kind === "custom" || (page.kind === "builtin" && !pageKey) ? (
-          <div className={page.kind === "custom" ? "pt-24 pb-16" : undefined}>
-            <BlocksView blocks={page.blocks} pageId={page.id} />
-          </div>
-        ) : null}
-      </main>
-      <Footer />
-    </div>
+    <main lang="en">
+      {page.kind === "builtin" && pageKey ? (
+        <PageLayoutRenderer
+          page={page}
+          pageKey={pageKey}
+          renderers={pageSectionRenderers}
+          mode="public"
+          respectHidden
+        />
+      ) : null}
+      {page.kind === "custom" || (page.kind === "builtin" && !pageKey) ? (
+        <div className={page.kind === "custom" ? "pt-24 pb-16" : undefined}>
+          <BlocksView blocks={page.blocks} pageId={page.id} />
+        </div>
+      ) : null}
+    </main>
   );
 }
