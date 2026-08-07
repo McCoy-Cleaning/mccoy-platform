@@ -367,7 +367,7 @@ export function hydratePublishedCmsState(input: {
   const pages = [...mergedServer, ...pendingCustom];
   lastHydratedServerCustomIds = serverCustomIds;
   // Prefer durable bundle chrome; keep in-memory/chrome-sync when bundle omits it
-  // (older deploys or pages-only hydrate) so mid-session logo heights are not wiped.
+  // (older deploys or pages-only hydrate) so mid-session nav/footer drafts are not wiped.
   const baseNav =
     input.navigation ?? current?.navigation ?? defaultSiteNavigation();
   const baseFooter = input.footer ?? current?.footer ?? defaultSiteFooter();

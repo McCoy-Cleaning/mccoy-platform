@@ -2,12 +2,6 @@ import * as React from "react";
 import {
   createNavLink,
   DEFAULT_NAV_LOGO,
-  LOGO_HEIGHT_DESKTOP_MAX,
-  LOGO_HEIGHT_DESKTOP_MIN,
-  LOGO_HEIGHT_MOBILE_MAX,
-  LOGO_HEIGHT_MOBILE_MIN,
-  resolveLogoHeightDesktop,
-  resolveLogoHeightMobile,
   type SiteNavLink,
   type SiteNavigationContent,
 } from "@mccoy/cms-schema";
@@ -87,8 +81,6 @@ export function NavigationEditor() {
   };
 
   const logoValue = navigation.logo ?? DEFAULT_NAV_LOGO;
-  const desktopHeight = resolveLogoHeightDesktop(navigation);
-  const mobileHeight = resolveLogoHeightMobile(navigation);
   const usingDefaultLogo = !navigation.logo;
 
   return (
@@ -108,7 +100,7 @@ export function NavigationEditor() {
             <img
               src={cmsMediaUrl(logoValue.src, assetBaseUrl)}
               alt=""
-              style={{ height: Math.min(desktopHeight, 64) }}
+              style={{ height: 48 }}
               className="max-w-full object-contain"
             />
           </div>
@@ -150,43 +142,9 @@ export function NavigationEditor() {
         />
         <p className="text-[10px] text-white/40">
           Upload naar de mediabibliotheek (Supabase Storage) of kies een projectbestand (bij voorkeur
-          via Storage na seed). Opslaan synchroniseert naar de storefront.
+          via Storage na seed). Opslaan synchroniseert naar de storefront. Logoformaat is vast in de
+          storefront (niet bewerkbaar hier).
         </p>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1.5">
-            <span className="flex items-center justify-between text-[11px] uppercase tracking-wider text-white/45">
-              <span>Desktop-hoogte</span>
-              <span className="font-mono text-white/70">{desktopHeight}px</span>
-            </span>
-            <input
-              type="range"
-              min={LOGO_HEIGHT_DESKTOP_MIN}
-              max={LOGO_HEIGHT_DESKTOP_MAX}
-              value={desktopHeight}
-              onChange={(e) => patch({ logoHeightDesktop: Number(e.target.value) })}
-              className="w-full accent-sky-400"
-              aria-label="Logohoogte desktopnavigatie"
-            />
-            <p className="text-[10px] text-white/35">Bovenste balk vanaf tablet/desktop</p>
-          </label>
-          <label className="block space-y-1.5">
-            <span className="flex items-center justify-between text-[11px] uppercase tracking-wider text-white/45">
-              <span>Mobiel-hoogte</span>
-              <span className="font-mono text-white/70">{mobileHeight}px</span>
-            </span>
-            <input
-              type="range"
-              min={LOGO_HEIGHT_MOBILE_MIN}
-              max={LOGO_HEIGHT_MOBILE_MAX}
-              value={mobileHeight}
-              onChange={(e) => patch({ logoHeightMobile: Number(e.target.value) })}
-              className="w-full accent-sky-400"
-              aria-label="Logohoogte mobiele navigatie"
-            />
-            <p className="text-[10px] text-white/35">Bovenste balk op mobiel én in het menu</p>
-          </label>
-        </div>
       </section>
 
       <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">

@@ -1,10 +1,8 @@
-import { useEffect, useState, lazy, Suspense, type CSSProperties } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { Menu, ArrowUpRight, Briefcase } from "lucide-react";
 import {
   resolveCmsLinkHref,
-  resolveLogoHeightDesktop,
-  resolveLogoHeightMobile,
   resolveStorefrontNavLinks,
 } from "@mccoy/cms-schema";
 import { LanguageToggle } from "./LanguageToggle";
@@ -23,16 +21,6 @@ const MobileMenu = lazy(() =>
   import("./MobileMenu").then((m) => ({ default: m.MobileMenu })),
 );
 
-/** CSS vars for responsive logo height (`[data-cms-logo]` in styles.css). */
-function logoSizeVars(mobilePx: number, desktopPx: number): CSSProperties {
-  return {
-    ["--cms-logo-h" as string]: `${mobilePx}px`,
-    ["--cms-logo-h-md" as string]: `${desktopPx}px`,
-    ["--nav-logo-h" as string]: `${mobilePx}px`,
-    ["--nav-logo-h-md" as string]: `${desktopPx}px`,
-  };
-}
-
 export function Navbar() {
   const cmsState = useCms();
   const navigation = useSiteNavigation();
@@ -49,9 +37,6 @@ export function Navbar() {
 
   const logoSrc = navigation.logo?.src;
   const logoWebp = logoSrc ? localWebpSibling(logoSrc) : undefined;
-  const logoHeightDesktop = resolveLogoHeightDesktop(navigation);
-  const logoHeightMobile = resolveLogoHeightMobile(navigation);
-  const logoStyle = logoSizeVars(logoHeightMobile, logoHeightDesktop);
   const logoWidthAttr = navigation.logo?.width ?? NAV_LOGO_WIDTH;
   const logoHeightAttr = navigation.logo?.height ?? NAV_LOGO_HEIGHT;
 
@@ -67,10 +52,6 @@ export function Navbar() {
             "flex items-center justify-between gap-3",
             "min-h-[calc(var(--nav-logo-h)+1.5rem)] md:min-h-[max(5rem,calc(var(--nav-logo-h-md)+1.5rem))]",
           )}
-          style={{
-            ["--nav-logo-h" as string]: `${logoHeightMobile}px`,
-            ["--nav-logo-h-md" as string]: `${logoHeightDesktop}px`,
-          }}
         >
           <Link to="/" preload="intent" className="flex items-center gap-2">
             {logoSrc ? (
@@ -84,11 +65,10 @@ export function Navbar() {
                   height={logoHeightAttr}
                   decoding="async"
                   fetchPriority="low"
-                  style={logoStyle}
                 />
               </picture>
             ) : (
-              <AnimatedLogo data-cms-logo="" style={logoStyle} />
+              <AnimatedLogo data-cms-logo="" />
             )}
           </Link>
 

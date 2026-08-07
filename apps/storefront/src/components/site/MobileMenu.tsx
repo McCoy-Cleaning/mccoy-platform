@@ -17,7 +17,7 @@ import logoWebpUrl from "@/assets/logo-mccoy.webp";
 import { LanguageToggle } from "./LanguageToggle";
 import { CmsLinkAnchor } from "./CmsLinkAnchor";
 import { useCms, useSiteNavigation } from "@/lib/cms/store";
-import { resolveCmsLinkHref, resolveLogoHeightMobile, resolveStorefrontNavLinks } from "@mccoy/cms-schema";
+import { resolveCmsLinkHref, resolveStorefrontNavLinks } from "@mccoy/cms-schema";
 import { useI18n } from "@/lib/i18n";
 import { localizedNavLabel } from "@/lib/cms-i18n";
 import { localWebpSibling, NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
@@ -44,10 +44,9 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
 
   const logoSrc = navigation.logo?.src || logoUrl;
   const logoWebp = navigation.logo?.src ? localWebpSibling(navigation.logo.src) : logoWebpUrl;
-  const logoHeightPx = resolveLogoHeightMobile(navigation);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background md:hidden">
+    <div data-site-mobile-menu="" className="fixed inset-0 z-[60] bg-background md:hidden">
       <div className="absolute inset-0 bg-grid opacity-20" />
 
       <div className="relative flex h-full flex-col overflow-y-auto">
@@ -55,13 +54,12 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
           <picture>
             {logoWebp ? <source type="image/webp" srcSet={logoWebp} /> : null}
             <img
+              data-cms-logo=""
               src={logoSrc}
               alt={navigation.logo?.decorative ? "" : navigation.logo?.alt || "McCoy Cleaning"}
               width={NAV_LOGO_WIDTH}
               height={NAV_LOGO_HEIGHT}
               decoding="async"
-              style={{ height: logoHeightPx, width: "auto", aspectRatio: "auto" }}
-              className="w-auto object-contain"
             />
           </picture>
           <button
