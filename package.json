@@ -56,7 +56,9 @@
     "guardian:doctor": "node .cursor/guardian/cli.mjs doctor",
     "guardian:verify": "node .cursor/guardian/cli.mjs verify",
     "guardian:inventory": "node .cursor/guardian/cli.mjs inventory",
-    "guardian:smoke": "node .cursor/guardian/cli.mjs smoke"
+    "guardian:smoke": "node .cursor/guardian/cli.mjs smoke",
+    "review:r8": "node scripts/r8-review/cli.mjs",
+    "review:r8:self-test": "node scripts/r8-review/finding-schema.test.mjs && node scripts/r8-review/cli.mjs --fixtures --no-write"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
