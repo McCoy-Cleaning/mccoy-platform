@@ -1,0 +1,36 @@
+{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_products",
+    "pageKey": "products",
+    "slug": "/producten",
+    "title": "Producten",
+    "description": "fixture",
+    "inNav": true,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:products.main", "kind": "fixed", "key": "products.main", "hidden": false },
+      { "id": "fixed:products.info", "kind": "fixed", "key": "products.info", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "products.main": {
+        "heading": "Ons assortiment",
+        "intro": "Intro NL",
+        "body": "Notice NL",
+        "image": { "kind": "url", "url": "/images/products.jpg", "alt": "Producten" }
+      },
+      "products.info": {
+        "heading": "Productinfo",
+        "items": [{ "id": "feat_1", "title": "Glas", "body": "Body", "icon": "sparkles" }]
+      }
+    },
+    "enFieldDrafts": {
+      "section:products.main:heading": "Our range"
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}

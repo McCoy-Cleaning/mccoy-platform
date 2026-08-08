@@ -148,15 +148,17 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Disposition** | `extract-composition` — **done in R7** |
 | **Docs** | [`r7-storefront-composition-audit.md`](./r7-storefront-composition-audit.md), [`r7-storefront-composition-architecture.md`](./r7-storefront-composition-architecture.md), [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md) |
 
-### 9b. MG5 fixed→blocks migration (**MG5_CODE_COMPLETE — 2026-08-08**)
+### 9b. MG5 fixed→blocks migration (**MG5_QUALIFIED — 2026-08-08**)
 
 | | |
 |--|--|
 | **Authority** | `@mccoy/cms-schema` migration matrix + pure pipeline; persistence via operator CLI only |
 | **CLI** | `npm run cms:migrate-fixed-blocks` (`scripts/cms-migrate-fixed-blocks.mts`) |
+| **Fixtures** | `packages/cms-schema/src/migration/mg5-fixtures` · `npm run cms:migrate-fixed-blocks:dry-run-fixtures` |
 | **Version** | `fixed-block/v1` (distinct from `CMS_SCHEMA_VERSION=6`) |
+| **Classification** | `MG5_QUALIFIED` (fixture dry-run); production apply **NO-GO** |
 | **Docs** | [`mg5-migration-audit.md`](./mg5-migration-audit.md), [`mg5-migration-matrix.md`](./mg5-migration-matrix.md), [`mg5-migration-runbook.md`](./mg5-migration-runbook.md), [`mg5-migration-closeout.md`](./mg5-migration-closeout.md) |
-| **Stop line** | R8 / MR not started; production apply NO-GO |
+| **Stop line** | R8 / MR not started |
 
 ### 10. `packages/cms-editor/src/ai-assist.tsx` (~855)
 

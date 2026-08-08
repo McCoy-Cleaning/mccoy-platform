@@ -1,0 +1,26 @@
+{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_privacy",
+    "pageKey": "privacy",
+    "slug": "/privacy",
+    "title": "Privacy",
+    "description": "fixture",
+    "inNav": false,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:privacy.main", "kind": "fixed", "key": "privacy.main", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "privacy.main": {
+        "heading": "Privacy",
+        "articles": [{ "id": "a1", "heading": "A", "content": "C" }]
+      }
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}

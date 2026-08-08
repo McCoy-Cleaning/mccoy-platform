@@ -1,6 +1,6 @@
 # MG5 — Fixed → blocks migration audit
 
-**Status:** Implementation complete (code) · Production apply **NO-GO** until operator gates  
+**Status:** `MG5_QUALIFIED` (fixture + dry-run) · Production apply **NO-GO**  
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
 **Stop line:** R8 / MR not started
@@ -62,5 +62,5 @@ No unfinished R7 WIP mixed into MG5. No R8 / MR work.
 ## Classification
 
 **MG5_CODE_COMPLETE** — machinery, matrix, tests, CLI, docs present.  
-**Not** `MG5_QUALIFIED` until staging/production-like dry-run + backup/rollback on real cohort is green.  
-**Not** `MG5_PRODUCTION_*`.
+**MG5_QUALIFIED** — offline fixture cohort dry-run green (`pagesBlocked=0`, `pagesFailed=0`) + unit/operator gates green.  
+**Not** `MG5_PRODUCTION_*` — staging/production-like credentials not exercised; no canary/apply.

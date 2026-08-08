@@ -202,7 +202,7 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Stage 7 / R7 (complete â€” 2026-08-08):** Storefront composition cleanup â€” class-level layout orchestration, fixed-section module split, thin `BlockView`, presentation adapters isolated, composition contract tests. See [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md).
 
-**MG5 (code-complete â€” 2026-08-08):** Production-grade fixedâ†’blocks migration machinery (`fixed-block/v1`) â€” matrix, pure pipeline, dry-run/apply/rollback operator CLI, backup/CAS/post-write verify. See [`mg5-migration-closeout.md`](./mg5-migration-closeout.md). Classification **MG5_CODE_COMPLETE**; production apply **NO-GO**. **R8 / MR not started.**
+**MG5 (qualified â€” 2026-08-08):** Production-grade fixedâ†’blocks migration machinery (`fixed-block/v1`) â€” matrix, pure pipeline wrapping resolve-time family modules, dry-run/apply/rollback operator CLI, backup/CAS/post-write verify, offline fixture cohort dry-run green. See [`mg5-migration-closeout.md`](./mg5-migration-closeout.md). Classification **MG5_QUALIFIED**; production apply **NO-GO**. **R8 / MR not started.**
 
 ### Stage 2 default (historical detail)
 

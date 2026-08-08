@@ -33,6 +33,8 @@
     "test:contract": "npm run test -w @mccoy/cms-schema",
     "test:contracts": "npm run test:contract",
     "cms:migrate-fixed-blocks": "vite-node --config scripts/mg5-vite.config.mts scripts/cms-migrate-fixed-blocks.mts",
+    "cms:migrate-fixed-blocks:fixtures": "vite-node --config scripts/mg5-vite.config.mts scripts/mg5-write-fixtures.mts",
+    "cms:migrate-fixed-blocks:dry-run-fixtures": "vite-node --config scripts/mg5-vite.config.mts scripts/cms-migrate-fixed-blocks.mts --dry-run --environment test --fixture-dir packages/cms-schema/src/migration/mg5-fixtures",
     "test:mg5": "npm run test -w @mccoy/cms-schema -- src/migration/mg5-matrix.test.ts src/migration/mg5-pipeline.test.ts src/migration/mg5-operator.test.ts src/migration/mg5-form-identity.test.ts src/migration/gate4-dry-run.test.ts",
     "test:integration": "npm run test -w @mccoy/cms-renderer",
     "test:integrations": "npm run test:integration",

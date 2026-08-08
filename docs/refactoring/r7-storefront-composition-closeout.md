@@ -2,7 +2,7 @@
 
 **Status:** Complete (implementation) · **Acceptance: R7_ACCEPTED**
 **Date:** 2026-08-08
-**Stop line:** R8 / MG5 / MR not started
+**Stop line:** R8 / MR not started (MG5 closed separately — see [`mg5-migration-closeout.md`](./mg5-migration-closeout.md))
 **Push:** Local commits ready (`4c47a0d` + `eb82322`…`a5acd36` + `3637321`); remote push blocked here by SSH agent/passphrase — run commands in closeout note below
 
 ## Preconditions
@@ -97,7 +97,7 @@ Composition contract test fails on storefront → cms-editor/admin under `compon
 
 ## Acceptance classification (2026-08-08)
 
-**R7_ACCEPTED** — Composition contract green; inventory dual-read expectations cover home hero / legal / offerte migrated rows and maxed `quoteRequestForm` picker; forms E2E green for contact + offerte quoteRequestForm path; coverage green. Locale EN publish remains a known editor console flake (`Maximum update depth`) after durable-save fixture hardening — document-only, not a push blocker for R7 composition. Next stage is **MG5** (not started). Do not start **R8** before MG5 closes.
+**R7_ACCEPTED** — Composition contract green; inventory dual-read expectations cover home hero / legal / offerte migrated rows and maxed `quoteRequestForm` picker; forms E2E green for contact + offerte quoteRequestForm path; coverage green. Locale EN publish remains a known editor console flake (`Maximum update depth`) after durable-save fixture hardening — document-only, not a push blocker for R7 composition. **MG5** closed as `MG5_QUALIFIED` (fixture dry-run; production NO-GO). Do not start **R8** until MG5 evidence is reviewed; do not start **MR** before R8.
 
 ## Remaining storefront debt (not R7)
 
@@ -108,7 +108,7 @@ Composition contract test fails on storefront → cms-editor/admin under `compon
 
 ## MG5 / MR dependencies
 
-MG5 must prove fixed→block safety before MR retires fixed renderers and presentation adapters.
+MG5 is `MG5_QUALIFIED` (fixture dry-run; production NO-GO). MR still waits for R8 review plus retirement proof before removing fixed renderers and presentation adapters.
 
 ## R8 recommendation
 

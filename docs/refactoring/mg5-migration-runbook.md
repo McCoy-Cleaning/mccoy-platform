@@ -40,8 +40,18 @@ Dry-run **must not** call `saveDraft`.
 
 ### Offline fixture dry-run (no DB)
 
+Committed cohort:
+
 ```powershell
-npm run cms:migrate-fixed-blocks -- --dry-run --environment test --fixture-dir path\to\fixtures
+npm run cms:migrate-fixed-blocks:dry-run-fixtures
+# equivalent:
+npm run cms:migrate-fixed-blocks -- --dry-run --environment test --fixture-dir packages/cms-schema/src/migration/mg5-fixtures
+```
+
+Regenerate fixtures after seed-shape changes:
+
+```powershell
+npm run cms:migrate-fixed-blocks:fixtures
 ```
 
 ## Report review

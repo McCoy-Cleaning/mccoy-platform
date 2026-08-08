@@ -1,0 +1,35 @@
+{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_about",
+    "pageKey": "about",
+    "slug": "/over-ons",
+    "title": "Over ons",
+    "description": "fixture",
+    "inNav": true,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:about.main", "kind": "fixed", "key": "about.main", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "about.main": {
+        "heading": "Over NL",
+        "missionTitle": "Missie",
+        "missionBody": "Missie NL",
+        "visionTitle": "Visie",
+        "visionBody": "Visie NL",
+        "historyTitle": "Historie",
+        "historyBody": "Historie NL"
+      }
+    },
+    "enFieldDrafts": {
+      "section:about.main:heading": "About EN",
+      "section:about.main:missionBody": "Mission EN"
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}

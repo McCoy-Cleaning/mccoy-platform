@@ -1,0 +1,35 @@
+{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_home",
+    "pageKey": "home",
+    "slug": "/",
+    "title": "Home",
+    "description": "fixture",
+    "inNav": true,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:home.hero", "kind": "fixed", "key": "home.hero", "hidden": false },
+      { "id": "fixed:home.partners", "kind": "fixed", "key": "home.partners", "hidden": false },
+      { "id": "fixed:home.stats", "kind": "fixed", "key": "home.stats", "hidden": false },
+      { "id": "fixed:home.workGallery", "kind": "fixed", "key": "home.workGallery", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "home.hero": { "heading": "NL hero", "body": "NL body" },
+      "home.partners": { "heading": "Partners", "items": [] },
+      "home.stats": {
+        "heading": "Stats",
+        "items": [{ "id": "stat_1", "value": "25", "label": "jaren" }]
+      },
+      "home.workGallery": { "heading": "Werk", "items": [] }
+    },
+    "enFieldDrafts": {
+      "section:home.hero:heading": "EN hero"
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_offerte",
+    "pageKey": "offerte",
+    "slug": "/offerte",
+    "title": "Offerte",
+    "description": "fixture",
+    "inNav": true,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:offerte.main", "kind": "fixed", "key": "offerte.main", "hidden": false },
+      { "id": "fixed:offerte.form", "kind": "fixed", "key": "offerte.form", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "offerte.main": { "heading": "Offerte NL", "body": "Body" },
+      "offerte.form": { "heading": "Form NL", "submitLabel": "Verstuur" }
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}
