@@ -3,6 +3,8 @@
 **Classification:** `MG5_CODE_COMPLETE`  
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
+**Branch:** `mg5-fixed-blocks-migration`  
+**Commits:** `209a0fe` → `40fb063` (MG5A / MG5B-E / MG5F / MG5H)  
 **Production decision:** **NO-GO** (no production apply executed)
 
 ## Delivered
