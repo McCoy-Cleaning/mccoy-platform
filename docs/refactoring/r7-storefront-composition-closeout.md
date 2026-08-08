@@ -3,7 +3,7 @@
 **Status:** Complete (implementation) · **Acceptance: R7_ACCEPTED**
 **Date:** 2026-08-08
 **Stop line:** R8 / MG5 / MR not started
-**Push:** Pending after acceptance gate re-run (R6 `4c47a0d` + R7 `eb82322`…`a5acd36` + dual-read E2E fix)
+**Push:** Local commits ready (`4c47a0d` + `eb82322`…`a5acd36` + `3637321`); remote push blocked here by SSH agent/passphrase — run commands in closeout note below
 
 ## Preconditions
 
@@ -113,3 +113,14 @@ MG5 must prove fixed→block safety before MR retires fixed renderers and presen
 ## R8 recommendation
 
 **Do not start R8 in this phase.** R8 = report-only review skills under `.cursor/skills/` + final verification — not further composition moves.
+
+## Push (manual if SSH agent locked)
+
+```powershell
+Get-Service ssh-agent | Set-Service -StartupType Manual
+Start-Service ssh-agent
+ssh-add $env:USERPROFILE\.ssh\id_ed25519_mccoy
+git push origin development
+```
+
+Remote: `git@github.com-mccoy:McCoy-Cleaning/mccoy-platform.git` (no force-push).
