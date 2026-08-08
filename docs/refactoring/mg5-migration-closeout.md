@@ -4,7 +4,7 @@
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
 **Branch:** `mg5-fixed-blocks-migration`  
-**Commits:** `209a0fe` → `40fb063` (MG5A / MG5B-E / MG5F / MG5H)  
+**Commits:** `209a0fe` → `20d9cb4` (MG5A / MG5B-E / MG5F / MG5H + closeout note)  
 **Production decision:** **NO-GO** (no production apply executed)
 
 ## Delivered
