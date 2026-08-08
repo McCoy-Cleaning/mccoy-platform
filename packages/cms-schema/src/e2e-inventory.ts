@@ -20,7 +20,6 @@ import {
   offerteMainMigrationBlockId,
 } from "./migration/offerte-blocks";
 import { homeHeroMigrationBlockId } from "./migration/home-hero-blocks";
-import { homeStatsMigrationBlockId } from "./migration/home-stats-blocks";
 import { legalMainMigrationBlockId } from "./migration/legal-blocks";
 import {
   FIXED_SECTION_DEFS,
