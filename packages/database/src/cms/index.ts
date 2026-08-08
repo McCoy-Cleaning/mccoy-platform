@@ -46,6 +46,15 @@ export {
   type CmsCacheInvalidationHook,
 } from "./outbox";
 export {
+  ensureIndexNowPublishHookRegistered,
+  notifyIndexNowForPublishEvent,
+  submitIndexNowUrls,
+  validateIndexNowUrl,
+  urlsFromPublishEvent,
+  INDEXNOW_CANONICAL_ORIGIN,
+  type IndexNowSubmitResult,
+} from "./indexnow";
+export {
   builtinCmsSeedPages,
   CMS_SEED_NAVIGATION,
   CMS_SEED_FOOTER,

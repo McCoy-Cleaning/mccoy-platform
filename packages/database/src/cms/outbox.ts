@@ -25,6 +25,14 @@ export function registerCmsPublishHook(hook: CmsCacheInvalidationHook): void {
  * Consumers: page cache, route metadata, nav, sitemap, redirects, JSON-LD, search, recrawl.
  */
 export async function processCmsOutbox(limit = 50): Promise<CmsOutboxConsumerResult> {
+  // SEO-5: register IndexNow fail-open hook once (lazy to avoid import cycles at load).
+  try {
+    const { ensureIndexNowPublishHookRegistered } = await import("./indexnow");
+    ensureIndexNowPublishHookRegistered();
+  } catch {
+    /* IndexNow adapter optional at boot */
+  }
+
   const store = getCmsStore();
   const rows = await store.listUnprocessedOutbox(limit);
   let processed = 0;
