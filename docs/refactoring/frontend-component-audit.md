@@ -136,15 +136,17 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Disposition** | `large-but-cohesive` |
 | **Why** | Focused layout UX; already uses shared `LayoutList`. Leave unless layout API changes. |
 
-### 9. `apps/storefront/src/components/site/sections/SitePageSections.tsx` (~622)
+### 9. Storefront composition (**R7 complete — 2026-08-08**)
 
 | | |
 |--|--|
-| **Primary responsibility** | Storefront page section composition for non-home pages; resolves CMS text fallbacks and renderer sections. |
-| **Imports** | `@mccoy/cms-schema` (`cmsTextOrFallback`, …), `@mccoy/cms-renderer`, local section components. |
-| **Who imports it** | Storefront page layout / route render path. |
-| **Disposition** | `large-but-cohesive` |
-| **Why** | Storefront-branded composition; must not merge with admin chrome. Parity depends on shared renderer, not shared page shell. |
+| **Orchestrator** | `PageLayoutRenderer.tsx` — class-level fixed/block dispatch (not BlockType). |
+| **Fixed registry** | `pageSectionRenderers.tsx` / `homeSectionRenderers.tsx`. |
+| **Reusable blocks** | `BlockView.tsx` → `RegisteredBlockView` (`@mccoy/cms-renderer`). |
+| **Presentation adapters** | `blockPresentationAdapters.tsx` — Producten/About dual-read only until MG5. |
+| **Fixed views** | `AboutSections.tsx`, `ServicesSections.tsx`, `ProductsFixedSections.tsx` (was monolithic `SitePageSections.tsx` ~677 lines; now thin barrel). |
+| **Disposition** | `extract-composition` — **done in R7** |
+| **Docs** | [`r7-storefront-composition-audit.md`](./r7-storefront-composition-audit.md), [`r7-storefront-composition-architecture.md`](./r7-storefront-composition-architecture.md), [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md) |
 
 ### 10. `packages/cms-editor/src/ai-assist.tsx` (~855)
 
@@ -325,7 +327,7 @@ type AdminFormFieldProps = {
 | Aanvragen mailbox semantics | Generic “inbox” UI kits / storefront contact success | Graph/IMAP/config errors; delete/reply policies |
 | Admin products/users mock pages | Real commerce admin (future) | Explicitly excluded stubs — do not “polish into shared catalog” |
 | Offer / plan section brand chrome (`OffersSectionView`, plan cards) | Admin buttons / dialogs | Customer-facing marketing layout |
-| Storefront `SitePageSections` / home sections | Admin `BuiltinLayoutEditor` | Authoring vs rendering |
+| Storefront fixed sections / `PageLayoutRenderer` (R7) | Admin `BuiltinLayoutEditor` | Authoring vs rendering |
 | Admin CMS store | Storefront CMS store | Different persistence and privilege; share schema only |
 | App-local shadcn `components/ui` | Blind move to `@mccoy/ui` | Themes diverge; share only proven primitives (`cn`, Button, LayoutList pattern) |
 | `window.confirm` | Accessible admin dialogs | Temporary debt — replace via injection, not by copying AlertDialog into schema |
