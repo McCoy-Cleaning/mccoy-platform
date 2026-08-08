@@ -20,6 +20,15 @@ import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
 
 type ConversionRenderMode = "storefront" | "preview";
 
+/** Mirrors storefront `useClientReady` so E2E can wait for hydrated submit controls. */
+function useClientReady(): boolean {
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    setReady(true);
+  }, []);
+  return ready;
+}
+
 function GlassIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -180,12 +189,13 @@ function TabForm({
   const [honeypot, setHoneypot] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
+  const clientReady = useClientReady();
   const Icon = iconForTab(tab);
   const preview = mode === "preview";
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (preview) return;
+    if (preview || !clientReady) return;
     setError(null);
     const payload: Record<string, string> = {};
     for (const field of fields) {
@@ -232,7 +242,11 @@ function TabForm({
 
       <SectionSurface variant="form" className="lg:col-span-7">
         {status === "success" ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center" role="status">
+          <div
+            className="flex flex-col items-center gap-3 py-12 text-center"
+            role="status"
+            data-testid="site-form-success"
+          >
             <p className="font-display text-2xl text-white">
               {tab.successMessage?.trim() || successMessage}
             </p>
@@ -276,7 +290,9 @@ function TabForm({
             ) : null}
             <button
               type="submit"
-              disabled={status === "loading" || preview}
+              disabled={!clientReady || status === "loading" || preview}
+              aria-disabled={!clientReady || status === "loading" || preview}
+              data-testid={clientReady ? "site-form-ready" : "site-form-pending"}
               className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
             >
               {status === "loading" ? "..." : tab.submitLabel?.trim() || submitLabel}

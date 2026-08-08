@@ -280,6 +280,12 @@ function BlockSelectChrome({
   );
 }
 
+/**
+ * R7 storefront composition orchestrator.
+ * Walks persisted layout order and dispatches by representation class
+ * (`fixed` → registered fixed view, `block` → BlocksView → RegisteredBlockView).
+ * Does not switch on reusable BlockType — that belongs to `@mccoy/cms-renderer`.
+ */
 export function PageLayoutRenderer({
   page,
   pageKey,

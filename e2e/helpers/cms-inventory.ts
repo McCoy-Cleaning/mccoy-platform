@@ -144,18 +144,17 @@ export async function openEditorChromeForPickerInventory(page: Page, pageId: str
 }
 
 /**
- * Assert every publishable block type appears as `data-cms-template` at least once.
- * Privileged types (e.g. quoteRequestForm) are probed on their allowed page.
+ * Assert every publishable block type appears as `data-cms-template` at least once,
+ * or — when page policy already has a maxed instance (e.g. migrated quoteRequestForm) —
+ * as an existing layout row of that block type on the probe page.
  */
 export async function expectPublishableBlockPickerInventory(page: Page) {
   const byPage = publishableTypesByPickerPage();
   const missing: string[] = [];
 
   for (const [pageId, types] of byPage) {
-    await openEditorChromeForPickerInventory(
-      page,
-      pageId === "page_e2e_custom" ? PAGES.custom : pageId,
-    );
+    const editorPageId = pageId === "page_e2e_custom" ? PAGES.custom : pageId;
+    await openEditorChromeForPickerInventory(page, editorPageId);
     await openAddSectionPickerAlle(page);
 
     const present = await page.locator("[data-cms-template]").evaluateAll((els) =>
@@ -166,14 +165,29 @@ export async function expectPublishableBlockPickerInventory(page: Page) {
     const presentSet = new Set(present);
 
     for (const type of types) {
-      if (!presentSet.has(type)) {
-        missing.push(`${type} (picker on ${pageId})`);
-      } else {
+      if (presentSet.has(type)) {
         await expect(
           page.locator(`[data-cms-template="${type}"]`).first(),
           `data-cms-template=${type} not visible on ${pageId}`,
         ).toBeVisible();
+        continue;
       }
+
+      // Close picker to inspect layout rows for already-placed privileged forms.
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("heading", { name: "Kies een sectie" })).toBeHidden({
+        timeout: 15_000,
+      });
+      await openSections(page);
+      const layoutHit = page.locator(
+        `[data-cms-layout-row^="block:"][data-cms-block-type="${type}"], [data-cms-block-type="${type}"]`,
+      );
+      const inLayout = (await layoutHit.count()) > 0;
+      if (!inLayout) {
+        missing.push(`${type} (picker on ${pageId})`);
+      }
+      // Re-open picker for remaining types on this page.
+      await openAddSectionPickerAlle(page);
     }
 
     await page.keyboard.press("Escape");

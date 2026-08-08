@@ -401,7 +401,11 @@ function Honeypot() {
 
 function Success({ label }: { label: string }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-12 text-center">
+    <div
+      className="flex flex-col items-center gap-3 py-12 text-center"
+      role="status"
+      data-testid="site-form-success"
+    >
       <CheckCircle2 className="h-12 w-12 text-primary" />
       <p className="font-display text-2xl text-white">{label}</p>
     </div>

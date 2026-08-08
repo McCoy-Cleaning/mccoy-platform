@@ -8,6 +8,7 @@ import {
 } from "./resolve-published-form";
 import { normalizeCmsPage } from "./pipeline";
 import { formFieldPayloadKey } from "./blocks/form-fields";
+import { offerteFormMigrationBlockId } from "./migration/offerte-blocks";
 
 function pageWithContactForm(scope?: { key: string; label: string }): BuiltinCmsPage {
   return {
@@ -109,6 +110,15 @@ describe("resolvePublishedFormScope", () => {
       resolvePublishedFormScope(offerte, {
         pageId: "page_offerte",
         sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
+        kind: "glass_washing",
+      }).ok,
+    ).toBe(true);
+
+    // In-memory migration clients submit the deterministic block id before publish persists it.
+    expect(
+      resolvePublishedFormScope(offerte, {
+        pageId: "page_offerte",
+        sourceId: offerteFormMigrationBlockId("page_offerte"),
         kind: "glass_washing",
       }).ok,
     ).toBe(true);

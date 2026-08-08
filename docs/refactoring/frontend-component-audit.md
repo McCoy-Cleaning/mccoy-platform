@@ -68,15 +68,15 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Disposition** | `split-required` — **done in Stage 4** |
 | **Why** | Mixes public package API, fixed-section editors, and low-level field chrome in one file. Block editors already live under `./blocks/`; remaining inspectors and helpers should follow that pattern so the barrel only re-exports. |
 
-### 2. `apps/admin/src/lib/cms/store.ts` (~1534; prior est. ~1600)
+### 2. `apps/admin/src/lib/cms/store.ts` (~123 façade; was ~1798) — **R6 complete**
 
 | | |
 |--|--|
-| **Primary responsibility** | Admin CMS client store: localStorage persistence, draft dirty tracking, layout mutations, EN draft sync / Opslaan locale decisions, publish/save/delete server calls, preview snapshot session maps. |
-| **Imports** | Heavy `@mccoy/cms-schema` pipeline/layout/i18n APIs; `./server-publish`, `./publish-sync`, `./templates`, `@/lib/api/cms-publish.functions`, `@/lib/api/content-ai.functions`. |
+| **Primary responsibility** | Thin public façade: `cms` object + React hooks. Bodies live in `store-persistence.ts`, `store-draft.ts`, `store-layout.ts`, `store-publish.ts`, `store-en.ts`. |
+| **Imports** | Schema preview helpers + slice modules only. |
 | **Who imports it** | Admin website routes and CMS components (`admin.website.$pageId`, layout editors, locale panels, etc.). |
-| **Disposition** | `extract-helpers` (later: `split-required` for persistence vs mutation vs publish) |
-| **Why** | Cohesive domain store, but persistence, layout ops, translation planning, and server publish are separable modules with clear seams. Not Stage 2. |
+| **Disposition** | `split-required` — **done in R6 / Stage 6** |
+| **Why** | Persistence, layout ops, translation planning, and server publish are separable modules with clear seams. Closeout: [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md). |
 
 ### 3. `apps/admin/src/routes/admin.inquiries.tsx` (**6** lines after Stage 3; was ~1457)
 
@@ -136,15 +136,17 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Disposition** | `large-but-cohesive` |
 | **Why** | Focused layout UX; already uses shared `LayoutList`. Leave unless layout API changes. |
 
-### 9. `apps/storefront/src/components/site/sections/SitePageSections.tsx` (~622)
+### 9. Storefront composition (**R7 complete — 2026-08-08**)
 
 | | |
 |--|--|
-| **Primary responsibility** | Storefront page section composition for non-home pages; resolves CMS text fallbacks and renderer sections. |
-| **Imports** | `@mccoy/cms-schema` (`cmsTextOrFallback`, …), `@mccoy/cms-renderer`, local section components. |
-| **Who imports it** | Storefront page layout / route render path. |
-| **Disposition** | `large-but-cohesive` |
-| **Why** | Storefront-branded composition; must not merge with admin chrome. Parity depends on shared renderer, not shared page shell. |
+| **Orchestrator** | `PageLayoutRenderer.tsx` — class-level fixed/block dispatch (not BlockType). |
+| **Fixed registry** | `pageSectionRenderers.tsx` / `homeSectionRenderers.tsx`. |
+| **Reusable blocks** | `BlockView.tsx` → `RegisteredBlockView` (`@mccoy/cms-renderer`). |
+| **Presentation adapters** | `blockPresentationAdapters.tsx` — Producten/About dual-read only until MG5. |
+| **Fixed views** | `AboutSections.tsx`, `ServicesSections.tsx`, `ProductsFixedSections.tsx` (was monolithic `SitePageSections.tsx` ~677 lines; now thin barrel). |
+| **Disposition** | `extract-composition` — **done in R7** |
+| **Docs** | [`r7-storefront-composition-audit.md`](./r7-storefront-composition-audit.md), [`r7-storefront-composition-architecture.md`](./r7-storefront-composition-architecture.md), [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md) |
 
 ### 10. `packages/cms-editor/src/ai-assist.tsx` (~855)
 
@@ -325,7 +327,7 @@ type AdminFormFieldProps = {
 | Aanvragen mailbox semantics | Generic “inbox” UI kits / storefront contact success | Graph/IMAP/config errors; delete/reply policies |
 | Admin products/users mock pages | Real commerce admin (future) | Explicitly excluded stubs — do not “polish into shared catalog” |
 | Offer / plan section brand chrome (`OffersSectionView`, plan cards) | Admin buttons / dialogs | Customer-facing marketing layout |
-| Storefront `SitePageSections` / home sections | Admin `BuiltinLayoutEditor` | Authoring vs rendering |
+| Storefront fixed sections / `PageLayoutRenderer` (R7) | Admin `BuiltinLayoutEditor` | Authoring vs rendering |
 | Admin CMS store | Storefront CMS store | Different persistence and privilege; share schema only |
 | App-local shadcn `components/ui` | Blind move to `@mccoy/ui` | Themes diverge; share only proven primitives (`cn`, Button, LayoutList pattern) |
 | `window.confirm` | Accessible admin dialogs | Temporary debt — replace via injection, not by copying AlertDialog into schema |
@@ -585,7 +587,7 @@ Honest gap: no single matrix test named “inspector callback/path parity” end
 
 ### Stage 5 closeout (complete — 2026-08-06)
 
-**Status:** Complete. All publishable `BlockType`s render through `blockViewRegistry`; `RegisteredBlockView` is orchestration-only. Stage 6 not started.
+**Status:** Complete. All publishable `BlockType`s render through `blockViewRegistry`; `RegisteredBlockView` is orchestration-only. R6 / Stage 6 (admin store split) completed later — see [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md).
 
 **Docs:** [`stage5-registry-inventory.md`](./stage5-registry-inventory.md), [`stage5-registry-closeout.md`](./stage5-registry-closeout.md).
 

@@ -359,7 +359,16 @@ export async function savePage(page: Page) {
             }
             throw new Error(`Opslaan rejected: ${alertMessage}`);
           }
-          return page.getByText("Opgeslagen").isVisible();
+          if (await page.getByText(/Opgeslagen/i).first().isVisible().catch(() => false)) {
+            return true;
+          }
+          // Toast can dismiss before the poll samples it; a cleared draft (Opslaan
+          // disabled again) is also a successful publish signal.
+          const saveAgain = page.getByRole("button", { name: "Opslaan & publiceren" });
+          if (await saveAgain.isDisabled().catch(() => false)) {
+            return true;
+          }
+          return false;
         },
         { timeout: 60_000 },
       )

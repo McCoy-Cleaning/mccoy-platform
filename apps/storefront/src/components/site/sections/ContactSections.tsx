@@ -242,7 +242,11 @@ export function ContactFormSection() {
   const formColumn = (
     <SectionSurface variant="form" className={cn(sideBySide && "lg:col-span-7")}>
       {sent ? (
-        <div className="flex flex-col items-center gap-4 py-14 text-center">
+        <div
+          className="flex flex-col items-center gap-4 py-14 text-center"
+          role="status"
+          data-testid="site-form-success"
+        >
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
             <CheckCircle2 className="h-8 w-8" aria-hidden />
           </div>

@@ -19,6 +19,9 @@ import {
   offerteFormMigrationBlockId,
   offerteMainMigrationBlockId,
 } from "./migration/offerte-blocks";
+import { homeHeroMigrationBlockId } from "./migration/home-hero-blocks";
+import { homeStatsMigrationBlockId } from "./migration/home-stats-blocks";
+import { legalMainMigrationBlockId } from "./migration/legal-blocks";
 import {
   FIXED_SECTION_DEFS,
   FIXED_SECTIONS_BY_PAGE,
@@ -123,6 +126,30 @@ export function expectedFixedInventoryForPage(
         fixedKey,
         layoutRowIds,
         migratedLayoutRowIds: [`block:${offerteFormMigrationBlockId(pageId)}`],
+      };
+    }
+    if (pageKey === "home" && fixedKey === "home.hero") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: [`block:${homeHeroMigrationBlockId(pageId)}`],
+      };
+    }
+    if (pageKey === "privacy" && fixedKey === "privacy.main") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: [`block:${legalMainMigrationBlockId(pageId, "privacy.main")}`],
+      };
+    }
+    if (pageKey === "terms" && fixedKey === "terms.main") {
+      return {
+        kind: "fixed-or-migrated-blocks",
+        fixedKey,
+        layoutRowIds,
+        migratedLayoutRowIds: [`block:${legalMainMigrationBlockId(pageId, "terms.main")}`],
       };
     }
     return {

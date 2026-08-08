@@ -56,15 +56,14 @@ test.describe("CMS NL/EN publish", () => {
 
     await page.goto(`${STOREFRONT_ORIGIN}/en/e2e-custom`);
     await expect(page).toHaveURL(/\/en\/e2e-custom\/?$/);
-    const enHero = page.getByTestId("hero-heading").or(page.getByRole("heading", { level: 1 }));
-    await expect(enHero.first()).toBeVisible({ timeout: 30_000 });
-    await expect(enHero.first()).toHaveText(enTitle);
+    // Hero may append headingAccent (e.g. "visible.") — match title, not exact full text.
+    const enHero = page.getByRole("heading", { level: 1, name: enTitle });
+    await expect(enHero).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("heading", { level: 1, name: nlTitle })).toHaveCount(0);
 
     await page.goto(`${STOREFRONT_ORIGIN}/e2e-custom`);
-    const nlHero = page.getByTestId("hero-heading").or(page.getByRole("heading", { level: 1 }));
-    await expect(nlHero.first()).toBeVisible({ timeout: 30_000 });
-    await expect(nlHero.first()).toHaveText(nlTitle);
+    const nlHero = page.getByRole("heading", { level: 1, name: nlTitle });
+    await expect(nlHero).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("heading", { level: 1, name: enTitle })).toHaveCount(0);
   });
 });
