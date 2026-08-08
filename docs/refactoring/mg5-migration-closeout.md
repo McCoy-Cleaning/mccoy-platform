@@ -4,7 +4,7 @@
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
 **Branch:** `mg5-fixed-blocks-migration`  
-**Commits:** `209a0fe` → `828fd3e` (MG5A–MG5H + MG5I fixture cohort + qualification evidence)  
+**Commits:** `209a0fe` → `cf5ef99` (MG5A–MG5H + MG5I fixture cohort + qualification evidence)  
 **Apply decision:** **NO-GO** for staging/live cohorts in this session (fixture qualification only)
 
 ## Delivered
