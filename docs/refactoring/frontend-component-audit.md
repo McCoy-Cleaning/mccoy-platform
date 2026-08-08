@@ -143,10 +143,20 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Orchestrator** | `PageLayoutRenderer.tsx` — class-level fixed/block dispatch (not BlockType). |
 | **Fixed registry** | `pageSectionRenderers.tsx` / `homeSectionRenderers.tsx`. |
 | **Reusable blocks** | `BlockView.tsx` → `RegisteredBlockView` (`@mccoy/cms-renderer`). |
-| **Presentation adapters** | `blockPresentationAdapters.tsx` — Producten/About dual-read only until MG5. |
+| **Presentation adapters** | `blockPresentationAdapters.tsx` — Producten/About dual-read retained through MG5 (MR retires later). |
 | **Fixed views** | `AboutSections.tsx`, `ServicesSections.tsx`, `ProductsFixedSections.tsx` (was monolithic `SitePageSections.tsx` ~677 lines; now thin barrel). |
 | **Disposition** | `extract-composition` — **done in R7** |
 | **Docs** | [`r7-storefront-composition-audit.md`](./r7-storefront-composition-audit.md), [`r7-storefront-composition-architecture.md`](./r7-storefront-composition-architecture.md), [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md) |
+
+### 9b. MG5 fixed→blocks migration (**MG5_CODE_COMPLETE — 2026-08-08**)
+
+| | |
+|--|--|
+| **Authority** | `@mccoy/cms-schema` migration matrix + pure pipeline; persistence via operator CLI only |
+| **CLI** | `npm run cms:migrate-fixed-blocks` (`scripts/cms-migrate-fixed-blocks.mts`) |
+| **Version** | `fixed-block/v1` (distinct from `CMS_SCHEMA_VERSION=6`) |
+| **Docs** | [`mg5-migration-audit.md`](./mg5-migration-audit.md), [`mg5-migration-matrix.md`](./mg5-migration-matrix.md), [`mg5-migration-runbook.md`](./mg5-migration-runbook.md), [`mg5-migration-closeout.md`](./mg5-migration-closeout.md) |
+| **Stop line** | R8 / MR not started; production apply NO-GO |
 
 ### 10. `packages/cms-editor/src/ai-assist.tsx` (~855)
 

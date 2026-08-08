@@ -1,6 +1,6 @@
 # Frontend component architecture â€” Stage 1 / roadmap R1â€“R8
 
-**Date:** 2026-08-06 (R7 closeout updated 2026-08-08)
+**Date:** 2026-08-06 (R7 closeout 2026-08-08 · MG5 code-complete 2026-08-08)
 **Scope:** Target architecture and roadmap for frontend component refactoring.
 **Companion audit:** [frontend-component-audit.md](./frontend-component-audit.md)
 
@@ -200,7 +200,9 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Stage 6 / R6 (complete â€” 2026-08-08):** Admin CMS store split into capability modules; public `cms` / hooks unchanged. See [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md) (Stage 6 alias: [`stage6-cms-store-closeout.md`](./stage6-cms-store-closeout.md)).
 
-**Stage 7 / R7 (complete â€” 2026-08-08):** Storefront composition cleanup â€” class-level layout orchestration, fixed-section module split, thin `BlockView`, presentation adapters isolated, composition contract tests. See [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md). **R8 / MG5 not started.**
+**Stage 7 / R7 (complete â€” 2026-08-08):** Storefront composition cleanup â€” class-level layout orchestration, fixed-section module split, thin `BlockView`, presentation adapters isolated, composition contract tests. See [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md).
+
+**MG5 (code-complete â€” 2026-08-08):** Production-grade fixedâ†’blocks migration machinery (`fixed-block/v1`) â€” matrix, pure pipeline, dry-run/apply/rollback operator CLI, backup/CAS/post-write verify. See [`mg5-migration-closeout.md`](./mg5-migration-closeout.md). Classification **MG5_CODE_COMPLETE**; production apply **NO-GO**. **R8 / MR not started.**
 
 ### Stage 2 default (historical detail)
 
@@ -215,7 +217,7 @@ See audit Â§ â€œPrecise Stage 2 slice recommendationâ€. Summary:
 
 ## R8 â€” skills requirements (formerly labelled Stage 7 skills)
 
-Skills live under **`.cursor/skills/`** (directory currently **absent**). Guardian hooks/CLI may already exist for verify/inventory/smoke; skills are a separate, report-oriented layer and must not silently rewrite production code. **Do not start R8 until R7 closeout is accepted.**
+Skills live under **`.cursor/skills/`** (directory currently **absent**). Guardian hooks/CLI may already exist for verify/inventory/smoke; skills are a separate, report-oriented layer and must not silently rewrite production code. **Do not start R8 until MG5 is closed (prefer MG5_QUALIFIED).** MR waits for MG5 + R8.
 
 ### Mandatory skill behaviour
 
