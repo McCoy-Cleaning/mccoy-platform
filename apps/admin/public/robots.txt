@@ -1,2 +1,3 @@
+# Admin surface — never index
 User-agent: *
-Allow: /
+Disallow: /

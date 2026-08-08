@@ -5,9 +5,13 @@ export {
 } from "./env";
 
 export {
+  CANONICAL_PUBLIC_HOST,
   getHostConfig,
   resolveHostSurface,
+  resolveCanonicalHostRedirect,
   shouldRedirectForHost,
+  stripTrailingSlashPath,
+  type CanonicalHostRedirect,
   type HostSurface,
 } from "./host";
 
