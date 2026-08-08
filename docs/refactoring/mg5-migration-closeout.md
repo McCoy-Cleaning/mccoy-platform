@@ -4,8 +4,8 @@
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
 **Branch:** `mg5-fixed-blocks-migration`  
-**Commits:** `209a0fe` → _(this closeout)_ (MG5A–MG5H + fixture cohort + qualification evidence)  
-**Production decision:** **NO-GO** (no production or staging CMS apply executed)
+**Commits:** `209a0fe` → `828fd3e` (MG5A–MG5H + MG5I fixture cohort + qualification evidence)  
+**Apply decision:** **NO-GO** for staging/live cohorts in this session (fixture qualification only)
 
 ## Delivered
 
