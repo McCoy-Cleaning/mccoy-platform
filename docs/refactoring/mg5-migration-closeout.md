@@ -1,11 +1,13 @@
 # MG5 — Closeout
 
-**Classification:** `MG5_QUALIFIED`  
+**Classification:** `MG5_QUALIFIED` (staging qualification **NO-GO** — not `MG5_STAGING_COMPLETE`)  
 **Date:** 2026-08-08  
 **Migration version:** `fixed-block/v1`  
 **Branch:** `mg5-fixed-blocks-migration`  
-**Commits:** `209a0fe`…`5d72bc3` on `mg5-fixed-blocks-migration` (MG5A–MG5I + closeout pins)  
-**Apply decision:** **NO-GO** for staging/live cohorts in this session (fixture qualification only)
+**HEAD (pre-identity commit):** `7774e807bbe30e643ad37a43c8c1e83644417ca6`  
+**Commits:** `209a0fe`… + MG5 environment-identity commit on `mg5-fixed-blocks-migration`  
+**Apply decision:** **NO-GO** for staging apply and production apply  
+**Staging GO/NO-GO (2026-08-08 re-run):** **NO-GO** — fail-closed identity gate; no DB dry-run/apply
 
 ## Delivered
 
@@ -17,6 +19,7 @@
 6. Offline fixture cohort + CLI dry-run evidence (no DB).
 7. Audit, matrix, runbook, closeout documentation.
 8. Architecture / audit roadmap IDs updated for MG5.
+9. **Explicit deployment identity** — `verifyMg5DeploymentTarget` + CLI `--verify-environment`; branch/env/project allowlist fail-closed (no `--force`/`--skip`/`--ignore`).
 
 ## Not delivered (explicit)
 
@@ -32,8 +35,91 @@
 |-------|--------|
 | `MG5_CODE_COMPLETE` | Yes — machinery, docs, CLI, tests |
 | `MG5_QUALIFIED` | **Yes (fixture + dry-run)** — offline cohort dry-run green; unit/operator gates green |
+| `MG5_STAGING_COMPLETE` | **No** — staging positively identified? **No** → fail-closed; dry-run/apply not run |
 | `MG5_PRODUCTION_*` | **No** — no approved production run |
-| `BLOCKED` | Remaining matrix rows stay `unqualified` for production apply |
+| `BLOCKED` | Remaining matrix rows stay `unqualified` for production apply; staging cohort pending identity |
+
+## Staging qualification re-run (2026-08-08 — identity gate)
+
+### Authoritative deployment mapping (now enforced in code)
+
+| Target | `MCCOY_ENVIRONMENT` | Branch | Allowlist |
+|--------|---------------------|--------|-----------|
+| Staging | `staging` | `development` \| `dev` | `MCCOY_STAGING_SUPABASE_PROJECT_ID` |
+| Production | `production` | `main` | `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` |
+
+Vercel: development/preview → staging env + staging Supabase; `main` → production env + production Supabase. Shared staging=production project IDs → **STOP**.
+
+### Environment identity (safe diagnostics)
+
+| Field | Recorded value |
+|-------|----------------|
+| `MCCOY_ENVIRONMENT` | **MISSING** |
+| Branch | `mg5-fixed-blocks-migration` (not `development`/`dev`) |
+| Supabase project ref (redacted) | `bwrk…ecmv` (from `SUPABASE_URL`) |
+| `MCCOY_STAGING_SUPABASE_PROJECT_ID` | **MISSING** |
+| `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` | **MISSING** |
+| `targetVerified` | **false** |
+| Verify command | `npm run cms:migrate-fixed-blocks:verify-env -- --environment staging` → exit 2 / `mg5.env.missing_mccoy_environment` |
+| Staging dry-run attempt | Refused by identity gate before any CMS I/O (exit 2) |
+
+### Backup mechanism (no CMS mutation)
+
+| Check | Result |
+|-------|--------|
+| Backup destination | `.data/mg5-backups/` (gitignored) |
+| Directory writable | Yes (probe write/delete; no CMS calls) |
+| Staging backups / cohort hashes | **Not collected** (DB dry-run blocked) |
+
+### Staging dry-run / matrix / GO
+
+| Step | Status |
+|------|--------|
+| verify environment | **FAILED** (missing declared env + allowlists; wrong branch) |
+| backup mechanism verification | PASS (local writable) |
+| full staging dry-run | **NOT RUN** (fail-closed) |
+| second deterministic dry-run | **NOT RUN** |
+| report review | N/A |
+| Staging apply | **NOT RUN** |
+| R8 / MR | **NOT STARTED** |
+| Production migration | **NOT STARTED** / **NO-GO** |
+
+### MG5 STAGING APPLY GO/NO-GO
+
+```
+MG5 STAGING APPLY GO/NO-GO
+
+Environment: unverified (MCCOY_ENVIRONMENT missing)
+Branch: mg5-fixed-blocks-migration
+supabaseProjectRef: bwrk…ecmv
+targetVerified: false
+Migration version: fixed-block/v1
+Qualified dry-run: NOT RUN
+Pages scanned: N/A
+Pages eligible: N/A
+Pages to change: N/A
+Conflicts: N/A
+Blocked pages: N/A
+Backup dir operational: YES
+Rollback tested (staging): NO
+dryRunWritesObserved: N/A
+
+Decision: NO-GO
+
+Blockers (exact missing / mismatched config):
+1. Set MCCOY_ENVIRONMENT=staging
+2. Set MCCOY_STAGING_SUPABASE_PROJECT_ID=<staging ref> (distinct from production)
+3. Set MCCOY_PRODUCTION_SUPABASE_PROJECT_ID=<production ref>
+4. Point SUPABASE_URL at the staging project ref
+5. Run operator from git branch development|dev
+6. Re-run: verify-env → backup probe → dry-run ×2 → GO report (still no --apply until explicit)
+```
+
+### What unblocks staging qualification
+
+1. Configure the five identity items above with a **real separate staging Supabase project**.
+2. Re-run verify → dry-run → second dry-run → GO report (apply remains a separate explicit step).
+3. Only after `MG5_STAGING_COMPLETE` merge MG5 to `main`. Production apply stays a separate NO-GO.
 
 ## 33-point final report
 
@@ -67,30 +153,36 @@
 | 26 | No migrate-on-startup | PASS |
 | 27 | Unqualified matrix rows blocked for production | PASS (docs + matrix) |
 | 28 | Fixture cohort dry-run green | PASS (`pagesScanned=5`, `blocked=0`, `failed=0`) |
-| 29 | Staging/production-like dataset dry-run | NOT RUN (no credentials in this session) |
+| 29 | Staging/production-like dataset dry-run | **NO-GO** — identity gate fail-closed (`missing_mccoy_environment` + missing allowlists + non-staging branch) |
 | 30 | Production canary apply | NOT EXECUTED — **NO-GO** |
-| 31 | Docs (audit/matrix/runbook/closeout + architecture) | PASS |
-| 32 | `npm run test:mg5` + cms-schema typecheck | PASS (28 tests; tsc clean) |
+| 31 | Docs (audit/matrix/runbook/closeout + apps-and-hosts + deploy mapping) | PASS |
+| 32 | `npm run test:mg5` + cms-schema typecheck | PASS (42 tests incl. env identity; tsc clean) |
 | 33 | Honest classification (no false PRODUCTION_COMPLETE) | PASS → **MG5_QUALIFIED** |
 
 ## Commands / results (this closeout)
 
 | Command | Result |
 |---------|--------|
-| `npm run test:mg5` | PASS (28 tests) |
+| `npm run test:mg5` | PASS (42 tests) |
 | `npm run typecheck -w @mccoy/cms-schema` | PASS |
-| `npm run cms:migrate-fixed-blocks -- --dry-run --environment test --fixture-dir packages/cms-schema/src/migration/mg5-fixtures` | PASS — runId `mg5_e14b5b2f-dcca-499a-a0c4-8ca811b5673e`, changed=5, blocked=0, failed=0 |
-| Production / staging apply | **NOT EXECUTED** |
+| `npm run cms:migrate-fixed-blocks:verify-env -- --environment staging` | FAIL exit 2 — `mg5.env.missing_mccoy_environment` |
+| `npm run cms:migrate-fixed-blocks -- --dry-run --environment staging` | REFUSED by identity gate (no CMS I/O) |
+| Offline fixture dry-run (prior) | PASS — runId `mg5_e14b5b2f-…`, changed=5, blocked=0, failed=0 |
+| Staging / production apply | **NOT EXECUTED** |
+| Merge MG5 → main | **NOT DONE** (blocked on `MG5_STAGING_COMPLETE`) |
 
 ## Prerequisites for R8 / MR
 
-1. Prefer keeping **MG5_QUALIFIED**; obtain staging dry-run + backup/rollback on a real cohort before any production GO.
+1. Keep **MG5_QUALIFIED** until staging is positively identified and `MG5_STAGING_COMPLETE` is earned.
 2. Do not start **MR** until R8 reviews MG5 evidence and unqualified rows are dual-read or full-mode staging-proven.
 3. Unqualified matrix rows remain blocked for production apply.
+4. Do not start **R8** until after merge policy allows (post-`MG5_STAGING_COMPLETE`); this closeout does not start R8.
 
 ## Confirmations
 
 - **MR was NOT started.**
 - **R8 was NOT started.**
-- **No silent production CMS mutation** was performed by MG5 tooling.
+- **No staging CMS dry-run or apply** — identity gate refused before DB access.
+- **No production migration** and **no silent production CMS mutation**.
+- Production safety gates (confirm phrase, qualification, CAS, backup) unchanged / not weakened.
 - Unrelated local WIP (`apps/admin/.../vercel-web-analytics.server.ts`) left uncommitted / outside MG5 commits.

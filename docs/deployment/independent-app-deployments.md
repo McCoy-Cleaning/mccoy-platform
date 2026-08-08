@@ -134,9 +134,11 @@ Require these job names (plus CMS E2E as appropriate) on branch protection.
 | Root Directory | `apps/admin` | `apps/storefront` |
 | Include files outside Root Directory | **On** | **On** |
 | Production branch | `main` | `main` |
-| Staging | `staging` (or separate staging projects) | Same |
+| Staging branch | `development` (alias `dev`) | Same |
 | Domains | `admin.mccoy.nl` | `www.mccoy.nl`, `mccoy.nl` |
 | Env | Admin secrets + `GROQ_*`, staff, inbox | Public + form SMTP; **no** `GROQ_*` / staff invite |
+| `MCCOY_ENVIRONMENT` | `staging` on development/preview; `production` on `main` | Same |
+| Supabase | Staging project on development/preview; production project on `main` (distinct refs; set `MCCOY_*_SUPABASE_PROJECT_ID` allowlists) | Same |
 
 `.vercel/project.json` is local linking only — not committed. Linking both projects locally is optional for CLI deploys.
 
@@ -148,6 +150,7 @@ Require these job names (plus CMS E2E as appropriate) on branch protection.
 |----------|:-----:|:----------:|
 | `VITE_SUPABASE_*` / `SUPABASE_URL` / publishable | Y | Y |
 | `SUPABASE_SECRET_KEY` | Y | Only if storefront server fns need it |
+| `MCCOY_ENVIRONMENT` / `MCCOY_STAGING_SUPABASE_PROJECT_ID` / `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` | Y (operator + deploy identity) | Y (deploy identity; must match branch mapping) |
 | `VITE_ADMIN_ORIGIN` / `VITE_STOREFRONT_ORIGIN` | Y | Y |
 | `ADMIN_HOST` / `PUBLIC_HOST` / `HOST_ENFORCE` | Y | Y |
 | `ADMIN_*` session / legacy auth | Y | N |

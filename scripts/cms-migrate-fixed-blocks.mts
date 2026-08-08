@@ -4,8 +4,11 @@
  * Dry-run never writes CMS records.
  * Apply is fail-closed: requires qualified dry-run, backup, CAS revision, post-write verify.
  * Production apply additionally requires --confirm-production "MIGRATE PRODUCTION CMS".
+ * Staging/production ops require verified MCCOY_ENVIRONMENT + git branch + Supabase allowlist.
+ * There is no --force / --skip / --ignore bypass.
  *
  * Usage:
+ *   npm run cms:migrate-fixed-blocks -- --verify-environment --environment staging
  *   npm run cms:migrate-fixed-blocks -- --dry-run
  *   npm run cms:migrate-fixed-blocks -- --dry-run --page-key products --environment staging
  *   npm run cms:migrate-fixed-blocks -- --apply --environment staging --qualified-run <id>
@@ -13,6 +16,7 @@
  *
  * Never invoked from application startup, CI apply, or preview builds.
  */
+import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,9 +26,12 @@ import {
   MG5_MIGRATION_VERSION,
   MG5_PRODUCTION_CONFIRM_PHRASE,
   assertApplyGates,
+  mg5EnvironmentVerifyInputFromEnv,
   runMg5Apply,
   runMg5DryRun,
   runMg5Rollback,
+  toSafeMg5EnvironmentDiagnostics,
+  verifyMg5DeploymentTarget,
   type BuiltinCmsPage,
   type Mg5BackupArtifact,
   type Mg5BackupPort,
@@ -44,10 +51,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const defaultBackupRoot = path.join(root, ".data", "mg5-backups");
 
+const ALLOWED_ENVIRONMENTS = new Set<Mg5Environment>([
+  "local",
+  "staging",
+  "production",
+  "test",
+]);
+
 type CliArgs = {
   dryRun: boolean;
   apply: boolean;
   rollback: boolean;
+  verifyEnvironment: boolean;
   environment: Mg5Environment;
   pageId?: string;
   pageKey?: string;
@@ -64,6 +79,7 @@ function parseArgs(argv: string[]): CliArgs {
     dryRun: false,
     apply: false,
     rollback: false,
+    verifyEnvironment: false,
     environment: "local",
     backupDir: defaultBackupRoot,
     migrationMode: "family",
@@ -74,7 +90,19 @@ function parseArgs(argv: string[]): CliArgs {
     if (a === "--dry-run") args.dryRun = true;
     else if (a === "--apply") args.apply = true;
     else if (a === "--rollback") args.rollback = true;
-    else if (a === "--environment" && next) {
+    else if (a === "--verify-environment") args.verifyEnvironment = true;
+    else if (a === "--force" || a === "--skip" || a === "--ignore" || a.startsWith("--force-") || a.startsWith("--skip-") || a.startsWith("--ignore-")) {
+      console.error(
+        `Rejected unsafe flag "${a}". MG5 has no force/skip/ignore bypass; fix environment identity instead.`,
+      );
+      process.exit(2);
+    } else if (a === "--environment" && next) {
+      if (!ALLOWED_ENVIRONMENTS.has(next as Mg5Environment)) {
+        console.error(
+          `Invalid --environment "${next}". Expected local|staging|production|test.`,
+        );
+        process.exit(2);
+      }
       args.environment = next as Mg5Environment;
       i += 1;
     } else if (a === "--page-id" && next) {
@@ -104,6 +132,10 @@ function parseArgs(argv: string[]): CliArgs {
     } else if (a === "--help" || a === "-h") {
       printHelp();
       process.exit(0);
+    } else if (a.startsWith("-")) {
+      console.error(`Unknown flag "${a}".`);
+      printHelp();
+      process.exit(2);
     }
   }
   return args;
@@ -113,6 +145,7 @@ function printHelp() {
   console.log(`MG5 fixed→blocks migration operator (${MG5_MIGRATION_VERSION})
 
 Modes (exactly one):
+  --verify-environment
   --dry-run
   --apply
   --rollback
@@ -128,12 +161,68 @@ Options:
   --backup-dir <dir>            (default .data/mg5-backups)
   --fixture-dir <dir>           (offline fixture pages; no DB writes)
 
+Deployment identity (staging/production, non-fixture):
+  MCCOY_ENVIRONMENT=staging|production|development
+  MCCOY_STAGING_SUPABASE_PROJECT_ID=<ref>
+  MCCOY_PRODUCTION_SUPABASE_PROJECT_ID=<ref>
+  Branch development|dev → staging; branch main → production
+  Current project ref derived from SUPABASE_URL / VITE_SUPABASE_URL
+
 Safety:
   Dry-run never writes CMS records.
+  Staging/production refuse mismatched env/branch/project allowlist (fail-closed).
+  Shared staging=production Supabase project is refused for staging qualification.
   Apply refuses stale qualification / missing backup / unresolved conflicts.
   Production apply requires explicit confirm phrase.
+  No --force / --skip / --ignore flags.
   Never run from app startup or CI apply jobs.
 `);
+}
+
+function readGitBranch(cwd: string): string | null {
+  try {
+    const out = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+function requireDeploymentTarget(args: CliArgs): void {
+  // Offline fixtures never bind to live Supabase allowlists.
+  if (args.fixtureDir) return;
+  if (args.environment !== "staging" && args.environment !== "production") return;
+
+  const verification = verifyMg5DeploymentTarget(
+    mg5EnvironmentVerifyInputFromEnv({
+      requestedEnvironment: args.environment,
+      gitBranch: readGitBranch(root),
+    }),
+  );
+  const safe = toSafeMg5EnvironmentDiagnostics(verification);
+  logEvent("mg5.env.verified", safe);
+  if (!verification.ok) {
+    console.error(
+      `MG5 environment verification FAILED (${verification.code ?? "unknown"}): ${verification.reason}`,
+    );
+    console.error(
+      JSON.stringify(
+        {
+          environment: safe.environment,
+          branch: safe.branch,
+          supabaseProjectRef: safe.supabaseProjectRef,
+          targetVerified: safe.targetVerified,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(2);
+  }
 }
 
 function logEvent(name: string, fields: Record<string, unknown>) {
@@ -248,12 +337,31 @@ async function writeJson(filePath: string, value: unknown) {
 async function main() {
   ensureMonorepoEnvLoaded();
   const args = parseArgs(process.argv.slice(2));
-  const modes = [args.dryRun, args.apply, args.rollback].filter(Boolean).length;
+  const modes = [args.verifyEnvironment, args.dryRun, args.apply, args.rollback].filter(
+    Boolean,
+  ).length;
   if (modes !== 1) {
-    console.error("Specify exactly one of --dry-run | --apply | --rollback");
+    console.error(
+      "Specify exactly one of --verify-environment | --dry-run | --apply | --rollback",
+    );
     printHelp();
     process.exit(2);
   }
+
+  if (args.verifyEnvironment) {
+    const verification = verifyMg5DeploymentTarget(
+      mg5EnvironmentVerifyInputFromEnv({
+        requestedEnvironment: args.environment,
+        gitBranch: readGitBranch(root),
+      }),
+    );
+    const safe = toSafeMg5EnvironmentDiagnostics(verification);
+    console.log(JSON.stringify(safe, null, 2));
+    process.exit(verification.ok ? 0 : 2);
+  }
+
+  // Staging/production against a live store require positive identity (fail-closed).
+  requireDeploymentTarget(args);
 
   if (args.apply) {
     const gate = assertApplyGates({

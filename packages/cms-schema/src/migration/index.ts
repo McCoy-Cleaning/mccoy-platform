@@ -213,3 +213,18 @@ export {
   type Mg5QualificationRecord,
   type Mg5OperatorOptions,
 } from "./mg5-operator";
+export {
+  verifyMg5DeploymentTarget,
+  mg5EnvironmentVerifyInputFromEnv,
+  toSafeMg5EnvironmentDiagnostics,
+  extractSupabaseProjectRef,
+  redactProjectRef,
+  parseMccoyEnvironment,
+  branchMatchesEnvironment,
+  expectedBranchesForEnvironment,
+  normalizeProjectRef,
+  type MccoyEnvironmentName,
+  type Mg5EnvironmentVerifyInput,
+  type Mg5EnvironmentVerifyResult,
+  type Mg5EnvironmentDiagnostics,
+} from "./mg5-environment";

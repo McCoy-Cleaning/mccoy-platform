@@ -97,8 +97,19 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 - `ADMIN_HOST`, `PUBLIC_HOST`, `HOST_ENFORCE` — host routing
 - `MCCOY_ALLOW_INDEXING` — storefront crawl override (`1` force allow, `0` force deny). Default: allow only when `VERCEL_ENV=production`; preview/local/staging stay `noindex` (see `packages/security/src/indexing.ts`)
 - `MCCOY_DATA_DIR` — optional override for local/file CMS and request stores
+- `MCCOY_ENVIRONMENT` — explicit deploy/operator label: `staging` | `production` | `development` (required for MG5 staging/production migrate)
+- `MCCOY_STAGING_SUPABASE_PROJECT_ID` / `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` — allowlisted Supabase project refs; must differ. MG5 derives the current ref from `SUPABASE_URL` / `VITE_SUPABASE_URL` and fail-closes on mismatch
 - `GROQ_*` — content AI (**Admin only**)
 - `VERCEL_TOKEN`, `VERCEL_WEB_ANALYTICS_PROJECT_ID`, optional `VERCEL_TEAM_ID` — admin overview visitor counts from Vercel Web Analytics API (**Admin only**, server-side). Enable Web Analytics on the storefront Vercel project; Hobby includes 50k events/month and a ~1 month reporting window. Do not put these on `VITE_*`.
+
+### Branch → environment → Supabase (authoritative)
+
+| Git branch | Environment | Vercel | Supabase |
+|------------|-------------|--------|----------|
+| `development` (alias `dev`) | staging | development / preview | staging project (`MCCOY_STAGING_SUPABASE_PROJECT_ID`) |
+| `main` | production | production | production project (`MCCOY_PRODUCTION_SUPABASE_PROJECT_ID`) |
+
+Do not point staging migrate tooling at the production Supabase project. A shared staging=production database blocks MG5 staging qualification.
 
 ## Website requests / Aanvragen
 
