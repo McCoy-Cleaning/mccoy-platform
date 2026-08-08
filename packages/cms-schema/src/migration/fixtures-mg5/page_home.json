@@ -1,0 +1,23 @@
+﻿{
+  "draftRevisionNumber": 1,
+  "payload": {
+    "kind": "builtin",
+    "isCustom": false,
+    "id": "page_home",
+    "pageKey": "home",
+    "slug": "/",
+    "title": "Home",
+    "description": "MG5 fixture",
+    "inNav": true,
+    "blocks": [],
+    "layout": [
+      { "id": "fixed:home.hero", "kind": "fixed", "key": "home.hero", "hidden": false }
+    ],
+    "layoutVersion": 7,
+    "sectionContent": {
+      "home.hero": { "heading": "Hero NL", "body": "Body NL" }
+    },
+    "updatedAt": 1,
+    "version": 1
+  }
+}
