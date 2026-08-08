@@ -58,7 +58,11 @@
     "guardian:inventory": "node .cursor/guardian/cli.mjs inventory",
     "guardian:smoke": "node .cursor/guardian/cli.mjs smoke",
     "review:r8": "node scripts/r8-review/cli.mjs",
-    "review:r8:self-test": "node scripts/r8-review/finding-schema.test.mjs && node scripts/r8-review/cli.mjs --fixtures --no-write"
+    "review:r8:self-test": "node scripts/r8-review/finding-schema.test.mjs && node scripts/r8-review/cli.mjs --fixtures --no-write",
+    "seo:diff-guard": "node scripts/seo/safe-mode-diff-guard.mjs",
+    "seo:visible-baseline:write": "node scripts/seo/visible-baseline.mjs write",
+    "seo:visible-baseline:check": "node scripts/seo/visible-baseline.mjs check",
+    "test:seo": "npm run seo:diff-guard && npm run seo:visible-baseline:check && npm run test -w @mccoy/security -- src/indexing.test.ts src/host-canonical.test.ts && npm run test -w @mccoy/cms-schema -- src/resolve-seo.test.ts && npm run test -w @mccoy/database -- src/cms/indexnow.test.ts src/cms/sitemap-seo.test.ts src/cms/conformance.test.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
