@@ -32,6 +32,8 @@
     "test:mocks": "npm run test:mock",
     "test:contract": "npm run test -w @mccoy/cms-schema",
     "test:contracts": "npm run test:contract",
+    "cms:migrate-fixed-blocks": "vite-node --config scripts/mg5-vite.config.mts scripts/cms-migrate-fixed-blocks.mts",
+    "test:mg5": "npm run test -w @mccoy/cms-schema -- src/migration/mg5-matrix.test.ts src/migration/mg5-pipeline.test.ts src/migration/mg5-operator.test.ts src/migration/mg5-form-identity.test.ts src/migration/gate4-dry-run.test.ts",
     "test:integration": "npm run test -w @mccoy/cms-renderer",
     "test:integrations": "npm run test:integration",
     "test:e2e": "playwright test --project=chromium",
