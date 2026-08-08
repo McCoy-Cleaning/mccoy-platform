@@ -1,0 +1,107 @@
+{
+  "home": {
+    "route": "/",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_home.json",
+    "hash": "41dd766304950596167617c86f3ca3950b6151c96d063ece6b071788f7300b73",
+    "payload": {
+      "route": "/",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "products": {
+    "route": "/products",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_products.json",
+    "hash": "9b59d674c9ae79892694b226bc340347164285f9db64a16e9f64121017f4c773",
+    "payload": {
+      "route": "/products",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "contact": {
+    "route": "/contact",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_about.json",
+    "hash": "ed707809be1f1edd6235fa963888711354baa0fb212b1b3d8f911fcda87a139d",
+    "payload": {
+      "route": "/contact",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "offerte": {
+    "route": "/offerte",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_offerte.json",
+    "hash": "c75d2e2314d8620e979609d01b63dabbb45da3f4478deb748f85dda5ffb91835",
+    "payload": {
+      "route": "/offerte",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "vacatures": {
+    "route": "/vacatures",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_about.json",
+    "hash": "3ed2262b7b91fff2c038c15fa8873b27ce8233bd3f81031c03e29ea65423ca5e",
+    "payload": {
+      "route": "/vacatures",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "about_cms": {
+    "route": "/about",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_about.json",
+    "hash": "804d77cee996f16a4e4c597501c0ec942b40532ea06b31ff7c9deee0fc883072",
+    "payload": {
+      "route": "/about",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  },
+  "privacy_en_proxy": {
+    "route": "/en/privacy",
+    "source": "packages\\cms-schema\\src\\migration\\mg5-fixtures\\page_privacy.json",
+    "hash": "b3c2b43985bde730d21ffee2452fc0bb282e7f2172d1376a7cabed0fc4d49a19",
+    "payload": {
+      "route": "/en/privacy",
+      "sectionOrder": [],
+      "blockIds": [],
+      "headings": [],
+      "links": [],
+      "images": [],
+      "formLabels": [],
+      "visibleTextSample": []
+    }
+  }
+}
