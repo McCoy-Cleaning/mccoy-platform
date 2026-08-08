@@ -21,6 +21,43 @@
         "@prisma/client",
         "packages/infrastructure/**"
       ]
+    },
+    {
+      "name": "storefront-forbids-cms-editor",
+      "enabled": true,
+      "from": [
+        "apps/storefront/**"
+      ],
+      "deny": [
+        "@mccoy/cms-editor",
+        "@mccoy/cms-editor/**"
+      ]
+    },
+    {
+      "name": "renderer-forbids-cms-editor",
+      "enabled": true,
+      "from": [
+        "packages/cms-renderer/**"
+      ],
+      "deny": [
+        "@mccoy/cms-editor",
+        "@mccoy/cms-editor/**"
+      ]
+    },
+    {
+      "name": "schema-forbids-react-apps",
+      "enabled": true,
+      "from": [
+        "packages/cms-schema/**"
+      ],
+      "deny": [
+        "react",
+        "react-dom",
+        "react/*",
+        "@mccoy/storefront",
+        "@mccoy/admin",
+        "@mccoy/cms-editor"
+      ]
     }
   ]
 }
