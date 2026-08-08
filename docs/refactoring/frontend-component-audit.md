@@ -48,7 +48,7 @@ Existing E2E inventory and known gaps: [docs/testing/application-e2e-matrix.md](
 
 - Root `lint` is a thin typecheck alias — do not treat exit 0 as app-wide ESLint coverage.
 - Builds emit Rollup “chunk > 500 kB” warnings for main bundles; not treated as failures.
-- `.cursor/skills/` is **absent** today. Guardian CLI scripts exist in `package.json` (`guardian:doctor|verify|inventory|smoke`). Stage 7 skills belong under `.cursor/skills/` when created (not in Stage 1–2).
+- `.cursor/skills/` **implemented in R8** (eight `*-review` skills + finding contract). Guardian CLI remains for cheap deterministic checks (`guardian:doctor|verify|inventory|smoke`). Runner: `npm run review:r8`.
 
 ---
 
@@ -158,7 +158,7 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Version** | `fixed-block/v1` (distinct from `CMS_SCHEMA_VERSION=6`) |
 | **Classification** | `MG5_QUALIFIED` (fixture dry-run); production apply **NO-GO** |
 | **Docs** | [`mg5-migration-audit.md`](./mg5-migration-audit.md), [`mg5-migration-matrix.md`](./mg5-migration-matrix.md), [`mg5-migration-runbook.md`](./mg5-migration-runbook.md), [`mg5-migration-closeout.md`](./mg5-migration-closeout.md) |
-| **Stop line** | R8 / MR not started |
+| **Stop line** | R8 complete (`R8_ACCEPTED_WITH_OPERATIONS_HOLD`); MR **not started / not eligible** |
 
 ### 10. `packages/cms-editor/src/ai-assist.tsx` (~855)
 

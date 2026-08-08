@@ -1,6 +1,6 @@
 # Frontend component architecture â€” Stage 1 / roadmap R1â€“R8
 
-**Date:** 2026-08-06 (R7 closeout 2026-08-08 · MG5 code-complete 2026-08-08)
+**Date:** 2026-08-06 (R7 closeout 2026-08-08 · MG5 qualified 2026-08-08 · R8 2026-08-08)
 **Scope:** Target architecture and roadmap for frontend component refactoring.
 **Companion audit:** [frontend-component-audit.md](./frontend-component-audit.md)
 
@@ -144,7 +144,7 @@ McCoy already uses **registry + dedicated module** patterns. Continue that inste
 | **5** | Registry decomposition | **Complete (2026-08-06).** All 35 types registered; orchestration-only `RegisteredBlockView` | cms-schema, cms-editor, cms-renderer |
 | **6** | Admin CMS store modularization (**R6**) | **Complete (2026-08-08).** Split persistence / layout / publish / EN behind stable `cms` faÃ§ade | `apps/admin/src/lib/cms/store*.ts` â€” see [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md) |
 | **7 / R7** | Storefront composition cleanup | **Complete (2026-08-08).** `PageLayoutRenderer` orchestration; fixed views split; BlockView â†’ RegisteredBlockView; no BlockType mega-switch | see [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md) |
-| **8 / R8** | Cursor skills + optional `@mccoy/ui` promotion | Report-only skills under `.cursor/skills/`; promote only proven cross-app primitives | `.cursor/skills/*`, `packages/ui` |
+| **8 / R8** | Cursor skills + final qualification | **Complete (2026-08-08) — `R8_ACCEPTED_WITH_OPERATIONS_HOLD`.** Eight report-only skills + finding contract + deterministic runner; MG5 staging ops hold | `.cursor/skills/*`, `docs/reviews/*`, [`r8-final-verification.md`](./r8-final-verification.md) |
 
 Stages 3+ must re-check the **protected-invariants register** in the audit doc before each slice.
 
@@ -202,7 +202,7 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Stage 7 / R7 (complete â€” 2026-08-08):** Storefront composition cleanup â€” class-level layout orchestration, fixed-section module split, thin `BlockView`, presentation adapters isolated, composition contract tests. See [`r7-storefront-composition-closeout.md`](./r7-storefront-composition-closeout.md).
 
-**MG5 (qualified â€” 2026-08-08):** Production-grade fixedâ†’blocks migration machinery (`fixed-block/v1`) â€” matrix, pure pipeline wrapping resolve-time family modules, dry-run/apply/rollback operator CLI, backup/CAS/post-write verify, offline fixture cohort dry-run green. See [`mg5-migration-closeout.md`](./mg5-migration-closeout.md). Classification **MG5_QUALIFIED**; production apply **NO-GO**. **R8 / MR not started.**
+**MG5 (qualified â€” 2026-08-08):** Production-grade fixedâ†’blocks migration machinery (`fixed-block/v1`) â€” matrix, pure pipeline wrapping resolve-time family modules, dry-run/apply/rollback operator CLI, backup/CAS/post-write verify, offline fixture cohort dry-run green. See [`mg5-migration-closeout.md`](./mg5-migration-closeout.md). Classification **MG5_QUALIFIED**; staging persisted-data **PENDING**; apply **NO-GO**.
 
 ### Stage 2 default (historical detail)
 
@@ -215,9 +215,9 @@ See audit Â§ â€œPrecise Stage 2 slice recommendationâ€. Summary:
 
 ---
 
-## R8 â€” skills requirements (formerly labelled Stage 7 skills)
+## R8 — review skills (implemented 2026-08-08)
 
-Skills live under **`.cursor/skills/`** (directory currently **absent**). Guardian hooks/CLI may already exist for verify/inventory/smoke; skills are a separate, report-oriented layer and must not silently rewrite production code. **Do not start R8 until MG5 is closed (prefer MG5_QUALIFIED).** MR waits for MG5 + R8.
+Skills live under **`.cursor/skills/`**. Classification: **`R8_ACCEPTED_WITH_OPERATIONS_HOLD`**. See [`r8-final-verification.md`](./r8-final-verification.md), [`follow-up-recommendations.md`](./follow-up-recommendations.md), and `docs/reviews/`. Guardian remains cheap deterministic checks only (not full LLM reviews on every save). Runner: `npm run review:r8`.
 
 ### Mandatory skill behaviour
 
@@ -229,14 +229,18 @@ Skills live under **`.cursor/skills/`** (directory currently **absent**). Guardi
 | **Deduplication** | Findings with the same ruleId+path(+symbol) collapse; skills must merge duplicates across runs. |
 | **No subjective Guardian gate** | Do not block merges on taste (â€œlooks cleanerâ€). Gates are invariant/regression/dependency checks from Stage 1 outcome gates and CI. Guardian may **report**; it must not invent subjective pass/fail cosmetics. |
 
-### Suggested R8 skill set (non-implementing)
+### Implemented R8 skill set
 
-1. `frontend-boundary-check` â€” dependency direction violations.
-2. `cms-invariant-check` â€” pageKey / form-source / publish validation touch points.
-3. `a11y-async-ux-check` â€” spinner-only, missing alert roles, `window.confirm`.
-4. `duplication-report` â€” candidate shared components with call-site lists.
+1. `architecture-review`
+2. `ui-ux-review`
+3. `accessibility-review`
+4. `seo-review`
+5. `security-review`
+6. `bug-risk-review`
+7. `performance-review`
+8. `platform-review`
 
-Each skill should read the Stage 1 audit/architecture docs as input context.
+Contract: `.cursor/skills/_shared/finding-contract.md`. MR remains blocked until MG5 staging/persisted-data evidence exists.
 
 ---
 
