@@ -3,6 +3,14 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build -w @mccoy/storefront",
   "ignoreCommand": "node ../../scripts/vercel-ignore.mjs storefront",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/fonts/(.*)",

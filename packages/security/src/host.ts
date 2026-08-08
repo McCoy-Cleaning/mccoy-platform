@@ -11,6 +11,9 @@
  * alongside Start middleware. File-based .env fallback lives in env.ts.
  */
 
+/** Production public canonical host (no protocol). */
+export const CANONICAL_PUBLIC_HOST = "www.mccoy.nl";
+
 function readHostEnv(name: string): string {
   try {
     return (typeof process !== "undefined" ? process.env[name] : undefined)?.trim() || "";
@@ -42,6 +45,12 @@ function isLocalHost(host: string): boolean {
   return h === "localhost" || h === "127.0.0.1" || h === "::1" || h.endsWith(".localhost");
 }
 
+/** Strip trailing slash except for `/`. Aligns with normalizeCmsPath. */
+export function stripTrailingSlashPath(pathname: string): string {
+  if (!pathname || pathname === "/") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
+}
+
 export type HostSurface = "admin" | "public" | "shared";
 
 export function resolveHostSurface(hostHeader: string | undefined): HostSurface {
@@ -66,6 +75,68 @@ function isInfrastructurePath(pathname: string): boolean {
   );
 }
 
+export type CanonicalHostRedirect = {
+  redirectTo: string;
+  status: 301;
+  reason: "https" | "apex_to_www" | "trailing_slash" | "combined";
+};
+
+/**
+ * SEO-4 — single-hop preference toward https://www.mccoy.nl + strip trailing slash.
+ * Preserves query string. Skips localhost / preview / infrastructure paths.
+ * Returns null when already canonical (no loop).
+ */
+export function resolveCanonicalHostRedirect(options: {
+  host: string | undefined;
+  pathname: string;
+  search?: string;
+  protocol?: string;
+  /** When false, skip (local/dev). Default: enforce only for known public hosts. */
+  enforce?: boolean;
+}): CanonicalHostRedirect | null {
+  const host = stripPort(options.host ?? "");
+  if (!host || isLocalHost(host)) return null;
+  if (isInfrastructurePath(options.pathname || "/")) return null;
+
+  // Never rewrite admin host into www.
+  const { adminHosts, publicHosts } = getHostConfig();
+  if (adminHosts.includes(host)) return null;
+
+  const isPublicHost = publicHosts.includes(host) || host === "mccoy.nl" || host === "www.mccoy.nl";
+  if (!isPublicHost && options.enforce !== true) return null;
+
+  const incomingProtocol = (options.protocol ?? "https").replace(":", "").toLowerCase();
+  const pathname = options.pathname || "/";
+  const normalizedPath = stripTrailingSlashPath(pathname);
+  const search = options.search ?? "";
+
+  const needsHttps = incomingProtocol === "http";
+  // Apex is the only non-www public host we force to www.
+  const apexToWww = host === "mccoy.nl";
+  const needsSlash = normalizedPath !== pathname;
+
+  if (!needsHttps && !apexToWww && !needsSlash) return null;
+
+  const target = `https://${CANONICAL_PUBLIC_HOST}${normalizedPath === "/" ? "" : normalizedPath}${search}`;
+  // Guard against self-redirect loops.
+  if (
+    !needsHttps &&
+    host === CANONICAL_PUBLIC_HOST &&
+    !needsSlash &&
+    target === `https://${host}${pathname}${search}`
+  ) {
+    return null;
+  }
+
+  let reason: CanonicalHostRedirect["reason"] = "combined";
+  if (needsHttps && apexToWww) reason = "combined";
+  else if (needsHttps) reason = "https";
+  else if (apexToWww) reason = "apex_to_www";
+  else if (needsSlash) reason = "trailing_slash";
+
+  return { redirectTo: target, status: 301, reason };
+}
+
 /**
  * @param app - Which app is handling the request.
  *              Dedicated apps only redirect away from foreign surfaces.
@@ -75,8 +146,9 @@ export function shouldRedirectForHost(options: {
   host: string | undefined;
   pathname: string;
   protocol?: string;
+  search?: string;
   app?: "storefront" | "admin" | "combined";
-}): { redirectTo: string } | null {
+}): { redirectTo: string; status?: number } | null {
   const surface = resolveHostSurface(options.host);
   const pathname = options.pathname || "/";
   if (isInfrastructurePath(pathname)) return null;
@@ -89,6 +161,17 @@ export function shouldRedirectForHost(options: {
   const publicHost = publicHosts[0] ?? "www.mccoy.nl";
 
   if (app === "storefront") {
+    // Prefer one-hop canonical host/slash before surface redirects.
+    const canonical = resolveCanonicalHostRedirect({
+      host: options.host,
+      pathname,
+      search: options.search,
+      protocol: options.protocol,
+    });
+    if (canonical) {
+      return { redirectTo: canonical.redirectTo, status: canonical.status };
+    }
+
     // Storefront never serves /admin*; send browsers to the admin host.
     if (isAdminPath) {
       return { redirectTo: `${protocol}://${adminHost}${pathname}` };

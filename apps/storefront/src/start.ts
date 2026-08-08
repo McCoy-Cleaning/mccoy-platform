@@ -38,13 +38,14 @@ const hostMiddleware = createMiddleware().server(async ({ next }) => {
   const redirect = shouldRedirectForHost({
     host,
     pathname: url.pathname,
+    search: url.search || "",
     protocol: protocolHeader === "http" ? "http" : url.protocol.replace(":", ""),
     app: "storefront",
   });
 
   if (redirect) {
     return new Response(null, {
-      status: 302,
+      status: redirect.status ?? 302,
       headers: { Location: redirect.redirectTo },
     });
   }

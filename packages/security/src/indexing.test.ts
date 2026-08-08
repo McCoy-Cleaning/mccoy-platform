@@ -60,4 +60,11 @@ describe("storefrontRobotsTxt", () => {
     expect(body).toContain("Disallow: /cms-preview");
     expect(body).toContain("Sitemap: https://www.mccoy.nl/sitemap.xml");
   });
+
+  it("fail-closed: preview never indexable without explicit override", () => {
+    expect(isStorefrontIndexable({ vercelEnv: "preview", nodeEnv: "production" })).toBe(
+      false,
+    );
+    expect(storefrontRobotsMetaContent({ vercelEnv: "preview" })).toBe("noindex, nofollow");
+  });
 });
