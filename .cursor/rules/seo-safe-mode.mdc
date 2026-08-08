@@ -1,0 +1,34 @@
+---
+description: SEO Safe Mode — read before any SEO task; protect CMS composition and visible content
+alwaysApply: true
+---
+
+# SEO Safe Mode
+
+Before any SEO-related change, read `docs/seo/SEO-SAFE-MODE.md`.
+
+## Required
+
+- Keep Safe Mode invariant flags false unless the user explicitly authorizes leaving Safe Mode.
+- Prefer technical crawl/head infrastructure over content or layout changes.
+- SEO-7 must not deploy SEO-8 marketing title/description rewrites. Proposed copy stays in `docs/seo/proposed-metadata.md` with `PENDING_APPROVAL`.
+- Canonical origin is always `https://www.mccoy.nl`. Never emit preview/localhost/admin hosts as canonical.
+- IndexNow: production `www.mccoy.nl` URLs only; publish remains successful if notify fails.
+
+## Forbidden without explicit authorization
+
+Do not edit for SEO:
+
+- `packages/cms-renderer` (including block views, `RegisteredBlockView`, `SitePageSections`)
+- Block registries / fixed↔block compatibility
+- CMS migration / MG5 apply logic
+- Translation schema or overlay mutations for SEO copy
+- Producten content, Aanvragen, authentication
+
+`scripts/seo/safe-mode-diff-guard.mjs` must pass for SEO qualification.
+
+## Out of scope shortcuts
+
+- No MG5 apply, no MR kickoff from SEO work
+- No invented JSON-LD reviews, ratings, or prices
+- No visible body/copy/styling changes “for SEO”
