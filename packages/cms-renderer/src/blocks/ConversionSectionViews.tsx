@@ -28,6 +28,15 @@ function cn(...parts: Array<string | false | null | undefined>) {
 
 export type ConversionRenderMode = "preview" | "storefront";
 
+/** Mirrors storefront `useClientReady` so E2E can wait for hydrated submit controls. */
+function useClientReady(): boolean {
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    setReady(true);
+  }, []);
+  return ready;
+}
+
 const CONTACT_FORM_SUCCESS_NL = "Bedankt voor uw bericht.";
 
 const FIELD_INPUT_CLASS =
@@ -301,6 +310,7 @@ export function ContactFormSectionView({
   const [honeypot, setHoneypot] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
+  const clientReady = useClientReady();
   const preview = mode === "preview";
   const textPlacement = normalizeContactFormTextPlacement(d.textPlacement);
   const formColumnsDesktop = normalizeContactFormColumnsDesktop(d.formColumnsDesktop);
@@ -320,7 +330,7 @@ export function ContactFormSectionView({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (preview) return;
+    if (preview || !clientReady) return;
     setError(null);
     const payload: Record<string, string> = {};
     for (const field of fields) {
@@ -388,7 +398,11 @@ export function ContactFormSectionView({
   const formColumn = (
     <SectionSurface variant="form" className={cn(sideBySide && "lg:col-span-7")}>
       {status === "success" ? (
-        <div className="flex flex-col items-center gap-4 py-14 text-center" role="status">
+        <div
+          className="flex flex-col items-center gap-4 py-14 text-center"
+          role="status"
+          data-testid="site-form-success"
+        >
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-2xl text-primary ring-1 ring-primary/30">
             ✓
           </div>
@@ -401,6 +415,7 @@ export function ContactFormSectionView({
           onSubmit={(e) => void onSubmit(e)}
           noValidate
           data-form-columns={formColumnsDesktop}
+          data-testid={clientReady ? "site-form-ready" : "site-form-pending"}
         >
           <div className="sr-only" aria-hidden="true">
             <label>
@@ -454,7 +469,8 @@ export function ContactFormSectionView({
             <p className="text-xs leading-relaxed text-muted-foreground">{consent}</p>
             <button
               type="submit"
-              disabled={preview || status === "loading"}
+              disabled={!clientReady || preview || status === "loading"}
+              aria-disabled={!clientReady || preview || status === "loading"}
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60"
             >
               {status === "loading" ? "Bezig…" : submitLabel}

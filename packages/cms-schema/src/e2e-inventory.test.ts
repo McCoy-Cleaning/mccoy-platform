@@ -12,6 +12,8 @@ import {
 import { FIXED_SECTION_DEFS, FIXED_SECTIONS_BY_PAGE, fixedLayoutId } from "./sections";
 import { compositeEditorRowId } from "./composite-sections";
 import { productsMigrationBlockId } from "./migration/products-blocks";
+import { homeHeroMigrationBlockId } from "./migration/home-hero-blocks";
+import { legalMainMigrationBlockId } from "./migration/legal-blocks";
 
 describe("e2e-inventory catalog (M5)", () => {
   it("ALL_FIXED_SECTION_KEYS matches FIXED_SECTION_DEFS and page map", () => {
@@ -77,5 +79,37 @@ describe("e2e-inventory catalog (M5)", () => {
     expect(byPage.get("page_offerte")).toEqual(["quoteRequestForm"]);
     expect(byPage.get("page_e2e_custom")?.includes("hero")).toBe(true);
     expect(byPage.get("page_e2e_custom")?.includes("quoteRequestForm")).toBe(false);
+  });
+
+  it("home.hero / privacy.main / terms.main accept fixed or migrated block rows", () => {
+    const home = expectedFixedInventoryForPage("page_home", "home").find(
+      (r) => r.fixedKey === "home.hero",
+    );
+    expect(home?.kind).toBe("fixed-or-migrated-blocks");
+    if (home?.kind === "fixed-or-migrated-blocks") {
+      expect(home.migratedLayoutRowIds).toEqual([
+        `block:${homeHeroMigrationBlockId("page_home")}`,
+      ]);
+    }
+
+    const privacy = expectedFixedInventoryForPage("page_privacy", "privacy").find(
+      (r) => r.fixedKey === "privacy.main",
+    );
+    expect(privacy?.kind).toBe("fixed-or-migrated-blocks");
+    if (privacy?.kind === "fixed-or-migrated-blocks") {
+      expect(privacy.migratedLayoutRowIds).toEqual([
+        `block:${legalMainMigrationBlockId("page_privacy", "privacy.main")}`,
+      ]);
+    }
+
+    const terms = expectedFixedInventoryForPage("page_terms", "terms").find(
+      (r) => r.fixedKey === "terms.main",
+    );
+    expect(terms?.kind).toBe("fixed-or-migrated-blocks");
+    if (terms?.kind === "fixed-or-migrated-blocks") {
+      expect(terms.migratedLayoutRowIds).toEqual([
+        `block:${legalMainMigrationBlockId("page_terms", "terms.main")}`,
+      ]);
+    }
   });
 });

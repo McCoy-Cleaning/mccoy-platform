@@ -29,6 +29,7 @@ import {
 } from "./form-source";
 import { normalizeCmsPage } from "./pipeline";
 import { normalizeVacaturesApplicationContent } from "./vacatures-application";
+import { offerteFormMigrationBlockId } from "./migration/offerte-blocks";
 
 export type ResolvedPublishedForm = {
   formId: string;
@@ -298,6 +299,22 @@ export function resolvePublishedFormScope(
         scope,
       },
     };
+  }
+
+  // Storefront may render in-memory migrated quoteRequestForm while the published
+  // revision is still fixed-only. Clients then submit the deterministic migration
+  // block id — treat it as the legacy fixed offerte form source.
+  if (
+    !normalized.blocks.some((b) => b.id === sourceId) &&
+    isOffertePage(normalized) &&
+    (kind === "glass_washing" || kind === "furniture_cleaning") &&
+    sourceId === offerteFormMigrationBlockId(pageId)
+  ) {
+    return resolvePublishedFormScope(page, {
+      pageId,
+      sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
+      kind,
+    });
   }
 
   const block = normalized.blocks.find((b) => b.id === sourceId);

@@ -1,6 +1,16 @@
 import { expect, type Page } from "@playwright/test";
 import { STOREFRONT_ORIGIN, e2eMarker } from "./base";
 
+/** NL + EN success copy — avoid matching field labels like "Uw bericht". */
+const FORM_SUCCESS_TEXT = /bedankt|thank you|ontvangen|received|we nemen|we will be in touch/i;
+
+async function expectFormSuccess(page: Page) {
+  const byTestId = page.getByTestId("site-form-success");
+  const byStatus = page.getByRole("status").filter({ hasText: FORM_SUCCESS_TEXT });
+  await expect(byTestId.or(byStatus).first()).toBeVisible({ timeout: 30_000 });
+  expect(page.url()).not.toMatch(/[?&]name=/);
+}
+
 export type ContactFormInput = {
   name: string;
   email: string;
@@ -47,12 +57,7 @@ export async function submitContactForm(
 
   await expect(page.getByRole("textbox", { name: /^Naam/i })).toHaveValue(name);
   await submit.click();
-
-  const success = page.getByText(/bedankt|succes|ontvangen/i).first();
-  const alert = page.getByRole("alert").first();
-  await expect(success.or(alert)).toBeVisible({ timeout: 30_000 });
-  await expect(success).toBeVisible({ timeout: 5_000 });
-  expect(page.url()).not.toMatch(/[?&]name=/);
+  await expectFormSuccess(page);
 
   return { marker, email, name };
 }
@@ -84,11 +89,7 @@ export async function submitOfferteGlassForm(page: Page): Promise<{ marker: stri
   }
 
   await submit.click();
-  const success = page.getByText(/bedankt|succes|ontvangen/i).first();
-  const alert = page.getByRole("alert").first();
-  await expect(success.or(alert)).toBeVisible({ timeout: 30_000 });
-  await expect(success).toBeVisible({ timeout: 5_000 });
-  expect(page.url()).not.toMatch(/[?&]name=/);
+  await expectFormSuccess(page);
 
   return { marker, email };
 }
