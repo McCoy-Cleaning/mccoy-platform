@@ -140,7 +140,7 @@ McCoy already uses **registry + dedicated module** patterns. Continue that inste
 | **3** | Aanvragen feature extraction | **Complete (2026-08-06).** Extracted into `apps/admin/src/features/inquiries/`; thin route composition only | `apps/admin/src/features/inquiries/*`, thin `admin.inquiries.tsx` (6 lines) |
 | **4** | cms-editor barrel / inspector split | **Complete (2026-08-06).** Inspectors/helpers out of barrel; `index.tsx` re-exports only (**97** lines; was **3102**) | `packages/cms-editor` |
 | **5** | Registry decomposition | **Complete (2026-08-06).** All 35 types registered; orchestration-only `RegisteredBlockView` | cms-schema, cms-editor, cms-renderer |
-| **6** | Admin CMS store modularization | Split persistence / layout mutations / publish / EN planning | `apps/admin/src/lib/cms/store.ts` |
+| **6** | Admin CMS store modularization (**R6**) | **Complete (2026-08-08).** Split persistence / layout / publish / EN behind stable `cms` façade | `apps/admin/src/lib/cms/store*.ts` — see [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md) |
 | **7** | Storefront composition cleanup | Clarify section routers vs renderer; no admin chrome leakage | `SitePageSections`, home sections |
 | **8** | Cursor skills + optional `@mccoy/ui` promotion | Report-only skills under `.cursor/skills/`; promote only proven cross-app primitives | `.cursor/skills/*`, `packages/ui` |
 
@@ -194,7 +194,9 @@ Collapsed `packages/cms-editor/src/index.tsx` to a thin re-export barrel (**97**
 
 **Localisation unit coverage:** see audit § Stage 4 “Localisation unit coverage matrix” (`translation-field`, `en-field-drafts`, `en-field-sync`, `translation-coverage`, `cms-text-fallback`, `en-draft-fields`).
 
-**Stage 5 (complete — 2026-08-06):** All 35 publishable types registered; `RegisteredBlockView` orchestration-only. See [`stage5-registry-closeout.md`](./stage5-registry-closeout.md). Do not start Stage 6 until prioritised.
+**Stage 5 (complete — 2026-08-06):** All 35 publishable types registered; `RegisteredBlockView` orchestration-only. See [`stage5-registry-closeout.md`](./stage5-registry-closeout.md).
+
+**Stage 6 / R6 (complete — 2026-08-08):** Admin CMS store split into capability modules; public `cms` / hooks unchanged. See [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md) (Stage 6 alias: [`stage6-cms-store-closeout.md`](./stage6-cms-store-closeout.md)). Stage 7 / R7 (storefront composition) not started.
 
 ### Stage 2 default (historical detail)
 

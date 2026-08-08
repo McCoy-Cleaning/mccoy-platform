@@ -68,15 +68,15 @@ Disposition values: `split-required | extract-helpers | extract-feature | regist
 | **Disposition** | `split-required` — **done in Stage 4** |
 | **Why** | Mixes public package API, fixed-section editors, and low-level field chrome in one file. Block editors already live under `./blocks/`; remaining inspectors and helpers should follow that pattern so the barrel only re-exports. |
 
-### 2. `apps/admin/src/lib/cms/store.ts` (~1534; prior est. ~1600)
+### 2. `apps/admin/src/lib/cms/store.ts` (~123 façade; was ~1798) — **R6 complete**
 
 | | |
 |--|--|
-| **Primary responsibility** | Admin CMS client store: localStorage persistence, draft dirty tracking, layout mutations, EN draft sync / Opslaan locale decisions, publish/save/delete server calls, preview snapshot session maps. |
-| **Imports** | Heavy `@mccoy/cms-schema` pipeline/layout/i18n APIs; `./server-publish`, `./publish-sync`, `./templates`, `@/lib/api/cms-publish.functions`, `@/lib/api/content-ai.functions`. |
+| **Primary responsibility** | Thin public façade: `cms` object + React hooks. Bodies live in `store-persistence.ts`, `store-draft.ts`, `store-layout.ts`, `store-publish.ts`, `store-en.ts`. |
+| **Imports** | Schema preview helpers + slice modules only. |
 | **Who imports it** | Admin website routes and CMS components (`admin.website.$pageId`, layout editors, locale panels, etc.). |
-| **Disposition** | `extract-helpers` (later: `split-required` for persistence vs mutation vs publish) |
-| **Why** | Cohesive domain store, but persistence, layout ops, translation planning, and server publish are separable modules with clear seams. Not Stage 2. |
+| **Disposition** | `split-required` — **done in R6 / Stage 6** |
+| **Why** | Persistence, layout ops, translation planning, and server publish are separable modules with clear seams. Closeout: [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md). |
 
 ### 3. `apps/admin/src/routes/admin.inquiries.tsx` (**6** lines after Stage 3; was ~1457)
 
@@ -585,7 +585,7 @@ Honest gap: no single matrix test named “inspector callback/path parity” end
 
 ### Stage 5 closeout (complete — 2026-08-06)
 
-**Status:** Complete. All publishable `BlockType`s render through `blockViewRegistry`; `RegisteredBlockView` is orchestration-only. Stage 6 not started.
+**Status:** Complete. All publishable `BlockType`s render through `blockViewRegistry`; `RegisteredBlockView` is orchestration-only. R6 / Stage 6 (admin store split) completed later — see [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md).
 
 **Docs:** [`stage5-registry-inventory.md`](./stage5-registry-inventory.md), [`stage5-registry-closeout.md`](./stage5-registry-closeout.md).
 

@@ -2,7 +2,7 @@
 
 **Status:** Complete  
 **Date:** 2026-08-06  
-**Stop line:** Stage 6 not started (no store modularisation / storefront composition cleanup)
+**Stop line (at Stage 5 closeout):** Stage 6 / R6 not started. *(R6 admin store modularization later completed — see [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md).)*
 
 ## Baseline commits (confirmed)
 
@@ -144,13 +144,13 @@
 2. Locale publish E2E fixture still asserts ephemeral `"Opgeslagen"` toast — tracked follow-up, not Stage 5 regression.
 3. Unrelated security/XSS WIP was stashed during this work and must not be mixed into Stage 5.
 
-## Precise Stage 6 proposal
+## Precise Stage 6 / R6 proposal
 
-**Do not start until product prioritises it.**
+**Status:** Admin store modularization **complete** (2026-08-08) as **R6**. See [`r6-admin-cms-store-closeout.md`](./r6-admin-cms-store-closeout.md).
 
-Stage 6 should modularise the **CMS store / draft-publish session** and storefront page composition without touching registries:
+R6 (Stage 6) modularised the **admin CMS store / draft-publish session** without touching registries:
 
-1. Extract admin + storefront CMS store concerns into capability modules (draft session, publish sync, locale overlays) behind existing public APIs.
+1. Extract admin CMS store concerns into capability modules (persistence, layout/draft, publish sync, EN planning) behind existing public APIs. *(Storefront store split deferred; R7 / Stage 7 owns storefront composition.)*
 2. Keep `RegisteredBlockView` / registries frozen as the single markup path.
 3. No content migration, no new blocks, no Aanvragen changes, no visual redesign.
 4. Entry criteria: Stage 5 closeout accepted; locale `savePage` fixture fix optionally landed first to reduce E2E noise.
