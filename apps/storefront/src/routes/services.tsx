@@ -5,6 +5,7 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 import { servicesCardsPreloadLinks } from "@/lib/image-delivery";
 import type { ServicesCardsContent } from "@mccoy/cms-schema";
 
@@ -35,22 +36,16 @@ export const Route = createFileRoute("/services")({
   head: ({ loaderData }) => {
     const page = loaderData?.snapshot.page;
     const preloadLinks = servicesCardsPreloadLinks(servicesCardImageSrcsForPreload(page));
+    if (!loaderData?.head) {
+      return {
+        meta: [{ title: "Diensten — McCoy Cleaning Twente" }],
+        links: preloadLinks,
+      };
+    }
+    const base = tanstackHeadFromCms(loaderData.head);
     return {
-      meta: [
-        { title: "Diensten — McCoy Cleaning Twente" },
-        {
-          name: "description",
-          content:
-            "Kantoorschoonmaak, horeca-, opleverings- en vloeronderhoud, meubelreiniging en glasbewassing in Twente. Vraag direct een offerte aan bij McCoy Cleaning.",
-        },
-        { property: "og:title", content: "Diensten — McCoy Cleaning Twente" },
-        {
-          property: "og:description",
-          content: "Een volledig schoonmaakaanbod door één vast eigen team in Twente.",
-        },
-        { property: "og:url", content: "/services" },
-      ],
-      links: [{ rel: "canonical", href: "/services" }, ...preloadLinks],
+      ...base,
+      links: [...(base.links ?? []), ...preloadLinks],
     };
   },
   component: ServicesPage,

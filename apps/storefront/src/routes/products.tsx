@@ -14,6 +14,7 @@ import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { absoluteCanonicalLink, absoluteOgUrl } from "@/lib/cms/absolute-head";
 
 /** In-memory Producten fixed→blocks for public/preview — storefront does not persist. */
 function withProductsBlocksCompat(page: CmsPage, locale: Locale = "nl"): CmsPage {
@@ -48,9 +49,9 @@ export const Route = createFileRoute("/products")({
         content:
           "McCoy Products: groothandel in hygiëne papier, professionele zepen, reinigingsmiddelen voor horeca en schoonmaakapparatuur.",
       },
-      { property: "og:url", content: "/products" },
+      { property: "og:url", content: absoluteOgUrl("/products") },
     ],
-    links: [{ rel: "canonical", href: "/products" }],
+    links: [absoluteCanonicalLink("/products")],
     scripts: [
       {
         type: "application/ld+json",

@@ -11,6 +11,7 @@ import {
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
+import { absoluteCanonicalLink } from "@/lib/cms/absolute-head";
 
 function findVacancyBySlug(vacancies: VacancyItem[], slug: string): VacancyItem | null {
   const normalized = slug.trim().toLowerCase();
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/vacatures/$slug")({
         content: "Vacature bij McCoy Cleaning in Twente. Bekijk details en solliciteer.",
       },
     ],
-    links: [{ rel: "canonical", href: `/vacatures/${params.slug}` }],
+    links: [absoluteCanonicalLink(`/vacatures/${params.slug}`)],
   }),
   component: VacatureDetailPage,
   notFoundComponent: () => (

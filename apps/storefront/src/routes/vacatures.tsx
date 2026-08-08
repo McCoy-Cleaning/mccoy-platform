@@ -5,109 +5,97 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
+import { absoluteCanonicalUrl } from "@mccoy/cms-schema";
+
+/** Existing fact-only JobPosting nodes — not invented ratings/prices. */
+const VACATURES_JOB_JSON_LD = [
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: "Schoonmaakmedewerker",
+    description:
+      "Schoonmaakmedewerker bij McCoy Cleaning in Twente. Werk in een vast eigen team aan kantoor-, horeca- en opleveringsschoonmaak.",
+    employmentType: "FULL_TIME",
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "McCoy Cleaning",
+      sameAs: absoluteCanonicalUrl("/"),
+    },
+    jobLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Oldenzaal",
+        addressRegion: "Overijssel",
+        addressCountry: "NL",
+      },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: "Glazenwasser",
+    description:
+      "Glazenwasser bij McCoy Cleaning in Twente. Professionele glasbewassing bij bedrijven en particulieren met modern materieel.",
+    employmentType: "FULL_TIME",
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "McCoy Cleaning",
+      sameAs: absoluteCanonicalUrl("/"),
+    },
+    jobLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Oldenzaal",
+        addressRegion: "Overijssel",
+        addressCountry: "NL",
+      },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: "Oproepkracht schoonmaak",
+    description:
+      "Oproepkracht schoonmaak bij McCoy Cleaning in Twente. Flexibele inzet voor uiteenlopende schoonmaakprojecten in de regio.",
+    employmentType: "PART_TIME",
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "McCoy Cleaning",
+      sameAs: absoluteCanonicalUrl("/"),
+    },
+    jobLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Oldenzaal",
+        addressRegion: "Overijssel",
+        addressCountry: "NL",
+      },
+    },
+  },
+];
 
 export const Route = createFileRoute("/vacatures")({
   loader: () => loadMarketingPublishedPage("/vacatures"),
-  head: () => ({
-    meta: [
-      { title: "Vacatures Schoonmaak Twente — Werken bij McCoy Cleaning" },
-      {
-        name: "description",
-        content:
-          "Vacatures schoonmaak Twente: schoonmaakmedewerker, glazenwasser en oproepkracht bij McCoy Cleaning in Oldenzaal. Solliciteer direct.",
-      },
-      {
-        name: "keywords",
-        content:
-          "vacatures schoonmaak Twente, schoonmaker Oldenzaal, glazenwasser vacature, baan schoonmaak Hengelo, werken bij schoonmaakbedrijf",
-      },
-      { property: "og:title", content: "Vacatures — Werken bij McCoy Cleaning" },
-      {
-        property: "og:description",
-        content: "Word onderdeel van een vast eigen team. Schoonmaakvacatures in Twente.",
-      },
-      { property: "og:url", content: "/vacatures" },
-    ],
-    links: [
-      { rel: "canonical", href: "/vacatures" },
-      { rel: "alternate", hrefLang: "nl", href: "/vacatures" },
-      { rel: "alternate", hrefLang: "en", href: "/en/vacatures" },
-      { rel: "alternate", hrefLang: "x-default", href: "/vacatures" },
-    ],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify([
-          {
-            "@context": "https://schema.org",
-            "@type": "JobPosting",
-            title: "Schoonmaakmedewerker",
-            description:
-              "Schoonmaakmedewerker bij McCoy Cleaning in Twente. Werk in een vast eigen team aan kantoor-, horeca- en opleveringsschoonmaak.",
-            employmentType: "FULL_TIME",
-            hiringOrganization: {
-              "@type": "Organization",
-              name: "McCoy Cleaning",
-              sameAs: "/",
-            },
-            jobLocation: {
-              "@type": "Place",
-              address: {
-                "@type": "PostalAddress",
-                addressLocality: "Oldenzaal",
-                addressRegion: "Overijssel",
-                addressCountry: "NL",
-              },
-            },
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "JobPosting",
-            title: "Glazenwasser",
-            description:
-              "Glazenwasser bij McCoy Cleaning in Twente. Professionele glasbewassing bij bedrijven en particulieren met modern materieel.",
-            employmentType: "FULL_TIME",
-            hiringOrganization: {
-              "@type": "Organization",
-              name: "McCoy Cleaning",
-              sameAs: "/",
-            },
-            jobLocation: {
-              "@type": "Place",
-              address: {
-                "@type": "PostalAddress",
-                addressLocality: "Oldenzaal",
-                addressRegion: "Overijssel",
-                addressCountry: "NL",
-              },
-            },
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "JobPosting",
-            title: "Oproepkracht schoonmaak",
-            description:
-              "Oproepkracht schoonmaak bij McCoy Cleaning in Twente. Flexibele inzet voor uiteenlopende schoonmaakprojecten in de regio.",
-            employmentType: "PART_TIME",
-            hiringOrganization: {
-              "@type": "Organization",
-              name: "McCoy Cleaning",
-              sameAs: "/",
-            },
-            jobLocation: {
-              "@type": "Place",
-              address: {
-                "@type": "PostalAddress",
-                addressLocality: "Oldenzaal",
-                addressRegion: "Overijssel",
-                addressCountry: "NL",
-              },
-            },
-          },
-        ]),
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Vacatures — McCoy Cleaning" }] };
+    }
+    const base = tanstackHeadFromCms(loaderData.head);
+    return {
+      ...base,
+      scripts: [
+        ...(base.scripts ?? []),
+        {
+          type: "application/ld+json",
+          children: JSON.stringify(VACATURES_JOB_JSON_LD),
+        },
+      ],
+    };
+  },
   component: VacaturesPage,
 });
 

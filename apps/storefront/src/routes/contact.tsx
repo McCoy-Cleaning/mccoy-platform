@@ -5,26 +5,16 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 
 export const Route = createFileRoute("/contact")({
   loader: () => loadMarketingPublishedPage("/contact"),
-  head: () => ({
-    meta: [
-      { title: "Contact — Schoonmaak Twente | McCoy Cleaning" },
-      {
-        name: "description",
-        content:
-          "Neem contact op met McCoy Cleaning voor algemene vragen of aanvragen voor professionele schoonmaak in Twente. Persoonlijk antwoord binnen één werkdag.",
-      },
-      { property: "og:title", content: "Contact — McCoy Cleaning Twente" },
-      {
-        property: "og:description",
-        content: "Neem contact op met McCoy Cleaning in Oldenzaal.",
-      },
-      { property: "og:url", content: "/contact" },
-    ],
-    links: [{ rel: "canonical", href: "/contact" }],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Contact — McCoy Cleaning" }] };
+    }
+    return tanstackHeadFromCms(loaderData.head);
+  },
   component: ContactPage,
 });
 

@@ -4,6 +4,7 @@ export * from "./slugs";
 export * from "./locale";
 export * from "./ui-locale";
 export * from "./seo";
+export * from "./resolve-seo";
 export * from "./paths";
 export * from "./migrate-locale";
 export * from "./en-field-drafts";

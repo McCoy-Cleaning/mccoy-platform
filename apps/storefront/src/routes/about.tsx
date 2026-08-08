@@ -9,26 +9,16 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 
 export const Route = createFileRoute("/about")({
   loader: () => loadMarketingPublishedPage("/about"),
-  head: () => ({
-    meta: [
-      { title: "Over ons — McCoy Cleaning Twente" },
-      {
-        name: "description",
-        content:
-          "Sinds 1998 staat McCoy Cleaning voor schoonmaak met karakter. Lees over onze missie, visie en geschiedenis als toonaangevend schoonmaakbedrijf in Twente.",
-      },
-      { property: "og:title", content: "Over ons — McCoy Cleaning" },
-      {
-        property: "og:description",
-        content: "Missie, visie en geschiedenis van McCoy Cleaning — Oldenzaal, sinds 1998.",
-      },
-      { property: "og:url", content: "/about" },
-    ],
-    links: [{ rel: "canonical", href: "/about" }],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Over ons — McCoy Cleaning Twente" }] };
+    }
+    return tanstackHeadFromCms(loaderData.head);
+  },
   component: AboutPage,
 });
 
