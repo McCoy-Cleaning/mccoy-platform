@@ -152,3 +152,64 @@ export {
   type LegalMigrationReport,
   type ResolveLegalBlocksResult,
 } from "./legal-blocks";
+
+/** MG5 — production-grade fixed→blocks migration qualification */
+export {
+  MG5_MIGRATION_VERSION,
+  MG5_PRODUCTION_CONFIRM_PHRASE,
+  type Mg5MigrationVersion,
+} from "./mg5-version";
+export {
+  buildMg5MigrationMatrix,
+  MG5_MIGRATION_MATRIX,
+  mg5MatrixEntriesForPageKey,
+  mg5MatrixEntry,
+  assertMg5MatrixCoversM5Inventory,
+  mg5MatrixSummary,
+  type Mg5MigrationEntry,
+  type Mg5Qualification,
+  type Mg5EligibilityClass,
+} from "./mg5-matrix";
+export type {
+  FixedBlockConflict,
+  MigrationOperation,
+  MigrationWarning,
+  MigrationValidationResult,
+  FixedToBlockMigrationInput,
+  FixedToBlockMigrationResult,
+  Mg5PageMigrationResult,
+  Mg5MigrationReport,
+} from "./mg5-contract";
+export {
+  classifyFixedBlockConflict,
+  classifyPageFixedBlockConflicts,
+  conflictsBlockApply,
+} from "./mg5-conflicts";
+export {
+  MG5_MAX_SUPPORTED_SCHEMA_VERSION,
+  pageContentHash,
+  migrateFixedToBlocks,
+  assertMigrationIdempotent,
+} from "./mg5-pipeline";
+export {
+  buildPageBackupRecord,
+  finalizeBackupArtifact,
+  verifyBackupArtifact,
+  restorePageFromBackup,
+  type Mg5PageBackupRecord,
+  type Mg5BackupArtifact,
+} from "./mg5-backup";
+export {
+  assertApplyGates,
+  buildQualificationRecord,
+  runMg5DryRun,
+  runMg5Apply,
+  runMg5Rollback,
+  MG5_EVENTS,
+  type Mg5Environment,
+  type Mg5OperatorPageRecord,
+  type Mg5PersistencePort,
+  type Mg5BackupPort,
+  type Mg5QualificationRecord,
+  type Mg5OperatorOptions,
+} from "./mg5-operator";
