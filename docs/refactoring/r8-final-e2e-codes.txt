@@ -1,0 +1,8 @@
+forms=0
+coverage=0
+inventory=0
+locale=1
+# forms: 4 passed
+# coverage: 7 passed
+# inventory: 14 passed
+# locale: 1 failed (BR-001 Maximum update depth / failureSink); public smoke 3 passed

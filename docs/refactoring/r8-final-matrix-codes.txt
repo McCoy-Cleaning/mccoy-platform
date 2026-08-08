@@ -1,0 +1,16 @@
+diffcheck=0
+typecheck=0
+lint=0
+contract=0
+ci=0
+security=0
+database=0
+schema=0
+editor=0
+renderer=0
+admin=0
+storefront=0
+mg5=0
+review=0
+badmin=0
+bstore=0
