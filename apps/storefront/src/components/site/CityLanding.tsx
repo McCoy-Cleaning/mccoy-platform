@@ -100,14 +100,17 @@ export function CityLanding({ city, intro, services, reasons }: CityLandingProps
 }
 
 export function cityJsonLd(city: string, path: string) {
+  const absolute =
+    path.startsWith("http") ? path : `https://www.mccoy.nl${path.startsWith("/") ? path : `/${path}`}`;
   return {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: `McCoy Cleaning — Schoonmaakbedrijf ${city}`,
     description: `Professioneel schoonmaakbedrijf actief in ${city} en omgeving. Kantoorschoonmaak, glasbewassing, vloeronderhoud en horecaschoonmaak.`,
-    url: path,
+    url: absolute,
     telephone: "+31541534982",
     email: "info@mccoy.nl",
+    // Qualitative band already published on site — not a numeric offer/rating.
     priceRange: "€€",
     address: {
       "@type": "PostalAddress",

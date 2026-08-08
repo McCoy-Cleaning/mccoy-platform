@@ -9,23 +9,16 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 
 export const Route = createFileRoute("/privacy")({
   loader: () => loadMarketingPublishedPage("/privacy"),
-  head: () => ({
-    meta: [
-      { title: "Privacyverklaring — McCoy Cleaning" },
-      {
-        name: "description",
-        content:
-          "Privacyverklaring van McCoy Cleaning B.V.: hoe wij persoonsgegevens verwerken, bewaren en beveiligen.",
-      },
-      { property: "og:title", content: "Privacyverklaring — McCoy Cleaning" },
-      { property: "og:description", content: "Privacyverklaring van McCoy Cleaning B.V." },
-      { property: "og:url", content: "/privacy" },
-    ],
-    links: [{ rel: "canonical", href: "/privacy" }],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Privacyverklaring — McCoy Cleaning" }] };
+    }
+    return tanstackHeadFromCms(loaderData.head);
+  },
   component: PrivacyPage,
 });
 

@@ -9,22 +9,16 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 
 export const Route = createFileRoute("/terms")({
   loader: () => loadMarketingPublishedPage("/terms"),
-  head: () => ({
-    meta: [
-      { title: "Algemene Voorwaarden — McCoy Cleaning" },
-      {
-        name: "description",
-        content:
-          "Algemene voorwaarden van McCoy Schoonmaak en Reiniging — offertes, uitvoering, aansprakelijkheid en geschillen.",
-      },
-      { property: "og:title", content: "Algemene Voorwaarden — McCoy Cleaning" },
-      { property: "og:url", content: "/terms" },
-    ],
-    links: [{ rel: "canonical", href: "/terms" }],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Algemene Voorwaarden — McCoy Cleaning" }] };
+    }
+    return tanstackHeadFromCms(loaderData.head);
+  },
   component: TermsPage,
 });
 

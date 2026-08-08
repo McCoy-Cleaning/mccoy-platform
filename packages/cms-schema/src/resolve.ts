@@ -14,6 +14,7 @@ import type { CmsPage } from "./types";
 import { ensurePageLocaleFields } from "./migrate-locale";
 import { localizeCmsPageForLocale } from "./en-field-drafts";
 import { normalizeCmsPage } from "./pipeline";
+import { resolveSeoMetadata } from "./resolve-seo";
 
 export type ResolvedSection = {
   key: string;
@@ -163,49 +164,8 @@ export function buildCmsHeadFromSnapshot(
   links: Array<{ rel: string; href: string; hrefLang?: string }>;
   jsonLd: Record<string, unknown>;
 } {
-  const origin = site.origin.replace(/\/+$/, "");
-  const absolute = `${origin}${snapshot.path === "/" ? "" : snapshot.path}` || origin;
-  const seo = snapshot.content.seo;
-  const meta: Array<Record<string, string>> = [
-    { title: seo.title },
-    { name: "description", content: seo.description },
-    { property: "og:title", content: seo.title },
-    { property: "og:description", content: seo.description },
-    { property: "og:url", content: absolute },
-    { property: "og:locale", content: snapshot.locale === "en" ? "en_GB" : "nl_NL" },
-  ];
-  if (seo.keywords) meta.push({ name: "keywords", content: seo.keywords });
-  if (seo.robots) meta.push({ name: "robots", content: seo.robots });
-  if (seo.ogImage) meta.push({ property: "og:image", content: seo.ogImage });
-
-  const links: Array<{ rel: string; href: string; hrefLang?: string }> = [
-    { rel: "canonical", href: absolute },
-  ];
-  for (const alt of snapshot.alternates) {
-    links.push({
-      rel: "alternate",
-      hrefLang: alt.locale,
-      href: alt.url,
-    });
-  }
-
-  const jsonLd: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": absolute,
-    url: absolute,
-    name: seo.title,
-    description: seo.description,
-    inLanguage: snapshot.locale,
-    dateModified: snapshot.publishedAt,
-    isPartOf: {
-      "@type": "WebSite",
-      name: "McCoy Cleaning",
-      url: origin,
-    },
-  };
-
-  return { title: seo.title, meta, links, jsonLd };
+  // SEO-7: absolute www canonicals + technical meta from existing SEO fields only.
+  return resolveSeoMetadata(snapshot, site);
 }
 
 export function resolveLocaleFromUrl(pathname: string): LocaleResolution {

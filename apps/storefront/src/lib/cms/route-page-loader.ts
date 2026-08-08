@@ -1,13 +1,16 @@
 import { redirect } from "@tanstack/react-router";
 import {
   buildCmsHeadFromSnapshot,
+  CANONICAL_SITE_ORIGIN,
   canonicalizePublicIdentityPath,
   resolvePublishedCmsPage,
+  resolveSeoMetadata,
   stripLocalePrefix,
   type ResolvedPublishedCmsPage,
 } from "@mccoy/cms-schema";
 import { cms } from "@/lib/cms/store";
 import { ensurePublishedCmsHydrated } from "@/lib/cms/published-hydrate";
+import { FROZEN_DEPLOYED_NL_SEO } from "@/lib/cms/frozen-deployed-seo";
 
 const BUILTIN_PATH_TO_PAGE_ID: Record<string, string> = {
   "/": "page_home",
@@ -37,6 +40,14 @@ function pathnameLocale(pathname: string): "nl" | "en" {
   return trimmed === "/en" || trimmed.startsWith("/en/") ? "en" : "nl";
 }
 
+function headFromSnapshot(snapshot: ResolvedPublishedCmsPage, pathname: string) {
+  const identity = identityPath(pathname);
+  const locale = pathnameLocale(pathname);
+  const frozen = locale === "nl" ? FROZEN_DEPLOYED_NL_SEO[identity] : undefined;
+  // Always emit www canonicals — never window / preview origin (SEO Safe Mode).
+  return resolveSeoMetadata(snapshot, { origin: CANONICAL_SITE_ORIGIN }, { seo: frozen });
+}
+
 /**
  * Instant SPA navigations: use whatever page is already in memory (seed or
  * published hydrate). Do not wait for the network — first click must paint
@@ -56,12 +67,12 @@ function snapshotFromClientMemory(pathname: string): MarketingPageLoaderData | n
     revisionId: `client:${page.id}:${page.updatedAt ?? 0}`,
     publishedAt: new Date(page.updatedAt ?? Date.now()).toISOString(),
     locale,
-    site: { origin: window.location.origin },
+    site: { origin: CANONICAL_SITE_ORIGIN },
   });
   if (!resolved.ok) return null;
   return {
     snapshot: resolved.snapshot,
-    head: buildCmsHeadFromSnapshot(resolved.snapshot, { origin: window.location.origin }),
+    head: headFromSnapshot(resolved.snapshot, pathname),
   };
 }
 
@@ -91,7 +102,11 @@ export async function loadMarketingPublishedPage(pathname: string): Promise<Mark
   if (result.kind !== "snapshot") {
     throw new Error(`cms: loader for ${pathname} must return a snapshot`);
   }
-  return { snapshot: result.snapshot, head: result.head };
+  // Re-resolve head with frozen deployed NL SEO + canonical origin (ignore any preview origin).
+  return {
+    snapshot: result.snapshot,
+    head: headFromSnapshot(result.snapshot, pathname),
+  };
 }
 
 /** Prefetch a marketing path into the router loader cache (nav hover). */

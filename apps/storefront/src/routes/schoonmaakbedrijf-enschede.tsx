@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CityLanding, cityJsonLd } from "@/components/site/CityLanding";
+import { absoluteCanonicalLink, absoluteOgUrl } from "@/lib/cms/absolute-head";
 
 const city = "Enschede";
 const path = "/schoonmaakbedrijf-enschede";
@@ -24,10 +25,10 @@ export const Route = createFileRoute("/schoonmaakbedrijf-enschede")({
         content:
           "Professionele schoonmaak in Enschede door een vast eigen team. Kantoor, horeca, glasbewassing en vloeronderhoud.",
       },
-      { property: "og:url", content: path },
+      { property: "og:url", content: absoluteOgUrl(path) },
       { property: "og:type", content: "website" },
     ],
-    links: [{ rel: "canonical", href: path }],
+    links: [absoluteCanonicalLink(path)],
     scripts: [
       {
         type: "application/ld+json",

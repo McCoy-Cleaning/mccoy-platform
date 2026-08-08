@@ -9,26 +9,16 @@ import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
+import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
 
 export const Route = createFileRoute("/offerte")({
   loader: () => loadMarketingPublishedPage("/offerte"),
-  head: () => ({
-    meta: [
-      { title: "Contact & Offerte — Schoonmaak Twente | McCoy Cleaning" },
-      {
-        name: "description",
-        content:
-          "Offerte aanvragen voor kantoorschoonmaak, glasbewassing, vloer- en meubelonderhoud in Twente. Persoonlijk antwoord binnen één werkdag — McCoy Cleaning Oldenzaal.",
-      },
-      { property: "og:title", content: "Contact & Offerte — McCoy Cleaning Twente" },
-      {
-        property: "og:description",
-        content: "Vraag direct een offerte aan voor professionele schoonmaak in Twente.",
-      },
-      { property: "og:url", content: "/offerte" },
-    ],
-    links: [{ rel: "canonical", href: "/offerte" }],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData?.head) {
+      return { meta: [{ title: "Contact & Offerte — McCoy Cleaning" }] };
+    }
+    return tanstackHeadFromCms(loaderData.head);
+  },
   component: OffertePage,
 });
 
