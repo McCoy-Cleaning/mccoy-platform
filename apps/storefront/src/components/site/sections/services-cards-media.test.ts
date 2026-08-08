@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 describe("ServicesCards media + dual CTAs", () => {
   it("uses object-cover, Lees meer modal, and separate contact CmsButton", () => {
     const dir = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(join(dir, "SitePageSections.tsx"), "utf8");
+    const src = readFileSync(join(dir, "ServicesSections.tsx"), "utf8");
     const cardsFn = src.indexOf("export function ServicesCards()");
     const afterCards = src.indexOf("/** @deprecated Prefer ServicesMain + ServicesCards", cardsFn);
     expect(cardsFn).toBeGreaterThanOrEqual(0);
