@@ -1,3 +1,8 @@
+import {
+  MCCOY_NAP,
+  napAddressSingleLine,
+} from "./business-nap";
+
 /** Shared shape for privacy / terms pages — header + ordered text blocks. */
 export type LegalArticle = {
   id: string;
@@ -45,12 +50,12 @@ function privacyArticles(): LegalArticle[] {
   return [
     article(
       "Verantwoordelijke",
-      `McCoy Cleaning B.V., gevestigd aan Nijverheidsstraat 63, 7575 BH Oldenzaal, is verantwoordelijk voor de verwerking van persoonsgegevens zoals weergegeven in deze privacyverklaring.
+      `McCoy Cleaning B.V., gevestigd aan ${napAddressSingleLine()}, is verantwoordelijk voor de verwerking van persoonsgegevens zoals weergegeven in deze privacyverklaring.
 
 Contactgegevens:
-https://www.mccoy.nl
-Nijverheidsstraat 63, 7575 BH Oldenzaal
-0541 534 982`,
+${MCCOY_NAP.website}
+${napAddressSingleLine()}
+${MCCOY_NAP.telephoneDisplayNational}`,
     ),
     article(
       "Persoonsgegevens die wij verwerken",
@@ -67,7 +72,7 @@ Hieronder vind je een overzicht van de persoonsgegevens die wij verwerken:
       "Bijzondere en/of gevoelige persoonsgegevens",
       `Onze website en/of dienst heeft niet de intentie gegevens te verzamelen over websitebezoekers die jonger zijn dan 16 jaar, tenzij ze toestemming hebben van ouders of voogd. We kunnen echter niet controleren of een bezoeker ouder dan 16 is. Wij raden ouders dan ook aan betrokken te zijn bij de onlineactiviteiten van hun kinderen, om zo te voorkomen dat er gegevens over kinderen verzameld worden zonder ouderlijke toestemming.
 
-Als je ervan overtuigd bent dat wij zonder die toestemming persoonlijke gegevens hebben verzameld over een minderjarige, neem dan contact met ons op via info@mccoy.nl, dan verwijderen wij deze informatie.`,
+Als je ervan overtuigd bent dat wij zonder die toestemming persoonlijke gegevens hebben verzameld over een minderjarige, neem dan contact met ons op via ${MCCOY_NAP.email}, dan verwijderen wij deze informatie.`,
     ),
     article(
       "Doeleinden van de gegevensverwerking",
@@ -96,7 +101,7 @@ Als je ervan overtuigd bent dat wij zonder die toestemming persoonlijke gegevens
       "Gegevens inzien, aanpassen of verwijderen",
       `Je hebt het recht om je persoonsgegevens in te zien, te corrigeren of te verwijderen. Dit kun je zelf doen via de persoonlijke instellingen van jouw account. Daarnaast heb je het recht om je eventuele toestemming voor de gegevensverwerking in te trekken of bezwaar te maken tegen de verwerking van jouw persoonsgegevens door ons bedrijf en heb je het recht op gegevensoverdraagbaarheid. Dat betekent dat je bij ons een verzoek kan indienen om de persoonsgegevens die wij van jou beschikken in een computerbestand naar jou of een ander, door jou genoemde organisatie, te sturen.
 
-Wil je gebruik maken van je recht op bezwaar en/of recht op gegevensoverdraagbaarheid of heb je andere vragen/opmerkingen over de gegevensverwerking, stuur dan een gespecificeerd verzoek naar info@mccoy.nl.
+Wil je gebruik maken van je recht op bezwaar en/of recht op gegevensoverdraagbaarheid of heb je andere vragen/opmerkingen over de gegevensverwerking, stuur dan een gespecificeerd verzoek naar ${MCCOY_NAP.email}.
 
 Om er zeker van te zijn dat het verzoek tot inzage door jou is gedaan, vragen wij jou een kopie van je identiteitsbewijs bij het verzoek mee te sturen. Maak in deze kopie je pasfoto, MRZ (machine readable zone, de strook met nummers onderaan het paspoort), paspoortnummer en Burgerservicenummer (BSN) zwart. Dit ter bescherming van je privacy. McCoy Cleaning B.V. zal zo snel mogelijk, maar in ieder geval binnen vier weken, op jouw verzoek reageren.
 
@@ -104,7 +109,7 @@ McCoy Cleaning B.V. wil je er tevens op wijzen dat je de mogelijkheid hebt om ee
     ),
     article(
       "Hoe wij persoonsgegevens beveiligen",
-      "McCoy Cleaning B.V. neemt de bescherming van jouw gegevens serieus en neemt passende maatregelen om misbruik, verlies, onbevoegde toegang, ongewenste openbaarmaking en ongeoorloofde wijziging tegen te gaan. Als jij het idee hebt dat jouw gegevens toch niet goed beveiligd zijn of er aanwijzingen zijn van misbruik, neem dan contact op met onze klantenservice of via info@mccoy.nl.",
+      `McCoy Cleaning B.V. neemt de bescherming van jouw gegevens serieus en neemt passende maatregelen om misbruik, verlies, onbevoegde toegang, ongewenste openbaarmaking en ongeoorloofde wijziging tegen te gaan. Als jij het idee hebt dat jouw gegevens toch niet goed beveiligd zijn of er aanwijzingen zijn van misbruik, neem dan contact op met onze klantenservice of via ${MCCOY_NAP.email}.`,
     ),
   ];
 }

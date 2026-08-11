@@ -10,7 +10,10 @@ import {
 } from "@mccoy/cms-schema";
 import { cms } from "@/lib/cms/store";
 import { ensurePublishedCmsHydrated } from "@/lib/cms/published-hydrate";
-import { FROZEN_DEPLOYED_NL_SEO } from "@/lib/cms/frozen-deployed-seo";
+import {
+  FROZEN_DEPLOYED_EN_SEO,
+  FROZEN_DEPLOYED_NL_SEO,
+} from "@/lib/cms/frozen-deployed-seo";
 
 const BUILTIN_PATH_TO_PAGE_ID: Record<string, string> = {
   "/": "page_home",
@@ -43,7 +46,8 @@ function pathnameLocale(pathname: string): "nl" | "en" {
 function headFromSnapshot(snapshot: ResolvedPublishedCmsPage, pathname: string) {
   const identity = identityPath(pathname);
   const locale = pathnameLocale(pathname);
-  const frozen = locale === "nl" ? FROZEN_DEPLOYED_NL_SEO[identity] : undefined;
+  const frozen =
+    locale === "en" ? FROZEN_DEPLOYED_EN_SEO[identity] : FROZEN_DEPLOYED_NL_SEO[identity];
   // Always emit www canonicals — never window / preview origin (SEO Safe Mode).
   return resolveSeoMetadata(snapshot, { origin: CANONICAL_SITE_ORIGIN }, { seo: frozen });
 }

@@ -3,6 +3,7 @@ import {
   defaultSectionContent,
   defaultSiteNavigation,
   resolveHeroHeadingParts,
+  MCCOY_NAP,
   type CmsLink,
   type ContactInfoContent,
   type FormPageChromeContent,
@@ -63,18 +64,25 @@ export function localizedNavLabel(cmsLabel: string, link: CmsLink, t: I18nDict):
 
 export function localizedHeroCopy(content: HomeHeroContent, t: I18nDict) {
   const def = defaultSectionContent("home.hero") as HomeHeroContent;
-  const heading = cmsTextOrFallback(content.heading, t.hero.title, def.heading);
+  const heading = cmsTextOrFallback(content.heading, t.hero.title, [
+    def.heading,
+    "Bij McCoy wordt kwaliteit",
+    "At McCoy quality becomes",
+  ]);
   const headingAccent = cmsTextOrFallback(
     content.headingAccent,
     t.hero.titleAccent,
-    def.headingAccent,
+    [def.headingAccent ?? "", "zichtbaar.", "visible."],
   );
   const parts = resolveHeroHeadingParts(heading, headingAccent);
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, t.hero.kicker, def.eyebrow),
     heading: parts.heading,
     headingAccent: parts.headingAccent,
-    body: cmsTextOrFallback(content.body, t.hero.sub, def.body),
+    body: cmsTextOrFallback(content.body, t.hero.sub, [
+      def.body,
+      "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is.",
+    ]),
     primaryCtaLabel: content.primaryCta
       ? cmsTextOrFallback(content.primaryCta.label, t.hero.ctaPrimary, undefined)
       : undefined,
@@ -111,7 +119,12 @@ export function localizedServicesCopy(
   const defCards = defaultSectionContent("services.cards") as ServicesCardsContent;
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, t.services.kicker, def.eyebrow),
-    heading: cmsTextOrFallback(content.heading, t.services.title, def.heading),
+    heading: cmsTextOrFallback(content.heading, t.services.title, [
+      def.heading,
+      "Ons aanbod",
+      "Wat wij voor u verzorgen",
+      "What we take care of",
+    ]),
     // No bilingual catalog for intro — keep CMS value (may stay NL until bilingual CMS).
     intro: content.intro,
     cards: cardsContent.cards.map((card, i) => {
@@ -155,7 +168,11 @@ export function localizedAboutCopy(
   };
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, t.about.kicker, def.eyebrow),
-    heading: cmsTextOrFallback(content.heading, t.about.title, def.heading),
+    heading: cmsTextOrFallback(content.heading, t.about.title, [
+      def.heading ?? "",
+      "Kwaliteit, missie & visie",
+      "Quality, mission & vision",
+    ]),
     missionTitle: cmsTextOrFallback(content.missionTitle, t.about.missionTitle, def.missionTitle),
     missionBody: cmsTextOrFallback(content.missionBody, t.about.mission, def.missionBody),
     visionTitle: cmsTextOrFallback(content.visionTitle, t.about.visionTitle, def.visionTitle),
@@ -218,10 +235,26 @@ export function localizedFormChromeCopy(
     },
   } as const;
   const cat = catalogs[sectionKey];
+  const legacyHeadings: Record<typeof sectionKey, string[]> = {
+    "contact.main": ["Neem contact op", "Laten we praten over uw pand."],
+    "vacatures.main": ["Werken bij McCoy", "Work at McCoy", "Werken bij McCoy Cleaning"],
+    "offerte.main": ["Vraag een offerte aan", "Request a quote"],
+  };
   return {
     eyebrow: cmsTextOrFallback(content.eyebrow, cat.eyebrow, def.eyebrow),
-    heading: cmsTextOrFallback(content.heading, cat.heading, def.heading),
-    body: content.body ? cmsTextOrFallback(content.body, cat.body, def.body) : undefined,
+    heading: cmsTextOrFallback(content.heading, cat.heading, [
+      def.heading,
+      ...legacyHeadings[sectionKey],
+    ]),
+    body: content.body
+      ? cmsTextOrFallback(content.body, cat.body, [
+          def.body ?? "",
+          "Wij denken graag met u mee.",
+          "Word onderdeel van ons vaste team.",
+          "Vertel ons wat u nodig heeft.",
+          "Tell us what you need.",
+        ])
+      : undefined,
   };
 }
 
@@ -236,12 +269,12 @@ export function localizedContactInfoContent(
 ): ContactInfoContent {
   const def = defaultSectionContent(sectionKey) as ContactInfoContent;
   const catalogById: Record<string, { label: string; value: string }> = {
-    contact_email: { label: t.contact.email, value: "info@mccoy.nl" },
-    contact_phone: { label: t.contact.phone, value: "0541 534 982" },
+    contact_email: { label: t.contact.email, value: MCCOY_NAP.email },
+    contact_phone: { label: t.contact.phone, value: MCCOY_NAP.telephoneDisplayNational },
     contact_address: { label: t.contact.address, value: t.contact.addressValue },
     contact_hours: { label: t.contact.hours, value: t.contact.hoursValue },
-    offerte_email: { label: t.contact.email, value: "info@mccoy.nl" },
-    offerte_phone: { label: t.contact.phone, value: "0541 534 982" },
+    offerte_email: { label: t.contact.email, value: MCCOY_NAP.email },
+    offerte_phone: { label: t.contact.phone, value: MCCOY_NAP.telephoneDisplayNational },
     offerte_address: { label: t.contact.address, value: t.contact.addressValue },
     offerte_hours: { label: t.contact.hours, value: t.contact.hoursValue },
   };

@@ -2,6 +2,8 @@
 
 Public storefront paths known from routes + dynamic sitemap builders. Fill live HTTP status from production when auditing.
 
+**Superseded for Phase 0 matrix detail by** [`mccoy-seo-baseline.md`](./mccoy-seo-baseline.md) **and legacy decisions by** [`legacy-url-migration-map.md`](./legacy-url-migration-map.md). Keep this file as the short inventory stub.
+
 ## Core NL
 
 | Path | Type | Notes |

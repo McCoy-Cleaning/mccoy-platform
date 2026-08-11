@@ -36,11 +36,13 @@ async function capturedMessages(page: import("@playwright/test").Page): Promise<
 
 test.describe("Cross-origin iframe bridge", () => {
   test("handshake, origin/source gates, selection, revisions, reconnect", async ({ page }) => {
-    await page.addInitScript(({ storefrontOrigin }) => {
+    await page.addInitScript(() => {
       const w = window as Window & { __cmsParentMsgs?: CapturedMsg[] };
       w.__cmsParentMsgs = [];
+      // Capture all postMessage traffic for assertions. Product bridge still
+      // enforces origin/source; filtering here hid same-origin srcdoc spoofs
+      // (event.origin === admin) and made the spoof poll flake.
       window.addEventListener("message", (event) => {
-        if (event.origin !== storefrontOrigin) return;
         const edit = document.querySelector('iframe[title="edit"]') as HTMLIFrameElement | null;
         w.__cmsParentMsgs!.push({
           origin: event.origin,
@@ -48,7 +50,7 @@ test.describe("Cross-origin iframe bridge", () => {
           data: event.data as CapturedMsg["data"],
         });
       });
-    }, { storefrontOrigin: STOREFRONT_ORIGIN });
+    });
 
     await page.goto(`/admin/website/${PAGES.home}`);
     await expect(page.locator('iframe[title="edit"]')).toBeVisible({ timeout: 60_000 });
@@ -84,11 +86,17 @@ test.describe("Cross-origin iframe bridge", () => {
     expect(handshake.data.sessionId).toMatch(/^sess_/);
     void readyMsg;
 
-    // Exact origin validation: only the storefront origin may announce ready.
+    // Exact origin validation: accepted ready announcements come from storefront + edit iframe.
     const readyOrigins = [
       ...new Set(
         (await capturedMessages(page))
-          .filter((m) => m.data?.type === "cms-edit-ready")
+          .filter(
+            (m) =>
+              m.data?.type === "cms-edit-ready" &&
+              m.sourceIsEditIframe &&
+              typeof m.data?.sessionId === "string" &&
+              !String(m.data.sessionId).includes("spoof"),
+          )
           .map((m) => m.origin),
       ),
     ];
@@ -96,13 +104,26 @@ test.describe("Cross-origin iframe bridge", () => {
 
     // Window-source validation: spoofed same-origin posts from a foreign iframe are ignored
     // by the bridge (listener requires event.source === edit iframe contentWindow).
-    const beforeSpoof = (await capturedMessages(page)).length;
+    // Use srcdoc + explicit ack so we wait for the post itself, not incidental traffic.
     await page.evaluate(
       ({ channel, pageId, adminOrigin }) => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
           const foreign = document.createElement("iframe");
           foreign.setAttribute("title", "e2e-spoof");
           foreign.style.display = "none";
+          const timer = window.setTimeout(
+            () => reject(new Error("foreign spoof iframe did not post in time")),
+            5_000,
+          );
+          const onMsg = (event: MessageEvent) => {
+            const data = event.data as { sessionId?: string; type?: string };
+            if (data?.sessionId === "sess_spoof_foreign" && data?.type === "cms-edit-ready") {
+              window.clearTimeout(timer);
+              window.removeEventListener("message", onMsg);
+              resolve();
+            }
+          };
+          window.addEventListener("message", onMsg);
           foreign.srcdoc = `<!doctype html><script>
             parent.postMessage({
               channel: ${JSON.stringify(channel)},
@@ -111,28 +132,27 @@ test.describe("Cross-origin iframe bridge", () => {
               pageId: ${JSON.stringify(pageId)},
             }, ${JSON.stringify(adminOrigin)});
           </script>`;
-          foreign.onload = () => resolve();
           document.body.appendChild(foreign);
         });
       },
       { channel: CMS_EDIT_CHANNEL, pageId: PAGES.home, adminOrigin: ADMIN_ORIGIN },
     );
-    await expect
-      .poll(async () => (await capturedMessages(page)).length)
-      .toBeGreaterThan(beforeSpoof);
     const spoofReady = (await capturedMessages(page)).filter(
       (m) => m.data?.sessionId === "sess_spoof_foreign",
     );
+    expect(spoofReady.length).toBeGreaterThanOrEqual(1);
     expect(spoofReady.every((m) => m.sourceIsEditIframe === false)).toBe(true);
+    expect(spoofReady.every((m) => m.origin === ADMIN_ORIGIN)).toBe(true);
     // Session must remain the real iframe session — spoof must not become active.
-    await editFrame(page).locator("[data-cms-select='home.hero']").first().click();
+    // Home hero is a reusable block after MG5 (data-cms-select-block).
+    await editFrame(page).locator("[data-cms-select-block]").first().click();
     await expect(page.getByRole("dialog", { name: "Paginaindeling" })).toBeVisible();
 
     // Parent → iframe selection highlight
     await openSections(page);
     await page.getByRole("dialog", { name: "Paginaindeling" }).getByText(/^Hero$/i).first().click();
     await expect(
-      editFrame(page).locator('[data-cms-select="home.hero"][aria-pressed="true"]').first(),
+      editFrame(page).locator("[data-cms-select-block][aria-pressed='true']").first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Normal edits must not reload the iframe
@@ -197,14 +217,16 @@ test.describe("Cross-origin iframe bridge", () => {
       }
     });
 
+    const storefrontHost = new URL(STOREFRONT_ORIGIN).host;
     const editPwFrame = page.frames().find((f) => {
       try {
-        return f.url().includes(":5173") && f.url().includes("_cmsMode=edit");
+        const url = f.url();
+        return url.includes(storefrontHost) && url.includes("_cmsMode=edit");
       } catch {
         return false;
       }
     });
-    expect(editPwFrame, "Playwright edit frame").toBeTruthy();
+    expect(editPwFrame, `Playwright edit frame on ${storefrontHost}`).toBeTruthy();
 
     await editPwFrame!.evaluate(
       ({ channel, pageId, sessionId, staleBase, adminOrigin }) => {
@@ -372,7 +394,7 @@ test.describe("Cross-origin iframe bridge", () => {
           { signal: ac.signal },
         );
         // Trigger a parent-side draft push by selecting hero again (bridge syncs selection + may bump).
-        const hero = document.querySelector('[data-cms-select="home.hero"]');
+        const hero = document.querySelector("[data-cms-select-block]");
         if (hero instanceof HTMLElement) hero.click();
         await new Promise((r) => setTimeout(r, 500));
         ac.abort();

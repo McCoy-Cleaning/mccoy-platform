@@ -142,6 +142,34 @@ describe("getPublishedLocaleAlternates", () => {
     );
     expect(alts.map((a) => a.locale)).toEqual(["nl", "x-default"]);
   });
+
+  it("omits English when published but indexable=false", () => {
+    const alts = getPublishedLocaleAlternates(
+      { nl: "/terms", en: "/terms" },
+      {
+        nl: { publicationState: "published" },
+        en: { publicationState: "published", indexable: false },
+      },
+      { origin: "https://www.mccoy.nl" },
+    );
+    expect(alts.map((a) => a.locale)).toEqual(["nl", "x-default"]);
+  });
+
+  it("falls back to NL identity under /en when paths.en is omitted", () => {
+    const alts = getPublishedLocaleAlternates(
+      { nl: "/services" },
+      {
+        nl: { publicationState: "published" },
+        en: { publicationState: "published", indexable: true },
+      },
+      { origin: "https://www.mccoy.nl" },
+    );
+    expect(alts).toEqual([
+      { locale: "nl", url: "https://www.mccoy.nl/services", published: true },
+      { locale: "en", url: "https://www.mccoy.nl/en/services", published: true },
+      { locale: "x-default", url: "https://www.mccoy.nl/services", published: true },
+    ]);
+  });
 });
 
 describe("locale content migration", () => {

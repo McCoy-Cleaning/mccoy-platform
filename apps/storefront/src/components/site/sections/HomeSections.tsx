@@ -15,7 +15,7 @@ import { useHomeHeroContent } from "@/lib/cms/use-section-content";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
 import { localizedHeroCopy } from "@/lib/cms-i18n";
-import { isCmsButtonInteractive } from "@mccoy/cms-schema";
+import { isCmsButtonInteractive, resolvePublicImageAlt } from "@mccoy/cms-schema";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 
 /** Public optimized hero — avoid bundling the ~430KB JPEG into the home chunk. */
@@ -254,24 +254,22 @@ export function Hero() {
         <div className="relative lg:col-span-5">
           <div className="relative mx-auto max-w-md">
             <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
-              {content.image.decorative ? (
-                <DeliveryImage
-                  variant="hero"
-                  src={imageSrc}
-                  alt=""
-                  role="presentation"
-                  webpSrcSet={heroWebpSrcSetFor(imageSrc)}
-                  {...heroImgProps}
-                />
-              ) : (
-                <DeliveryImage
-                  variant="hero"
-                  src={imageSrc}
-                  alt={content.image.alt || "McCoy Cleaning professional at work"}
-                  webpSrcSet={heroWebpSrcSetFor(imageSrc)}
-                  {...heroImgProps}
-                />
-              )}
+              {(() => {
+                const heroAlt = resolvePublicImageAlt(
+                  content.image,
+                  "McCoy Cleaning professional at work",
+                );
+                return (
+                  <DeliveryImage
+                    variant="hero"
+                    src={imageSrc}
+                    alt={heroAlt}
+                    role={heroAlt ? undefined : "presentation"}
+                    webpSrcSet={heroWebpSrcSetFor(imageSrc)}
+                    {...heroImgProps}
+                  />
+                );
+              })()}
               <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
             </div>
             <div className="absolute -bottom-6 -left-6 hidden rounded-2xl border border-white/15 bg-card/95 px-5 py-4 shadow-2xl sm:block">

@@ -82,6 +82,13 @@ describe("validatePageBlocksForPublish", () => {
     }
   });
 
+  it("hero normalize preserves explicit empty title for editor/publish gate", () => {
+    const normalized = blockDataRegistry.hero.normalize({ title: "", eyebrow: "x" }) as {
+      title: string;
+    };
+    expect(normalized.title).toBe("");
+  });
+
   it("rejects newsletter without title or button label", () => {
     const block = createDefaultBlock("newsletter");
     const result = validatePageBlocksForPublish([

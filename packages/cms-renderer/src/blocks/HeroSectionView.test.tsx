@@ -10,7 +10,8 @@ describe("HeroSectionView Home parity", () => {
       <HeroSectionView data={block.data as Record<string, unknown>} pages={[]} />,
     );
     expect(html).toContain('data-testid="hero-heading"');
-    expect(html).toContain("zichtbaar.");
+    expect(html).toContain("McCoy Cleaning,");
+    expect(html).toContain("schoonmaakbedrijf in Twente.");
     expect(html).toContain("Bekijk onze diensten");
     expect(html).toContain("Jaar ervaring");
     expect(html).toContain("Gecertificeerd");

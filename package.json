@@ -62,7 +62,8 @@
     "seo:diff-guard": "node scripts/seo/safe-mode-diff-guard.mjs",
     "seo:visible-baseline:write": "node scripts/seo/visible-baseline.mjs write",
     "seo:visible-baseline:check": "node scripts/seo/visible-baseline.mjs check",
-    "test:seo": "npm run seo:diff-guard && npm run seo:visible-baseline:check && npm run test -w @mccoy/security -- src/indexing.test.ts src/host-canonical.test.ts && npm run test -w @mccoy/cms-schema -- src/resolve-seo.test.ts && npm run test -w @mccoy/database -- src/cms/indexnow.test.ts src/cms/sitemap-seo.test.ts src/cms/conformance.test.ts"
+    "seo:visual-fingerprint:check": "node scripts/seo/visual-fingerprint.mjs check",
+    "test:seo": "npm run seo:diff-guard && npm run seo:visible-baseline:check && npm run seo:visual-fingerprint:check && npm run test -w @mccoy/security -- src/indexing.test.ts src/host-canonical.test.ts src/legacy-redirects.test.ts src/internal-link-integrity.test.ts && npm run test -w @mccoy/cms-schema -- src/resolve-seo.test.ts src/hreflang.test.ts src/locale.test.ts src/ui-locale.test.ts src/footer.test.ts src/links.test.ts src/service-detail-anchors.test.ts src/business-nap.test.ts src/image-alt.test.ts && npm run test -w @mccoy/database -- src/cms/indexnow.test.ts src/cms/sitemap-seo.test.ts src/cms/conformance.test.ts && npm run test -w @mccoy/storefront -- src/components/site/sections/services-ssr-crawlability.test.ts src/components/site/sections/service-detail-anchors.test.ts src/lib/cms/on-page-seo-gate.test.ts src/lib/locale-path.test.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",

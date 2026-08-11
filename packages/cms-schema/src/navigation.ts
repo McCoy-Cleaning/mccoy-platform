@@ -184,10 +184,14 @@ export function isNavigationDraftDirty(
   return JSON.stringify(draft) !== JSON.stringify(published ?? defaultSiteNavigation());
 }
 
-/** Built-in McCoy mark used when CMS has no custom logo. */
+/**
+ * Built-in McCoy mark used when CMS has no custom logo.
+ * Content-bearing (not decorative): it is typically the sole accessible name
+ * of the home link in nav/footer.
+ */
 export const DEFAULT_NAV_LOGO: CmsImage = {
   assetId: "local:images/cms/logo-mccoy.png",
   src: "/images/cms/logo-mccoy.png",
   alt: "McCoy Cleaning",
-  decorative: true,
+  decorative: false,
 };

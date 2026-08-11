@@ -58,7 +58,26 @@ describe("storefrontRobotsTxt", () => {
     );
     expect(body).toContain("Allow: /");
     expect(body).toContain("Disallow: /cms-preview");
+    expect(body).toContain("Disallow: /cms-sync");
     expect(body).toContain("Sitemap: https://www.mccoy.nl/sitemap.xml");
+  });
+
+  it("does not block CSS/JS or asset paths in production", () => {
+    const body = storefrontRobotsTxt(
+      { vercelEnv: "production" },
+      "https://www.mccoy.nl/sitemap.xml",
+    );
+    expect(body).not.toMatch(/Disallow:\s*\/.*\.(css|js)/i);
+    expect(body).not.toContain("Disallow: /assets");
+    expect(body).not.toContain("Disallow: /_assets");
+    expect(body).not.toContain("Disallow: /*.css");
+    expect(body).not.toContain("Disallow: /*.js");
+    // Allow:/ keeps static assets crawlable; only preview CMS paths are blocked.
+    const disallowLines = body
+      .split("\n")
+      .filter((line) => line.startsWith("Disallow:"))
+      .map((line) => line.replace(/^Disallow:\s*/, "").trim());
+    expect(disallowLines).toEqual(["/cms-preview", "/cms-sync"]);
   });
 
   it("fail-closed: preview never indexable without explicit override", () => {

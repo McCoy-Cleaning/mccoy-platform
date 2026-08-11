@@ -310,7 +310,7 @@ export function CmsButtonEditor({
   );
 }
 
-const PLACEHOLDER = localImage("/images/hero-placeholder.jpg", "Afbeelding");
+const PLACEHOLDER = localImage("/images/hero-placeholder.jpg", "", true);
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 export function BlockImageField({

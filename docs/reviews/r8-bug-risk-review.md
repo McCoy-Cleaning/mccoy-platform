@@ -16,7 +16,7 @@ CMS save/publish races, Aanvragen forms path, locale EN publish console loop, MG
 | Forms → Aanvragen E2E | 4 passed |
 | CMS inventory / coverage | 14 + 7 passed |
 | MG5 unit/operator/idempotency | 42 passed |
-| Locale EN publish E2E | fails `failureSink` on `Maximum update depth exceeded` (pre-existing; tracked since R7) |
+| Locale EN publish E2E | **fixed** — `npm run test:e2e:locale` green after LocalePublishPanel coverage-effect deps use stable store refs |
 
 ## Findings
 
@@ -28,15 +28,13 @@ CMS save/publish races, Aanvragen forms path, locale EN publish console loop, MG
 | ruleId | `bug.cms.editor-update-depth` |
 | severity | medium |
 | confidence | high |
-| path | `e2e/cms-locale-en-publish.spec.ts` (symptom); editor modules under Admin CMS |
-| status | deferred |
-| evidence | Playwright exit 1; global failureSink reports 186–230 `Maximum update depth exceeded` console errors while durable save asserts can still succeed (R7 classification) |
-| impact | Noisy/unstable EN publish E2E; potential editor jank under EN field editing |
-| recommendation | Isolate setState cycle in EN/custom-page editor path; keep durable `savePage` fixtures; do not treat as MG5/MR work |
-| verification | `npm run test:e2e:locale` |
-
-Not promoted to R8 blocker: publish durability already hardened; public locale smoke green; documented follow-up remains.
+| path | `apps/admin/src/components/admin/cms/LocalePublishPanel.tsx` |
+| status | **resolved** |
+| evidence | Root cause: coverage `useEffect` depended on `getEditablePage()` nested fields; `applyDraftToPage` always `structuredClone`s so deps churned every render → `setCoverage` loop. Fixed by depending on `useCms()` draft/saved/version/`updatedAt` and `useEditablePage`. |
+| impact | Was: noisy EN publish E2E via failureSink; editor jank. Now: locale + focused CMS editor E2E green without ignoring update-depth console errors. |
+| recommendation | Keep avoiding `getEditablePage()` object identity in React effect deps (see `admin.website.$pageId.tsx` / `useEditablePage`). |
+| verification | `npm run test:e2e:locale`; unit `LocalePublishPanel.test.tsx` |
 
 ## Verdict
 
-**PASS with deferred BR-001** (not production data-integrity blocker).
+**PASS** — BR-001 resolved at editor source (not failureSink masking).

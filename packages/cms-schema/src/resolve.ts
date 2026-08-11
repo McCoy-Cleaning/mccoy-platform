@@ -13,6 +13,7 @@ import {
 import type { CmsPage } from "./types";
 import { ensurePageLocaleFields } from "./migrate-locale";
 import { localizeCmsPageForLocale } from "./en-field-drafts";
+import { isEnglishLegalDutchBleed, robotsIndicateNoindex } from "./hreflang";
 import { normalizeCmsPage } from "./pipeline";
 import { resolveSeoMetadata } from "./resolve-seo";
 
@@ -96,22 +97,52 @@ export function resolvePublishedCmsPage(
     return { ok: false, reason: "missing_content" };
   }
 
+  // Phase 3: published EN legal without EN overlays still serves NL body under /en
+  // — noindex until factual EN exists (do not invent copy).
+  const enLegalBleed = isEnglishLegalDutchBleed(page);
+  if (input.locale === "en" && enLegalBleed) {
+    const robots = localeContent.seo.robots;
+    localeContent = {
+      ...localeContent,
+      seo: {
+        ...localeContent.seo,
+        robots: robotsIndicateNoindex(robots) ? robots : "noindex,follow",
+      },
+    };
+  }
+
   const paths = page.paths ?? { nl: page.slug };
   const path =
     input.locale === "en"
       ? normalizeCmsPath("en", paths.en ?? paths.nl)
       : normalizeCmsPath("nl", paths.nl);
 
-  const alternates = getPublishedLocaleAlternates(
-    paths as LocalizedPagePath,
-    {
-      nl: { publicationState: localeStates.nl.publicationState },
-      en: localeStates.en
-        ? { publicationState: localeStates.en.publicationState }
-        : undefined,
-    },
-    input.site,
-  );
+  const nlIndexable = !robotsIndicateNoindex(page.localeContent?.nl?.seo?.robots);
+  const enIndexable =
+    localeStates.en?.publicationState === "published" &&
+    !enLegalBleed &&
+    !robotsIndicateNoindex(page.localeContent?.en?.seo?.robots);
+
+  // Noindex snapshots must not emit hreflang clusters (acceptance: never advertise
+  // unpublished / noindex / redirected peers; origin noindex → no alternates).
+  const alternates = robotsIndicateNoindex(localeContent.seo.robots)
+    ? []
+    : getPublishedLocaleAlternates(
+        paths as LocalizedPagePath,
+        {
+          nl: {
+            publicationState: localeStates.nl.publicationState,
+            indexable: nlIndexable,
+          },
+          en: localeStates.en
+            ? {
+                publicationState: localeStates.en.publicationState,
+                indexable: enIndexable,
+              }
+            : undefined,
+        },
+        input.site,
+      );
 
   // Body follows the requested locale: EN overlays enFieldDrafts onto NL base fields.
   // Never serve Dutch SEO under /en (checked above); never ignore stored EN section drafts.

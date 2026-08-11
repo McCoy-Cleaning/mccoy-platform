@@ -10,7 +10,7 @@ import {
 } from "motion/react";
 import { Award, Eye, History, Leaf, ShieldCheck, Target, Users } from "lucide-react";
 import type { CmsButton, CmsImage } from "@mccoy/cms-schema";
-import { isCmsButtonInteractive } from "@mccoy/cms-schema";
+import { isCmsButtonInteractive, withResolvedPublicImageAlt } from "@mccoy/cms-schema";
 import { CmsButtonView, CmsImageView, SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
 import { useMobileLiteMotion } from "@/lib/use-mobile-lite-motion";
 
@@ -160,7 +160,10 @@ export function AboutPillarRowView({
                   }
                   className={`absolute inset-0 h-full w-full${soft ? "" : " will-change-transform"}`}
                 >
-                  <CmsImageView image={image} className="h-full w-full object-cover" />
+                  <CmsImageView
+                    image={withResolvedPublicImageAlt(image, title)}
+                    className="h-full w-full object-cover"
+                  />
                 </motion.div>
               ) : imgSrc ? (
                 <motion.img

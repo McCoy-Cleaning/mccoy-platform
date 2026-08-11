@@ -12,7 +12,7 @@ import {
   adminRollbackCmsPage,
   adminSetCmsLocaleState,
 } from "@/lib/api/cms-publish.functions";
-import { cms } from "@/lib/cms/store";
+import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { cn } from "@/lib/utils";
 import { appConfirm } from "@/lib/app-dialogs";
 
@@ -35,6 +35,8 @@ const PUBLICATION_LABELS: Record<LocalePublicationState, string> = {
  * AI never auto-publishes — publish is always an explicit editor action.
  */
 export function LocalePublishPanel({ page, onPageChange }: Props) {
+  const state = useCms();
+  const editable = useEditablePage(page.id) ?? page;
   const [locale, setLocale] = React.useState<Locale>("nl");
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
@@ -62,18 +64,19 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
     void refresh();
   }, [refresh]);
 
-  const editable = cms.getEditablePage(page.id) ?? page;
+  // Depend on stable store refs only. Never put getEditablePage() nested fields in
+  // deps — applyDraftToPage always structuredClone's, so enFieldDrafts/etc. are new
+  // identities every render and setCoverage → re-render loops (BR-001).
+  const draft = state.draft[page.id];
+  const saved = state.saved[page.id];
+  const publishedUpdatedAt = state.pages.find((p) => p.id === page.id)?.updatedAt ?? page.updatedAt;
 
   React.useEffect(() => {
-    const next = cms.getTranslationCoverage(page.id);
-    setCoverage(next ?? scanTranslationCoverage({ page: editable }));
-  }, [
-    page.id,
-    editable.enFieldDrafts,
-    editable.enFieldDraftSources,
-    editable.enFieldDraftMeta,
-    editable.updatedAt,
-  ]);
+    const live = cms.getEditablePage(page.id) ?? page;
+    const next =
+      cms.getTranslationCoverage(page.id) ?? scanTranslationCoverage({ page: live });
+    setCoverage(next);
+  }, [page.id, draft, saved, publishedUpdatedAt, state.version]);
 
   const setState = async (publicationState: LocalePublicationState) => {
     setBusy(true);

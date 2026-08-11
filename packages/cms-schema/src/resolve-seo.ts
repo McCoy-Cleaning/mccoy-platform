@@ -1,9 +1,9 @@
 /**
  * SEO-7 — centralized technical metadata resolution.
  *
- * Does NOT invent marketing title/description copy (SEO-8 is approval-gated).
- * Uses existing CMS SEO fields and/or explicit frozen deployed copy.
+ * Phase 6 may overlay deployed factual titles/descriptions via frozen SEO.
  * Canonical origin is always https://www.mccoy.nl for public head output.
+ * Does not invent unsupported marketing claims or emit ranking keywords meta.
  */
 
 import type { CmsSeo } from "./seo";
@@ -104,21 +104,27 @@ export function resolveSeoMetadata(
   };
   const absolute = absoluteCanonicalUrl(snapshot.path, origin);
 
+  // og:locale must match the URL locale (NL → nl_NL, EN → en_GB).
+  const ogLocale = snapshot.locale === "en" ? "en_GB" : "nl_NL";
+  const ogLocaleAlternate = snapshot.locale === "en" ? "nl_NL" : "en_GB";
+
   const meta: Array<Record<string, string>> = [
     { title: seo.title },
     { name: "description", content: seo.description },
     { property: "og:title", content: seo.title },
     { property: "og:description", content: seo.description },
     { property: "og:url", content: absolute },
-    { property: "og:locale", content: snapshot.locale === "en" ? "en_GB" : "nl_NL" },
+    { property: "og:locale", content: ogLocale },
+    { property: "og:locale:alternate", content: ogLocaleAlternate },
   ];
-  if (seo.keywords) meta.push({ name: "keywords", content: seo.keywords });
+  // Do not emit <meta name="keywords"> for ranking — field ignored if present on CmsSeo.
   if (seo.robots) meta.push({ name: "robots", content: seo.robots });
   if (seo.ogImage) meta.push({ property: "og:image", content: seo.ogImage });
 
   const links: Array<{ rel: string; href: string; hrefLang?: string }> = [
     { rel: "canonical", href: absolute },
   ];
+  // snapshot.alternates already exclude unpublished / non-indexable peers.
   for (const alt of snapshot.alternates) {
     const href = absoluteCanonicalUrl(new URL(alt.url, origin).pathname, origin);
     links.push({

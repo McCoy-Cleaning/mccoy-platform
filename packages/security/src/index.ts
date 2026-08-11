@@ -16,6 +16,29 @@ export {
 } from "./host";
 
 export {
+  LEGACY_GONE_PATHS,
+  LEGACY_PERMANENT_REDIRECTS,
+  buildLegacyRedirectLocation,
+  resolveLegacyHttpAction,
+  resolveLegacyUrlDecision,
+  type LegacyHttpAction,
+  type LegacyUrlDecision,
+} from "./legacy-redirects";
+
+export {
+  MAJOR_PUBLIC_CANONICAL_PATHS,
+  PUBLIC_IDENTITY_ALIAS_PATHS,
+  assertInternalLinkIntegrity,
+  collectInternalLinkIntegrityIssues,
+  evaluateInternalLinkHref,
+  parseMccoyInternalHref,
+  type InternalLinkIntegrityIssue,
+  type InternalLinkIntegrityOptions,
+  type InternalLinkIntegrityReason,
+  type InternalLinkRef,
+} from "./internal-link-integrity";
+
+export {
   isStorefrontIndexable,
   storefrontRobotsMetaContent,
   storefrontRobotsTxt,

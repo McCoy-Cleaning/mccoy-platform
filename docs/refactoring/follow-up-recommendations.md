@@ -11,9 +11,10 @@
 
 ## SHOULD SOON
 
-1. Fix Admin CMS editor `Maximum update depth exceeded` during custom-page EN publish (BR-001) so `test:e2e:locale` is fully green without failureSink masking.
+1. ~~Fix Admin CMS editor `Maximum update depth exceeded` during custom-page EN publish (BR-001)~~ — **done** (`LocalePublishPanel` stable store deps; `test:e2e:locale` green).
 2. Reduce cms-media noisy failures when Supabase is intentionally unset in E2E (graceful empty list).
 3. Run `test:e2e:quality` (axe/responsive/security browser) on a clean port pair as a scheduled gate.
+4. Optionally retire leftover `home.hero` *section* mutation payloads in `cms-cross-origin-bridge` negative protocol tests (selectors already use `data-cms-select-block`).
 
 ## OPTIONAL IMPROVEMENT
 

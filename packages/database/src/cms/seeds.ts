@@ -32,7 +32,8 @@ function emptyBuiltin(input: {
     version: 1,
     localeStates: {
       nl: { publicationState: "published", freshness: "current" },
-      en: { publicationState: "published", freshness: "current" },
+      // EN stays missing until explicit Publiceer EN (seedBuiltinsIfEmpty also forces this).
+      en: { publicationState: "missing", freshness: "unknown" },
     },
   });
 }

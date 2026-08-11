@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./host": "./src/host.ts",
+    "./legacy-redirects": "./src/legacy-redirects.ts",
     "./env": "./src/env.ts",
     "./indexing": "./src/indexing.ts",
     "./headers": "./src/headers.ts",

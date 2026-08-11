@@ -15,9 +15,11 @@ import {
 } from "./helpers/reset-cms-home";
 
 async function awaitCmsToastGone(page: import("@playwright/test").Page) {
-  const toast = page.getByText("Sectie toegevoegd");
-  if (await toast.isVisible().catch(() => false)) {
-    await expect(toast).toBeHidden({ timeout: 10_000 });
+  // Scope to the visible Sonner toast — an aria-live echo can keep the plain
+  // text node "visible" to Playwright after the toast UI has dismissed.
+  const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Sectie toegevoegd" });
+  if (await toast.count().then((n) => n > 0).catch(() => false)) {
+    await expect(toast.first()).toBeHidden({ timeout: 15_000 });
   }
 }
 
@@ -88,7 +90,7 @@ test.describe("CMS pixel screenshots (targeted)", () => {
     await awaitCmsToastGone(page);
     await expect(dialog).toHaveScreenshot("text-image-editor.png");
 
-    await addCmsSection(page, "Foto galerij");
+    await addCmsSection(page, "Werkgalerij");
     await awaitCmsToastGone(page);
     await expect(dialog).toHaveScreenshot("gallery-editor.png");
 
@@ -96,8 +98,8 @@ test.describe("CMS pixel screenshots (targeted)", () => {
     await page.getByRole("button", { name: "Secties sluiten" }).click();
     await expect(dialog).toBeHidden();
 
-    await editFrame(page).locator("[data-cms-select='home.hero']").first().click();
-    const selected = editFrame(page).locator("[data-cms-select='home.hero']").first();
+    const selected = editFrame(page).locator("[data-cms-select-block]").first();
+    await selected.click();
     await expect(selected).toHaveAttribute("aria-pressed", "true");
     // Selection re-opens Secties; close again so the canvas shot is not racing the drawer.
     await prepareCanvasScreenshot(page, selected);

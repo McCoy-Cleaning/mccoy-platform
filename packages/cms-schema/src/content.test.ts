@@ -51,7 +51,7 @@ describe("section content", () => {
     }
   });
 
-  it("parses default home hero matching the original copy without primary Offerte CTA", () => {
+  it("parses default home hero matching Phase 6 SEO factory copy without primary Offerte CTA", () => {
     const raw = defaultSectionContent("home.hero") as {
       eyebrow: string;
       heading: string;
@@ -62,15 +62,16 @@ describe("section content", () => {
     };
     const parsed = parseSectionContent("home.hero", raw);
     expect(parsed?.eyebrow).toBe("Live Clean");
-    expect(parsed?.heading).toBe("Bij McCoy wordt kwaliteit");
-    expect(parsed?.headingAccent).toBe("zichtbaar.");
+    expect(parsed?.heading).toBe("McCoy Cleaning,");
+    expect(parsed?.headingAccent).toBe("schoonmaakbedrijf in Twente.");
     expect(parsed?.body).toContain("Geen onderaannemers");
+    expect(parsed?.body).toContain("Oldenzaal");
     expect(raw.primaryCta).toBeUndefined();
     expect(raw.secondaryCta?.label).toBe("Bekijk onze diensten");
     expect(parsed?.image?.assetId.startsWith("local:")).toBe(true);
   });
 
-  it("migrates legacy prototype hero to the original defaults", () => {
+  it("migrates legacy prototype hero to the current factory defaults", () => {
     const migrated = migrateLegacyHeroContent({
       eyebrow: "Schoonmaakbedrijf Twente",
       heading: "Bij McCoy wordt",
@@ -92,8 +93,8 @@ describe("section content", () => {
       },
     });
     expect(migrated.eyebrow).toBe("Live Clean");
-    expect(migrated.heading).toBe("Bij McCoy wordt kwaliteit");
-    expect(migrated.headingAccent).toBe("zichtbaar.");
+    expect(migrated.heading).toBe("McCoy Cleaning,");
+    expect(migrated.headingAccent).toBe("schoonmaakbedrijf in Twente.");
     expect(migrated.primaryCta).toBeUndefined();
     expect(migrated.image?.src).toBe("/images/hero-cleaning.jpg");
   });

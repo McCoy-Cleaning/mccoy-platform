@@ -6,6 +6,7 @@ import {
   SECTION_INNER,
   SECTION_SHELL_Y,
 } from "@mccoy/cms-renderer/section-layout";
+import { buildCityLandingJsonLd } from "@mccoy/cms-schema";
 
 export interface CityLandingProps {
   city: string;
@@ -99,27 +100,7 @@ export function CityLanding({ city, intro, services, reasons }: CityLandingProps
   );
 }
 
+/** @deprecated Prefer `buildCityLandingJsonLd` from `@mccoy/cms-schema` — kept as route-friendly alias. */
 export function cityJsonLd(city: string, path: string) {
-  const absolute =
-    path.startsWith("http") ? path : `https://www.mccoy.nl${path.startsWith("/") ? path : `/${path}`}`;
-  return {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: `McCoy Cleaning — Schoonmaakbedrijf ${city}`,
-    description: `Professioneel schoonmaakbedrijf actief in ${city} en omgeving. Kantoorschoonmaak, glasbewassing, vloeronderhoud en horecaschoonmaak.`,
-    url: absolute,
-    telephone: "+31541534982",
-    email: "info@mccoy.nl",
-    // Qualitative band already published on site — not a numeric offer/rating.
-    priceRange: "€€",
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "Nijverheidsstraat 63",
-      postalCode: "7575 BH",
-      addressLocality: "Oldenzaal",
-      addressRegion: "Overijssel",
-      addressCountry: "NL",
-    },
-    areaServed: { "@type": "City", name: city },
-  };
+  return buildCityLandingJsonLd(city, path);
 }

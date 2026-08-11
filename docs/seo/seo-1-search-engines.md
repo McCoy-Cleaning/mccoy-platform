@@ -2,6 +2,13 @@
 
 Human-only. No automatic external profile edits.
 
+**Post-deploy runbooks (Phase 12):**
+
+- Google: [`search-console-post-deploy.md`](./search-console-post-deploy.md)
+- Bing: [`bing-post-deploy.md`](./bing-post-deploy.md)
+
+Use those after production ships Phases 2–11. This file remains the short kickoff stub.
+
 ## Google Search Console
 
 1. Confirm property `https://www.mccoy.nl` (URL-prefix or Domain).

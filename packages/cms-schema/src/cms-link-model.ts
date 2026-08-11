@@ -14,10 +14,21 @@ export type BuiltinRouteKey =
   | "privacy"
   | "terms";
 
+/**
+ * Optional in-page fragment for internal links (no leading `#`).
+ * Preserved by {@link resolveCmsLinkHref} / CmsLinkAnchor (e.g. `/services#vloeronderhoud`).
+ */
+export type CmsLinkHash = string;
+
 export type CmsLink =
   | { type: "none" }
-  | { type: "internal"; pageId: string; openInNewTab?: boolean }
-  | { type: "internal_route"; route: BuiltinRouteKey; openInNewTab?: boolean }
+  | { type: "internal"; pageId: string; hash?: CmsLinkHash; openInNewTab?: boolean }
+  | {
+      type: "internal_route";
+      route: BuiltinRouteKey;
+      hash?: CmsLinkHash;
+      openInNewTab?: boolean;
+    }
   | { type: "external"; url: string; openInNewTab?: boolean }
   | { type: "email"; email: string; subject?: string }
   | { type: "phone"; phone: string };

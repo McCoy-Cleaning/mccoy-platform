@@ -17,7 +17,7 @@ import logoWebpUrl from "@/assets/logo-mccoy.webp";
 import { LanguageToggle } from "./LanguageToggle";
 import { CmsLinkAnchor } from "./CmsLinkAnchor";
 import { useCms, useSiteNavigation } from "@/lib/cms/store";
-import { resolveCmsLinkHref, resolveStorefrontNavLinks } from "@mccoy/cms-schema";
+import { resolveCmsLinkHref, resolveStorefrontNavLinks, MCCOY_NAP, napMailtoHref, napTelHref, resolvePublicImageAlt } from "@mccoy/cms-schema";
 import { useI18n } from "@/lib/i18n";
 import { localizedNavLabel } from "@/lib/cms-i18n";
 import { localWebpSibling, NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
@@ -44,6 +44,7 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
 
   const logoSrc = navigation.logo?.src || logoUrl;
   const logoWebp = navigation.logo?.src ? localWebpSibling(navigation.logo.src) : logoWebpUrl;
+  const logoAlt = resolvePublicImageAlt(navigation.logo, "McCoy Cleaning");
 
   return (
     <div data-site-mobile-menu="" className="fixed inset-0 z-[60] bg-background md:hidden">
@@ -56,7 +57,7 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
             <img
               data-cms-logo=""
               src={logoSrc}
-              alt={navigation.logo?.decorative ? "" : navigation.logo?.alt || "McCoy Cleaning"}
+              alt={logoAlt}
               width={NAV_LOGO_WIDTH}
               height={NAV_LOGO_HEIGHT}
               decoding="async"
@@ -144,16 +145,16 @@ export function MobileMenu({ onClose }: { onClose: () => void }) {
           ) : null}
           <div className="grid grid-cols-2 gap-2 text-[11px] text-white/70 sm:text-xs">
             <a
-              href="tel:+31541534982"
+              href={napTelHref()}
               className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5"
             >
-              <Phone className="h-3.5 w-3.5 shrink-0 text-primary" /> 0541 534 982
+              <Phone className="h-3.5 w-3.5 shrink-0 text-primary" /> {MCCOY_NAP.telephoneDisplayNational}
             </a>
             <a
-              href="mailto:info@mccoy.nl"
+              href={napMailtoHref()}
               className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5"
             >
-              <Mail className="h-3.5 w-3.5 shrink-0 text-primary" /> info@mccoy.nl
+              <Mail className="h-3.5 w-3.5 shrink-0 text-primary" /> {MCCOY_NAP.email}
             </a>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 sm:mt-4">

@@ -1,7 +1,15 @@
 import { z } from "zod";
 import type { BuiltinRouteKey, CmsLink, CmsLinkPageRef } from "./cms-link-model";
+import type { Locale } from "./locale";
+import { normalizeCmsPath } from "./paths";
+import { appendCmsLinkHash, normalizeCmsLinkHash } from "./service-detail-anchors";
 
 export type { BuiltinRouteKey, CmsLink, CmsLinkPageRef } from "./cms-link-model";
+
+const cmsLinkHashSchema = z
+  .string()
+  .optional()
+  .transform((v) => normalizeCmsLinkHash(v ?? null));
 
 export const BUILTIN_ROUTE_PATHS: Record<BuiltinRouteKey, string> = {
   home: "/",
@@ -88,6 +96,7 @@ export const cmsLinkSchema: z.ZodType<CmsLink> = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("internal"),
     pageId: z.string().min(1),
+    hash: cmsLinkHashSchema,
     openInNewTab: z.boolean().optional(),
   }),
   z.object({
@@ -103,6 +112,7 @@ export const cmsLinkSchema: z.ZodType<CmsLink> = z.discriminatedUnion("type", [
       "privacy",
       "terms",
     ]),
+    hash: cmsLinkHashSchema,
     openInNewTab: z.boolean().optional(),
   }),
   z.object({
@@ -174,9 +184,11 @@ export function parseCmsLinkDraft(value: unknown): CmsLink | null {
   }
 
   if (type === "internal" && typeof rec.pageId === "string" && rec.pageId.trim()) {
+    const hash = normalizeCmsLinkHash(typeof rec.hash === "string" ? rec.hash : null);
     return {
       type: "internal",
       pageId: rec.pageId,
+      ...(hash ? { hash } : {}),
       openInNewTab: typeof rec.openInNewTab === "boolean" ? rec.openInNewTab : undefined,
     };
   }
@@ -184,9 +196,11 @@ export function parseCmsLinkDraft(value: unknown): CmsLink | null {
   if (type === "internal_route" && typeof rec.route === "string") {
     const route = rec.route as BuiltinRouteKey;
     if (!(route in BUILTIN_ROUTE_PATHS)) return null;
+    const hash = normalizeCmsLinkHash(typeof rec.hash === "string" ? rec.hash : null);
     return {
       type: "internal_route",
       route,
+      ...(hash ? { hash } : {}),
       openInNewTab: typeof rec.openInNewTab === "boolean" ? rec.openInNewTab : undefined,
     };
   }
@@ -212,11 +226,18 @@ export function linkFromLegacyHref(href: string | undefined | null): CmsLink | n
     const phone = h.slice("tel:".length);
     return isValidPhone(phone) ? { type: "phone", phone } : null;
   }
+  const hashIdx = h.indexOf("#");
+  const pathOnly = hashIdx >= 0 ? h.slice(0, hashIdx) : h;
+  const hash = hashIdx >= 0 ? normalizeCmsLinkHash(h.slice(hashIdx + 1)) : undefined;
   const routeEntry = (Object.entries(BUILTIN_ROUTE_PATHS) as [BuiltinRouteKey, string][]).find(
-    ([, path]) => path === h || (path !== "/" && h === path),
+    ([, path]) => path === pathOnly || (path !== "/" && pathOnly === path),
   );
   if (routeEntry) {
-    return { type: "internal_route", route: routeEntry[0] };
+    return {
+      type: "internal_route",
+      route: routeEntry[0],
+      ...(hash ? { hash } : {}),
+    };
   }
   if (h.startsWith("/") && !h.startsWith("//")) {
     return null;
@@ -227,9 +248,15 @@ export function linkFromLegacyHref(href: string | undefined | null): CmsLink | n
   return null;
 }
 
+export type ResolveCmsLinkHrefOptions = {
+  /** When `en`, prefix builtin/internal paths with `/en` (hashes preserved). */
+  locale?: Locale;
+};
+
 export function resolveCmsLinkHref(
   link: CmsLink | null | undefined,
   pages: Pick<CmsLinkPageRef, "id" | "slug">[],
+  options?: ResolveCmsLinkHrefOptions,
 ): string | null {
   if (!link || link.type === "none") return null;
   if (link.type === "external") {
@@ -244,10 +271,16 @@ export function resolveCmsLinkHref(
     return isValidPhone(link.phone) ? `tel:${link.phone.trim().replace(/\s+/g, "")}` : null;
   }
   if (link.type === "internal_route") {
-    return BUILTIN_ROUTE_PATHS[link.route] ?? null;
+    const base = BUILTIN_ROUTE_PATHS[link.route];
+    if (!base) return null;
+    const localized = options?.locale === "en" ? normalizeCmsPath("en", base) : base;
+    return appendCmsLinkHash(localized, link.hash);
   }
   const page = pages.find((p) => p.id === link.pageId);
-  return page?.slug ?? null;
+  if (!page?.slug) return null;
+  const localized =
+    options?.locale === "en" ? normalizeCmsPath("en", page.slug) : page.slug;
+  return appendCmsLinkHash(localized, link.hash);
 }
 
 export function linkRel(link: CmsLink | null | undefined): string | undefined {

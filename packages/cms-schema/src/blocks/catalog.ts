@@ -194,12 +194,13 @@ export const DEFAULT_HERO_TRUST_ITEMS: readonly HeroTrustItem[] = [
 ];
 
 function createDefaultHero(): HeroBlockData {
+  // Keep in sync with `defaultSectionContent("home.hero")` (Phase 6 SEO factory).
   return {
     eyebrow: "Live Clean",
-    title: "Bij McCoy wordt kwaliteit",
-    headingAccent: { accent: "zichtbaar." },
+    title: "McCoy Cleaning,",
+    headingAccent: { accent: "schoonmaakbedrijf in Twente." },
     subtitle:
-      "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is.",
+      "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is. Vanuit Oldenzaal actief in heel Twente.",
     secondaryCta: {
       label: "Bekijk onze diensten",
       link: { type: "internal_route", route: "services" },
@@ -265,7 +266,14 @@ function normalizeHero(value: unknown): HeroBlockData {
   const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const primary = legacyCta(rec) ?? parseOptionalButton(rec.primaryCta);
   const secondary = parseOptionalButton(rec.secondaryCta);
-  const title = str(rec, "title") || str(rec, "heading", "Titel");
+  // Preserve explicit empty title so editors can clear it and publish validation
+  // (HERO_TITLE_REQUIRED) can reject — do not coerce "" → "Titel".
+  const title =
+    typeof rec.title === "string"
+      ? rec.title
+      : typeof rec.heading === "string"
+        ? rec.heading
+        : "Titel";
   const subtitle = str(rec, "subtitle") || str(rec, "body") || undefined;
   const presentation: HeroPresentation | undefined =
     rec.presentation === "formChrome" ? "formChrome" : undefined;
