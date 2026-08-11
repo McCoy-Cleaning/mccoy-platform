@@ -11,6 +11,9 @@ Same deploy prerequisites as [`search-console-post-deploy.md`](./search-console-
 ## Steps
 
 1. **Verify** `https://www.mccoy.nl` (import from GSC or Bing verification).
+   - XML file method: ship `apps/storefront/public/BingSiteAuth.xml` so  
+     `https://www.mccoy.nl/BingSiteAuth.xml` returns the Bing users XML (200, `application/xml` or text).  
+     After deploy, use **Try Again** in Bing Webmaster Tools.
 2. **Sitemap** — Submit `https://www.mccoy.nl/sitemap.xml`.
 3. **IndexNow**
    - Production env `INDEXNOW_KEY` set server-side only
