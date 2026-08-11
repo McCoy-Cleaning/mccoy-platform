@@ -45,7 +45,7 @@ function PartnerLogoImg({
       ) : null}
       <img
         src={imgSrc}
-        alt={name}
+        alt={name.trim() || "Partner"}
         width={160}
         height={64}
         sizes={PARTNER_LOGO_SIZES}

@@ -147,21 +147,36 @@ export type SiteUrlConfig = {
   origin: string; // e.g. https://www.mccoy.nl — no trailing slash
 };
 
+export type LocaleAlternateState = {
+  publicationState: string;
+  /**
+   * When false, locale is published for rendering but must not appear in hreflang
+   * (e.g. noindex / Dutch-bleed legal EN). Defaults to true when published.
+   */
+  indexable?: boolean;
+};
+
+function localeEligibleForHreflang(state: LocaleAlternateState | undefined): boolean {
+  if (!state || state.publicationState !== "published") return false;
+  return state.indexable !== false;
+}
+
 /**
- * Shared alternate builder for head() and sitemap — published locales only.
+ * Shared alternate builder for head() and sitemap — published + indexable locales only.
+ * Never emits hreflang toward unpublished or explicitly non-indexable peers.
  */
 export function getPublishedLocaleAlternates(
   paths: LocalizedPagePath,
-  localeStates: { nl: { publicationState: string }; en?: { publicationState: string } },
+  localeStates: { nl: LocaleAlternateState; en?: LocaleAlternateState },
   site: SiteUrlConfig,
 ): LocaleAlternate[] {
   const origin = site.origin.replace(/\/+$/, "");
   const alts: LocaleAlternate[] = [];
 
-  const nlPublished = localeStates.nl.publicationState === "published";
-  const enPublished = localeStates.en?.publicationState === "published";
+  const nlEligible = localeEligibleForHreflang(localeStates.nl);
+  const enEligible = localeEligibleForHreflang(localeStates.en);
 
-  if (nlPublished) {
+  if (nlEligible) {
     alts.push({
       locale: "nl",
       url: `${origin}${paths.nl === "/" ? "/" : paths.nl}`,
@@ -169,8 +184,10 @@ export function getPublishedLocaleAlternates(
     });
   }
 
-  if (enPublished && paths.en) {
-    const enPath = normalizeCmsPath("en", paths.en.startsWith("/en") ? paths.en : paths.en);
+  if (enEligible) {
+    // Match resolvePublishedCmsPage: EN identity defaults to NL path under /en.
+    const enIdentity = paths.en ?? paths.nl;
+    const enPath = normalizeCmsPath("en", enIdentity);
     alts.push({
       locale: "en",
       url: `${origin}${enPath}`,
@@ -178,7 +195,7 @@ export function getPublishedLocaleAlternates(
     });
   }
 
-  if (nlPublished) {
+  if (nlEligible) {
     alts.push({
       locale: "x-default",
       url: `${origin}${paths.nl === "/" ? "/" : paths.nl}`,

@@ -25,7 +25,7 @@ import {
   readIndexingEnv,
   storefrontRobotsMetaContent,
 } from "@mccoy/security/indexing";
-import { UI_LOCALE_COOKIE } from "@mccoy/cms-schema";
+import { UI_LOCALE_COOKIE, buildMccoyCleaningServiceJsonLd } from "@mccoy/cms-schema";
 
 /** Trusted static critical CSS — never feed CMS/user strings into this. */
 const STOREFRONT_CRITICAL_CSS = [
@@ -100,18 +100,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "McCoy Cleaning — Schoonmaakbedrijf Twente" },
+      { title: "McCoy Cleaning — Schoonmaakbedrijf Twente | Oldenzaal" },
       {
         name: "description",
         content:
-          "Professioneel schoonmaakbedrijf in Twente. Kantoorschoonmaak, glasbewassing, vloeronderhoud en horecaschoonmaak door een vast eigen team.",
+          "Professioneel schoonmaakbedrijf in Twente sinds 1998. Kantoorschoonmaak, glasbewassing, vloer- en horecaschoonmaak vanuit Oldenzaal — met een vast eigen team.",
       },
       { name: "google", content: "notranslate" },
-      {
-        name: "keywords",
-        content:
-          "schoonmaakbedrijf Twente, schoonmaakbedrijf Oldenzaal, kantoorschoonmaak Hengelo, schoonmaak Enschede, glasbewassing Twente, glazenwasser Oldenzaal, opleveringsschoonmaak, vloeronderhoud, tapijtreiniging, horeca schoonmaak, dieptereiniging sanitair, professionele schoonmaak bedrijven, commercial cleaning Twente, office cleaning Netherlands, window cleaning Twente",
-      },
       { name: "author", content: "McCoy Cleaning" },
       {
         name: "robots",
@@ -122,21 +117,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "geo.region", content: "NL-OV" },
       { name: "geo.placename", content: "Oldenzaal" },
       { property: "og:site_name", content: "McCoy Cleaning" },
-      { property: "og:title", content: "McCoy Cleaning — Schoonmaakbedrijf Twente" },
+      { property: "og:title", content: "McCoy Cleaning — Schoonmaakbedrijf Twente | Oldenzaal" },
       {
         property: "og:description",
         content:
-          "Professionele schoonmaak, glasbewassing en vloeronderhoud voor bedrijven, horeca en specialistische projecten in Twente. Kwaliteit boven alles — al meer dan 25 jaar.",
+          "Professionele schoonmaak, glasbewassing en vloeronderhoud voor bedrijven, horeca en specialistische projecten in Twente. Kwaliteit boven alles — sinds 1998 vanuit Oldenzaal.",
       },
       { property: "og:type", content: "website" },
       { property: "og:locale", content: "nl_NL" },
-      { property: "og:locale:alternate", content: "en_US" },
+      { property: "og:locale:alternate", content: "en_GB" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "McCoy Cleaning — Schoonmaakbedrijf Twente" },
+      { name: "twitter:title", content: "McCoy Cleaning — Schoonmaakbedrijf Twente | Oldenzaal" },
       {
         name: "twitter:description",
         content:
-          "Professionele schoonmaak, glasbewassing en vloeronderhoud in Twente. Vast eigen team, 25+ jaar ervaring.",
+          "Professionele schoonmaak, glasbewassing en vloeronderhoud in Twente. Vast eigen team, sinds 1998 in Oldenzaal.",
       },
     ],
     links: [
@@ -161,48 +156,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "CleaningService",
-          name: "McCoy Cleaning",
-          description:
-            "Professioneel schoonmaakbedrijf in Twente. Kantoorschoonmaak, glasbewassing, vloeronderhoud, horeca- en opleveringsschoonmaak.",
-          image: logoUrl,
-          telephone: "+31541534982",
-          email: "info@mccoy.nl",
-          priceRange: "€€",
-          address: {
-            "@type": "PostalAddress",
-            streetAddress: "Nijverheidsstraat 63",
-            postalCode: "7575 BH",
-            addressLocality: "Oldenzaal",
-            addressRegion: "Overijssel",
-            addressCountry: "NL",
-          },
-          areaServed: [
-            { "@type": "City", name: "Oldenzaal" },
-            { "@type": "City", name: "Hengelo" },
-            { "@type": "City", name: "Enschede" },
-            { "@type": "City", name: "Almelo" },
-            { "@type": "AdministrativeArea", name: "Twente" },
-          ],
-          openingHoursSpecification: [
-            {
-              "@type": "OpeningHoursSpecification",
-              dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-              opens: "08:30",
-              closes: "17:00",
-            },
-          ],
-          serviceType: [
-            "Kantoorschoonmaak",
-            "Glasbewassing",
-            "Vloeronderhoud",
-            "Horeca schoonmaak",
-            "Opleveringsschoonmaak",
-            "Tapijtreiniging",
-          ],
-        }),
+        children: JSON.stringify(
+          buildMccoyCleaningServiceJsonLd({
+            image: logoUrl,
+          }),
+        ),
       },
     ],
   }),

@@ -3,22 +3,18 @@ import {
   readIndexingEnv,
   storefrontRobotsTxt,
 } from "@mccoy/security/indexing";
-import { readServerEnv } from "@mccoy/security/env";
+import { CANONICAL_PUBLIC_HOST } from "@mccoy/security/host";
 
 /**
  * Env-gated robots.txt — production allows crawl; preview/staging disallow.
- * Prefer this over static public/robots.txt (removed).
+ * Sitemap line always uses the www canonical host (never preview/localhost).
  */
 export const Route = createFileRoute("/robots.txt")({
   server: {
     handlers: {
       GET: async () => {
         const env = readIndexingEnv();
-        const publicHost =
-          (readServerEnv("PUBLIC_HOST") || "www.mccoy.nl,mccoy.nl")
-            .split(",")[0]
-            ?.trim() || "www.mccoy.nl";
-        const sitemapUrl = `https://${publicHost}/sitemap.xml`;
+        const sitemapUrl = `https://${CANONICAL_PUBLIC_HOST}/sitemap.xml`;
         const body = storefrontRobotsTxt(env, sitemapUrl);
         return new Response(body, {
           headers: {

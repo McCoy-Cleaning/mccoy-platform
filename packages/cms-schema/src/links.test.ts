@@ -43,6 +43,29 @@ describe("links", () => {
     ).toBe("/custom");
   });
 
+  it("preserves hashes on internal routes and localizes EN", () => {
+    expect(
+      resolveCmsLinkHref(
+        { type: "internal_route", route: "services", hash: "vloeronderhoud" },
+        [],
+      ),
+    ).toBe("/services#vloeronderhoud");
+    expect(
+      resolveCmsLinkHref(
+        { type: "internal_route", route: "services", hash: "#meubelreiniging" },
+        [],
+        { locale: "en" },
+      ),
+    ).toBe("/en/services#meubelreiniging");
+    expect(
+      linkFromLegacyHref("/services#reguliere-schoonmaak"),
+    ).toEqual({
+      type: "internal_route",
+      route: "services",
+      hash: "reguliere-schoonmaak",
+    });
+  });
+
   it("maps legacy hrefs to internal_route", () => {
     expect(linkFromLegacyHref("/services")).toEqual({
       type: "internal_route",

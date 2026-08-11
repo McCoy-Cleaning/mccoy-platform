@@ -6,7 +6,9 @@ import {
   formatHoursPerWeekNl,
   normalizeJobs,
   resolveVacancyPublicSlug,
+  buildJobPostingJsonLd,
   type VacancyItem,
+  type ResolvedPublishedCmsPage,
 } from "@mccoy/cms-schema";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
@@ -18,18 +20,44 @@ function findVacancyBySlug(vacancies: VacancyItem[], slug: string): VacancyItem 
   return vacancies.find((v) => resolveVacancyPublicSlug(v).toLowerCase() === normalized) ?? null;
 }
 
+function visibleVacanciesFromSnapshot(snapshot: ResolvedPublishedCmsPage | undefined): VacancyItem[] {
+  const page = snapshot?.page;
+  if (!page || page.kind !== "builtin") return [];
+  const jobsBlock = page.blocks.find((b) => b.type === "jobs");
+  if (!jobsBlock) return [];
+  return normalizeJobs(jobsBlock.data).vacancies.filter((v) => v.visible);
+}
+
 export const Route = createFileRoute("/vacatures/$slug")({
   loader: () => loadMarketingPublishedPage("/vacatures"),
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug} — Vacatures | McCoy Cleaning` },
-      {
-        name: "description",
-        content: "Vacature bij McCoy Cleaning in Twente. Bekijk details en solliciteer.",
-      },
-    ],
-    links: [absoluteCanonicalLink(`/vacatures/${params.slug}`)],
-  }),
+  head: ({ params, loaderData }) => {
+    const vacancy = findVacancyBySlug(
+      visibleVacanciesFromSnapshot(loaderData?.snapshot),
+      params.slug,
+    );
+    const title = vacancy
+      ? `${vacancy.title} — Vacatures | McCoy Cleaning`
+      : `${params.slug} — Vacatures | McCoy Cleaning`;
+    const description = vacancy?.shortDescription?.trim()
+      ? vacancy.shortDescription.trim()
+      : "Vacature bij McCoy Cleaning in Twente. Bekijk details en solliciteer.";
+    const jobLd = vacancy ? buildJobPostingJsonLd(vacancy) : null;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+      ],
+      links: [absoluteCanonicalLink(`/vacatures/${params.slug}`)],
+      scripts: jobLd
+        ? [
+            {
+              type: "application/ld+json",
+              children: JSON.stringify(jobLd),
+            },
+          ]
+        : [],
+    };
+  },
   component: VacatureDetailPage,
   notFoundComponent: () => (
     <div className="grid min-h-screen place-items-center bg-background text-foreground">

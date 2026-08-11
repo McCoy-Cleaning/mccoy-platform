@@ -77,4 +77,10 @@ Also: `apps/storefront/vercel.json` apex host redirect; storefront middleware us
 
 - MG5 apply: not run
 - MR: not started
-- No push to remote
+- No push to remote (2026-08-08 local closeout)
+
+## Development deployment qualification (follow-up)
+
+See [`seo-dev-deployment-qualification.md`](./seo-dev-deployment-qualification.md).
+
+2026-08-09 attempt: local re-qualify PASS; `git push origin development` **FAIL** (`Permission denied (publickey)` for `id_ed25519_mccoy`). Classification **SEO_DEV_BLOCKED**. Remote `origin/development` remains `d213d83`.

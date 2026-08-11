@@ -14,11 +14,6 @@ export const Route = createFileRoute("/schoonmaakbedrijf-hengelo")({
         content:
           "Schoonmaakbedrijf in Hengelo: kantoorschoonmaak, glasbewassing en horecaschoonmaak door een vast eigen team van McCoy Cleaning. Vraag een offerte aan.",
       },
-      {
-        name: "keywords",
-        content:
-          "schoonmaakbedrijf Hengelo, kantoorschoonmaak Hengelo, glazenwasser Hengelo, schoonmaak Twente",
-      },
       { property: "og:title", content: "Schoonmaakbedrijf Hengelo — McCoy Cleaning" },
       {
         property: "og:description",

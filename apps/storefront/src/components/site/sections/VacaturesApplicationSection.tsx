@@ -20,6 +20,7 @@ import {
   allowLegacyVacancyFallback,
   warnLegacyVacancyFallback,
   slugifyVacancyTitle,
+  resolvePublicImageAlt,
   type FormFieldItem,
   type VacaturesApplicationContent,
   type VacaturesMainContent,
@@ -314,7 +315,7 @@ export function VacaturesApplicationSection() {
                 !isCmsPlaceholderSrc(media.image.src) ? (
                 <img
                   src={media.image.src}
-                  alt={media.image.decorative ? "" : media.image.alt || mediaEyebrow}
+                  alt={resolvePublicImageAlt(media.image, mediaEyebrow || "McCoy Cleaning")}
                   className="aspect-video w-full bg-black/35 object-contain object-center"
                 />
               ) : (

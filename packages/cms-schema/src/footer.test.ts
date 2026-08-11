@@ -8,6 +8,8 @@ import {
   parseSiteFooterResult,
 } from "./footer";
 import { migrateAndValidate } from "./migrate";
+import { resolveCmsLinkHref } from "./links";
+import { SERVICE_DETAIL_ANCHORS } from "./service-detail-anchors";
 
 describe("site footer", () => {
   it("parses default footer", () => {
@@ -15,6 +17,32 @@ describe("site footer", () => {
     expect(parseSiteFooter(footer)?.tagline).toBe(footer.tagline);
     expect(footer.servicesLinks.length).toBeGreaterThan(0);
     expect(footer.legalLinks.length).toBe(2);
+  });
+
+  it("wires each service link to /services#… Phase 7 anchors", () => {
+    const footer = defaultSiteFooter();
+    expect(footer.servicesLinks).toHaveLength(SERVICE_DETAIL_ANCHORS.length);
+    const hrefs = footer.servicesLinks.map((item) => resolveCmsLinkHref(item.link, []));
+    expect(hrefs).toEqual([
+      "/services#reguliere-schoonmaak",
+      "/services#horeca-schoonmaak",
+      "/services#opleveringsschoonmaak",
+      "/services#vloeronderhoud",
+      "/services#meubelreiniging",
+      "/services#glas-gevelreiniging",
+    ]);
+    expect(
+      footer.servicesLinks.map((item) =>
+        resolveCmsLinkHref(item.link, [], { locale: "en" }),
+      ),
+    ).toEqual([
+      "/en/services#reguliere-schoonmaak",
+      "/en/services#horeca-schoonmaak",
+      "/en/services#opleveringsschoonmaak",
+      "/en/services#vloeronderhoud",
+      "/en/services#meubelreiniging",
+      "/en/services#glas-gevelreiniging",
+    ]);
   });
 
   it("rejects malformed footer", () => {

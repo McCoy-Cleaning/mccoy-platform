@@ -12,7 +12,7 @@ import {
   RegisteredBlockView,
   type CmsFormAdapters,
 } from "@mccoy/cms-renderer";
-import { type Block, type QuoteFormKind } from "@mccoy/cms-schema";
+import { type Block, type QuoteFormKind, sanitizePublicCmsImageTree } from "@mccoy/cms-schema";
 import { submitWebsiteForm } from "@/lib/api/forms.functions";
 import { usesStorefrontPresentationAdapter } from "./block-presentation";
 import { renderStorefrontPresentationAdapter } from "./blockPresentationAdapters";
@@ -80,11 +80,13 @@ export function BlockView({
   adminMode?: boolean;
   pageId?: string;
 }) {
-  const presentation = usesStorefrontPresentationAdapter(block)
-    ? renderStorefrontPresentationAdapter(block)
+  // Public delivery: replace generic CMS alts without touching cms-renderer.
+  const publicBlock = adminMode ? block : sanitizePublicCmsImageTree(block);
+  const presentation = usesStorefrontPresentationAdapter(publicBlock)
+    ? renderStorefrontPresentationAdapter(publicBlock)
     : null;
   const rendered = presentation ?? (
-    <RegisteredBlockView block={block} adminMode={adminMode} />
+    <RegisteredBlockView block={publicBlock} adminMode={adminMode} />
   );
 
   const withAdapters = (

@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
   head: ({ loaderData }) => {
     if (!loaderData?.head) {
       return {
-        meta: [{ title: "McCoy Cleaning" }],
+                meta: [{ title: "McCoy Cleaning — Schoonmaakbedrijf Twente | Oldenzaal" }],
       };
     }
     const base = tanstackHeadFromCms(loaderData.head);

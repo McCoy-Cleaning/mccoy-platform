@@ -13,6 +13,8 @@ import {
   resolveClientHydrationUiLang,
   resolveUiLangFromHints,
   UI_LOCALE_COOKIE,
+  MCCOY_NAP,
+  napAddressMultiline,
   type Locale,
 } from "@mccoy/cms-schema";
 
@@ -38,9 +40,9 @@ const translations = {
     },
     hero: {
       kicker: "Live Clean",
-      title: "Bij McCoy wordt kwaliteit",
-      titleAccent: "zichtbaar.",
-      sub: "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is.",
+      title: "McCoy Cleaning,",
+      titleAccent: "schoonmaakbedrijf in Twente.",
+      sub: "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is. Vanuit Oldenzaal actief in heel Twente.",
       ctaPrimary: "Vraag een offerte aan",
       ctaSecondary: "Bekijk onze diensten",
     },
@@ -129,7 +131,7 @@ const translations = {
     },
     services: {
       kicker: "Diensten",
-      title: "Wat wij voor u verzorgen",
+      title: "Schoonmaakdiensten in Twente",
       readMore: "Lees meer",
       readLess: "Inklappen",
       contactCta: "Neem contact op",
@@ -137,7 +139,7 @@ const translations = {
     },
     about: {
       kicker: "Over ons",
-      title: "Kwaliteit, missie & visie",
+      title: "Over McCoy Cleaning",
       missionTitle: "Missie",
       mission:
         "McCoy heeft als missie het leveren van schoonmaakdiensten van het hoogste kwaliteitsniveau voor organisaties waar hygiëne en uitstraling van cruciaal belang zijn.\n\nWij realiseren schone, veilige en representatieve leef- en werkomgevingen door te werken met maximale precisie, professionele middelen en goed opgeleide vakmensen. Daarbij streven wij continu naar een subliem eindresultaat, waarbij geen detail over het hoofd wordt gezien.\n\nMcCoy onderscheidt zich door een compromisloze focus op kwaliteit: wij leveren geen standaard schoonmaak, maar een zichtbaar hoger niveau van dienstverlening.",
@@ -171,8 +173,8 @@ const translations = {
       success: "Bedankt! We nemen zo snel mogelijk contact op.",
       address: "Adres",
       hours: "Kantooruren",
-      hoursValue: "Maandag t/m vrijdag 08:30 – 17:00",
-      addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+      hoursValue: MCCOY_NAP.officeHoursLabelNl,
+      addressValue: napAddressMultiline(),
       photosLabel: "Foto's van de situatie (optioneel)",
       photosHelp: "JPG, PNG of PDF — meerdere bestanden toegestaan",
       responseWithin: "Persoonlijk antwoord binnen één werkdag",
@@ -235,7 +237,7 @@ const translations = {
     },
     jobs: {
       kicker: "Vacatures",
-      title: "Werken bij McCoy",
+      title: "Werken bij McCoy Cleaning",
       sub: "Door groei zijn we bij McCoy altijd opzoek naar goede mensen, zowel voor de schoonmaak als glasbewassing. Geen ervaring? Geen probleem. Bij McCoy leren wij jou het vak en kijken we naar de uren en dagen die bij jou passen.\n\nJe kunt dus altijd solliciteren!",
       teamTitle: "Meer dan schoonmaken alleen",
       teamText: "Wist je dat we naast schoonmaken ook gewoon kunnen voetballen? Bij McCoy geloven we in een sterke teamgeest — op het werk én daarbuiten.",
@@ -290,9 +292,9 @@ const translations = {
     },
     hero: {
       kicker: "Live Clean",
-      title: "At McCoy quality becomes",
-      titleAccent: "visible.",
-      sub: "For over 25 years we've stood for cleaning with character — delivered by a permanent in-house team, with professional equipment and an unmistakable eye for detail. No subcontractors, no temps: only craftspeople who treat your building as if it were their own.",
+      title: "McCoy Cleaning,",
+      titleAccent: "cleaning company in Twente.",
+      sub: "For over 25 years we've stood for cleaning with character — delivered by a permanent in-house team, with professional equipment and an unmistakable eye for detail. No subcontractors, no temps: only craftspeople who treat your building as if it were their own. Based in Oldenzaal and active across Twente.",
       ctaPrimary: "Request a quote",
       ctaSecondary: "Explore our services",
     },
@@ -381,7 +383,7 @@ const translations = {
     },
     services: {
       kicker: "Services",
-      title: "What we take care of",
+      title: "Cleaning services in Twente",
       readMore: "Read more",
       readLess: "Collapse",
       contactCta: "Contact us",
@@ -389,7 +391,7 @@ const translations = {
     },
     about: {
       kicker: "About us",
-      title: "Quality, mission & vision",
+      title: "About McCoy Cleaning",
       missionTitle: "Mission",
       mission:
         "McCoy's mission is to deliver cleaning services of the highest quality for organisations where hygiene and appearance are critical.\n\nWe create clean, safe and presentable living and working environments through maximum precision, professional equipment and well-trained craftspeople. We continuously pursue a sublime end result, where no detail is overlooked.\n\nMcCoy stands out through an uncompromising focus on quality: not standard cleaning, but a visibly higher level of service.",
@@ -424,7 +426,7 @@ const translations = {
       address: "Address",
       hours: "Office hours",
       hoursValue: "Monday to Friday 08:30 – 17:00",
-      addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+      addressValue: napAddressMultiline(),
       photosLabel: "Photos of the situation (optional)",
       photosHelp: "JPG, PNG or PDF — multiple files allowed",
       responseWithin: "Personal reply within one working day",
@@ -487,7 +489,7 @@ const translations = {
     },
     jobs: {
       kicker: "Careers",
-      title: "Work at McCoy",
+      title: "Work at McCoy Cleaning",
       sub: "Due to our growth, McCoy is always looking for great people — both for cleaning and window cleaning. No experience? No problem. At McCoy we teach you the trade and find hours and days that suit you.\n\nSo you can always apply!",
       teamTitle: "More than just cleaning",
       teamText: "Did you know that besides cleaning, we also know how to play football? At McCoy we believe in strong team spirit — at work and beyond.",

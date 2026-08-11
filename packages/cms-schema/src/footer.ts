@@ -4,6 +4,15 @@ import { createItemId } from "./ids";
 import { cmsLinkSchema } from "./links";
 import type { CmsLink } from "./cms-link-model";
 import { DEFAULT_NAV_LOGO } from "./navigation";
+import {
+  SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID,
+} from "./service-detail-anchors";
+import {
+  MCCOY_NAP,
+  napAddressSingleLine,
+  napMailtoHref,
+  napTelHref,
+} from "./business-nap";
 
 export type SiteFooterLink = {
   id: string;
@@ -159,32 +168,56 @@ export function defaultSiteFooter(): SiteFooterContent {
       {
         id: "footer_svc_1",
         label: "Reguliere schoonmaak",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_1,
+        },
       },
       {
         id: "footer_svc_2",
         label: "Horeca schoonmaak",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_2,
+        },
       },
       {
         id: "footer_svc_3",
         label: "Opleveringsschoonmaak",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_3,
+        },
       },
       {
         id: "footer_svc_4",
         label: "Vloeronderhoud",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_4,
+        },
       },
       {
         id: "footer_svc_5",
         label: "Meubelreiniging",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_5,
+        },
       },
       {
         id: "footer_svc_6",
         label: "Glas- & gevelreiniging",
-        link: { type: "internal_route", route: "services" },
+        link: {
+          type: "internal_route",
+          route: "services",
+          hash: SERVICE_DETAIL_ANCHOR_BY_FOOTER_LINK_ID.footer_svc_6,
+        },
       },
     ],
     contactTitle: "Contact",
@@ -192,19 +225,19 @@ export function defaultSiteFooter(): SiteFooterContent {
       {
         id: "footer_contact_addr",
         kind: "address",
-        label: "Nijverheidsstraat 63, 7575 BH Oldenzaal",
+        label: napAddressSingleLine(),
       },
       {
         id: "footer_contact_phone",
         kind: "phone",
-        label: "0541 534 982",
-        href: "tel:+31541534982",
+        label: MCCOY_NAP.telephoneDisplayNational,
+        href: napTelHref(),
       },
       {
         id: "footer_contact_email",
         kind: "email",
-        label: "info@mccoy.nl",
-        href: "mailto:info@mccoy.nl",
+        label: MCCOY_NAP.email,
+        href: napMailtoHref(),
       },
     ],
     certsTitle: "Keurmerken",

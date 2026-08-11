@@ -183,56 +183,63 @@ const SEED_PAGES: Page[] = [
   emptyBuiltin({
     id: "page_home",
     slug: "/",
-    title: "Home",
-    description: "McCoy Cleaning — professioneel schoonmaakbedrijf in Twente.",
+    title: "McCoy Cleaning — Schoonmaakbedrijf Twente | Oldenzaal",
+    description:
+      "Professioneel schoonmaakbedrijf in Twente sinds 1998. Kantoorschoonmaak, glasbewassing, vloer- en horecaschoonmaak vanuit Oldenzaal — met een vast eigen team.",
     inNav: true,
     pageKey: "home",
   }),
   emptyBuiltin({
     id: "page_about",
     slug: "/about",
-    title: "Over ons",
-    description: "Over McCoy Cleaning — ons verhaal, team en waarden.",
+    title: "Over McCoy Cleaning — Schoonmaakbedrijf Twente sinds 1998",
+    description:
+      "Sinds 1998 staat McCoy Cleaning voor schoonmaak met karakter vanuit Oldenzaal. Lees over onze missie, visie en geschiedenis als schoonmaakbedrijf in Twente.",
     inNav: true,
     pageKey: "about",
   }),
   emptyBuiltin({
     id: "page_services",
     slug: "/services",
-    title: "Diensten",
-    description: "Ons volledige aanbod aan schoonmaakdiensten.",
+    title: "Schoonmaakdiensten Twente — McCoy Cleaning",
+    description:
+      "Kantoorschoonmaak, horeca-, opleverings- en vloeronderhoud, meubelreiniging en glasbewassing in Twente. Vast eigen team van McCoy Cleaning in Oldenzaal — vraag een offerte aan.",
     inNav: true,
     pageKey: "services",
   }),
   emptyBuiltin({
     id: "page_products",
     slug: "/products",
-    title: "Producten",
-    description: "McCoy Products — hygiënepapier, zepen en meer.",
+    title: "Producten — McCoy Cleaning Products | Groothandel",
+    description:
+      "McCoy Products: groothandel in hygiënepapier, professionele zepen, reinigingsmiddelen voor horeca en schoonmaakapparatuur. Neem contact op voor het assortiment.",
     inNav: true,
     pageKey: "products",
   }),
   emptyBuiltin({
     id: "page_contact",
     slug: "/contact",
-    title: "Contact",
-    description: "Neem contact op met McCoy Cleaning.",
+    title: "Contact — McCoy Cleaning Twente | Oldenzaal",
+    description:
+      "Neem contact op met McCoy Cleaning in Oldenzaal voor vragen of aanvragen over professionele schoonmaak in Twente. Persoonlijk antwoord binnen één werkdag.",
     inNav: true,
     pageKey: "contact",
   }),
   emptyBuiltin({
     id: "page_vacatures",
     slug: "/vacatures",
-    title: "Vacatures",
-    description: "Werken bij McCoy Cleaning.",
+    title: "Vacatures Schoonmaak Twente — Werken bij McCoy Cleaning",
+    description:
+      "Vacatures schoonmaak Twente: schoonmaakmedewerker, glazenwasser en oproepkracht bij McCoy Cleaning in Oldenzaal. Solliciteer direct.",
     inNav: true,
     pageKey: "vacatures",
   }),
   emptyBuiltin({
     id: "page_offerte",
     slug: "/offerte",
-    title: "Offerte",
-    description: "Vraag een offerte aan bij McCoy Cleaning.",
+    title: "Offerte aanvragen — Schoonmaak Twente | McCoy Cleaning",
+    description:
+      "Offerte aanvragen voor kantoorschoonmaak, glasbewassing, vloer- en meubelonderhoud in Twente. Persoonlijk antwoord binnen één werkdag — McCoy Cleaning Oldenzaal.",
     inNav: true,
     pageKey: "offerte",
   }),

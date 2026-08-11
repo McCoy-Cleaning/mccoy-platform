@@ -56,7 +56,7 @@ None required (no verified auto-eligible blocker/high). R8D omitted as empty.
 
 ## 8. Deferred findings
 
-- BR-001 locale EN publish editor update-depth (medium)
+- ~~BR-001 locale EN publish editor update-depth (medium)~~ — **resolved** (LocalePublishPanel store-ref deps; see `r8-bug-risk-review.md`)
 - PL-001 MG5 staging identity operations hold (info)
 
 ## 9–18. Domain verdicts
@@ -89,7 +89,7 @@ Final E2E (alternate ports 5273/5274, `E2E_USE_DEV=1`) — see `r8-final-e2e-cod
 | forms | 0 | 4 passed |
 | coverage | 0 | 7 passed |
 | inventory | 0 | 14 passed |
-| locale | 1 | public smoke 3 passed; EN publish deferred BR-001 |
+| locale | 0 | public smoke + EN publish green after BR-001 fix |
 
 ## 22. Known environmental limitations
 

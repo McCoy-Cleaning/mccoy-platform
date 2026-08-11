@@ -21,8 +21,13 @@ describe("cmsTextOrFallback", () => {
     expect(resolved).toBe(introFallback);
   });
 
-  it("uses fallback when CMS value still matches factory Dutch default", () => {
-    expect(cmsTextOrFallback("Hallo", "Hello", "Hallo")).toBe("Hello");
+  it("uses fallback when CMS value matches any legacy factory default", () => {
+    expect(
+      cmsTextOrFallback("Bij McCoy wordt kwaliteit", "McCoy Cleaning,", [
+        "McCoy Cleaning,",
+        "Bij McCoy wordt kwaliteit",
+      ]),
+    ).toBe("McCoy Cleaning,");
   });
 
   it("keeps editor-customized CMS copy", () => {

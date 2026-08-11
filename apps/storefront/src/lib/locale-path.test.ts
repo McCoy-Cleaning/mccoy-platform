@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapPathnameToLocale, type LocalePathPage } from "./locale-path";
+import { mapPathnameToLocale, localizeInternalHref, localeFromPathname, type LocalePathPage } from "./locale-path";
 
 const pages: LocalePathPage[] = [
   { slug: "/", paths: { nl: "/", en: "/" } },
@@ -47,5 +47,24 @@ describe("mapPathnameToLocale", () => {
     expect(mapPathnameToLocale("/en/products", "nl")).toBe("/products");
     expect(mapPathnameToLocale("/en/jobs", "nl")).toBe("/vacatures");
     expect(mapPathnameToLocale("/en/jobs", "en")).toBe("/en/vacatures");
+  });
+});
+
+describe("localizeInternalHref (Phase 8)", () => {
+  it("preserves hashes when localizing to EN", () => {
+    expect(localeFromPathname("/en/about")).toBe("en");
+    expect(localizeInternalHref("/services#vloeronderhoud", "en")).toBe(
+      "/en/services#vloeronderhoud",
+    );
+    expect(localizeInternalHref("/en/services#vloeronderhoud", "nl")).toBe(
+      "/services#vloeronderhoud",
+    );
+  });
+
+  it("leaves mailto and absolute external hrefs alone", () => {
+    expect(localizeInternalHref("mailto:info@mccoy.nl", "en")).toBe("mailto:info@mccoy.nl");
+    expect(localizeInternalHref("https://www.facebook.com/x", "en")).toBe(
+      "https://www.facebook.com/x",
+    );
   });
 });

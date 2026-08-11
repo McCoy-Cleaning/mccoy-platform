@@ -11,7 +11,7 @@ Before any SEO-related change, read `docs/seo/SEO-SAFE-MODE.md`.
 
 - Keep Safe Mode invariant flags false unless the user explicitly authorizes leaving Safe Mode.
 - Prefer technical crawl/head infrastructure over content or layout changes.
-- SEO-7 must not deploy SEO-8 marketing title/description rewrites. Proposed copy stays in `docs/seo/proposed-metadata.md` with `PENDING_APPROVAL`.
+- Phase 6 on-page titles/H1/descriptions are authorized via `docs/seo/SEO-SAFE-MODE-AUTHORIZATION.md`; record deployed copy in `docs/seo/proposed-metadata.md` with `DEPLOYED`.
 - Canonical origin is always `https://www.mccoy.nl`. Never emit preview/localhost/admin hosts as canonical.
 - IndexNow: production `www.mccoy.nl` URLs only; publish remains successful if notify fails.
 
@@ -31,4 +31,4 @@ Do not edit for SEO:
 
 - No MG5 apply, no MR kickoff from SEO work
 - No invented JSON-LD reviews, ratings, or prices
-- No visible body/copy/styling changes “for SEO”
+- No visual redesign “for SEO” (classNames/layout); Phase 6 may change heading tags/copy when authorized

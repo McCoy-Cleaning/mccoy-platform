@@ -32,7 +32,7 @@ const VACATURES_APP_COPY_KEYS = [
   "mediaLinkLabel",
 ] as const;
 
-const FALLBACK_IMAGE = localImage("/images/hero-placeholder.jpg", "Afbeelding");
+const FALLBACK_IMAGE = localImage("/images/hero-placeholder.jpg", "", true);
 
 function FormFieldOptionsEditor({
   options,

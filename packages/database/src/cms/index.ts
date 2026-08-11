@@ -40,6 +40,15 @@ export {
   type PublicCmsResolveResult,
 } from "./resolve";
 export {
+  assertSitemapIndexabilityConsistency,
+  collectSitemapEmittedUrls,
+  forbiddenSitemapPathnames,
+  isSitemapExcludedPathname,
+  type SitemapConsistencyReport,
+  type SitemapConsistencyViolation,
+  type SitemapEntry,
+} from "./sitemap-consistency";
+export {
   processCmsOutbox,
   registerCmsPublishHook,
   type CmsOutboxConsumerResult,

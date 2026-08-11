@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import type { FixedSectionKey, FormPageChromeContent } from "@mccoy/cms-schema";
+import { withResolvedPublicImageAlt } from "@mccoy/cms-schema";
 import { CmsImageView, SectionInner } from "@mccoy/cms-renderer";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { useI18n } from "@/lib/i18n";
@@ -75,7 +76,7 @@ function FormPageChromeSection({
             className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10"
           >
             <CmsImageView
-              image={content.image}
+              image={withResolvedPublicImageAlt(content.image, copy.heading || "McCoy Cleaning")}
               className="max-h-64 w-full bg-black/35 object-contain object-center"
             />
           </motion.div>

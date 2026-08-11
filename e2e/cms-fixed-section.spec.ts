@@ -22,8 +22,8 @@ test.describe("Fixed built-in section editing", () => {
     const dialog = page.getByRole("dialog", { name: "Paginaindeling" });
     await dialog.getByRole("button", { name: /Hero/i }).first().click();
 
-    // Fixed home.hero uses SelectedSectionInspector — Kop is the public heading.
-    const title = dialog.getByLabel(/^Kop$/i);
+    // Migrated home hero uses the reusable hero block editor — Titel is the public heading.
+    const title = dialog.getByLabel(/^Titel$/i);
     await expect(title).toBeVisible({ timeout: 15_000 });
     await title.fill(titleA);
     await expectEditCanvasText(page, titleA);
@@ -36,7 +36,7 @@ test.describe("Fixed built-in section editing", () => {
     await openPageEditor(page, PAGES.home);
     await openSections(page);
     await dialog.getByRole("button", { name: /Hero/i }).first().click();
-    await dialog.getByLabel(/^Kop$/i).fill("HERO_DISCARD");
+    await dialog.getByLabel(/^Titel$/i).fill("HERO_DISCARD");
     await discardDraft(page);
     await expect(editFrame(page).getByText("HERO_DISCARD")).toHaveCount(0);
     await expectEditCanvasText(page, titleB);

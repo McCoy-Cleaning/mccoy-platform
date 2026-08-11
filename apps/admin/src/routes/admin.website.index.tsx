@@ -79,7 +79,7 @@ function WebsitePage() {
             Pagina's ({publishedPages.length})
           </h2>
           {customCount > 0 ? (
-            <span className="text-sm text-white/45">{customCount} zelf gemaakt</span>
+            <span className="text-sm text-white/55">{customCount} zelf gemaakt</span>
           ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -104,7 +104,7 @@ function WebsitePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-lg font-bold tracking-tight">{p.title}</div>
-                      <div className="truncate text-sm text-white/40 font-mono">{p.slug}</div>
+                      <div className="truncate text-sm text-white/55 font-mono">{p.slug}</div>
                     </div>
                     {p.isCustom && (
                       <span className="shrink-0 rounded-full border border-purple-400/30 bg-purple-400/10 px-2.5 py-1 text-xs font-semibold text-purple-200">
@@ -115,7 +115,7 @@ function WebsitePage() {
                   <p className="mt-4 min-h-[3rem] text-[15px] leading-relaxed text-white/55 line-clamp-2">
                     {p.description}
                   </p>
-                  <div className="mt-3 flex items-center gap-3 text-sm text-white/45">
+                  <div className="mt-3 flex items-center gap-3 text-sm text-white/55">
                     <span>{countEditorSections(p.layout)} secties</span>
                     <span aria-hidden>·</span>
                     <span className={inNav ? "font-medium text-emerald-300" : ""}>
@@ -201,7 +201,7 @@ function WebsitePage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold tracking-tight">Foto&apos;s &amp; bestanden</div>
-                <div className="text-sm text-white/45">Uw mediabibliotheek</div>
+                <div className="text-sm text-white/55">Uw mediabibliotheek</div>
               </div>
             </div>
             <p className="mt-4 text-[15px] leading-relaxed text-white/55">
@@ -218,7 +218,7 @@ function WebsitePage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold tracking-tight">Menu bovenaan</div>
-                <div className="text-sm text-white/45">Navigatie van de website</div>
+                <div className="text-sm text-white/55">Navigatie van de website</div>
               </div>
             </div>
             <p className="mt-4 text-[15px] leading-relaxed text-white/55">
@@ -235,7 +235,7 @@ function WebsitePage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold tracking-tight">Footer</div>
-                <div className="text-sm text-white/45">Onderkant van de website</div>
+                <div className="text-sm text-white/55">Onderkant van de website</div>
               </div>
             </div>
             <p className="mt-4 text-[15px] leading-relaxed text-white/55">

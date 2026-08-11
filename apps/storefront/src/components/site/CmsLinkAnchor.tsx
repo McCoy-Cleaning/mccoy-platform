@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   resolveCmsLinkHref,
   linkRel,
@@ -10,11 +10,13 @@ import { useCms } from "@/lib/cms/store";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { warmPublishedCmsOnNavIntent } from "@/lib/cms/published-hydrate";
 import { prefetchMarketingPage } from "@/lib/cms/route-page-loader";
+import { localeFromPathname, localizeInternalHref } from "@/lib/locale-path";
 import { cn } from "@/lib/utils";
 
 /**
  * Renders a CmsLink as either a TanStack route link or an <a>.
  * In Bewerken, clicks select/edit only — navigation is blocked by EditInteractionGuard.
+ * Preserves `#hash` / `?query` and localizes to `/en/...` when on an English path.
  */
 export function CmsLinkAnchor({
   link,
@@ -29,11 +31,17 @@ export function CmsLinkAnchor({
 }) {
   const state = useCms();
   const { isEdit } = useLiveEditApi();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const pages = React.useMemo(
-    () => state.pages.map((p) => ({ id: p.id, slug: p.slug })),
+    () => state.pages.map((p) => ({ id: p.id, slug: p.slug, paths: p.paths })),
     [state.pages],
   );
-  const href = resolveCmsLinkHref(link, pages) ?? fallbackHref;
+  const locale = localeFromPathname(pathname);
+  const rawHref = resolveCmsLinkHref(link, pages) ?? fallbackHref;
+  const href =
+    link?.type === "internal_route" || link?.type === "internal"
+      ? localizeInternalHref(rawHref, locale, pages)
+      : rawHref;
   const external = link?.type === "external";
   const target = linkTarget(link) ?? (external ? "_blank" : undefined);
   const rel = linkRel(link) ?? (external ? "noopener noreferrer" : undefined);
@@ -84,9 +92,15 @@ export function CmsLinkAnchor({
 
 export function useResolvedCmsHref(link: CmsLink | null | undefined, fallback = "#"): string {
   const state = useCms();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const pages = React.useMemo(
-    () => state.pages.map((p) => ({ id: p.id, slug: p.slug })),
+    () => state.pages.map((p) => ({ id: p.id, slug: p.slug, paths: p.paths })),
     [state.pages],
   );
-  return resolveCmsLinkHref(link, pages) ?? fallback;
+  const locale = localeFromPathname(pathname);
+  const raw = resolveCmsLinkHref(link, pages) ?? fallback;
+  if (link?.type === "internal_route" || link?.type === "internal") {
+    return localizeInternalHref(raw, locale, pages);
+  }
+  return raw;
 }

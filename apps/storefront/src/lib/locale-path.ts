@@ -97,3 +97,44 @@ export function mapPathnameToLocale(
 
   return toLocalePublicPath(target, identity);
 }
+
+/** Locale implied by a public pathname (`/en/...` → en). */
+export function localeFromPathname(pathname: string): Locale {
+  const trimmed = pathname.replace(/\/+$/, "") || "/";
+  if (trimmed === "/en" || trimmed.startsWith("/en/")) return "en";
+  return "nl";
+}
+
+/**
+ * Localize a site-relative href for the active URL locale.
+ * Preserves `?query` and `#hash` (Phase 8 footer / Lees meer hashes).
+ * Leaves mailto/tel/external/protocol-relative unchanged.
+ */
+export function localizeInternalHref(
+  href: string,
+  locale: Locale,
+  pages: readonly LocalePathPage[] = [],
+): string {
+  const trimmed = href.trim();
+  if (!trimmed || trimmed === "#") return trimmed;
+  if (
+    trimmed.startsWith("mailto:") ||
+    trimmed.startsWith("tel:") ||
+    trimmed.startsWith("//") ||
+    /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+  ) {
+    return trimmed;
+  }
+  if (!trimmed.startsWith("/")) return trimmed;
+
+  const hashIdx = trimmed.indexOf("#");
+  const queryIdx = trimmed.indexOf("?");
+  let pathEnd = trimmed.length;
+  if (hashIdx >= 0) pathEnd = Math.min(pathEnd, hashIdx);
+  if (queryIdx >= 0) pathEnd = Math.min(pathEnd, queryIdx);
+
+  const path = trimmed.slice(0, pathEnd) || "/";
+  const rest = trimmed.slice(pathEnd);
+  const localizedPath = mapPathnameToLocale(path, locale, pages);
+  return `${localizedPath}${rest}`;
+}

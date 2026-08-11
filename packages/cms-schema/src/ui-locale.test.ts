@@ -170,3 +170,20 @@ describe("resolveHeroHeadingParts", () => {
     });
   });
 });
+
+
+describe("Phase 11 — NL/EN primary language smoke", () => {
+  it("NL marketing paths resolve UI lang nl by default", () => {
+    for (const path of ["/", "/services", "/products", "/contact", "/about"]) {
+      expect(resolveUiLangFromHints({ pathname: path })).toBe("nl");
+    }
+  });
+
+  it("EN URL prefix resolves UI lang en (primary language for /en/*)", () => {
+    for (const path of ["/en", "/en/services", "/en/products", "/en/contact"]) {
+      expect(resolveUiLangFromHints({ pathname: path, cookieHeader: "mccoy-lang=nl" })).toBe(
+        "en",
+      );
+    }
+  });
+});

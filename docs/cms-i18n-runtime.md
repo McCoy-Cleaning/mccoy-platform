@@ -67,7 +67,7 @@
 3. `GET /en` → **302** `/` until EN published (no drafts / EN never published)
 4. Fill EN fields + **Opslaan & publiceren** (or **Publiceer EN**) → `GET /en` renders
    English SEO + body (section/block `enFieldDrafts` overlaid onto NL base)
-5. `/sitemap.xml` includes EN only when `publicationState=published`
+5. `/sitemap.xml` includes EN only when `publicationState=published` **and** indexable (Phase 5: Dutch-bleed `/en/terms`/`/en/privacy` omitted; see `docs/seo/sitemap-indexability.md`)
 6. Language toggle switches client locale immediately; navigates to `/en` only when that locale is published (avoids 302 bounce). Static i18n and CMS section overlays share `useI18n().lang` / `useActiveCmsLocale`.
 
 ### Locale body resolution
@@ -75,6 +75,8 @@
 - Active CMS locale = preview `?_cmsLocale=` → else `/en` URL → else client i18n lang
 - `localizeCmsPageForLocale(page, "en")` applies `enFieldDrafts` onto `sectionContent` and `blocks`
 - Missing EN draft → keep NL base value (partial translation; never invent copy at render)
+- **Phase 3:** published EN legal (`terms` / `privacy`) without EN overlays → `noindex,follow` + omitted from hreflang (see `docs/seo/locale-en-gaps.md`)
+- Hreflang / sitemap alternates require published **and** indexable (`getPublishedLocaleAlternates` `indexable` flag)
 
 ## Monitoring (F5)
 

@@ -42,11 +42,12 @@ test.describe("Edit-mode interaction blocking", () => {
       );
     }
 
-    await frame.locator("[data-cms-select='home.hero']").first().click();
+    // Home hero is a reusable block after MG5 (data-cms-select-block), not fixed home.hero.
+    const heroBlock = frame.locator("[data-cms-select-block]").first();
+    await expect(heroBlock).toBeVisible();
+    await heroBlock.click();
     await expect(page.getByRole("dialog", { name: "Paginaindeling" })).toBeVisible();
-    await expect(
-      frame.locator('[data-cms-select="home.hero"][aria-pressed="true"]').first(),
-    ).toBeVisible();
+    await expect(heroBlock).toHaveAttribute("aria-pressed", "true");
   });
 
   test("Public storefront remains free of edit guards", async ({ page }) => {

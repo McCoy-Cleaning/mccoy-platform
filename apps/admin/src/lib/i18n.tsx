@@ -7,6 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { MCCOY_NAP, napAddressMultiline } from "@mccoy/cms-schema";
 
 const STORAGE_KEY = "mccoy-lang";
 
@@ -162,8 +163,8 @@ const translations = {
       success: "Bedankt! We nemen zo snel mogelijk contact op.",
       address: "Adres",
       hours: "Kantooruren",
-      hoursValue: "Maandag t/m vrijdag 08:30 – 17:00",
-      addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+      hoursValue: MCCOY_NAP.officeHoursLabelNl,
+      addressValue: napAddressMultiline(),
       photosLabel: "Foto's van de situatie (optioneel)",
       photosHelp: "JPG, PNG of PDF — meerdere bestanden toegestaan",
       sections: {
@@ -405,7 +406,7 @@ const translations = {
       address: "Address",
       hours: "Office hours",
       hoursValue: "Monday to Friday 08:30 – 17:00",
-      addressValue: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+      addressValue: napAddressMultiline(),
       photosLabel: "Photos of the situation (optional)",
       photosHelp: "JPG, PNG or PDF — multiple files allowed",
       sections: {

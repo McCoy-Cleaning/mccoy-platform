@@ -5,7 +5,7 @@ import { CmsLinkAnchor } from "@/components/site/CmsLinkAnchor";
 import { useSiteFooter } from "@/lib/cms/store";
 import { NAV_LOGO_HEIGHT, NAV_LOGO_WIDTH } from "@/lib/image-delivery";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
-import { DEFAULT_FOOTER_LOGO } from "@mccoy/cms-schema";
+import { DEFAULT_FOOTER_LOGO, resolvePublicImageAlt } from "@mccoy/cms-schema";
 import { cn } from "@/lib/utils";
 
 function SocialIcon({ network }: { network: string }) {
@@ -32,6 +32,7 @@ export function Footer() {
     logo.src.includes("logo-mccoy");
   const logoWidthAttr = logo.width ?? NAV_LOGO_WIDTH;
   const logoHeightAttr = logo.height ?? NAV_LOGO_HEIGHT;
+  const logoAlt = resolvePublicImageAlt(logo, "McCoy Cleaning");
 
   return (
     <footer data-site-footer="" className="relative border-t border-white/10 bg-card/50">
@@ -44,7 +45,7 @@ export function Footer() {
                 <img
                   data-cms-logo=""
                   src={logoUrl}
-                  alt={logo.alt || "McCoy Cleaning"}
+                  alt={logoAlt}
                   width={logoWidthAttr}
                   height={logoHeightAttr}
                   loading="lazy"
@@ -55,7 +56,7 @@ export function Footer() {
               <img
                 data-cms-logo=""
                 src={logoSrc}
-                alt={logo.decorative ? "" : logo.alt || "McCoy Cleaning"}
+                alt={logoAlt}
                 width={logoWidthAttr}
                 height={logoHeightAttr}
                 loading="lazy"
@@ -70,9 +71,12 @@ export function Footer() {
                 {footer.socialLinks.map((social) => {
                   const href = social.href?.trim();
                   if (!href || href === "#") {
+                    // Placeholder (no destination yet): role=img so aria-label is valid
+                    // (axe aria-prohibited-attr rejects aria-label on a bare span).
                     return (
                       <span
                         key={social.id}
+                        role="img"
                         className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-white/40"
                         aria-label={social.label}
                       >

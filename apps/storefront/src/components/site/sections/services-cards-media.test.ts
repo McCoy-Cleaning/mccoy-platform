@@ -5,11 +5,11 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Dienstkaarten: edge-to-edge media + dual controls.
- * - Lees meer → fixed detail modal (section content), not CmsButton popup-block
+ * - Lees meer → crawlable hash link + fixed detail panel (section content), not CmsButton popup-block
  * - Contact CTA → CmsButtonView (geen link hides only that button)
  */
 describe("ServicesCards media + dual CTAs", () => {
-  it("uses object-cover, Lees meer modal, and separate contact CmsButton", () => {
+  it("uses object-cover, Lees meer hash link + modal, and separate contact CmsButton", () => {
     const dir = dirname(fileURLToPath(import.meta.url));
     const src = readFileSync(join(dir, "ServicesSections.tsx"), "utf8");
     const cardsFn = src.indexOf("export function ServicesCards()");
@@ -20,14 +20,18 @@ describe("ServicesCards media + dual CTAs", () => {
     const servicesCardsBody = src.slice(cardsFn, afterCards);
     expect(servicesCardsBody).toContain("object-cover");
     expect(servicesCardsBody).not.toContain("object-contain");
-    expect(servicesCardsBody.match(/object-cover/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(servicesCardsBody.match(/object-cover/g)?.length).toBeGreaterThanOrEqual(1);
 
-    expect(servicesCardsBody).toContain("createPortal");
-    expect(servicesCardsBody).toContain("service-modal-panel");
-    expect(servicesCardsBody).toContain("service-modal-title");
+    expect(servicesCardsBody).toContain("BodyPortal");
+    expect(servicesCardsBody).toContain("ServiceDetailPanel");
+    expect(servicesCardsBody).toContain("ServiceDetailPanel");
+    const panelSrc = readFileSync(join(dir, "ServiceDetailPanel.tsx"), "utf8");
+    expect(panelSrc).toContain("service-modal-panel");
     expect(servicesCardsBody).toContain("t.services.readMore");
-    expect(servicesCardsBody).toContain("setOpen(i)");
-    expect(servicesCardsBody).toContain("card.full.map");
+    expect(servicesCardsBody).toContain("serviceDetailHref");
+    expect(servicesCardsBody).toContain("aria-label");
+    expect(servicesCardsBody).toMatch(/aria-label=\{`\$\{t\.services\.readMore\}: \$\{card\.title\}`\}/);
+    expect(servicesCardsBody).toContain("openService");
 
     expect(servicesCardsBody).toContain("CmsButtonView");
     // Lees meer must not be wired through the shared popup/link CTA model

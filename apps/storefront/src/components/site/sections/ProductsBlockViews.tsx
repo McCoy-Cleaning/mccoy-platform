@@ -18,14 +18,18 @@ import {
 import {
   cmsTextOrFallback,
   DEFAULT_PRODUCTS_INTRO_METRICS,
+  MCCOY_NAP,
+  napTelHref,
+  resolvePublicImageAlt,
+  withResolvedPublicImageAlt,
   type CmsButton,
   type CmsImage,
   type CmsLink,
 } from "@mccoy/cms-schema";
 import { CmsLinkAnchor } from "../CmsLinkAnchor";
+import { DeliveryImage } from "../DeliveryImage";
 import {
   CmsButtonView,
-  CmsImageView,
   SECTION_PAGE_RAIL,
   SectionSurface,
 } from "@mccoy/cms-renderer";
@@ -140,11 +144,13 @@ export function ProductsIntroView({
             className="lg:col-span-6"
           >
             {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+              <h1 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                {eyebrow}
+              </h1>
             ) : null}
-            <h1 className="font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl">
+            <h2 className="font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl">
               {heading}
-            </h1>
+            </h2>
             <div className="mt-5 h-0.5 w-14 rounded-full bg-primary" aria-hidden />
 
             {introParagraphs.map((paragraph, index) => {
@@ -171,11 +177,11 @@ export function ProductsIntroView({
                 {ctaLabel}
               </Link>
               <a
-                href="tel:+31541534982"
+                href={napTelHref()}
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-primary/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <Phone className="h-4 w-4 text-primary" aria-hidden />
-                0541 534 982
+                {MCCOY_NAP.telephoneDisplayNational}
               </a>
             </div>
 
@@ -202,9 +208,28 @@ export function ProductsIntroView({
                   aria-hidden
                 />
                 <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
-                  <CmsImageView image={image} className="h-auto w-full object-contain" />
+                  {(() => {
+                    const resolved = withResolvedPublicImageAlt(
+                      image,
+                      heading || "McCoy Cleaning Products",
+                    );
+                    return (
+                      <DeliveryImage
+                        src={resolved.src}
+                        alt={resolved.alt}
+                        variant="photo"
+                        width={resolved.width}
+                        height={resolved.height}
+                        loading="eager"
+                        fetchPriority="high"
+                        className="h-auto w-full object-contain"
+                      />
+                    );
+                  })()}
                 </div>
-                <figcaption className="sr-only">{image.alt || heading}</figcaption>
+                <figcaption className="sr-only">
+                  {resolvePublicImageAlt(image, heading || "McCoy Cleaning Products")}
+                </figcaption>
               </figure>
             ) : null}
 

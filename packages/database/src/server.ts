@@ -166,6 +166,8 @@ export {
   buildPublishedSitemapEntries,
   buildCmsHeadFromSnapshot,
   resolvePublishedCmsPage,
+  assertSitemapIndexabilityConsistency,
+  collectSitemapEmittedUrls,
   processCmsOutbox,
   registerCmsPublishHook,
   ensureIndexNowPublishHookRegistered,

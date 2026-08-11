@@ -14,11 +14,6 @@ export const Route = createFileRoute("/schoonmaakbedrijf-enschede")({
         content:
           "Schoonmaakbedrijf in Enschede: kantoorschoonmaak, glasbewassing en vloeronderhoud door een vast eigen team van McCoy Cleaning. Vraag een offerte aan.",
       },
-      {
-        name: "keywords",
-        content:
-          "schoonmaakbedrijf Enschede, kantoorschoonmaak Enschede, glazenwasser Enschede, schoonmaak Twente",
-      },
       { property: "og:title", content: "Schoonmaakbedrijf Enschede — McCoy Cleaning" },
       {
         property: "og:description",

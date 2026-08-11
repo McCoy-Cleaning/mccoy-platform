@@ -31,10 +31,10 @@
 - review: bug-risk
 - severity: medium
 - confidence: high
-- path: `e2e/cms-locale-en-publish.spec.ts` (symptom)
-- status: **deferred**
-- evidence: Playwright `test:e2e:locale` exit 1 via failureSink on `Maximum update depth exceeded`
-- recommendation: isolate editor setState cycle; keep durable save fixtures
+- path: `apps/admin/src/components/admin/cms/LocalePublishPanel.tsx`
+- status: **resolved**
+- evidence: Coverage effect depended on freshly cloned `enFieldDrafts` from `getEditablePage()`; fixed to stable `useCms()` store refs + `useEditablePage`. `test:e2e:locale` green.
+- recommendation: do not put `getEditablePage()` nested fields in effect deps
 - see: `r8-bug-risk-review.md`
 
 ### PL-001 — MG5 staging identity operations hold

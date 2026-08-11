@@ -5,6 +5,126 @@
   "ignoreCommand": "node ../../scripts/vercel-ignore.mjs storefront",
   "redirects": [
     {
+      "source": "/cleaning",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/cleaning/",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/cleaning",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/services",
+      "permanent": true
+    },
+    {
+      "source": "/cleaning/",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/services",
+      "permanent": true
+    },
+    {
+      "source": "/over-ons",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/over-ons/",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/over-ons",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/about",
+      "permanent": true
+    },
+    {
+      "source": "/over-ons/",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/about",
+      "permanent": true
+    },
+    {
+      "source": "/collegas-gezocht",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/collegas-gezocht/",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/collegas-gezocht",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/collegas-gezocht/",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/solliciteer-direct",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/solliciteer-direct/",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/solliciteer-direct",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/solliciteer-direct/",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/vacatures",
+      "permanent": true
+    },
+    {
+      "source": "/privacybeleid",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/privacybeleid/",
+      "has": [{ "type": "host", "value": "www.mccoy.nl" }],
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/privacybeleid",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/privacybeleid/",
+      "has": [{ "type": "host", "value": "mccoy.nl" }],
+      "destination": "https://www.mccoy.nl/privacy",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "mccoy.nl" }],
       "destination": "https://www.mccoy.nl/:path*",

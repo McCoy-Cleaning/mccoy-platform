@@ -2,9 +2,12 @@ import {
   buildCmsHeadFromSnapshot,
   canonicalizePublicIdentityPath,
   getPublishedLocaleAlternates,
+  isEnglishLegalDutchBleed,
   normalizeCmsPath,
+  resolveCanonicalOrigin,
   resolveEnglishPathAccess,
   resolvePublishedCmsPage,
+  robotsIndicateNoindex,
   stripLocalePrefix,
   type CmsRedirect,
   type Locale,
@@ -12,6 +15,7 @@ import {
   type SiteUrlConfig,
 } from "@mccoy/cms-schema";
 
+import { isSitemapExcludedPathname } from "./sitemap-eligibility";
 import { DEFAULT_CMS_SITE_ID, type CmsStore } from "./types";
 import { getCmsStore } from "./supabase-store";
 
@@ -138,7 +142,8 @@ export async function buildPublishedSitemapEntries(input?: {
   const store = input?.store ?? getCmsStore();
   const siteId = input?.siteId ?? DEFAULT_CMS_SITE_ID;
   const siteRecord = await store.getSite(siteId);
-  const site: SiteUrlConfig = { origin: siteRecord.origin };
+  // Fail-closed: never emit preview/localhost origins in sitemap locs.
+  const site: SiteUrlConfig = { origin: resolveCanonicalOrigin(siteRecord.origin) };
   const published = await store.listPublishedLocaleStates(siteId);
 
   const byPage = new Map<string, typeof published>();
@@ -154,27 +159,55 @@ export async function buildPublishedSitemapEntries(input?: {
     alternates: Array<{ locale: string; url: string }>;
   }> = [];
 
-  for (const [pageId, rows] of byPage) {
+  for (const [pageId] of byPage) {
     const rev = await store.getActivePublishedRevision(pageId, siteId);
     if (!rev) continue;
     const page = rev.payload;
     const paths = page.paths ?? { nl: page.slug };
+    const enLegalBleed = isEnglishLegalDutchBleed(page);
     const localeStates = {
       nl: {
         publicationState: page.localeStates?.nl?.publicationState ?? "missing",
+        indexable: !robotsIndicateNoindex(page.localeContent?.nl?.seo?.robots),
       },
       en: page.localeStates?.en
-        ? { publicationState: page.localeStates.en.publicationState }
+        ? {
+            publicationState: page.localeStates.en.publicationState,
+            indexable:
+              page.localeStates.en.publicationState === "published" &&
+              !enLegalBleed &&
+              !robotsIndicateNoindex(page.localeContent?.en?.seo?.robots),
+          }
         : undefined,
     };
     const alts = getPublishedLocaleAlternates(paths, localeStates, site);
-    const nl = alts.find((a) => a.locale === "nl");
-    if (!nl) continue;
-    entries.push({
-      loc: nl.url,
-      lastmod: rev.publishedAt ?? undefined,
-      alternates: alts.map((a) => ({ locale: a.locale, url: a.url })),
-    });
+    const alternateLinks = alts
+      .filter((a) => {
+        try {
+          return !isSitemapExcludedPathname(new URL(a.url).pathname);
+        } catch {
+          return false;
+        }
+      })
+      .map((a) => ({ locale: a.locale, url: a.url }));
+
+    // One <url> per indexable locale (nl / en). x-default stays an alternate only.
+    // Phase 3: Dutch-bleed / noindex EN is already omitted via indexable=false.
+    for (const alt of alts) {
+      if (alt.locale !== "nl" && alt.locale !== "en") continue;
+      let pathname: string;
+      try {
+        pathname = new URL(alt.url).pathname;
+      } catch {
+        continue;
+      }
+      if (isSitemapExcludedPathname(pathname)) continue;
+      entries.push({
+        loc: alt.url,
+        lastmod: rev.publishedAt ?? undefined,
+        alternates: alternateLinks,
+      });
+    }
   }
 
   return entries;

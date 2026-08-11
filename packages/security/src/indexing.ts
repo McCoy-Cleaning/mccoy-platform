@@ -48,7 +48,12 @@ export function storefrontRobotsMetaContent(env: IndexingEnv): "index, follow" |
 
 /**
  * robots.txt body for the storefront.
- * @param sitemapUrl Absolute sitemap URL when indexing is allowed (optional).
+ *
+ * Production: Allow `/` (CSS/JS/assets stay crawlable — never blanket-Disallow
+ * extensions or `/assets`), Disallow CMS preview surfaces, list Sitemap.
+ * Non-production: Disallow `/` and omit Sitemap.
+ *
+ * @param sitemapUrl Absolute www sitemap URL when indexing is allowed (optional).
  */
 export function storefrontRobotsTxt(env: IndexingEnv, sitemapUrl?: string): string {
   if (!isStorefrontIndexable(env)) {

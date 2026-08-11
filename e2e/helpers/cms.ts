@@ -290,8 +290,14 @@ export async function addCmsSection(page: Page, templateName: string) {
   await page.getByRole("button", { name: "Sectie toevoegen" }).first().click();
   await expect(page.getByRole("heading", { name: "Kies een sectie" })).toBeVisible();
   await page.getByRole("button", { name: "Alle", exact: true }).click();
-  await page.getByPlaceholder(/Zoek/).fill(templateName);
   const type = TEMPLATE_TYPE[templateName];
+  // Prefer canonical picker label for search so aliases like "Foto galerij" /
+  // "Nieuwsbrief signup" still surface the template card.
+  const searchTerm =
+    type && type in BLOCK_TYPE_TEMPLATE_NAME
+      ? BLOCK_TYPE_TEMPLATE_NAME[type as BlockType]
+      : templateName;
+  await page.getByPlaceholder(/Zoek/).fill(searchTerm);
   if (type) {
     await page.locator(`[data-cms-template="${type}"]`).first().click();
   } else {
@@ -308,7 +314,16 @@ export async function setBlockTitle(page: Page, title: string) {
     .or(page.getByRole("dialog", { name: "Pagina beheren" }));
   const titleField = dialog.getByLabel("Titel", { exact: true }).first();
   await expect(titleField).toBeVisible();
-  await titleField.fill(title);
+  await titleField.click();
+  // clear() + fill ensures controlled React inputs see empty (fill("") alone can desync).
+  await titleField.clear();
+  if (title) {
+    await titleField.fill(title);
+  } else {
+    await titleField.press("ControlOrMeta+A");
+    await titleField.press("Backspace");
+  }
+  await expect(titleField).toHaveValue(title);
 }
 
 export async function savePage(page: Page) {

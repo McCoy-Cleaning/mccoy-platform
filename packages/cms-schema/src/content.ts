@@ -27,6 +27,12 @@ import {
   type VacaturesApplicationContent,
 } from "./vacatures-application";
 import {
+  MCCOY_NAP,
+  napAddressMultiline,
+  napMailtoHref,
+  napTelHref,
+} from "./business-nap";
+import {
   createTextListItem,
   textListItemSchema,
   type TextListItem,
@@ -941,12 +947,12 @@ export function replaceCmsImagesInTree(
 export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[FixedSectionKey] {
   switch (key) {
     case "home.hero":
-      // Match the legacy original: i18n copy, secondary CTA only (quote CTA lives in navbar).
+      // Phase 6: who/what/where H1 (McCoy + schoonmaakbedrijf + Twente).
       return {
         eyebrow: "Live Clean",
-        heading: "Bij McCoy wordt kwaliteit",
-        headingAccent: "zichtbaar.",
-        body: "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is.",
+        heading: "McCoy Cleaning,",
+        headingAccent: "schoonmaakbedrijf in Twente.",
+        body: "Al meer dan 25 jaar staan wij voor schoonmaak met karakter — uitgevoerd door een vast eigen team, met professionele middelen en een onmiskenbaar oog voor detail. Geen onderaannemers, geen losse krachten: alleen vakmensen die uw pand behandelen alsof het hun eigen pand is. Vanuit Oldenzaal actief in heel Twente.",
         image: localImage("/images/cms/hero-cleaning.jpg", "McCoy Cleaning professional at work"),
         secondaryCta: {
           label: "Bekijk onze diensten",
@@ -1014,7 +1020,7 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "about.main":
       return {
         eyebrow: "Over ons",
-        heading: "Kwaliteit, missie & visie",
+        heading: "Over McCoy Cleaning",
         missionTitle: "Missie",
         missionBody:
           "McCoy heeft als missie het leveren van schoonmaakdiensten van het hoogste kwaliteitsniveau voor organisaties waar hygiëne en uitstraling van cruciaal belang zijn.\n\nWij realiseren schone, veilige en representatieve leef- en werkomgevingen door te werken met maximale precisie, professionele middelen en goed opgeleide vakmensen. Daarbij streven wij continu naar een subliem eindresultaat, waarbij geen detail over het hoofd wordt gezien.\n\nMcCoy onderscheidt zich door een compromisloze focus op kwaliteit: wij leveren geen standaard schoonmaak, maar een zichtbaar hoger niveau van dienstverlening.",
@@ -1031,8 +1037,9 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "services.main":
       return {
         eyebrow: "Diensten",
-        heading: "Ons aanbod",
-        intro: "Een volledig schoonmaakaanbod door één vast eigen team in Twente.",
+        heading: "Schoonmaakdiensten in Twente",
+        intro:
+          "Een volledig schoonmaakaanbod door één vast eigen team in Twente — kantoor, horeca, oplevering, vloeren, meubels en glas.",
       } satisfies ServicesMainContent;
     case "services.cards":
       return {
@@ -1058,7 +1065,7 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
       return {
         eyebrow: "Contact",
         heading: "Neem contact op",
-        body: "Wij denken graag met u mee.",
+        body: "Wij denken graag met u mee over schoonmaak in Twente.",
       } satisfies FormPageChromeContent;
     case "contact.info":
       return {
@@ -1067,27 +1074,27 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
             id: "contact_email",
             icon: "mail",
             label: "E-mail",
-            value: "info@mccoy.nl",
-            href: "mailto:info@mccoy.nl",
+            value: MCCOY_NAP.email,
+            href: napMailtoHref(),
           },
           {
             id: "contact_phone",
             icon: "phone",
             label: "Telefoon",
-            value: "0541 534 982",
-            href: "tel:+31541534982",
+            value: MCCOY_NAP.telephoneDisplayNational,
+            href: napTelHref(),
           },
           {
             id: "contact_address",
             icon: "map",
             label: "Adres",
-            value: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+            value: napAddressMultiline(),
           },
           {
             id: "contact_hours",
             icon: "clock",
             label: "Kantooruren",
-            value: "Maandag t/m vrijdag 08:30 – 17:00",
+            value: MCCOY_NAP.officeHoursLabelNl,
           },
         ],
       } satisfies ContactInfoContent;
@@ -1123,8 +1130,8 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "vacatures.main":
       return {
         eyebrow: "Vacatures",
-        heading: "Werken bij McCoy",
-        body: "Word onderdeel van ons vaste team.",
+        heading: "Werken bij McCoy Cleaning",
+        body: "Word onderdeel van ons vaste team in Twente.",
       } satisfies VacaturesMainContent;
     case "vacatures.application":
       return defaultVacaturesApplicationContent() satisfies VacaturesApplicationContent;
@@ -1132,7 +1139,7 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
       return {
         eyebrow: "Offerte",
         heading: "Vraag een offerte aan",
-        body: "Vertel ons wat u nodig heeft.",
+        body: "Vertel ons wat u nodig heeft voor uw pand in Twente.",
       } satisfies FormPageChromeContent;
     case "offerte.info":
       return {
@@ -1141,27 +1148,27 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
             id: "offerte_email",
             icon: "mail",
             label: "E-mail",
-            value: "info@mccoy.nl",
-            href: "mailto:info@mccoy.nl",
+            value: MCCOY_NAP.email,
+            href: napMailtoHref(),
           },
           {
             id: "offerte_phone",
             icon: "phone",
             label: "Telefoon",
-            value: "0541 534 982",
-            href: "tel:+31541534982",
+            value: MCCOY_NAP.telephoneDisplayNational,
+            href: napTelHref(),
           },
           {
             id: "offerte_address",
             icon: "map",
             label: "Adres",
-            value: "Nijverheidsstraat 63\n7575 BH Oldenzaal",
+            value: napAddressMultiline(),
           },
           {
             id: "offerte_hours",
             icon: "clock",
             label: "Kantooruren",
-            value: "Maandag t/m vrijdag 08:30 – 17:00",
+            value: MCCOY_NAP.officeHoursLabelNl,
           },
         ],
       } satisfies ContactInfoContent;
@@ -1256,7 +1263,7 @@ export function isLegacyPrototypeHero(content: HomeHeroContent): boolean {
 }
 
 /**
- * Replace known-bad prototype hero with the original-matching defaults.
+ * Replace known-bad prototype hero with current factory defaults (Phase 6 SEO).
  * Preserves a custom image when the rest of the copy is prototype-only.
  */
 export function migrateLegacyHeroContent(existing?: HomeHeroContent): HomeHeroContent {
@@ -1535,7 +1542,7 @@ export function migrateLegacyHeroOverrides(
   if (overrides["hero.titleAccent"]) next.headingAccent = overrides["hero.titleAccent"];
   if (overrides["hero.sub"]) next.body = overrides["hero.sub"];
   if (overrides["hero.image"]) {
-    const fallback = next.image ?? localImage("/images/hero-placeholder.jpg", "Hero");
+    const fallback = next.image ?? localImage("/images/hero-placeholder.jpg", "", true);
     next.image = {
       ...fallback,
       src: overrides["hero.image"],

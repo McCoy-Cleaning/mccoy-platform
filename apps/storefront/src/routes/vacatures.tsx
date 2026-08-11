@@ -6,95 +6,19 @@ import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-conte
 import { useEdit } from "@/lib/cms/edit-mode-context";
 import { loadMarketingPublishedPage } from "@/lib/cms/route-page-loader";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
-import { absoluteCanonicalUrl } from "@mccoy/cms-schema";
 
-/** Existing fact-only JobPosting nodes — not invented ratings/prices. */
-const VACATURES_JOB_JSON_LD = [
-  {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: "Schoonmaakmedewerker",
-    description:
-      "Schoonmaakmedewerker bij McCoy Cleaning in Twente. Werk in een vast eigen team aan kantoor-, horeca- en opleveringsschoonmaak.",
-    employmentType: "FULL_TIME",
-    hiringOrganization: {
-      "@type": "Organization",
-      name: "McCoy Cleaning",
-      sameAs: absoluteCanonicalUrl("/"),
-    },
-    jobLocation: {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: "Oldenzaal",
-        addressRegion: "Overijssel",
-        addressCountry: "NL",
-      },
-    },
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: "Glazenwasser",
-    description:
-      "Glazenwasser bij McCoy Cleaning in Twente. Professionele glasbewassing bij bedrijven en particulieren met modern materieel.",
-    employmentType: "FULL_TIME",
-    hiringOrganization: {
-      "@type": "Organization",
-      name: "McCoy Cleaning",
-      sameAs: absoluteCanonicalUrl("/"),
-    },
-    jobLocation: {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: "Oldenzaal",
-        addressRegion: "Overijssel",
-        addressCountry: "NL",
-      },
-    },
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: "Oproepkracht schoonmaak",
-    description:
-      "Oproepkracht schoonmaak bij McCoy Cleaning in Twente. Flexibele inzet voor uiteenlopende schoonmaakprojecten in de regio.",
-    employmentType: "PART_TIME",
-    hiringOrganization: {
-      "@type": "Organization",
-      name: "McCoy Cleaning",
-      sameAs: absoluteCanonicalUrl("/"),
-    },
-    jobLocation: {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: "Oldenzaal",
-        addressRegion: "Overijssel",
-        addressCountry: "NL",
-      },
-    },
-  },
-];
-
+/**
+ * Phase 9 JobPosting decision:
+ * Do not emit multi-job JobPosting arrays on `/vacatures` (list abuse / eligibility risk).
+ * Each visible vacancy gets a single JobPosting on `/vacatures/$slug` instead.
+ */
 export const Route = createFileRoute("/vacatures")({
   loader: () => loadMarketingPublishedPage("/vacatures"),
   head: ({ loaderData }) => {
     if (!loaderData?.head) {
       return { meta: [{ title: "Vacatures — McCoy Cleaning" }] };
     }
-    const base = tanstackHeadFromCms(loaderData.head);
-    return {
-      ...base,
-      scripts: [
-        ...(base.scripts ?? []),
-        {
-          type: "application/ld+json",
-          children: JSON.stringify(VACATURES_JOB_JSON_LD),
-        },
-      ],
-    };
+    return tanstackHeadFromCms(loaderData.head);
   },
   component: VacaturesPage,
 });

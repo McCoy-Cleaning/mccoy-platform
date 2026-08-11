@@ -3,6 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Menu, ArrowUpRight, Briefcase } from "lucide-react";
 import {
   resolveCmsLinkHref,
+  resolvePublicImageAlt,
   resolveStorefrontNavLinks,
 } from "@mccoy/cms-schema";
 import { LanguageToggle } from "./LanguageToggle";
@@ -39,6 +40,7 @@ export function Navbar() {
   const logoWebp = logoSrc ? localWebpSibling(logoSrc) : undefined;
   const logoWidthAttr = navigation.logo?.width ?? NAV_LOGO_WIDTH;
   const logoHeightAttr = navigation.logo?.height ?? NAV_LOGO_HEIGHT;
+  const logoAlt = resolvePublicImageAlt(navigation.logo, "McCoy Cleaning");
 
   return (
     <>
@@ -60,7 +62,7 @@ export function Navbar() {
                 <img
                   data-cms-logo=""
                   src={logoWebp ?? logoSrc}
-                  alt={navigation.logo?.decorative ? "" : navigation.logo?.alt || "McCoy Cleaning"}
+                  alt={logoAlt}
                   width={logoWidthAttr}
                   height={logoHeightAttr}
                   decoding="async"

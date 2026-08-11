@@ -1,0 +1,168 @@
+{
+  "$schema_comment": "Phase 11 current expected fingerprint AFTER intentional Phase 6-10 SEO edits (titles/H1/services SSR). Structural classNames/layout unchanged; doc markers updated.",
+  "capturedAt": "2026-08-11",
+  "canonicalOrigin": "https://www.mccoy.nl",
+  "method": "source-component structural markers (primary section classNames, H1 tag/class patterns, fixed section keys) — gate checks after.json against source",
+  "routes": {
+    "/": {
+      "routeFile": "apps/storefront/src/routes/index.tsx",
+      "pageKey": "home",
+      "fixedSections": [
+        "home.hero",
+        "home.partners",
+        "home.stats",
+        "home.workGallery"
+      ],
+      "primaryShell": "main > PageLayoutRenderer",
+      "h1": {
+        "tag": "h1",
+        "component": "HomeSections",
+        "className": "font-display mt-6 text-6xl leading-[0.98] tracking-tight text-white sm:text-7xl lg:text-[5.75rem] xl:text-[6.5rem]",
+        "sectionId": "home",
+        "sectionClassName": "relative isolate flex min-h-[100svh] items-center overflow-hidden pt-24"
+      },
+      "markers": [
+        "section#home.min-h-[100svh]",
+        "bg-grid opacity-40",
+        "SECTION_PAGE_RAIL grid lg:grid-cols-12"
+      ]
+    },
+    "/services": {
+      "routeFile": "apps/storefront/src/routes/services.tsx",
+      "pageKey": "services",
+      "fixedSections": [
+        "services.main",
+        "services.cards"
+      ],
+      "primaryShell": "main.pt-24 > PageLayoutRenderer",
+      "h1": {
+        "tag": "h1",
+        "component": "ServicesMain",
+        "className": "font-display mt-4 text-4xl text-foreground md:text-5xl",
+        "defaultCopyHint": "Ons aanbod"
+      },
+      "markers": [
+        "main.pt-24",
+        "ServicesCards grid + SectionSurface cards",
+        "ServiceDetailPanel SSR BodyPortal",
+        "SSR note: full service text once in initial HTML (hidden/inert when closed; no sr-only clone)"
+      ]
+    },
+    "/products": {
+      "routeFile": "apps/storefront/src/routes/products.tsx",
+      "pageKey": "products",
+      "fixedSections": [
+        "products.main",
+        "products.info"
+      ],
+      "primaryShell": "main > PageLayoutRenderer (products blocks compat)",
+      "h1": {
+        "tag": "h1",
+        "component": "ProductsBlockViews",
+        "className": "text-xs font-semibold uppercase tracking-[0.2em] text-primary",
+        "defaultCopyHint": "Producten (page-level); scent title demoted to h2 with display classes",
+        "h2Scent": {
+          "tag": "h2",
+          "className": "font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl",
+          "defaultCopyHint": "Geurproducten met een premium sanitaire beleving."
+        }
+      },
+      "markers": [
+        "products.main hero: eyebrow h1 + scent h2 (same classes as pre-Phase-6 p/h1)",
+        "products.info h2 optional",
+        "ItemList JSON-LD in route head"
+      ]
+    },
+    "/about": {
+      "routeFile": "apps/storefront/src/routes/about.tsx",
+      "pageKey": "about",
+      "fixedSections": [
+        "about.main"
+      ],
+      "primaryShell": "main > PageLayoutRenderer / AboutSections",
+      "h1": {
+        "tag": "h1",
+        "component": "AboutSections",
+        "className": "font-display mt-4 text-4xl text-white md:text-5xl lg:text-6xl",
+        "sectionId": "about",
+        "sectionClassName": "relative overflow-hidden py-24 sm:py-28",
+        "defaultCopyHint": "Kwaliteit, missie & visie"
+      },
+      "markers": [
+        "section#about",
+        "lg:grid-cols-12 header + pillars",
+        "bg-grid opacity-20"
+      ]
+    },
+    "/contact": {
+      "routeFile": "apps/storefront/src/routes/contact.tsx",
+      "pageKey": "contact",
+      "fixedSections": [
+        "contact.main",
+        "contact.info",
+        "contact.form"
+      ],
+      "primaryShell": "FormPageChrome + form sections",
+      "h1": {
+        "tag": "h1",
+        "component": "FormPageChrome",
+        "className": "font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl",
+        "sectionAttr": "data-cms-section=contact.main",
+        "defaultCopyHint": "Laten we praten over uw pand. / Neem contact op"
+      },
+      "markers": [
+        "data-cms-section=contact.main",
+        "min-h-[16rem] form chrome section",
+        "contact.form fields below"
+      ]
+    },
+    "/offerte": {
+      "routeFile": "apps/storefront/src/routes/offerte.tsx",
+      "pageKey": "offerte",
+      "fixedSections": [
+        "offerte.main",
+        "offerte.info",
+        "offerte.form"
+      ],
+      "primaryShell": "FormPageChrome + quote form",
+      "h1": {
+        "tag": "h1",
+        "component": "FormPageChrome",
+        "className": "font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl",
+        "sectionAttr": "data-cms-section=offerte.main",
+        "defaultCopyHint": "Vraag een offerte aan"
+      },
+      "markers": [
+        "data-cms-section=offerte.main",
+        "offerte.form required section"
+      ]
+    },
+    "/vacatures": {
+      "routeFile": "apps/storefront/src/routes/vacatures.tsx",
+      "pageKey": "vacatures",
+      "fixedSections": [
+        "vacatures.main",
+        "vacatures.application"
+      ],
+      "primaryShell": "FormPageChrome + jobs / application",
+      "h1": {
+        "tag": "h1",
+        "component": "FormPageChrome",
+        "className": "font-display mt-6 max-w-3xl text-5xl text-white md:text-7xl",
+        "sectionAttr": "data-cms-section=vacatures.main",
+        "defaultCopyHint": "Werken bij McCoy",
+        "badgeVariant": true
+      },
+      "markers": [
+        "data-cms-section=vacatures.main",
+        "JobPosting JSON-LD on /vacatures/$slug only (Phase 9)",
+        "vacatures.application last-locked"
+      ]
+    }
+  },
+  "phaseNotes": [
+    "Phase 6: products eyebrow H1 + scent H2 demotion (classNames preserved); form/home/services/about H1 copy via i18n — layout classes unchanged.",
+    "Phase 7: services full text SSR via ServiceDetailPanel (hidden/inert when closed); hash <a href>; no sr-only duplicate. Replaced Phase 0 marker card.full not in initial HTML.",
+    "Phase 8-10: internal link hashes, NAP JSON-LD, image alts — no layout redesign."
+  ]
+}
