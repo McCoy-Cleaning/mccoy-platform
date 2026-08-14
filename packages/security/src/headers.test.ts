@@ -118,6 +118,16 @@ describe("security headers", () => {
     expect(scriptSrc.split(/\s+/)).not.toContain("https:");
   });
 
+  it("allows storefront GA4 / gtag script hosts without opening script-src to all https", () => {
+    const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+    const scriptSrc =
+      csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";
+    expect(scriptSrc).toContain("https://www.googletagmanager.com");
+    expect(scriptSrc).toContain("https://www.google-analytics.com");
+    expect(scriptSrc).toContain("https://va.vercel-scripts.com");
+    expect(scriptSrc.split(/\s+/)).not.toContain("https:");
+  });
+
   it("builds distinct CSPs per app", () => {
     expect(buildContentSecurityPolicy("admin")).toMatch(/frame-ancestors\s+'none'/);
     expect(buildContentSecurityPolicy("storefront", ["https://admin.example"])).toContain(

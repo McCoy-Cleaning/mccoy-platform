@@ -2,7 +2,7 @@ import {
   POPUP_CONTENT_BLOCK_TYPES,
   type PopupContentBlockType,
 } from "../button";
-import type { BlockCategory } from "../types";
+import type { BlockCategory } from "../block-types";
 import { getBlockDataDefinition } from "./registry";
 
 /**

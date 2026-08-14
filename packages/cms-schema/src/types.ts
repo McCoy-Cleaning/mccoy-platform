@@ -7,26 +7,15 @@ import type { Localized, LocaleState } from "./locale";
 import type { CmsPageLocaleContent, PageTranslationMetaMap } from "./seo";
 import type { CmsRedirect, LocalizedPagePath } from "./paths";
 import type { Block } from "./block-model";
-import type { BlockType } from "./block-types";
 import type { BuiltinRouteKey, CmsLink } from "./cms-link-model";
 import type { TranslationFieldMetadata } from "./translation-field";
 
 export type { Block } from "./block-model";
-export type { BlockType } from "./block-types";
+export type { BlockCategory, BlockType } from "./block-types";
 export type { BuiltinRouteKey, CmsLink } from "./cms-link-model";
 
 /** Schema v6: localized page meta + publication/freshness. Public SEO runtime is Phase C. */
 export const CMS_SCHEMA_VERSION = 6 as const;
-
-export type BlockCategory =
-  | "Hero & intro"
-  | "Content"
-  | "Media"
-  | "Structure"
-  | "Team & about"
-  | "Conversion"
-  | "Showcase"
-  | "Recruitment";
 
 type PageBase = {
   id: string;

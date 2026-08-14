@@ -22,7 +22,7 @@ export function defaultPrivacyMainContent(): LegalMainContent {
   return {
     eyebrow: "Juridisch",
     heading: "Privacyverklaring",
-    updatedLabel: "McCoy Cleaning B.V. — laatst bijgewerkt: juli 2026",
+    updatedLabel: "McCoy Cleaning B.V. — laatst bijgewerkt: augustus 2026",
     articles: privacyArticles(),
   };
 }
@@ -95,7 +95,11 @@ Als je ervan overtuigd bent dat wij zonder die toestemming persoonlijke gegevens
     ),
     article(
       "Cookies, of vergelijkbare technieken, die wij gebruiken",
-      "McCoy Cleaning B.V. gebruikt geen cookies of vergelijkbare technieken.",
+      `McCoy Cleaning B.V. gebruikt functionele technieken die nodig zijn voor de werking van de website (bijvoorbeeld het onthouden van je taalvoorkeur).
+
+Voor niet-noodzakelijke statistieken vragen wij apart toestemming via de cookiebanner. Na toestemming laden wij Google Analytics 4 (Google Ireland Limited / Google LLC) om geanonimiseerde bezoekstatistieken te verzamelen (onder meer paginaweergaven en technische gegevens zoals browser/apparaat). Analytics-scripts en bijbehorende cookies worden niet geladen zolang je analytics cookies niet hebt geaccepteerd. Je kunt je keuze later resetten door de lokale opslag (localStorage) van deze website te wissen of opnieuw te kiezen wanneer de banner opnieuw verschijnt.
+
+Daarnaast kan Vercel Web Analytics actief zijn. Dat is een cookieloze, geaggregeerde meting van websitebezoek en valt buiten de analytics-cookiebanner.`,
     ),
     article(
       "Gegevens inzien, aanpassen of verwijderen",

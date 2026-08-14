@@ -1,7 +1,17 @@
 /**
- * Leaf block-type union — keep free of content/page imports.
+ * Leaf block-type / category unions — keep free of content/page imports.
  * Must stay in sync with catalog / renderer registries.
  */
+export type BlockCategory =
+  | "Hero & intro"
+  | "Content"
+  | "Media"
+  | "Structure"
+  | "Team & about"
+  | "Conversion"
+  | "Showcase"
+  | "Recruitment";
+
 export type BlockType =
   | "hero"
   | "richText"

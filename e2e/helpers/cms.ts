@@ -247,6 +247,15 @@ export async function prepareCanvasScreenshot(page: Page, subject: Locator) {
 
   await subject.evaluate(async (el) => {
     const doc = el.ownerDocument;
+    // Fixed site chrome paints into element screenshots after scrollIntoView.
+    // Hero height changes (e.g. Phase 6 SEO copy) shift that bleed and flake
+    // roadmap/plans baselines — hide once per edit-iframe document for the shot.
+    for (const node of doc.querySelectorAll("header[data-site-header]")) {
+      const html = node as HTMLElement;
+      if (html.dataset.cmsE2eChromeHidden === "1") continue;
+      html.dataset.cmsE2eChromeHidden = "1";
+      html.style.setProperty("visibility", "hidden", "important");
+    }
     if (doc.fonts?.ready) await doc.fonts.ready;
     const images = Array.from(el.querySelectorAll("img"));
     await Promise.all(

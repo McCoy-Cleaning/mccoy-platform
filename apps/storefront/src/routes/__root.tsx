@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
 import { CmsUiLocaleProvider } from "@mccoy/cms-renderer";
+import { StorefrontAnalytics } from "@/components/site/StorefrontAnalytics";
 
 // Side-effect import so Start can discover CSS for Early Hints.
 // Do not use `?url` + head link when relying on Start-managed stylesheet assets.
@@ -235,11 +236,12 @@ function RootComponent() {
         </CmsUiLocaleBridge>
       </PublishedCmsProvider>
       {/*
-        Vercel Web Analytics: cookieless / hashed visitor identity.
-        No storefront cookie-consent banner yet — when one is added for optional
-        tracking, gate with beforeSend returning null until accepted.
+        GA4 (gtag): consent-gated via StorefrontAnalytics — loads only after
+        analytics cookies are accepted (see VITE_GA_MEASUREMENT_ID).
+        Vercel Web Analytics: cookieless / hashed visitor identity — left as-is.
         Skip CMS bridge routes so admin preview traffic does not inflate counts.
       */}
+      <StorefrontAnalytics />
       <Analytics
         beforeSend={(event) => {
           try {

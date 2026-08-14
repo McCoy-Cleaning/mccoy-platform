@@ -1,11 +1,23 @@
 import { z } from "zod";
+import type { Block } from "../block-model";
+import type { CmsLink } from "../cms-link-model";
 import { createItemId } from "../ids";
 import { cmsLinkSchema, isActionableCmsLink, linkFromLegacyHref, parseCmsLink } from "../links";
-import { newBlockLayoutItem, ensureLastLocked } from "../layout";
-import type { Block, BuiltinCmsPage, CmsLink, CmsPage } from "../types";
+import { newBlockLayoutItem, ensureLastLocked, type LayoutItem } from "../layout";
 import type { CmsBlockDataDefinition } from "./definition";
 import type { PublishValidationError } from "./validation-codes";
 import { PUBLISH_VALIDATION_CODES } from "./validation-codes";
+
+/**
+ * Structural page shape for vacatures jobs seeding — avoids importing `../types`
+ * (which pulls content → legal-defaults → business-nap → … → jobs and closes a Guardian cycle).
+ */
+type VacaturesJobsHostPage = {
+  kind: string;
+  pageKey?: string | null;
+  blocks: Block[];
+  layout: LayoutItem[];
+};
 
 export const EMPLOYMENT_TYPES = [
   "full-time",
@@ -605,7 +617,7 @@ export function allowLegacyVacancyFallback(): boolean {
  * listing UI is optional and starts hidden — it was previously seeded visible,
  * which duplicated the form’s role picker on /vacatures.
  */
-export function ensureVacaturesJobsBlock(page: CmsPage): CmsPage {
+export function ensureVacaturesJobsBlock<T extends VacaturesJobsHostPage>(page: T): T {
   if (page.kind !== "builtin" || page.pageKey !== "vacatures") return page;
 
   if (!page.blocks.some((b) => b.type === "jobs")) {
@@ -616,7 +628,7 @@ export function ensureVacaturesJobsBlock(page: CmsPage): CmsPage {
       // v3: public listing starts hidden (see migration below).
       dataVersion: 3,
     };
-    const next = structuredClone(page) as BuiltinCmsPage;
+    const next = structuredClone(page);
     next.blocks = [...next.blocks, block];
     next.layout = ensureLastLocked(
       [...next.layout, { ...newBlockLayoutItem(block.id), hidden: true }],
@@ -628,7 +640,7 @@ export function ensureVacaturesJobsBlock(page: CmsPage): CmsPage {
   // One-shot v2 → v3: hide the public listing. Vacancy data is unchanged.
   // After this, admins may unhide the section in the page builder; we do not re-hide.
   let changed = false;
-  const next = structuredClone(page) as BuiltinCmsPage;
+  const next = structuredClone(page);
   const jobsIds = new Set<string>();
   next.blocks = next.blocks.map((b) => {
     if (b.type !== "jobs") return b;

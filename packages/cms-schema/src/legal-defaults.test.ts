@@ -12,6 +12,9 @@ describe("legal page section content", () => {
     expect(legalMainContentSchema.safeParse(def).success).toBe(true);
     expect(parseSectionContent("privacy.main", def)?.heading).toBe("Privacyverklaring");
     expect(def.articles.length).toBeGreaterThan(5);
+    const cookies = def.articles.find((a) => a.title.startsWith("Cookies"));
+    expect(cookies?.body).toMatch(/Google Analytics 4/);
+    expect(cookies?.body).toMatch(/toestemming/);
   });
 
   it("parses default terms content", () => {

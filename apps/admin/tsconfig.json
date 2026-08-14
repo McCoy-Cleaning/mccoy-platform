@@ -27,6 +27,12 @@
       "@mccoy/email/contracts": ["../../packages/email/src/contracts.ts"],
       "@mccoy/email/server": ["../../packages/email/src/server.ts"],
       "@mccoy/security": ["../../packages/security/src/index.ts"],
+      "@mccoy/security/host": ["../../packages/security/src/host.ts"],
+      "@mccoy/cms-schema": ["../../packages/cms-schema/src/index.ts"],
+      "@mccoy/cms-renderer": ["../../packages/cms-renderer/src/index.tsx"],
+      "@mccoy/cms-renderer/section-layout": ["../../packages/cms-renderer/src/sectionLayout.ts"],
+      "@mccoy/cms-renderer/content-align": ["../../packages/cms-renderer/src/contentAlign.tsx"],
+      "@mccoy/cms-editor": ["../../packages/cms-editor/src/index.tsx"],
       "@mccoy/ui": ["../../packages/ui/src/index.ts"]
     }
   }

@@ -112,7 +112,8 @@ export function buildContentSecurityPolicy(
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com",
+    // GA4 gtag (consent-gated in storefront) + Vercel Analytics / preview toolbar.
+    "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com",
     "connect-src 'self' https: wss:",
     "form-action 'self'",
     // CMS video embeds: YouTube, Vimeo, Facebook plugins (see resolveSafeVideoEmbed)

@@ -156,6 +156,7 @@ Require these job names (plus CMS E2E as appropriate) on branch protection.
 | `ADMIN_*` session / legacy auth | Y | N |
 | `GROQ_*` / `STAFF_INVITE_*` | Y | N |
 | `VERCEL_TOKEN` / `VERCEL_WEB_ANALYTICS_PROJECT_ID` / optional `VERCEL_TEAM_ID` | Y (overview visitors) | N — enable Web Analytics on storefront; put `prj_…` of **storefront** in admin env |
+| `VITE_GA_MEASUREMENT_ID` / optional `VITE_GA_ENABLE_DEV` | N | Y — GA4 gtag, consent-gated; redeploy after change |
 | `SMTP_*` / `FORM_*` | Inbox/reply as needed | Form notify as needed |
 
 Never put secrets in `VITE_*`.

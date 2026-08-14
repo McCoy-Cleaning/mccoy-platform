@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { BlockCategory, BlockType } from "../types";
+import type { BlockCategory, BlockType } from "../block-types";
 
 export type BlockCapabilities = {
   duplicable: boolean;
