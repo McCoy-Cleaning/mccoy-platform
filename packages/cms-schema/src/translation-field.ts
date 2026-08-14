@@ -27,6 +27,8 @@ export type TranslationFieldStatus =
   | "machine_translated"
   | "manually_translated"
   | "intentional_blank"
+  | "translation_pending"
+  | "translation_failed"
   /** Editor cleared EN overlay — use NL at render; Opslaan may refill when draft empty. */
   | "override_removed";
 
@@ -36,6 +38,10 @@ export type TranslationFieldMetadata = {
   translatedAt?: string;
   translatedBy?: string;
   provider?: string;
+  /** Last provider attempt for cooldown/deduplication of an empty EN field. */
+  attemptSourceHash?: string;
+  attemptedAt?: string;
+  attemptErrorCode?: string;
 };
 
 export type TranslationFieldInput = {
@@ -99,9 +105,7 @@ export function createTranslationSourceHash(normalizedSourceValue: unknown): str
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-export function classifyTranslationField(
-  input: TranslationFieldInput,
-): TranslationFieldState {
+export function classifyTranslationField(input: TranslationFieldInput): TranslationFieldState {
   if (input.translatable === false) return "not_translatable";
 
   const source = asTrimmedString(input.sourceValue);
@@ -138,8 +142,7 @@ export function classifyTranslationField(
   if (input.targetValue === undefined) return "missing";
   if (target == null || target === "") return "blank";
 
-  const sourceHash =
-    input.sourceHash ?? createTranslationSourceHash(source);
+  const sourceHash = input.sourceHash ?? createTranslationSourceHash(source);
   const translatedHash = input.translatedSourceHash ?? input.metadata?.sourceHash;
   if (translatedHash && translatedHash !== sourceHash) {
     return "stale";
@@ -151,8 +154,7 @@ export function classifyTranslationField(
   if (input.metadata?.status === "machine_translated") {
     return "machine_translated";
   }
-  // Without metadata, a non-empty EN that differs from NL is treated as translated.
-  if (target === source) return "blank";
+  // Any non-empty EN is protected, including a deliberate source echo.
   return "machine_translated";
 }
 
@@ -217,15 +219,8 @@ export function resolveLocalizedField(
 }
 
 /** True when EN publication / coverage should require a translation. */
-export function translationFieldRequiresEnglish(
-  state: TranslationFieldState,
-): boolean {
-  return (
-    state === "missing" ||
-    state === "blank" ||
-    state === "invalid" ||
-    state === "stale"
-  );
+export function translationFieldRequiresEnglish(state: TranslationFieldState): boolean {
+  return state === "missing" || state === "blank" || state === "invalid" || state === "stale";
 }
 
 /** States that count as “resolved” for coverage completeness. */

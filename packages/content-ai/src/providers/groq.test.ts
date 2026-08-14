@@ -94,3 +94,75 @@ describe("GroqContentAiProvider empty response handling", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("GroqContentAiProvider error classification", () => {
+  const request = {
+    messages: [{ role: "user" as const, content: "Vertaal dit" }],
+    maxTokens: 800,
+  };
+
+  it("labels only HTTP 429 or an explicit provider code as rate limiting", async () => {
+    const http429 = new GroqContentAiProvider({
+      apiKey: "test-key",
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { message: "slow down" } }), {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ) as unknown as typeof fetch,
+    });
+    await expect(http429.complete(request)).rejects.toMatchObject({
+      code: "rate_limit",
+      message: expect.stringMatching(/rate limit/i),
+    } satisfies Partial<ContentAiError>);
+
+    const explicitCode = new GroqContentAiProvider({
+      apiKey: "test-key",
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: { code: "rate_limit_exceeded", message: "request budget exhausted" },
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          ),
+      ) as unknown as typeof fetch,
+    });
+    await expect(explicitCode.complete(request)).rejects.toMatchObject({
+      code: "rate_limit",
+    } satisfies Partial<ContentAiError>);
+  });
+
+  it("does not mislabel authentication or provider failures as rate limiting", async () => {
+    const invalidKey = new GroqContentAiProvider({
+      apiKey: "test-key",
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: "invalid_api_key" } }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ) as unknown as typeof fetch,
+    });
+    await expect(invalidKey.complete(request)).rejects.toMatchObject({
+      code: "provider",
+      message: expect.stringMatching(/GROQ_API_KEY/),
+    } satisfies Partial<ContentAiError>);
+
+    const unavailable = new GroqContentAiProvider({
+      apiKey: "test-key",
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: "service_unavailable" } }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ) as unknown as typeof fetch,
+    });
+    await expect(unavailable.complete(request)).rejects.toMatchObject({
+      code: "provider",
+      message: expect.not.stringMatching(/rate limit/i),
+    } satisfies Partial<ContentAiError>);
+  });
+});

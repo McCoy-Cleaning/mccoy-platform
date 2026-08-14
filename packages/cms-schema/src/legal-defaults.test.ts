@@ -15,6 +15,12 @@ describe("legal page section content", () => {
     const cookies = def.articles.find((a) => a.title.startsWith("Cookies"));
     expect(cookies?.body).toMatch(/Google Analytics 4/);
     expect(cookies?.body).toMatch(/toestemming/);
+    expect(cookies?.body).toMatch(/Alleen noodzakelijk/);
+    expect(cookies?.body).toMatch(/Accepteer/);
+    expect(cookies?.body).toMatch(/Europese Economische Ruimte|EER/);
+    expect(cookies?.body).toMatch(/Google Analytics-instellingen/);
+    expect(cookies?.body).toMatch(/localStorage/);
+    expect(cookies?.body).not.toMatch(/gebruikt geen cookies/i);
   });
 
   it("parses default terms content", () => {

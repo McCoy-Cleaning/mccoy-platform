@@ -264,6 +264,30 @@
   backface-visibility: hidden;
   overscroll-behavior: contain;
 }
+/*
+ * Cookie consent: floating card inset from the viewport — never a glued bar.
+ * Extra 1rem/1.5rem sits on top of iOS home-indicator safe-area when present.
+ */
+.cookie-consent-shell {
+  position: fixed;
+  z-index: 80;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+  padding-top: 1rem;
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  .cookie-consent-shell {
+    padding-left: calc(1.5rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(1.5rem + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
 @supports (height: 100svh) {
   .service-modal-panel {
     max-height: min(46rem, calc(100svh - 5rem));

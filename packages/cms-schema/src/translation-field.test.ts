@@ -125,7 +125,7 @@ describe("resolveLocalizedField — blank EN must not suppress NL", () => {
 });
 
 describe("classifyTranslationField", () => {
-  it("treats EN identical to NL as blank/untranslated", () => {
+  it("treats any non-empty EN, including an NL echo, as protected content", () => {
     expect(
       classifyTranslationField({
         path: "block:x:title",
@@ -134,7 +134,7 @@ describe("classifyTranslationField", () => {
         sourceValue: "Zelfde",
         targetValue: "Zelfde",
       }),
-    ).toBe("blank");
+    ).toBe("machine_translated");
   });
 
   it("source_empty does not require EN", () => {

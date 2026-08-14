@@ -101,7 +101,7 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 - `MCCOY_STAGING_SUPABASE_PROJECT_ID` / `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` — allowlisted Supabase project refs; must differ. MG5 derives the current ref from `SUPABASE_URL` / `VITE_SUPABASE_URL` and fail-closes on mismatch
 - `GROQ_*` — content AI (**Admin only**)
 - `VERCEL_TOKEN`, `VERCEL_WEB_ANALYTICS_PROJECT_ID`, optional `VERCEL_TEAM_ID` — admin overview visitor counts from Vercel Web Analytics API (**Admin only**, server-side). Enable Web Analytics on the storefront Vercel project; Hobby includes 50k events/month and a ~1 month reporting window. Do not put these on `VITE_*`.
-- `VITE_GA_MEASUREMENT_ID` (storefront) — Google Analytics 4 measurement ID (`G-…`). Loaded only after analytics cookie consent. Production builds only unless `VITE_GA_ENABLE_DEV=1`. Redeploy storefront after changing. Not a secret, but still prefer env over hardcoding.
+- `VITE_GA_MEASUREMENT_ID` (storefront) — Google Analytics 4 measurement ID (`G-…`). Loaded only after analytics cookie consent. Production builds only unless `VITE_GA_ENABLE_DEV=1`. With `VITE_GA_ENABLE_DEV=1` alone, the consent banner can still appear for local design preview (gtag still needs the ID). Redeploy storefront after changing. Not a secret, but still prefer env over hardcoding.
 
 ### Branch → environment → Supabase (authoritative)
 

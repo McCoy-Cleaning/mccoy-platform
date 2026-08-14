@@ -1,33 +1,55 @@
 import { useEffect } from "react";
 import type { AnalyticsConsent } from "./consent";
 import {
-  isGoogleAnalyticsRuntimeAllowed,
+  isAnalyticsExemptPath,
   parseGaMeasurementId,
   readGaEnableDevFlag,
+  resolveGoogleAnalyticsMeasurementId,
 } from "./ga-config";
-import { loadGoogleAnalyticsGtag } from "./load-gtag";
+import {
+  loadGoogleAnalyticsGtag,
+  resetGoogleAnalyticsPageViewDedupe,
+  sendGoogleAnalyticsPageView,
+} from "./load-gtag";
 
 /**
  * Loads gtag only when:
  * - VITE_GA_MEASUREMENT_ID is a valid G-… id
  * - runtime is production (or VITE_GA_ENABLE_DEV)
  * - analytics consent is granted
+ * - the route is not a CMS preview/sync bridge
  */
-export function GoogleAnalytics({ consent }: { consent: AnalyticsConsent | null }) {
+export function GoogleAnalytics({
+  consent,
+  pathname,
+}: {
+  consent: AnalyticsConsent | null;
+  pathname: string;
+}) {
   useEffect(() => {
-    if (consent !== "granted") return;
-
-    const measurementId = parseGaMeasurementId(import.meta.env.VITE_GA_MEASUREMENT_ID);
+    const enableDev = readGaEnableDevFlag(import.meta.env.VITE_GA_ENABLE_DEV);
+    const rawMeasurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;
+    const parsedMeasurementId = parseGaMeasurementId(rawMeasurementId);
+    if (parsedMeasurementId && isAnalyticsExemptPath(pathname)) {
+      resetGoogleAnalyticsPageViewDedupe(parsedMeasurementId);
+      return;
+    }
+    const measurementId = resolveGoogleAnalyticsMeasurementId({
+      consent,
+      rawMeasurementId,
+      isProd: import.meta.env.PROD === true,
+      enableDev,
+      pathname,
+    });
     if (!measurementId) return;
 
-    const allowed = isGoogleAnalyticsRuntimeAllowed({
-      isProd: import.meta.env.PROD === true,
-      enableDev: readGaEnableDevFlag(import.meta.env.VITE_GA_ENABLE_DEV),
-    });
-    if (!allowed) return;
-
     loadGoogleAnalyticsGtag(measurementId);
-  }, [consent]);
+    sendGoogleAnalyticsPageView({
+      measurementId,
+      pathname,
+      title: document.title,
+    });
+  }, [consent, pathname]);
 
   return null;
 }

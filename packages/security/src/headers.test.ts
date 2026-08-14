@@ -122,10 +122,18 @@ describe("security headers", () => {
     const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
     const scriptSrc =
       csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";
+    const connectSrc =
+      csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
     expect(scriptSrc).toContain("https://www.googletagmanager.com");
     expect(scriptSrc).toContain("https://www.google-analytics.com");
     expect(scriptSrc).toContain("https://va.vercel-scripts.com");
     expect(scriptSrc.split(/\s+/)).not.toContain("https:");
+    expect(connectSrc).toContain("https://www.googletagmanager.com");
+    expect(connectSrc).toContain("https://www.google-analytics.com");
+    expect(connectSrc).toContain("https://region1.google-analytics.com");
+    expect(connectSrc).toContain("https://analytics.google.com");
+    expect(connectSrc.split(/\s+/)).not.toContain("https:");
+    expect(connectSrc.split(/\s+/)).not.toContain("wss:");
   });
 
   it("builds distinct CSPs per app", () => {

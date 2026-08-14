@@ -35,6 +35,8 @@ const NON_TRANSLATABLE_FIELD_KEYS = new Set([
   "phone",
   "route",
   "pageId",
+  "anchor",
+  "updatedAt",
   "openInNewTab",
   "version",
   "dataVersion",
@@ -206,11 +208,7 @@ export function collectTranslatableStringPaths(
   return out;
 }
 
-function scopePath(
-  scope: "section" | "block" | "page",
-  id: string,
-  relative: string,
-): string {
+function scopePath(scope: "section" | "block" | "page", id: string, relative: string): string {
   return enFieldDraftPath(scope, id, relative);
 }
 
@@ -226,11 +224,7 @@ export function collectPageNlFieldDraftCollection(page: CmsPage): {
   fields[enFieldDraftPath("page", "meta", "title")] = page.title ?? "";
   fields[enFieldDraftPath("page", "meta", "description")] = page.description ?? "";
 
-  const absorb = (
-    scope: "section" | "block",
-    id: string,
-    detailed: TranslatablePathCollection,
-  ) => {
+  const absorb = (scope: "section" | "block", id: string, detailed: TranslatablePathCollection) => {
     for (const [rel, value] of Object.entries(detailed.fields)) {
       fields[scopePath(scope, id, rel)] = value;
     }
@@ -290,8 +284,7 @@ export function remapEnFieldDraftsToCanonicalPaths(page: CmsPage): {
     const canonical = resolveCanonical(path);
     if (!canonical) continue;
     // Never resurrect EN text for fields the editor cleared / blanked.
-    const clearedStatus =
-      metaIn[canonical]?.status ?? metaIn[path]?.status;
+    const clearedStatus = metaIn[canonical]?.status ?? metaIn[path]?.status;
     if (clearedStatus === "override_removed" || clearedStatus === "intentional_blank") {
       if (path !== canonical) remapped += 1;
       continue;
@@ -322,8 +315,7 @@ export function remapEnFieldDraftsToCanonicalPaths(page: CmsPage): {
   return {
     enFieldDrafts,
     enFieldDraftSources,
-    enFieldDraftMeta:
-      Object.keys(enFieldDraftMeta).length > 0 ? enFieldDraftMeta : undefined,
+    enFieldDraftMeta: Object.keys(enFieldDraftMeta).length > 0 ? enFieldDraftMeta : undefined,
     remapped,
   };
 }
@@ -439,23 +431,18 @@ export function classifyEnOverlayValidity(input: {
   return "valid_en";
 }
 
-/** True when Opslaan / translate-missing should queue NL→EN for this validity. */
+/** True when Opslaan / translate-missing should queue an empty EN value for NL→EN. */
 export function enOverlayNeedsTranslation(validity: EnOverlayValidity): boolean {
-  return (
-    validity === "missing" ||
-    validity === "blank" ||
-    validity === "override_removed" ||
-    validity === "source_echo"
-  );
+  return validity === "missing" || validity === "blank" || validity === "override_removed";
 }
 
 /**
  * Plan EN draft updates from current NL fields.
  * - Deleted / empty NL → drop EN draft
- * - Existing EN that differs from NL → keep (manual/AI wins)
+ * - Any non-empty existing EN → keep without sending it to the provider
  * - intentional_blank → never auto-fill
  * - empty/echo `override_removed` → queue (repairs stuck clears; Opslaan refills)
- * - NL present with missing EN, or EN identical to NL → queue for NL→EN
+ * - NL present with empty/missing EN → queue for NL→EN
  */
 export function planEnFieldDraftSync(input: {
   nlFields: Record<string, string>;
@@ -490,6 +477,14 @@ export function planEnFieldDraftSync(input: {
     const status = existingMeta[path]?.status;
     const hasDraftKey = Object.prototype.hasOwnProperty.call(existingDrafts, path);
     const prevEn = existingDrafts[path];
+    const enTrim = prevEn?.trim() ?? "";
+    // EN content is immutable to automatic translation, even when it happens to
+    // equal the Dutch source. Only empty/null/undefined/whitespace is eligible.
+    if (enTrim) {
+      retainedDrafts[path] = enTrim;
+      retainedSources[path] = existingSources[path] ?? nl;
+      continue;
+    }
     const validity = classifyEnOverlayValidity({
       nl,
       en: hasDraftKey ? prevEn : undefined,
@@ -500,14 +495,13 @@ export function planEnFieldDraftSync(input: {
       continue;
     }
     if (validity === "valid_en" || validity === "manually_translated") {
-      const enTrim = prevEn?.trim() ?? "";
       if (enTrim) {
         retainedDrafts[path] = enTrim;
         retainedSources[path] = existingSources[path] ?? nl;
       }
       continue;
     }
-    // missing | blank | override_removed | source_echo → Opslaan auto-fill.
+    // missing | blank | override_removed → Opslaan background auto-fill.
     if (enOverlayNeedsTranslation(validity)) {
       toTranslate[path] = nl;
     }
@@ -574,10 +568,7 @@ export function chunkRecordByBudget(
   let chars = 0;
   for (const [key, value] of entries) {
     const nextChars = chars + value.length + key.length;
-    if (
-      current.length > 0 &&
-      (current.length >= maxItems || nextChars > maxChars)
-    ) {
+    if (current.length > 0 && (current.length >= maxItems || nextChars > maxChars)) {
       chunks.push(Object.fromEntries(current));
       current = [];
       chars = 0;

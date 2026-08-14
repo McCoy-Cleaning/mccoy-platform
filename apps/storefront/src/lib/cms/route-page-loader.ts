@@ -6,9 +6,10 @@ import {
   resolvePublishedCmsPage,
   resolveSeoMetadata,
   stripLocalePrefix,
+  type CmsPage,
   type ResolvedPublishedCmsPage,
 } from "@mccoy/cms-schema";
-import { cms } from "@/lib/cms/store";
+import { cms, isPublishedCmsBundleHydrated } from "@/lib/cms/store";
 import { ensurePublishedCmsHydrated } from "@/lib/cms/published-hydrate";
 import {
   FROZEN_DEPLOYED_EN_SEO,
@@ -53,17 +54,20 @@ function headFromSnapshot(snapshot: ResolvedPublishedCmsPage, pathname: string) 
 }
 
 /**
- * Instant SPA navigations: use whatever page is already in memory (seed or
- * published hydrate). Do not wait for the network — first click must paint
- * the shell immediately; hydrate upgrades content in the background.
+ * Build a client snapshot only from the real published bundle. The store also
+ * contains same-id seed pages, but those are loading sentinels rather than
+ * publishable content and must never become a route's first visible page.
  */
-function snapshotFromClientMemory(pathname: string): MarketingPageLoaderData | null {
-  if (typeof window === "undefined") return null;
+export function publishedClientSnapshotForPage(
+  pathname: string,
+  page: CmsPage | undefined,
+  bundleHydrated: boolean,
+): MarketingPageLoaderData | null {
+  if (!bundleHydrated || !page || page.isDraftOnly) return null;
   const identity = identityPath(pathname);
   const pageId = BUILTIN_PATH_TO_PAGE_ID[identity];
   if (!pageId) return null;
-  const page = cms.getPage(pageId);
-  if (!page) return null;
+  if (page.id !== pageId) return null;
 
   const locale = pathnameLocale(pathname);
   const resolved = resolvePublishedCmsPage({
@@ -78,6 +82,22 @@ function snapshotFromClientMemory(pathname: string): MarketingPageLoaderData | n
     snapshot: resolved.snapshot,
     head: headFromSnapshot(resolved.snapshot, pathname),
   };
+}
+
+/**
+ * Instant SPA navigations may reuse a matching, validated published page.
+ * Before bundle hydration, wait for the route server snapshot instead of
+ * flashing generic seed content from another page/locale state.
+ */
+function snapshotFromClientMemory(pathname: string): MarketingPageLoaderData | null {
+  if (typeof window === "undefined") return null;
+  const pageId = BUILTIN_PATH_TO_PAGE_ID[identityPath(pathname)];
+  const page = pageId ? cms.getPage(pageId) : undefined;
+  return publishedClientSnapshotForPage(
+    pathname,
+    page,
+    isPublishedCmsBundleHydrated(),
+  );
 }
 
 /**

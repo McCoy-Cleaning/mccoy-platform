@@ -13,6 +13,7 @@ import { requireAdminSession } from "@mccoy/database/server";
 import {
   AdminAuthError,
   assertContentAiRateLimit,
+  RateLimitError,
   readServerEnv,
 } from "@mccoy/security";
 import {
@@ -42,7 +43,20 @@ function mapError(error: unknown): {
   if (error instanceof AdminAuthError) {
     return { ok: false, error: error.message, code: "auth" };
   }
+  if (error instanceof RateLimitError) {
+    console.warn(
+      JSON.stringify({ type: "content_ai.error", source: "local_limiter", code: error.code }),
+    );
+    return { ok: false, error: error.message, code: error.code };
+  }
   if (error instanceof ContentAiError) {
+    const source =
+      error.code === "not_configured"
+        ? "configuration"
+        : error.code === "parse" || error.code === "validation"
+          ? "response_processing"
+          : "provider";
+    console.warn(JSON.stringify({ type: "content_ai.error", source, code: error.code }));
     return { ok: false, error: error.message, code: error.code };
   }
   if (error instanceof z.ZodError) {

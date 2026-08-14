@@ -309,19 +309,15 @@ export function assertInboxFetchRateLimit(username: string, limit = 30, windowMs
 }
 
 export function assertContentAiRateLimit(username: string, limit = 20, windowMs = 60_000): void {
-  try {
-    assertRateLimit(
-      `admin-content-ai:${username}`,
-      limit,
-      windowMs,
-      "Te veel AI-verzoeken. Wacht even en probeer opnieuw.",
-    );
-  } catch (error) {
-    if (error instanceof RateLimitError) {
-      throw new AdminAuthError(error.message);
-    }
-    throw error;
-  }
+  // Keep this distinguishable from authentication failures so callers can show
+  // an accurate local-throttle status instead of asking an authenticated editor
+  // to log in again.
+  assertRateLimit(
+    `admin-content-ai:${username}`,
+    limit,
+    windowMs,
+    "Te veel AI-verzoeken kort na elkaar. Probeer over een minuut opnieuw.",
+  );
 }
 
 /** Sensitive staff account changes (email / password / profile). */

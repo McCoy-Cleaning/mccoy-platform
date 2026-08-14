@@ -95,9 +95,17 @@ Als je ervan overtuigd bent dat wij zonder die toestemming persoonlijke gegevens
     ),
     article(
       "Cookies, of vergelijkbare technieken, die wij gebruiken",
-      `McCoy Cleaning B.V. gebruikt functionele technieken die nodig zijn voor de werking van de website (bijvoorbeeld het onthouden van je taalvoorkeur).
+      `McCoy Cleaning B.V. gebruikt cookies en vergelijkbare technieken op deze website.
 
-Voor niet-noodzakelijke statistieken vragen wij apart toestemming via de cookiebanner. Na toestemming laden wij Google Analytics 4 (Google Ireland Limited / Google LLC) om geanonimiseerde bezoekstatistieken te verzamelen (onder meer paginaweergaven en technische gegevens zoals browser/apparaat). Analytics-scripts en bijbehorende cookies worden niet geladen zolang je analytics cookies niet hebt geaccepteerd. Je kunt je keuze later resetten door de lokale opslag (localStorage) van deze website te wissen of opnieuw te kiezen wanneer de banner opnieuw verschijnt.
+Noodzakelijk
+Wij gebruiken noodzakelijke cookies en/of lokale opslag die nodig zijn voor de werking van de website. Denk hierbij aan het onthouden van je taalvoorkeur, het opslaan van je cookievoorkeur (localStorage) en, voor zover van toepassing, sessie- of beveiligingstechnieken. Voor deze technieken is geen toestemming vereist.
+
+Optionele analytics
+Voor niet-noodzakelijke statistieken vragen wij apart toestemming via de cookiebanner. Kies je Accepteer, dan laden wij Google Analytics 4 (Google Ireland Limited / Google LLC) om te begrijpen hoe bezoekers de website gebruiken en om de website te verbeteren (onder meer paginaweergaven en technische gegevens zoals browser of apparaat). Analytics-scripts en bijbehorende cookies worden niet geladen zolang je analytics niet hebt geaccepteerd. Kies je Alleen noodzakelijk, dan laden wij geen Google Analytics.
+
+Google kan gegevens (mede) verwerken in landen buiten de Europese Economische Ruimte (EER). Waar van toepassing gebeurt dit met passende waarborgen, zoals door Google gehanteerde standaardcontractbepalingen. De bewaartermijn van analyticsgegevens volgt de Google Analytics-instellingen in ons account.
+
+Je kunt toestemming weigeren of later intrekken door Alleen noodzakelijk te kiezen, door in je browser de lokale opslag (localStorage) van deze website te wissen, of via je browserinstellingen cookies en sitegegevens van mccoy.nl te verwijderen. Daarna verschijnt de banner opnieuw. Meer informatie over je rechten staat elders in deze privacyverklaring.
 
 Daarnaast kan Vercel Web Analytics actief zijn. Dat is een cookieloze, geaggregeerde meting van websitebezoek en valt buiten de analytics-cookiebanner.`,
     ),

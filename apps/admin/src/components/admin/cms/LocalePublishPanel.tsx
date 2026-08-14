@@ -1,5 +1,10 @@
 import * as React from "react";
-import type { CmsPage, Locale, LocalePublicationState, TranslationCoverageResult } from "@mccoy/cms-schema";
+import type {
+  CmsPage,
+  Locale,
+  LocalePublicationState,
+  TranslationCoverageResult,
+} from "@mccoy/cms-schema";
 import {
   ensureEnglishLocaleContentFromDrafts,
   enPublishBlockedByCoverage,
@@ -42,6 +47,9 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
   const [message, setMessage] = React.useState<string | null>(null);
   const [draftRevision, setDraftRevision] = React.useState(1);
   const [coverage, setCoverage] = React.useState<TranslationCoverageResult | null>(null);
+  const [automaticTranslationStatus, setAutomaticTranslationStatus] = React.useState(() =>
+    cms.getAutomaticEnTranslationStatus(page.id),
+  );
   const [revisions, setRevisions] = React.useState<
     Array<{ id: string; revisionNumber: number; status: string; publishedAt: string | null }>
   >([]);
@@ -64,6 +72,11 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
     void refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    setAutomaticTranslationStatus(cms.getAutomaticEnTranslationStatus(page.id));
+    return cms.subscribeAutomaticEnTranslationStatus(page.id, setAutomaticTranslationStatus);
+  }, [page.id]);
+
   // Depend on stable store refs only. Never put getEditablePage() nested fields in
   // deps — applyDraftToPage always structuredClone's, so enFieldDrafts/etc. are new
   // identities every render and setCoverage → re-render loops (BR-001).
@@ -73,8 +86,7 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
 
   React.useEffect(() => {
     const live = cms.getEditablePage(page.id) ?? page;
-    const next =
-      cms.getTranslationCoverage(page.id) ?? scanTranslationCoverage({ page: live });
+    const next = cms.getTranslationCoverage(page.id) ?? scanTranslationCoverage({ page: live });
     setCoverage(next);
   }, [page.id, draft, saved, publishedUpdatedAt, state.version]);
 
@@ -137,8 +149,7 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
     try {
       if (locale === "en") {
         const cov =
-          cms.getTranslationCoverage(page.id) ??
-          scanTranslationCoverage({ page: editable });
+          cms.getTranslationCoverage(page.id) ?? scanTranslationCoverage({ page: editable });
         if (enPublishBlockedByCoverage(cov)) {
           setMessage(
             `EN publicatie geblokkeerd: ${cov.missing} ontbrekend, ${cov.blank} leeg, ${cov.invalid} ongeldig. Vertaal eerst ontbrekende velden.`,
@@ -162,10 +173,7 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
         },
       };
       const publishedLocales: Locale[] = ["nl"];
-      if (
-        locale === "en" ||
-        payload.localeStates?.en?.publicationState === "published"
-      ) {
+      if (locale === "en" || payload.localeStates?.en?.publicationState === "published") {
         payload = ensureEnglishLocaleContentFromDrafts(payload);
         publishedLocales.push("en");
       }
@@ -249,7 +257,7 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
             ? page.paths.en
             : `/en${page.paths.en === "/" ? "" : page.paths.en}`
           : "/en"
-        : page.paths?.nl ?? page.slug;
+        : (page.paths?.nl ?? page.slug);
     return `${origin}${path}?_cmsPreview=1&_cmsLocale=${locale}&pageId=${encodeURIComponent(page.id)}`;
   })();
 
@@ -282,11 +290,28 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
       </div>
 
       <p className="text-xs text-white/50">
-        Publicatie en vertaal-frisheid zijn gescheiden. AI publiceert nooit automatisch.
-        Opslaan &amp; publiceren zet NL live; als er EN-vertalingen in het concept staan
-        (of EN al live is), gaat EN mee live. “Publiceer EN” blijft beschikbaar voor
-        handmatig publiceren of republish; EN kan hier ook terug naar concept.
+        Opslaan &amp; publiceren behoudt alle bestaande EN-tekst, vertaalt alle lege EN-velden in
+        gebundelde aanvragen en publiceert het resultaat in één stap. EN kan hier ook terug naar
+        concept.
       </p>
+
+      {automaticTranslationStatus?.state === "queued" ||
+      automaticTranslationStatus?.state === "translating" ? (
+        <p className="text-xs text-[#90caf9]" role="status">
+          Ontbrekende EN-velden vertalen…
+        </p>
+      ) : automaticTranslationStatus?.state === "completed" &&
+        automaticTranslationStatus.translated > 0 ? (
+        <p className="text-xs text-emerald-300/90" role="status">
+          {automaticTranslationStatus.translated} EN-veld(en) automatisch aangevuld.
+        </p>
+      ) : automaticTranslationStatus?.state === "failed" ? (
+        <p className="text-xs text-amber-200" role="status">
+          Automatisch aanvullen is gepauzeerd
+          {automaticTranslationStatus.errorCode === "rate_limit" ? " door de Groq-limiet" : ""}.
+          Probeer ontbrekende velden handmatig opnieuw.
+        </p>
+      ) : null}
 
       {coverage ? (
         <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70">
@@ -296,17 +321,15 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
             {coverage.missing ? ` · ${coverage.missing} ontbrekend` : ""}
             {coverage.blank ? ` · ${coverage.blank} leeg` : ""}
             {coverage.stale ? ` · ${coverage.stale} verouderd` : ""}
-            {coverage.overrideRemoved
-              ? ` · ${coverage.overrideRemoved} gewist (nog EN nodig)`
-              : ""}
+            {coverage.overrideRemoved ? ` · ${coverage.overrideRemoved} gewist (nog EN nodig)` : ""}
             {coverage.intentionalBlank ? ` · ${coverage.intentionalBlank} bewust leeg` : ""}
             {coverage.complete && coverage.overrideRemoved === 0 ? " · compleet" : ""}
           </p>
           {coverage.missing + coverage.blank + coverage.overrideRemoved > 0 ? (
             <p className="mt-1 text-white/50">
-              {coverage.missing + coverage.blank + coverage.overrideRemoved} veld(en) hebben
-              nog geen geldige EN-vertaling. Opslaan of “Ontbrekende velden vertalen” vult
-              ontbrekende, lege en gewiste velden (NL-echo) opnieuw.
+              {coverage.missing + coverage.blank + coverage.overrideRemoved} veld(en) hebben nog
+              geen geldige EN-vertaling. Na opslaan worden alleen lege velden automatisch aangevuld;
+              de knop hieronder probeert mislukte of ontbrekende velden expliciet opnieuw.
             </p>
           ) : null}
         </div>
@@ -341,13 +364,14 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
           type="button"
           disabled={
             busy ||
-            (coverage != null &&
-              coverage.missing + coverage.blank + coverage.overrideRemoved === 0)
+            (coverage != null && coverage.missing + coverage.blank + coverage.overrideRemoved === 0)
           }
           onClick={() => void translateMissing()}
           className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-40"
         >
-          Ontbrekende velden vertalen
+          {automaticTranslationStatus?.state === "failed"
+            ? "Opnieuw proberen"
+            : "Ontbrekende velden vertalen"}
         </button>
         <button
           type="button"
@@ -376,7 +400,10 @@ export function LocalePublishPanel({ page, onPageChange }: Props) {
           </div>
           <ul className="max-h-40 space-y-1 overflow-auto text-xs text-white/60">
             {revisions.slice(0, 8).map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg bg-black/30 px-2 py-1.5">
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-2 rounded-lg bg-black/30 px-2 py-1.5"
+              >
                 <span>
                   #{r.revisionNumber} · {r.status}
                   {r.publishedAt ? ` · ${r.publishedAt.slice(0, 16)}` : ""}

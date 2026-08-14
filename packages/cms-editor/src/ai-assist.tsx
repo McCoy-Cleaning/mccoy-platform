@@ -2,6 +2,9 @@ import * as React from "react";
 import { shouldSyncParagraphStructure, syncParagraphStructure } from "@mccoy/cms-schema";
 import { cn } from "@mccoy/ui";
 
+export const EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER =
+  "Leeg — wordt automatisch vertaald bij publiceren";
+
 export type CmsAiTone = "professional" | "catchy" | "warm" | "concise";
 
 export type CmsAiGenerateRequest = {
@@ -37,8 +40,7 @@ export type CmsAiGenerateSectionRequest = {
 };
 
 export type CmsAiGenerateResponse =
-  | { ok: true; text: string; warnings: string[] }
-  | { ok: false; error: string };
+  { ok: true; text: string; warnings: string[] } | { ok: false; error: string };
 
 export type CmsAiTranslateResponse =
   | { ok: true; text?: string; fields: Record<string, string>; warnings: string[] }
@@ -161,7 +163,12 @@ export function isTranslatableFieldKey(key: string): boolean {
 
 export function defaultMaxCharsForField(key: string): number {
   const lower = key.toLowerCase();
-  if (lower.includes("body") || lower.includes("description") || lower.includes("intro") || lower.includes("quote")) {
+  if (
+    lower.includes("body") ||
+    lower.includes("description") ||
+    lower.includes("intro") ||
+    lower.includes("quote")
+  ) {
     return 600;
   }
   if (lower.includes("heading") || lower === "title" || lower.includes("subtitle")) return 120;
@@ -213,12 +220,14 @@ export function InspectTextField({
   const ai = useCmsAiAssist();
   const [preview, setPreview] = React.useState<PreviewState>({ kind: "idle" });
 
-  const hintKey = fieldHint?.split(/[.\s:/]/).filter(Boolean).at(-1) ?? "";
+  const hintKey =
+    fieldHint
+      ?.split(/[.\s:/]/)
+      .filter(Boolean)
+      .at(-1) ?? "";
   const aiEligible =
     enableAi ??
-    (Boolean(ai) &&
-      Boolean(fieldPath) &&
-      (hintKey ? isTranslatableFieldKey(hintKey) : true));
+    (Boolean(ai) && Boolean(fieldPath) && (hintKey ? isTranslatableFieldKey(hintKey) : true));
 
   const configured = ai?.configured === true;
   const showAiChrome = Boolean(ai) && aiEligible;
@@ -237,7 +246,8 @@ export function InspectTextField({
     const result = await ai.generateDutch({
       currentText: idea || undefined,
       // When regenerating with an empty field, still require some seed — use previous as brief idea.
-      brief: !idea && opts?.previousText ? `Variant op: ${opts.previousText.slice(0, 400)}` : undefined,
+      brief:
+        !idea && opts?.previousText ? `Variant op: ${opts.previousText.slice(0, 400)}` : undefined,
       fieldHint: fieldHint ?? label,
       tone: "catchy",
       maxChars,
@@ -258,7 +268,10 @@ export function InspectTextField({
       return;
     }
     setPreview({ kind: "loading", action: "en" });
-    const result = await ai.translateToEn({ text: value, maxCharsPerField: Math.max(maxChars, 400) });
+    const result = await ai.translateToEn({
+      text: value,
+      maxCharsPerField: Math.max(maxChars, 400),
+    });
     if (!result.ok) {
       setPreview({ kind: "error", message: result.error });
       return;
@@ -283,8 +296,7 @@ export function InspectTextField({
     if (existing.trim() && existing.trim() !== preview.text.trim()) {
       const ok = await requestCmsOverwriteConfirm(ai, {
         title: "Engelse concepttekst overschrijven?",
-        description:
-          "Er staat al een Engelse concepttekst. Overschrijven met de nieuwe vertaling?",
+        description: "Er staat al een Engelse concepttekst. Overschrijven met de nieuwe vertaling?",
         confirmLabel: "Overschrijven",
         cancelLabel: "Annuleren",
         tone: "warning",
@@ -301,7 +313,9 @@ export function InspectTextField({
   return (
     <div className="group/field block space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          {label}
+        </span>
         {showAiChrome ? (
           <div
             className={cn(
@@ -327,7 +341,9 @@ export function InspectTextField({
                 disabled={!configured || preview.kind === "loading" || !value.trim()}
                 onClick={() => void runTranslateEn()}
                 aria-label={`${label}: Vertaal naar Engels`}
-                title={!configured ? (ai?.statusMessage ?? "AI niet geconfigureerd") : "Vertaal naar EN"}
+                title={
+                  !configured ? (ai?.statusMessage ?? "AI niet geconfigureerd") : "Vertaal naar EN"
+                }
               >
                 {preview.kind === "loading" && preview.action === "en" ? "…" : "EN"}
               </button>
@@ -372,9 +388,12 @@ export function InspectTextField({
             EN · handmatig
           </span>
           <textarea
-            className={cn(inputClass, "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
+            className={cn(
+              inputClass,
+              "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90",
+            )}
             value={enDraftValue}
-            placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
+            placeholder={EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER}
             onChange={(e) => ai!.setEnDraft(fieldPath, e.target.value)}
             aria-label={`${label}: Engelse vertaling (handmatig)`}
           />
@@ -382,9 +401,16 @@ export function InspectTextField({
       ) : null}
 
       {preview.kind === "error" ? (
-        <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-100" role="alert">
+        <div
+          className="rounded-lg border border-red-400/30 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-100"
+          role="alert"
+        >
           <p>{preview.message}</p>
-          <button type="button" className={cn(aiBtnClass, "mt-1.5")} onClick={() => setPreview({ kind: "idle" })}>
+          <button
+            type="button"
+            className={cn(aiBtnClass, "mt-1.5")}
+            onClick={() => setPreview({ kind: "idle" })}
+          >
             Sluiten
           </button>
         </div>
@@ -397,7 +423,9 @@ export function InspectTextField({
           aria-label="AI-voorbeeld"
         >
           <p className="text-[11px] font-semibold text-sky-100">
-            {preview.kind === "preview-nl" ? "Voorbeeld (NL) — nog niet toegepast" : "Voorbeeld (EN) — nog niet toegepast"}
+            {preview.kind === "preview-nl"
+              ? "Voorbeeld (NL) — nog niet toegepast"
+              : "Voorbeeld (EN) — nog niet toegepast"}
           </p>
           <p className="whitespace-pre-wrap text-sm text-white/90">{preview.text}</p>
           {preview.warnings.length > 0 ? (
@@ -411,9 +439,7 @@ export function InspectTextField({
             <button
               type="button"
               className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              onClick={() =>
-                void (preview.kind === "preview-nl" ? applyNl() : applyEn())
-              }
+              onClick={() => void (preview.kind === "preview-nl" ? applyNl() : applyEn())}
             >
               Toepassen
             </button>
@@ -427,12 +453,18 @@ export function InspectTextField({
                   : runTranslateEn())
               }
               aria-label={
-                preview.kind === "preview-nl" ? `${label}: Opnieuw genereren` : `${label}: Opnieuw vertalen`
+                preview.kind === "preview-nl"
+                  ? `${label}: Opnieuw genereren`
+                  : `${label}: Opnieuw vertalen`
               }
             >
               Opnieuw
             </button>
-            <button type="button" className={aiBtnClass} onClick={() => setPreview({ kind: "idle" })}>
+            <button
+              type="button"
+              className={aiBtnClass}
+              onClick={() => setPreview({ kind: "idle" })}
+            >
               Annuleren
             </button>
           </div>
@@ -467,7 +499,12 @@ export function SectionAiToolbar({
   const [state, setState] = React.useState<
     | { kind: "idle" }
     | { kind: "loading"; phase: "generate" | "translate" }
-    | { kind: "preview-section"; nl: Record<string, string>; en: Record<string, string>; warnings: string[] }
+    | {
+        kind: "preview-section";
+        nl: Record<string, string>;
+        en: Record<string, string>;
+        warnings: string[];
+      }
     | { kind: "preview-translate"; fields: Record<string, string>; warnings: string[] }
     | { kind: "error"; message: string }
     | { kind: "success"; message: string }
@@ -616,157 +653,16 @@ export function SectionAiToolbar({
 
       {panelOpen ? (
         <>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] leading-relaxed text-white/40">
-            Nederlandse tekst voor deze sectie, daarna automatisch EN-concepten. Niet publiceren.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={primaryAiBtnClass}
-          disabled={!canGenerate || busy}
-          onClick={() =>
-            void runGenerateSection(
-              state.kind === "preview-section"
-                ? { regenerate: true, previousFields: state.nl }
-                : undefined,
-            )
-          }
-          aria-label="Genereer sectie met AI (Nederlands + Engels)"
-          title={
-            !configured
-              ? (ai.statusMessage ?? "AI niet geconfigureerd")
-              : !onApplyDutch
-                ? "Genereren niet beschikbaar voor deze sectie"
-                : targetKeys.length === 0
-                  ? "Geen tekstvelden in deze sectie"
-                  : "Genereer NL + EN"
-          }
-        >
-          {state.kind === "loading" && state.phase === "generate"
-            ? "Bezig…"
-            : state.kind === "preview-section" || state.kind === "success"
-              ? "Opnieuw genereren"
-              : "Genereer met AI"}
-        </button>
-      </div>
-
-      <div
-        className="rounded-xl border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
-        role="note"
-        aria-label="Tips voor een goede AI-briefing"
-      >
-        <p className="text-[11px] font-semibold text-sky-100/95">Zo formuleert u het beste</p>
-        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-white/55">
-          <li>
-            Noem <span className="text-white/75">doelgroep</span>,{" "}
-            <span className="text-white/75">doel van de sectie</span> en{" "}
-            <span className="text-white/75">toon</span> (bijv. kort &amp; krachtig).
-          </li>
-          <li>
-            Geef <span className="text-white/75">concrete feiten</span> die waar mogen blijven
-            (regio, USP, dienst) — AI verzint geen cijfers of claims.
-          </li>
-          <li>
-            Tip: zet ook een idee in de velden hieronder; dat stuurt de AI sterker dan alleen een
-            lege briefing.
-          </li>
-        </ul>
-        <p className="mt-2 border-t border-white/10 pt-2 text-[11px] leading-relaxed text-white/45">
-          <span className="font-medium text-white/60">Goed:</span>{" "}
-          “Hero voor kantoren in Twente; vast eigen team; toon zelfverzekerd; CTA naar offerte.”
-          <br />
-          <span className="font-medium text-white/60">Zwak:</span> “Maak iets moois over schoonmaak.”
-        </p>
-      </div>
-
-      <label className="block space-y-1">
-        <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/35">
-          Briefing
-        </span>
-        <textarea
-          className={cn(inputClass, "min-h-[88px] py-2 text-[13px] leading-relaxed")}
-          value={brief}
-          placeholder="Bijv. Hero voor zakelijke klanten in Twente. Benadruk vast eigen team en zichtbaar resultaat. Toon: kort en zelfverzekerd. Geen prijsclaims."
-          onChange={(e) => setBrief(e.target.value)}
-          disabled={busy}
-          maxLength={2000}
-          aria-describedby="cms-ai-brief-hint"
-        />
-        <p id="cms-ai-brief-hint" className="text-[10px] leading-snug text-white/35">
-          Hoe specifieker de briefing, hoe beter het resultaat. Leeg laten kan — dan gebruikt AI de
-          bestaande veldteksten of algemene McCoy-copy.
-        </p>
-      </label>
-
-      {!configured ? (
-        <p className="text-[11px] text-amber-200/85" role="status">
-          {ai.statusMessage ?? "AI niet geconfigureerd. Zet GROQ_API_KEY in .env (server)."}
-        </p>
-      ) : null}
-
-      {configured && targetKeys.length === 0 ? (
-        <p className="text-[11px] text-white/40">Geen vertaalbare tekstvelden in deze sectie.</p>
-      ) : null}
-
-      {state.kind === "error" ? (
-        <div className="rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-2" role="alert">
-          <p className="text-[11px] text-red-100">{state.message}</p>
-          <button type="button" className={cn(aiBtnClass, "mt-1.5")} onClick={() => setState({ kind: "idle" })}>
-            Sluiten
-          </button>
-        </div>
-      ) : null}
-
-      {state.kind === "success" ? (
-        <p className="text-[11px] text-emerald-200/90" role="status">
-          {state.message}
-        </p>
-      ) : null}
-
-      {state.kind === "preview-section" ? (
-        <div
-          className="space-y-3 rounded-xl border border-sky-400/25 bg-sky-500/[0.08] p-3"
-          role="dialog"
-          aria-label="AI-sectievoorbeeld"
-        >
-          <p className="text-[11px] font-semibold text-sky-100">Voorbeeld — nog niet toegepast</p>
-          <ul className="max-h-56 space-y-2.5 overflow-y-auto">
-            {Object.keys(state.nl).map((key) => (
-              <li key={key} className="space-y-1 rounded-lg bg-black/25 px-2.5 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                  {labelFor(key)}
-                </p>
-                <p className="text-[12px] leading-snug text-white/90">
-                  <span className="text-white/40">NL · </span>
-                  {state.nl[key]}
-                </p>
-                <p className="text-[12px] leading-snug text-sky-100/85">
-                  <span className="text-sky-200/50">EN · </span>
-                  {state.en[key]}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {state.warnings.length > 0 ? (
-            <ul className="list-disc pl-4 text-[10px] text-amber-100/80">
-              {state.warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[11px] leading-relaxed text-white/40">
+                Nederlandse tekst voor deze sectie, daarna automatisch EN-concepten. Niet
+                publiceren.
+              </p>
+            </div>
             <button
               type="button"
-              className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400"
-              onClick={() => void applySection()}
-            >
-              Toepassen
-            </button>
-            <button
-              type="button"
-              className={aiBtnClass}
+              className={primaryAiBtnClass}
               disabled={!canGenerate || busy}
               onClick={() =>
                 void runGenerateSection(
@@ -775,76 +671,131 @@ export function SectionAiToolbar({
                     : undefined,
                 )
               }
-              aria-label="Opnieuw genereren met AI"
+              aria-label="Genereer sectie met AI (Nederlands + Engels)"
+              title={
+                !configured
+                  ? (ai.statusMessage ?? "AI niet geconfigureerd")
+                  : !onApplyDutch
+                    ? "Genereren niet beschikbaar voor deze sectie"
+                    : targetKeys.length === 0
+                      ? "Geen tekstvelden in deze sectie"
+                      : "Genereer NL + EN"
+              }
             >
-              Opnieuw genereren
-            </button>
-            <button type="button" className={aiBtnClass} onClick={() => setState({ kind: "idle" })}>
-              Annuleren
+              {state.kind === "loading" && state.phase === "generate"
+                ? "Bezig…"
+                : state.kind === "preview-section" || state.kind === "success"
+                  ? "Opnieuw genereren"
+                  : "Genereer met AI"}
             </button>
           </div>
-        </div>
-      ) : null}
 
-      {draftEntries.length > 0 ? (
-        <div className="space-y-2 rounded-xl border border-sky-500/15 bg-sky-950/10 p-2.5">
-          <div>
-            <p className="text-[11px] font-semibold text-sky-100/90">Engelse vertaling</p>
-            <p className="mt-0.5 text-[10px] text-white/40">
-              Handmatig invullen of via AI hierboven. Concept — nog niet publiceren.
+          <div
+            className="rounded-xl border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
+            role="note"
+            aria-label="Tips voor een goede AI-briefing"
+          >
+            <p className="text-[11px] font-semibold text-sky-100/95">Zo formuleert u het beste</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-white/55">
+              <li>
+                Noem <span className="text-white/75">doelgroep</span>,{" "}
+                <span className="text-white/75">doel van de sectie</span> en{" "}
+                <span className="text-white/75">toon</span> (bijv. kort &amp; krachtig).
+              </li>
+              <li>
+                Geef <span className="text-white/75">concrete feiten</span> die waar mogen blijven
+                (regio, USP, dienst) — AI verzint geen cijfers of claims.
+              </li>
+              <li>
+                Tip: zet ook een idee in de velden hieronder; dat stuurt de AI sterker dan alleen
+                een lege briefing.
+              </li>
+            </ul>
+            <p className="mt-2 border-t border-white/10 pt-2 text-[11px] leading-relaxed text-white/45">
+              <span className="font-medium text-white/60">Goed:</span> “Hero voor kantoren in
+              Twente; vast eigen team; toon zelfverzekerd; CTA naar offerte.”
+              <br />
+              <span className="font-medium text-white/60">Zwak:</span> “Maak iets moois over
+              schoonmaak.”
             </p>
           </div>
-          {draftEntries.map(({ key, path, value }) => (
-            <label key={path} className="block space-y-1">
-              <span className="text-[10px] text-white/40">{labelFor(key)}</span>
-              <textarea
-                className={cn(inputClass, "min-h-[48px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
-                value={value}
-                placeholder="Engelse vertaling (handmatig — AI overschrijft dit niet)"
-                onChange={(e) => ai.setEnDraft(path, e.target.value)}
-                aria-label={`${labelFor(key)}: Engelse concepttekst`}
-              />
-            </label>
-          ))}
-        </div>
-      ) : null}
 
-      <details className="group/ai rounded-xl border border-white/[0.06] bg-black/15 open:bg-black/20">
-        <summary className="cursor-pointer list-none px-2.5 py-2 text-[11px] font-medium text-white/40 transition hover:text-white/65 [&::-webkit-details-marker]:hidden">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className="inline-block text-white/25 transition-transform group-open/ai:rotate-90"
-            >
-              ▸
+          <label className="block space-y-1">
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/35">
+              Briefing
             </span>
-            Meer AI
-            <span className="font-normal text-white/28">· alleen vertalen</span>
-          </span>
-        </summary>
-        <div className="space-y-3 border-t border-white/[0.06] px-2.5 py-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-white/45">Vertaal bestaande NL-tekst naar EN-concepten.</p>
-            <button
-              type="button"
-              className={aiBtnClass}
-              disabled={!configured || busy || translateEntries.length === 0}
-              onClick={() => void runBatchTranslate()}
-              aria-label="Vertaal sectie naar Engels"
-            >
-              {state.kind === "loading" && state.phase === "translate" ? "Bezig…" : "Vertaal naar EN"}
-            </button>
-          </div>
-          {translateEntries.length === 0 ? (
-            <p className="text-[10px] text-white/40">Geen Nederlandse tekst om te vertalen.</p>
+            <textarea
+              className={cn(inputClass, "min-h-[88px] py-2 text-[13px] leading-relaxed")}
+              value={brief}
+              placeholder="Bijv. Hero voor zakelijke klanten in Twente. Benadruk vast eigen team en zichtbaar resultaat. Toon: kort en zelfverzekerd. Geen prijsclaims."
+              onChange={(e) => setBrief(e.target.value)}
+              disabled={busy}
+              maxLength={2000}
+              aria-describedby="cms-ai-brief-hint"
+            />
+            <p id="cms-ai-brief-hint" className="text-[10px] leading-snug text-white/35">
+              Hoe specifieker de briefing, hoe beter het resultaat. Leeg laten kan — dan gebruikt AI
+              de bestaande veldteksten of algemene McCoy-copy.
+            </p>
+          </label>
+
+          {!configured ? (
+            <p className="text-[11px] text-amber-200/85" role="status">
+              {ai.statusMessage ?? "AI niet geconfigureerd. Zet GROQ_API_KEY in .env (server)."}
+            </p>
           ) : null}
-          {state.kind === "preview-translate" ? (
-            <div className="space-y-2" role="dialog" aria-label="Sectievertalling voorbeeld">
-              <p className="text-[11px] text-sky-100">Voorbeeld — nog niet toegepast</p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto text-[11px] text-white/80">
-                {Object.entries(state.fields).map(([key, value]) => (
-                  <li key={key}>
-                    <span className="text-white/45">{labelFor(key)}:</span> {value}
+
+          {configured && targetKeys.length === 0 ? (
+            <p className="text-[11px] text-white/40">
+              Geen vertaalbare tekstvelden in deze sectie.
+            </p>
+          ) : null}
+
+          {state.kind === "error" ? (
+            <div
+              className="rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-2"
+              role="alert"
+            >
+              <p className="text-[11px] text-red-100">{state.message}</p>
+              <button
+                type="button"
+                className={cn(aiBtnClass, "mt-1.5")}
+                onClick={() => setState({ kind: "idle" })}
+              >
+                Sluiten
+              </button>
+            </div>
+          ) : null}
+
+          {state.kind === "success" ? (
+            <p className="text-[11px] text-emerald-200/90" role="status">
+              {state.message}
+            </p>
+          ) : null}
+
+          {state.kind === "preview-section" ? (
+            <div
+              className="space-y-3 rounded-xl border border-sky-400/25 bg-sky-500/[0.08] p-3"
+              role="dialog"
+              aria-label="AI-sectievoorbeeld"
+            >
+              <p className="text-[11px] font-semibold text-sky-100">
+                Voorbeeld — nog niet toegepast
+              </p>
+              <ul className="max-h-56 space-y-2.5 overflow-y-auto">
+                {Object.keys(state.nl).map((key) => (
+                  <li key={key} className="space-y-1 rounded-lg bg-black/25 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                      {labelFor(key)}
+                    </p>
+                    <p className="text-[12px] leading-snug text-white/90">
+                      <span className="text-white/40">NL · </span>
+                      {state.nl[key]}
+                    </p>
+                    <p className="text-[12px] leading-snug text-sky-100/85">
+                      <span className="text-sky-200/50">EN · </span>
+                      {state.en[key]}
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -859,27 +810,141 @@ export function SectionAiToolbar({
                 <button
                   type="button"
                   className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400"
-                  onClick={() => void applyTranslate()}
+                  onClick={() => void applySection()}
                 >
                   Toepassen
                 </button>
                 <button
                   type="button"
                   className={aiBtnClass}
-                  disabled={!configured || busy || translateEntries.length === 0}
-                  onClick={() => void runBatchTranslate()}
-                  aria-label="Opnieuw vertalen naar Engels"
+                  disabled={!canGenerate || busy}
+                  onClick={() =>
+                    void runGenerateSection(
+                      state.kind === "preview-section"
+                        ? { regenerate: true, previousFields: state.nl }
+                        : undefined,
+                    )
+                  }
+                  aria-label="Opnieuw genereren met AI"
                 >
-                  Opnieuw
+                  Opnieuw genereren
                 </button>
-                <button type="button" className={aiBtnClass} onClick={() => setState({ kind: "idle" })}>
+                <button
+                  type="button"
+                  className={aiBtnClass}
+                  onClick={() => setState({ kind: "idle" })}
+                >
                   Annuleren
                 </button>
               </div>
             </div>
           ) : null}
-        </div>
-      </details>
+
+          {draftEntries.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-sky-500/15 bg-sky-950/10 p-2.5">
+              <div>
+                <p className="text-[11px] font-semibold text-sky-100/90">Engelse vertaling</p>
+                <p className="mt-0.5 text-[10px] text-white/40">
+                  Handmatig invullen of via AI hierboven. Concept — nog niet publiceren.
+                </p>
+              </div>
+              {draftEntries.map(({ key, path, value }) => (
+                <label key={path} className="block space-y-1">
+                  <span className="text-[10px] text-white/40">{labelFor(key)}</span>
+                  <textarea
+                    className={cn(
+                      inputClass,
+                      "min-h-[48px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90",
+                    )}
+                    value={value}
+                    placeholder="Engelse vertaling (handmatig — AI overschrijft dit niet)"
+                    onChange={(e) => ai.setEnDraft(path, e.target.value)}
+                    aria-label={`${labelFor(key)}: Engelse concepttekst`}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          <details className="group/ai rounded-xl border border-white/[0.06] bg-black/15 open:bg-black/20">
+            <summary className="cursor-pointer list-none px-2.5 py-2 text-[11px] font-medium text-white/40 transition hover:text-white/65 [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="inline-block text-white/25 transition-transform group-open/ai:rotate-90"
+                >
+                  ▸
+                </span>
+                Meer AI
+                <span className="font-normal text-white/28">· alleen vertalen</span>
+              </span>
+            </summary>
+            <div className="space-y-3 border-t border-white/[0.06] px-2.5 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-white/45">
+                  Vertaal bestaande NL-tekst naar EN-concepten.
+                </p>
+                <button
+                  type="button"
+                  className={aiBtnClass}
+                  disabled={!configured || busy || translateEntries.length === 0}
+                  onClick={() => void runBatchTranslate()}
+                  aria-label="Vertaal sectie naar Engels"
+                >
+                  {state.kind === "loading" && state.phase === "translate"
+                    ? "Bezig…"
+                    : "Vertaal naar EN"}
+                </button>
+              </div>
+              {translateEntries.length === 0 ? (
+                <p className="text-[10px] text-white/40">Geen Nederlandse tekst om te vertalen.</p>
+              ) : null}
+              {state.kind === "preview-translate" ? (
+                <div className="space-y-2" role="dialog" aria-label="Sectievertalling voorbeeld">
+                  <p className="text-[11px] text-sky-100">Voorbeeld — nog niet toegepast</p>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto text-[11px] text-white/80">
+                    {Object.entries(state.fields).map(([key, value]) => (
+                      <li key={key}>
+                        <span className="text-white/45">{labelFor(key)}:</span> {value}
+                      </li>
+                    ))}
+                  </ul>
+                  {state.warnings.length > 0 ? (
+                    <ul className="list-disc pl-4 text-[10px] text-amber-100/80">
+                      {state.warnings.map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-400"
+                      onClick={() => void applyTranslate()}
+                    >
+                      Toepassen
+                    </button>
+                    <button
+                      type="button"
+                      className={aiBtnClass}
+                      disabled={!configured || busy || translateEntries.length === 0}
+                      onClick={() => void runBatchTranslate()}
+                      aria-label="Opnieuw vertalen naar Engels"
+                    >
+                      Opnieuw
+                    </button>
+                    <button
+                      type="button"
+                      className={aiBtnClass}
+                      onClick={() => setState({ kind: "idle" })}
+                    >
+                      Annuleren
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </details>
         </>
       ) : null}
     </div>
@@ -914,9 +979,12 @@ export function ManualEnDraftField({
       </span>
       {multiline ? (
         <textarea
-          className={cn(inputClass, "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
+          className={cn(
+            inputClass,
+            "min-h-[52px] border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90",
+          )}
           value={value}
-          placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
+          placeholder={EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER}
           onChange={(e) => onEnChange(e.target.value)}
           aria-label={label ? `${label}: Engelse vertaling` : "Engelse vertaling (handmatig)"}
         />
@@ -924,7 +992,7 @@ export function ManualEnDraftField({
         <input
           className={cn(inputClass, "border-sky-500/15 bg-sky-950/15 text-xs text-sky-50/90")}
           value={value}
-          placeholder="Leeg = NL-fallback (Opslaan vult dit niet opnieuw)"
+          placeholder={EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER}
           onChange={(e) => onEnChange(e.target.value)}
           aria-label={label ? `${label}: Engelse vertaling` : "Engelse vertaling (handmatig)"}
         />
@@ -946,7 +1014,11 @@ export function collectShallowStringFields(
     const value = content[key];
     if (typeof value === "string") {
       if (value.trim() || options?.includeEmpty) out[key] = value;
-    } else if (options?.includeEmpty && keys?.includes(key) && (value === undefined || value === null)) {
+    } else if (
+      options?.includeEmpty &&
+      keys?.includes(key) &&
+      (value === undefined || value === null)
+    ) {
       out[key] = "";
     }
   }

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { collectShallowStringFields, defaultMaxCharsForField, isTranslatableFieldKey } from "./ai-assist";
+import {
+  collectShallowStringFields,
+  defaultMaxCharsForField,
+  EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER,
+  isTranslatableFieldKey,
+} from "./ai-assist";
+
+it("explains that empty EN is translated on publish", () => {
+  expect(EMPTY_EN_AUTO_TRANSLATE_PLACEHOLDER).toBe(
+    "Leeg — wordt automatisch vertaald bij publiceren",
+  );
+});
 
 describe("isTranslatableFieldKey", () => {
   it("allows copy fields", () => {

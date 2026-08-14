@@ -114,7 +114,9 @@ export function buildContentSecurityPolicy(
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // GA4 gtag (consent-gated in storefront) + Vercel Analytics / preview toolbar.
     "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com",
-    "connect-src 'self' https: wss:",
+    // Same-origin app/server functions + explicit analytics/preview telemetry.
+    // Do not use bare https:/wss: here: that would let injected scripts exfiltrate anywhere.
+    "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com",
     "form-action 'self'",
     // CMS video embeds: YouTube, Vimeo, Facebook plugins (see resolveSafeVideoEmbed)
     "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.facebook.com https://web.facebook.com https://www.fb.com",

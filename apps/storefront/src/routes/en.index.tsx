@@ -3,8 +3,8 @@ import {
   resolveHomeHeroBlocksLayout,
   type BuiltinCmsPage,
 } from "@mccoy/cms-schema";
-import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
-import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
+import { HomePageLayout } from "@/components/site/HomePageLayout";
+import { HomePageLoadingShell } from "@/components/site/HomePageLoadingShell";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { tanstackHeadFromCms } from "@/lib/cms/cms-head";
@@ -14,6 +14,7 @@ import { resolveHomeHeroImageSrc } from "@/lib/cms/home-hero-src";
 
 export const Route = createFileRoute("/en/")({
   loader: () => loadMarketingPublishedPage("/en"),
+  pendingComponent: HomePageLoadingShell,
   head: ({ loaderData }) => {
     if (!loaderData?.head) return { meta: [{ name: "robots", content: "noindex" }] };
     const base = tanstackHeadFromCms(loaderData.head);
@@ -47,10 +48,8 @@ function EnglishHomePage() {
   return (
     <main lang="en">
       {page.kind === "builtin" && page.pageKey === "home" ? (
-        <PageLayoutRenderer
+        <HomePageLayout
           page={page}
-          pageKey="home"
-          renderers={homeSectionRenderers}
           mode="public"
           respectHidden
         />
