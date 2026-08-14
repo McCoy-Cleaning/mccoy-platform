@@ -3,8 +3,8 @@ import {
   resolveHomeHeroBlocksLayout,
   type BuiltinCmsPage,
 } from "@mccoy/cms-schema";
-import { PageLayoutRenderer } from "@/components/site/PageLayoutRenderer";
-import { homeSectionRenderers } from "@/components/site/homeSectionRenderers";
+import { HomePageLayout } from "@/components/site/HomePageLayout";
+import { HomePageLoadingShell } from "@/components/site/HomePageLoadingShell";
 import { useCmsPageForView } from "@/lib/cms/use-cms-page-for-view";
 import { RoutePublishedPageProvider } from "@/lib/cms/route-published-page-context";
 import { useEdit } from "@/lib/cms/edit-mode-context";
@@ -15,6 +15,7 @@ import { resolveHomeHeroImageSrc } from "@/lib/cms/home-hero-src";
 
 export const Route = createFileRoute("/")({
   loader: () => loadMarketingPublishedPage("/"),
+  pendingComponent: HomePageLoadingShell,
   head: ({ loaderData }) => {
     if (!loaderData?.head) {
       return {
@@ -54,10 +55,8 @@ function HomePage() {
   return (
     <main>
       {page?.kind === "builtin" ? (
-        <PageLayoutRenderer
+        <HomePageLayout
           page={page}
-          pageKey="home"
-          renderers={homeSectionRenderers}
           mode={editing ? "admin" : "public"}
           respectHidden={!editing}
         />

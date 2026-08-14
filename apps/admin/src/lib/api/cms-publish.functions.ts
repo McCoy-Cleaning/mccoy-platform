@@ -309,16 +309,33 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
   .validator(publishSchema)
   .handler(async ({ data }) => {
     let actorUserId: string | undefined;
+    const startedAt = Date.now();
     try {
       const session = await requireAdminSession();
       actorUserId = session.userId;
       const store = await ensureSeeded();
       let payload = ensurePageLocaleFields(data.payload as unknown as CmsPage);
-      const gate = await requireExistingCmsPage(store, data.pageId, payload.id);
-      if (!gate.ok) return gate;
-
       const publishedLocales = Array.from(new Set(data.publishedLocales)) as Locale[];
-      const activeRev = await store.getActivePublishedRevision(data.pageId);
+      const readsStartedAt = Date.now();
+      const [existingPage, activeRev] = await Promise.all([
+        store.getPage(data.pageId),
+        store.getActivePublishedRevision(data.pageId),
+      ]);
+      const readsCompletedAt = Date.now();
+      if (payload.id !== data.pageId) {
+        return {
+          ok: false as const,
+          error: "Payload-id komt niet overeen met pageId.",
+          code: "forbidden" as const,
+        };
+      }
+      if (!existingPage) {
+        return {
+          ok: false as const,
+          error: CMS_PAGE_CREATE_FORBIDDEN_REASON,
+          code: "forbidden" as const,
+        };
+      }
       const serverEnPublished =
         activeRev?.payload.localeStates?.en?.publicationState === "published";
 
@@ -354,11 +371,10 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
         };
       }
 
-      await store.upsertPage({
-        siteId: DEFAULT_CMS_SITE_ID,
-        page: validated.page,
-        stableKey: validated.page.id,
-      });
+      // The atomic publish operation updates the existing cms_pages row (inNav,
+      // draft-only state, revision pointer and timestamps), so a preceding
+      // upsert duplicated database reads/writes on every click.
+      const persistStartedAt = Date.now();
       const result = await store.publishPage({
         siteId: DEFAULT_CMS_SITE_ID,
         pageId: data.pageId,
@@ -367,8 +383,25 @@ export const adminPublishCmsPage = createServerFn({ method: "POST" })
         createdBy: session.username,
         expectedDraftRevision: data.expectedDraftRevision ?? null,
       });
-      await processCmsOutbox(10);
+      const persistCompletedAt = Date.now();
+
+      // cms_outbox is durable and IndexNow is explicitly fail-open. Start its
+      // drain after persistence without making the editor wait on external
+      // network retries; a later drain safely picks up an interrupted attempt.
+      void processCmsOutbox(10).catch((error) => {
+        console.error("[cms-admin] deferred CMS outbox drain failed", error);
+      });
       await reconcileOrphanScopesAfterCmsChange();
+      console.info(
+        JSON.stringify({
+          type: "cms.publish.timing",
+          pageId: data.pageId,
+          preflightReadMs: readsCompletedAt - readsStartedAt,
+          persistMs: persistCompletedAt - persistStartedAt,
+          criticalPathMs: Date.now() - startedAt,
+          outboxDeferred: true,
+        }),
+      );
       return jsonClone({
         ok: true as const,
         result: {

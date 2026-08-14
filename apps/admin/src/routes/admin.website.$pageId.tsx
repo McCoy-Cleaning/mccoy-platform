@@ -8,6 +8,7 @@ import {
   Smartphone,
   Settings,
   Layers,
+  LoaderCircle,
   X,
 } from "lucide-react";
 import { type CmsPage, type Locale } from "@mccoy/cms-schema";
@@ -15,10 +16,7 @@ import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { useCmsEditParentBridge } from "@/lib/cms/edit-bridge";
 import { buildStorefrontEditCanvasUrl } from "@/lib/cms/edit-canvas-url";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
-import {
-  BuiltinLayoutEditor,
-  SectiesOpenButton,
-} from "@/components/admin/cms/BuiltinLayoutEditor";
+import { BuiltinLayoutEditor, SectiesOpenButton } from "@/components/admin/cms/BuiltinLayoutEditor";
 import {
   LegacyCmsImagesPanel,
   pageHasLegacyEmbeddedImages,
@@ -136,11 +134,14 @@ function EditCanvasIframe({
           className="absolute inset-0 z-10 grid place-items-center bg-[#e8e8e8] p-6 text-center"
         >
           <div className="max-w-md space-y-3">
-            <p className="text-sm font-semibold text-neutral-800">Edit canvas kan de storefront niet laden</p>
+            <p className="text-sm font-semibold text-neutral-800">
+              Edit canvas kan de storefront niet laden
+            </p>
             <p className="text-xs text-neutral-600 leading-relaxed">
-              Geen response op <span className="font-mono text-[11px]">{origin}</span>. Start de storefront
-              (standaard poort 5173) of zet <span className="font-mono text-[11px]">VITE_STOREFRONT_ORIGIN</span>{" "}
-              op de poort waar de storefront draait — daarna deze pagina herladen.
+              Geen response op <span className="font-mono text-[11px]">{origin}</span>. Start de
+              storefront (standaard poort 5173) of zet{" "}
+              <span className="font-mono text-[11px]">VITE_STOREFRONT_ORIGIN</span> op de poort waar
+              de storefront draait — daarna deze pagina herladen.
             </p>
             <a
               href={editUrl}
@@ -185,10 +186,7 @@ function PreviewLocaleToggle({
 }) {
   return (
     <div
-      className={cn(
-        "inline-flex rounded-xl border border-white/10 bg-white/5 p-1",
-        className,
-      )}
+      className={cn("inline-flex rounded-xl border border-white/10 bg-white/5 p-1", className)}
       role="group"
       aria-label="Voorbeeldtaal"
       data-cms-toolbar="preview-locale"
@@ -201,9 +199,7 @@ function PreviewLocaleToggle({
           aria-pressed={locale === l}
           className={cn(
             "rounded-lg px-3 py-1.5 text-xs font-semibold uppercase transition",
-            locale === l
-              ? "bg-[#1e88e5] text-white shadow"
-              : "text-white/55 hover:text-white",
+            locale === l ? "bg-[#1e88e5] text-white shadow" : "text-white/55 hover:text-white",
           )}
         >
           {l}
@@ -244,7 +240,15 @@ function PageEditorRoute() {
   );
 }
 
-function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug: string; title: string }) {
+function BuiltinPageSplitEditor({
+  pageId,
+  slug,
+  title,
+}: {
+  pageId: string;
+  slug: string;
+  title: string;
+}) {
   const state = useCms();
   const hasDraft = cms.hasDraft(pageId);
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
@@ -253,6 +257,8 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   const editRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
+  const publishInFlight = React.useRef(false);
+  const [publishing, setPublishing] = React.useState(false);
 
   // Run Producten layout ensure on open. Do NOT depend on draft[pageId]
   // (ensure writes draft; that dependency caused an ensure→commit→effect OOM loop).
@@ -325,44 +331,59 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   }, [bridge.selection]);
 
   const onSave = () => {
+    if (publishInFlight.current) return;
+    publishInFlight.current = true;
+    setPublishing(true);
     void (async () => {
-      if (page && pageHasLegacyEmbeddedImages(page)) {
-        document.getElementById("cms-legacy-images-panel")?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-        notifyToast({
-          kind: "error",
-          title: "Publiceren geblokkeerd",
-          description:
-            "Deze pagina bevat nog ingesloten data-URL-afbeeldingen. Gebruik het amber paneel “Migreer ingesloten afbeeldingen” hierboven, daarna opnieuw Opslaan & publiceren. Nieuwe carousel-/galerij-uploads gaan naar de mediabibliotheek.",
-        });
-        return;
-      }
-      const result = await cms.savePage(pageId);
-      if (!result.ok) {
-        notifyToast({
-          kind: "error",
-          title: "Opslaan mislukt",
-          description: result.reason,
-        });
-        return;
-      }
-      if ("warning" in result && result.warning) {
-        notifyToast({ kind: "warning", title: result.warning });
-      } else {
-        notifyToast({
-          kind: "success",
-          title: ("message" in result && result.message) || "Opgeslagen.",
-        });
-      }
-      setTimeout(() => {
-        try {
-          editRef.current?.contentWindow?.location.reload();
-        } catch {
-          /* cross-origin */
+      try {
+        if (page && pageHasLegacyEmbeddedImages(page)) {
+          document.getElementById("cms-legacy-images-panel")?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+          notifyToast({
+            kind: "error",
+            title: "Publiceren geblokkeerd",
+            description:
+              "Deze pagina bevat nog ingesloten data-URL-afbeeldingen. Gebruik het amber paneel “Migreer ingesloten afbeeldingen” hierboven, daarna opnieuw Opslaan & publiceren. Nieuwe carousel-/galerij-uploads gaan naar de mediabibliotheek.",
+            dedupeKey: `cms-publish-blocked:${pageId}`,
+          });
+          return;
         }
-      }, 50);
+        const result = await cms.savePage(pageId);
+        if (!result.ok) {
+          notifyToast({
+            kind: "error",
+            title: "Opslaan mislukt",
+            description: result.reason,
+            dedupeKey: `cms-publish-error:${pageId}`,
+          });
+          return;
+        }
+        if ("warning" in result && result.warning) {
+          notifyToast({
+            kind: "warning",
+            title: result.warning,
+            dedupeKey: `cms-publish-warning:${pageId}`,
+          });
+        } else {
+          notifyToast({
+            kind: "success",
+            title: ("message" in result && result.message) || "Opgeslagen.",
+            dedupeKey: `cms-publish-success:${pageId}`,
+          });
+        }
+        setTimeout(() => {
+          try {
+            editRef.current?.contentWindow?.location.reload();
+          } catch {
+            /* cross-origin */
+          }
+        }, 50);
+      } finally {
+        publishInFlight.current = false;
+        setPublishing(false);
+      }
     })();
   };
 
@@ -394,10 +415,12 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col animate-fade-in">
       <SplitToolbar
+        pageId={pageId}
         title={title}
         slug={slug}
         hasDraft={hasDraft}
         onSave={onSave}
+        saving={publishing}
         onDiscard={onDiscard}
         device={device}
         onDevice={setDevice}
@@ -432,7 +455,9 @@ function BuiltinPageSplitEditor({ pageId, slug, title }: { pageId: string; slug:
           {sectionsOpen ? (
             <>
               <span className="mx-1 hidden h-4 w-px bg-white/15 xl:block" aria-hidden />
-              <span className="hidden text-sm font-semibold text-sky-200/80 xl:inline">Secties</span>
+              <span className="hidden text-sm font-semibold text-sky-200/80 xl:inline">
+                Secties
+              </span>
             </>
           ) : null}
           <PreviewLocaleToggle
@@ -508,6 +533,8 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   const editRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
+  const publishInFlight = React.useRef(false);
+  const [publishing, setPublishing] = React.useState(false);
   const hasDraft = cms.hasDraft(pageId) || page.isDraftOnly;
   const editUrl = storefrontEditUrl(page.slug, pageId, previewLocale);
 
@@ -536,44 +563,59 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId], publishedUpdatedAt]);
 
   const onSave = () => {
+    if (publishInFlight.current) return;
+    publishInFlight.current = true;
+    setPublishing(true);
     void (async () => {
-      if (pageHasLegacyEmbeddedImages(page)) {
-        document.getElementById("cms-legacy-images-panel")?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-        notifyToast({
-          kind: "error",
-          title: "Publiceren geblokkeerd",
-          description:
-            "Deze pagina bevat nog ingesloten data-URL-afbeeldingen. Gebruik het amber paneel “Migreer ingesloten afbeeldingen” hierboven, daarna opnieuw Opslaan & publiceren. Nieuwe carousel-/galerij-uploads gaan naar de mediabibliotheek.",
-        });
-        return;
-      }
-      const result = await cms.savePage(pageId);
-      if (!result.ok) {
-        notifyToast({
-          kind: "error",
-          title: "Opslaan mislukt",
-          description: result.reason,
-        });
-        return;
-      }
-      if ("warning" in result && result.warning) {
-        notifyToast({ kind: "warning", title: result.warning });
-      } else {
-        notifyToast({
-          kind: "success",
-          title: ("message" in result && result.message) || "Opgeslagen.",
-        });
-      }
-      setTimeout(() => {
-        try {
-          editRef.current?.contentWindow?.location.reload();
-        } catch {
-          /* cross-origin */
+      try {
+        if (pageHasLegacyEmbeddedImages(page)) {
+          document.getElementById("cms-legacy-images-panel")?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+          notifyToast({
+            kind: "error",
+            title: "Publiceren geblokkeerd",
+            description:
+              "Deze pagina bevat nog ingesloten data-URL-afbeeldingen. Gebruik het amber paneel “Migreer ingesloten afbeeldingen” hierboven, daarna opnieuw Opslaan & publiceren. Nieuwe carousel-/galerij-uploads gaan naar de mediabibliotheek.",
+            dedupeKey: `cms-publish-blocked:${pageId}`,
+          });
+          return;
         }
-      }, 50);
+        const result = await cms.savePage(pageId);
+        if (!result.ok) {
+          notifyToast({
+            kind: "error",
+            title: "Opslaan mislukt",
+            description: result.reason,
+            dedupeKey: `cms-publish-error:${pageId}`,
+          });
+          return;
+        }
+        if ("warning" in result && result.warning) {
+          notifyToast({
+            kind: "warning",
+            title: result.warning,
+            dedupeKey: `cms-publish-warning:${pageId}`,
+          });
+        } else {
+          notifyToast({
+            kind: "success",
+            title: ("message" in result && result.message) || "Opgeslagen.",
+            dedupeKey: `cms-publish-success:${pageId}`,
+          });
+        }
+        setTimeout(() => {
+          try {
+            editRef.current?.contentWindow?.location.reload();
+          } catch {
+            /* cross-origin */
+          }
+        }, 50);
+      } finally {
+        publishInFlight.current = false;
+        setPublishing(false);
+      }
     })();
   };
   const onDiscard = () => {
@@ -618,10 +660,12 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col animate-fade-in">
       <SplitToolbar
+        pageId={pageId}
         title={page.title}
         slug={page.slug}
         hasDraft={!!hasDraft}
         onSave={onSave}
+        saving={publishing}
         onDiscard={onDiscard}
         device="desktop"
         onDevice={() => {}}
@@ -652,9 +696,7 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
           label="Voorbeeld van uw website"
           tone="edit"
           hidden={false}
-          headerEnd={
-            <PreviewLocaleToggle locale={previewLocale} onLocale={setPreviewLocale} />
-          }
+          headerEnd={<PreviewLocaleToggle locale={previewLocale} onLocale={setPreviewLocale} />}
         >
           <div className="relative h-full min-h-0">
             <EditCanvasIframe
@@ -744,7 +786,9 @@ function CustomPageDrawer({
                 onClick={() => setTab("sections")}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
-                  tab === "sections" ? "bg-primary text-primary-foreground" : "text-white/70 hover:text-white",
+                  tab === "sections"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/70 hover:text-white",
                 )}
               >
                 <Layers className="h-4 w-4" /> Secties
@@ -754,7 +798,9 @@ function CustomPageDrawer({
                 onClick={() => setTab("settings")}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
-                  tab === "settings" ? "bg-primary text-primary-foreground" : "text-white/70 hover:text-white",
+                  tab === "settings"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/70 hover:text-white",
                 )}
               >
                 <Settings className="h-4 w-4" /> Instellingen
@@ -833,7 +879,11 @@ function CustomPageMetaForm({
     <div className="space-y-5 p-5">
       <label className="block">
         <span className="a-label">Titel (voor Google)</span>
-        <input className={metaInputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input
+          className={metaInputClass}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
       </label>
       <label className="block">
         <span className="a-label">Webadres (URL)</span>
@@ -899,7 +949,9 @@ function CustomPageMetaForm({
       </button>
       {savedFlash ? (
         <p className="text-center text-sm text-emerald-300/90">
-          Concept bijgewerkt ✓ — klik op “{page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}” hierboven om dit live te zetten.
+          Concept bijgewerkt ✓ — klik op “
+          {page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}” hierboven om dit live
+          te zetten.
         </p>
       ) : null}
     </div>
@@ -907,10 +959,12 @@ function CustomPageMetaForm({
 }
 
 function SplitToolbar({
+  pageId,
   title,
   slug,
   hasDraft,
   onSave,
+  saving,
   onDiscard,
   device,
   onDevice,
@@ -919,10 +973,12 @@ function SplitToolbar({
   onPreviewLocale,
   saveLabel = "Opslaan & publiceren",
 }: {
+  pageId: string;
   title: string;
   slug: string;
   hasDraft: boolean;
   onSave: () => void;
+  saving: boolean;
   onDiscard: () => void;
   device: "desktop" | "mobile";
   onDevice: (d: "desktop" | "mobile") => void;
@@ -932,6 +988,17 @@ function SplitToolbar({
   saveLabel?: string;
 }) {
   const navigate = useNavigate();
+  const [translationState, setTranslationState] = React.useState(() =>
+    cms.getAutomaticEnTranslationStatus(pageId),
+  );
+
+  React.useEffect(() => {
+    setTranslationState(cms.getAutomaticEnTranslationStatus(pageId));
+    return cms.subscribeAutomaticEnTranslationStatus(pageId, setTranslationState);
+  }, [pageId]);
+
+  const savingLabel =
+    translationState?.state === "translating" ? "Ontbrekende EN-velden vertalen…" : "Publiceren…";
 
   return (
     <div className="rounded-3xl border border-white/10 bg-black/60 p-3 shadow-[0_24px_60px_-32px_rgba(0,0,0,0.9)] backdrop-blur-xl">
@@ -992,7 +1059,9 @@ function SplitToolbar({
               aria-label="Desktop"
               className={cn(
                 "grid h-10 w-10 place-items-center rounded-lg transition",
-                device === "desktop" ? "bg-[#1e88e5] text-white shadow" : "text-white/55 hover:text-white",
+                device === "desktop"
+                  ? "bg-[#1e88e5] text-white shadow"
+                  : "text-white/55 hover:text-white",
               )}
               title="Bekijk als computer"
             >
@@ -1003,7 +1072,9 @@ function SplitToolbar({
               aria-label="Mobiel"
               className={cn(
                 "grid h-10 w-10 place-items-center rounded-lg transition",
-                device === "mobile" ? "bg-[#1e88e5] text-white shadow" : "text-white/55 hover:text-white",
+                device === "mobile"
+                  ? "bg-[#1e88e5] text-white shadow"
+                  : "text-white/55 hover:text-white",
               )}
               title="Bekijk als telefoon"
             >
@@ -1015,7 +1086,7 @@ function SplitToolbar({
         <button
           type="button"
           onClick={onDiscard}
-          disabled={!hasDraft}
+          disabled={!hasDraft || saving}
           data-cms-toolbar="discard"
           aria-label="Verwerpen"
           title="Niet-opgeslagen wijzigingen ongedaan maken"
@@ -1027,12 +1098,18 @@ function SplitToolbar({
         <button
           type="button"
           onClick={onSave}
-          disabled={!hasDraft}
+          disabled={!hasDraft || saving}
+          aria-busy={saving}
           data-cms-toolbar="save"
           aria-label={saveLabel}
           className="a-btn a-btn-primary"
         >
-          <Save className="h-4 w-4" /> {saveLabel}
+          {saving ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Save className="h-4 w-4" aria-hidden />
+          )}{" "}
+          {saving ? savingLabel : saveLabel}
         </button>
       </div>
       <p className="mt-2.5 border-t border-white/5 px-1 pt-2.5 text-[13px] leading-snug text-white/45">
@@ -1061,9 +1138,18 @@ function PaneShell({
   headerEnd?: React.ReactNode;
 }) {
   return (
-    <div className={cn("min-h-0 rounded-3xl border overflow-hidden flex flex-col", tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]", hidden && "hidden lg:flex", className)}>
+    <div
+      className={cn(
+        "min-h-0 rounded-3xl border overflow-hidden flex flex-col",
+        tone === "edit" ? "border-primary/30 bg-primary/[0.03]" : "border-white/10 bg-white/[0.02]",
+        hidden && "hidden lg:flex",
+        className,
+      )}
+    >
       <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
-        <span className={cn("h-2 w-2 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")} />
+        <span
+          className={cn("h-2 w-2 rounded-full", tone === "edit" ? "bg-primary" : "bg-emerald-400")}
+        />
         <span className="text-sm font-semibold text-white/70">{label}</span>
         {headerEnd ? <div className="ml-auto">{headerEnd}</div> : null}
       </div>
@@ -1079,7 +1165,13 @@ const DESKTOP_CANVAS_WIDTH = 1280;
  * Desktop: render at a real desktop width, then scale to fit the pane so Secties
  * never forces horizontal scrolling. Mobile: phone chrome as before.
  */
-function DeviceFrame({ device, children }: { device: "desktop" | "mobile"; children: React.ReactNode }) {
+function DeviceFrame({
+  device,
+  children,
+}: {
+  device: "desktop" | "mobile";
+  children: React.ReactNode;
+}) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const [scale, setScale] = React.useState(1);
   const [hostHeight, setHostHeight] = React.useState(0);

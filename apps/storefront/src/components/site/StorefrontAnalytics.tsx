@@ -9,40 +9,52 @@ import {
 import { GoogleAnalytics } from "@/lib/analytics/GoogleAnalytics";
 import {
   isAnalyticsExemptPath,
-  isGoogleAnalyticsRuntimeAllowed,
   parseGaMeasurementId,
   readGaEnableDevFlag,
+  shouldOfferAnalyticsConsent,
 } from "@/lib/analytics/ga-config";
 
-function gaFeatureEnabled(): boolean {
+function readAnalyticsOfferState(): {
+  offerConsent: boolean;
+  measurementId: string | null;
+  enableDev: boolean;
+} {
   const measurementId = parseGaMeasurementId(import.meta.env.VITE_GA_MEASUREMENT_ID);
-  if (!measurementId) return false;
-  return isGoogleAnalyticsRuntimeAllowed({
+  const enableDev = readGaEnableDevFlag(import.meta.env.VITE_GA_ENABLE_DEV);
+  const offerConsent = shouldOfferAnalyticsConsent({
+    measurementId,
     isProd: import.meta.env.PROD === true,
-    enableDev: readGaEnableDevFlag(import.meta.env.VITE_GA_ENABLE_DEV),
+    enableDev,
   });
+  return { offerConsent, measurementId, enableDev };
 }
 
 /**
  * Consent-gated GA4 + banner. Mount once in the storefront root.
- * Does nothing when measurement ID is unset or runtime is not allowed.
+ * Banner can appear in enableDev preview without a measurement ID;
+ * gtag still loads only with a valid ID + granted consent.
  */
 export function StorefrontAnalytics() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const exempt = isAnalyticsExemptPath(pathname);
-  const enabled = gaFeatureEnabled();
+  const { offerConsent, measurementId, enableDev } = readAnalyticsOfferState();
 
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!enabled || exempt) {
+    if (!offerConsent || exempt) {
       setReady(false);
       return;
     }
+    if (import.meta.env.DEV && enableDev && !measurementId) {
+      console.warn(
+        "[analytics] Consent banner preview active (VITE_GA_ENABLE_DEV) but VITE_GA_MEASUREMENT_ID is unset — gtag will not load.",
+      );
+    }
     setConsent(readAnalyticsConsent());
     setReady(true);
-  }, [enabled, exempt]);
+  }, [offerConsent, exempt, enableDev, measurementId]);
 
   const onAccept = useCallback(() => {
     writeAnalyticsConsent("granted");
@@ -54,13 +66,13 @@ export function StorefrontAnalytics() {
     setConsent("denied");
   }, []);
 
-  if (!enabled || exempt) return null;
+  if (!offerConsent) return null;
 
   return (
     <>
-      <GoogleAnalytics consent={consent} />
+      <GoogleAnalytics consent={consent} pathname={pathname} />
       <CookieConsentBanner
-        open={ready && consent === null}
+        open={!exempt && ready && consent === null}
         onAccept={onAccept}
         onReject={onReject}
       />

@@ -4,12 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { CmsPage } from "@mccoy/cms-schema";
 
-const {
-  getEditablePage,
-  getTranslationCoverage,
-  samplePage,
-  persistedState,
-} = vi.hoisted(() => {
+const { getEditablePage, getTranslationCoverage, samplePage, persistedState } = vi.hoisted(() => {
   const getEditablePage = vi.fn();
   const getTranslationCoverage = vi.fn();
   const samplePage = {
@@ -46,6 +41,8 @@ vi.mock("@/lib/cms/store", () => ({
   cms: {
     getEditablePage: (...args: unknown[]) => getEditablePage(...args),
     getTranslationCoverage: (...args: unknown[]) => getTranslationCoverage(...args),
+    getAutomaticEnTranslationStatus: vi.fn(() => null),
+    subscribeAutomaticEnTranslationStatus: vi.fn(() => () => undefined),
     updatePage: vi.fn(),
     translateMissingEnFields: vi.fn(),
   },

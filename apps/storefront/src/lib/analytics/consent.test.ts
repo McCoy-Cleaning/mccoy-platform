@@ -10,6 +10,8 @@ import {
   isGoogleAnalyticsRuntimeAllowed,
   parseGaMeasurementId,
   readGaEnableDevFlag,
+  resolveGoogleAnalyticsMeasurementId,
+  shouldOfferAnalyticsConsent,
 } from "./ga-config";
 
 describe("analytics consent", () => {
@@ -87,6 +89,44 @@ describe("ga-config", () => {
     expect(isGoogleAnalyticsRuntimeAllowed({ isProd: false, enableDev: true })).toBe(true);
   });
 
+  it("offers consent UI with ID, or enableDev preview without ID", () => {
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: "G-ABC",
+        isProd: true,
+        enableDev: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: null,
+        isProd: true,
+        enableDev: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: null,
+        isProd: false,
+        enableDev: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: null,
+        isProd: false,
+        enableDev: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: "G-ABC",
+        isProd: false,
+        enableDev: false,
+      }),
+    ).toBe(false);
+  });
+
   it("parses enable-dev flag", () => {
     expect(readGaEnableDevFlag("1")).toBe(true);
     expect(readGaEnableDevFlag("true")).toBe(true);
@@ -98,5 +138,48 @@ describe("ga-config", () => {
     expect(isAnalyticsExemptPath("/cms-preview")).toBe(true);
     expect(isAnalyticsExemptPath("/cms-sync/x")).toBe(true);
     expect(isAnalyticsExemptPath("/privacy")).toBe(false);
+  });
+
+  it("never enables GA before consent or after denial", () => {
+    const base = {
+      rawMeasurementId: "G-ABC123",
+      isProd: true,
+      enableDev: false,
+      pathname: "/",
+    };
+    expect(resolveGoogleAnalyticsMeasurementId({ ...base, consent: null })).toBeNull();
+    expect(resolveGoogleAnalyticsMeasurementId({ ...base, consent: "denied" })).toBeNull();
+    expect(
+      resolveGoogleAnalyticsMeasurementId({ ...base, consent: "granted" }),
+    ).toBe("G-ABC123");
+  });
+
+  it("excludes preview routes and invalid or unavailable IDs", () => {
+    const base = {
+      consent: "granted" as const,
+      rawMeasurementId: "G-ABC123",
+      isProd: true,
+      enableDev: false,
+    };
+    expect(
+      resolveGoogleAnalyticsMeasurementId({ ...base, pathname: "/cms-preview" }),
+    ).toBeNull();
+    expect(
+      resolveGoogleAnalyticsMeasurementId({ ...base, pathname: "/cms-sync/nl" }),
+    ).toBeNull();
+    expect(
+      resolveGoogleAnalyticsMeasurementId({
+        ...base,
+        pathname: "/",
+        rawMeasurementId: "UA-123",
+      }),
+    ).toBeNull();
+    expect(
+      resolveGoogleAnalyticsMeasurementId({
+        ...base,
+        pathname: "/",
+        isProd: false,
+      }),
+    ).toBeNull();
   });
 });

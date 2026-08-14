@@ -40,12 +40,11 @@ import {
   saveConceptPageToServer,
 } from "./server-publish";
 import {
-  adminGetCmsPageStatus,
   adminGetPublishedCmsPages,
   adminListPublishedCustomPageIds,
 } from "@/lib/api/cms-publish.functions";
 import { pagesForNavCap, publishedPage } from "./store-draft";
-import { preparePageEnForOpslaan } from "./store-en";
+import { preparePageEnForOpslaan, translateMissingEnForPublish } from "./store-en";
 import {
   markPreviewStale,
   read,
@@ -57,6 +56,12 @@ import {
   write,
   writeOrAlert,
 } from "./store-persistence";
+
+export type CmsSavePageResult =
+  | { ok: true; warning?: string; message?: string; publishedLocales?: Array<"nl" | "en"> }
+  | { ok: false; reason: string };
+
+const savePageRequests = new Map<string, Promise<CmsSavePageResult>>();
 
 export const cmsPublishApi = {
   getNavigation(): SiteNavigationContent {
@@ -120,8 +125,7 @@ export const cmsPublishApi = {
       return {
         ok: false,
         reason:
-          server.error ||
-          "Navigatie kon niet worden opgeslagen op de live site. Probeer opnieuw.",
+          server.error || "Navigatie kon niet worden opgeslagen op de live site. Probeer opnieuw.",
       };
     }
 
@@ -184,8 +188,7 @@ export const cmsPublishApi = {
       return {
         ok: false,
         reason:
-          server.error ||
-          "Footer kon niet worden opgeslagen op de live site. Probeer opnieuw.",
+          server.error || "Footer kon niet worden opgeslagen op de live site. Probeer opnieuw.",
       };
     }
 
@@ -209,10 +212,13 @@ export const cmsPublishApi = {
    * local editor has no dirty draft — so Secties shows live text/images.
    * Fixes ghosts like Referenties after a Supabase/table delete that skipped admin deletePage.
    */
-  async reconcileLocalCustomPagesWithServer(): Promise<{
-    ok: true;
-    removedIds: string[];
-  } | { ok: false; reason: string }> {
+  async reconcileLocalCustomPagesWithServer(): Promise<
+    | {
+        ok: true;
+        removedIds: string[];
+      }
+    | { ok: false; reason: string }
+  > {
     const listed = await adminListPublishedCustomPageIds();
     if (!listed.ok || !("customPageIds" in listed)) {
       // Server/auth unavailable: keep local customs. Deleting them here made seeded
@@ -222,9 +228,7 @@ export const cmsPublishApi = {
     const allowed = new Set(listed.customPageIds);
     const state = read();
     const purged = purgeLocalCustomPagesNotAllowed(state, allowed);
-    let next = purged.changed
-      ? ({ ...state, ...purged.state } as CmsPersistedState)
-      : state;
+    let next = purged.changed ? ({ ...state, ...purged.state } as CmsPersistedState) : state;
 
     // Hydrate published payloads into local pages that have no dirty draft.
     // Also import remote custom pages that are not yet in localStorage (e.g. E2E seed).
@@ -255,10 +259,8 @@ export const cmsPublishApi = {
         ...next.pages.map((local) => {
           const remote = byId.get(local.id);
           if (!remote) return local;
-          const localFresh =
-            typeof local.updatedAt === "number" ? local.updatedAt : 0;
-          const remoteFresh =
-            typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
+          const localFresh = typeof local.updatedAt === "number" ? local.updatedAt : 0;
+          const remoteFresh = typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
           const dirty = isDraftDirty(nextDraft[local.id]);
 
           // Newer published server copy always wins (multi-admin last write).
@@ -293,12 +295,9 @@ export const cmsPublishApi = {
         published.navigationJson.length > 0
       ) {
         try {
-          const parsed = parseSiteNavigationResult(
-            JSON.parse(published.navigationJson) as unknown,
-          );
+          const parsed = parseSiteNavigationResult(JSON.parse(published.navigationJson) as unknown);
           if (parsed.ok) {
-            const same =
-              JSON.stringify(next.navigation) === JSON.stringify(parsed.data);
+            const same = JSON.stringify(next.navigation) === JSON.stringify(parsed.data);
             if (!same) {
               next = { ...next, navigation: parsed.data };
               pagesTouched = true;
@@ -428,9 +427,7 @@ export const cmsPublishApi = {
    * Soft-draft persist: durable concept on the server without publishing.
    * Keeps the local draft so the editor still shows "Concept — nog niet live".
    */
-  async saveConcept(
-    pageId: string,
-  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  async saveConcept(pageId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
     const s = read();
     const published = publishedPage(s, pageId);
     if (!published) return { ok: false, reason: "Pagina niet gevonden." };
@@ -450,116 +447,117 @@ export const cmsPublishApi = {
     }
     return { ok: true };
   },
-  async savePage(
-    pageId: string,
-  ): Promise<
-    | { ok: true; warning?: string; message?: string; publishedLocales?: Array<"nl" | "en"> }
-    | { ok: false; reason: string }
-  > {
-    const s = read();
-    const published = publishedPage(s, pageId);
-    if (!published) return { ok: false, reason: "Pagina niet gevonden." };
-    const draft = s.draft[pageId];
-    const effective = applyDraftToPage(published, draft);
-    const validated = validatePublishableCmsPage(effective);
-    if (!validated.ok) {
-      const msg = formatValidateIssuesNl(validated.issues).join(" ");
-      return { ok: false, reason: msg || "Pagina is niet publiceerbaar." };
-    }
+  async savePage(pageId: string): Promise<CmsSavePageResult> {
+    const pending = savePageRequests.get(pageId);
+    if (pending) return pending;
 
-    let nextPage = structuredClone(validated.page);
-    nextPage.updatedAt = Date.now();
-    nextPage.version = (published.version ?? 1) + 1;
-    if (nextPage.isDraftOnly) {
-      nextPage.isDraftOnly = false;
-    }
-    if (nextPage.isCustom && nextPage.inNav) {
-      const forCap = pagesForNavCap(s).map((p) =>
-        p.id === pageId ? { ...nextPage, inNav: false, isDraftOnly: false } : p,
+    const request = (async (): Promise<CmsSavePageResult> => {
+      const s = read();
+      const published = publishedPage(s, pageId);
+      if (!published) return { ok: false, reason: "Pagina niet gevonden." };
+      const draft = s.draft[pageId];
+      const effective = applyDraftToPage(published, draft);
+      const validated = validatePublishableCmsPage(effective);
+      if (!validated.ok) {
+        const msg = formatValidateIssuesNl(validated.issues).join(" ");
+        return { ok: false, reason: msg || "Pagina is niet publiceerbaar." };
+      }
+
+      let nextPage = structuredClone(validated.page);
+      nextPage.updatedAt = Date.now();
+      nextPage.version = (published.version ?? 1) + 1;
+      if (nextPage.isDraftOnly) {
+        nextPage.isDraftOnly = false;
+      }
+      if (nextPage.isCustom && nextPage.inNav) {
+        const forCap = pagesForNavCap(s).map((p) =>
+          p.id === pageId ? { ...nextPage, inNav: false, isDraftOnly: false } : p,
+        );
+        const check = canEnableCustomPageInNav(forCap, pageId);
+        if (!check.ok) {
+          return { ok: false, reason: check.reason };
+        }
+      }
+
+      const enPrep = preparePageEnForOpslaan(nextPage, published);
+      nextPage = enPrep.nextPage;
+      const enTranslation = await translateMissingEnForPublish(
+        pageId,
+        nextPage,
+        enPrep.toTranslate,
       );
-      const check = canEnableCustomPageInNav(forCap, pageId);
-      if (!check.ok) {
-        return { ok: false, reason: check.reason };
-      }
-    }
+      nextPage = enTranslation.page;
+      const hasEnDraftKeys = Object.values(nextPage.enFieldDrafts ?? {}).some(
+        (value) => value.trim().length > 0,
+      );
 
-    const enPrep = await preparePageEnForOpslaan(nextPage, published);
-    nextPage = enPrep.nextPage;
-    const { toTranslate, translated, translateWarning, hasEnDraftKeys } = enPrep;
-
-    // Durable publish first — never clear the local draft until the live store accepts it.
-    // Include EN when already live (republish overlays) OR when EN drafts exist so first
-    // go-live happens on Opslaan without a separate Publiceer EN click.
-    let serverEnPublished = false;
-    try {
-      const status = await adminGetCmsPageStatus({ data: { pageId } });
-      if (status.ok) {
-        serverEnPublished = status.localeStates?.en?.publicationState === "published";
-      }
-    } catch {
-      /* local-only / offline — fall back to editor state */
-    }
-    const localEnPublished = nextPage.localeStates?.en?.publicationState === "published";
-    const publishedLocales = decideOpslaanPublishedLocales({
-      localEnPublished,
-      serverEnPublished,
-      hasEnDraftKeys,
-    });
-    const shouldPublishEn = publishedLocales.includes("en");
-    if (shouldPublishEn) {
-      Object.assign(nextPage, ensureEnglishLocaleContentFromDrafts(nextPage));
-      nextPage.localeStates = {
-        ...(nextPage.localeStates ?? {
-          nl: { publicationState: "published", freshness: "current" },
-        }),
-        nl: nextPage.localeStates?.nl ?? {
-          publicationState: "published",
-          freshness: "current",
-        },
-        en: { publicationState: "published", freshness: "current" },
-      };
-    }
-    const pub = await publishSavedPageToServer(nextPage, publishedLocales);
-    if (!pub.ok) {
-      return {
-        ok: false,
-        reason:
-          pub.error ||
-          "Publicatie naar de live site mislukte. Concept behouden — probeer opnieuw.",
-      };
-    }
-
-    if (draft?.overrides) {
-      s.saved[pageId] = { ...(s.saved[pageId] || {}), ...draft.overrides };
-    }
-    s.pages = s.pages.map((p) => (p.id === pageId ? nextPage : p));
-    delete s.draft[pageId];
-    sessionPreviewSnapshots.delete(pageId);
-    markPreviewStale(pageId);
-    if (nextPage.isCustom) {
-      syncCustomPageIntoNavigation(s, nextPage, { push: true });
-    } else {
-      // Builtin publish: push full page into open storefront tabs so live content
-      // updates without waiting for a hard refresh / snapshot TTL.
-      pushPublishedChromeToStorefront({
-        navigation: s.navigation ?? defaultSiteNavigation(),
-        pages: [nextPage],
+      // The server publish endpoint independently preserves an already-live EN
+      // locale, so a separate preflight status request is unnecessary here.
+      const localEnPublished = nextPage.localeStates?.en?.publicationState === "published";
+      const publishedLocales = decideOpslaanPublishedLocales({
+        localEnPublished,
+        serverEnPublished: false,
+        hasEnDraftKeys,
       });
-    }
-    if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
-    const successMessage = opslaanSuccessToastTitle(publishedLocales);
-    if (translateWarning) {
-      const missing = Object.keys(toTranslate).filter((k) => !translated[k]?.trim()).length;
+      const shouldPublishEn = publishedLocales.includes("en");
+      if (shouldPublishEn) {
+        Object.assign(nextPage, ensureEnglishLocaleContentFromDrafts(nextPage));
+        nextPage.localeStates = {
+          ...(nextPage.localeStates ?? {
+            nl: { publicationState: "published", freshness: "current" },
+          }),
+          nl: nextPage.localeStates?.nl ?? {
+            publicationState: "published",
+            freshness: "current",
+          },
+          en: { publicationState: "published", freshness: "current" },
+        };
+      }
+      const pub = await publishSavedPageToServer(nextPage, publishedLocales);
+      if (!pub.ok) {
+        return {
+          ok: false,
+          reason:
+            pub.error ||
+            "Publicatie naar de live site mislukte. Concept behouden — probeer opnieuw.",
+        };
+      }
+
+      if (draft?.overrides) {
+        s.saved[pageId] = { ...(s.saved[pageId] || {}), ...draft.overrides };
+      }
+      s.pages = s.pages.map((p) => (p.id === pageId ? nextPage : p));
+      delete s.draft[pageId];
+      sessionPreviewSnapshots.delete(pageId);
+      markPreviewStale(pageId);
+      if (nextPage.isCustom) {
+        syncCustomPageIntoNavigation(s, nextPage, { push: true });
+      } else {
+        // Builtin publish: push full page into open storefront tabs so live content
+        // updates without waiting for a hard refresh / snapshot TTL.
+        pushPublishedChromeToStorefront({
+          navigation: s.navigation ?? defaultSiteNavigation(),
+          pages: [nextPage],
+        });
+      }
+      if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
       return {
         ok: true,
         publishedLocales,
-        message: successMessage,
-        warning:
-          missing > 0
-            ? `Opgeslagen. Automatische EN-vertaling mislukte (${translateWarning}). Vul ontbrekende EN-velden handmatig in — bestaande handmatige EN blijft behouden.`
-            : undefined,
+        message: opslaanSuccessToastTitle(publishedLocales),
+        warning: enTranslation.warning
+          ? `Pagina gepubliceerd; EN-vertaling niet volledig. ${enTranslation.warning}`
+          : undefined,
       };
+    })();
+
+    savePageRequests.set(pageId, request);
+    try {
+      return await request;
+    } finally {
+      if (savePageRequests.get(pageId) === request) {
+        savePageRequests.delete(pageId);
+      }
     }
-    return { ok: true, publishedLocales, message: successMessage };
   },
 };

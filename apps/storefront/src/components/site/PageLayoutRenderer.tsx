@@ -26,6 +26,12 @@ export type PageSectionRenderers = Partial<
   Record<BuiltinPageKey, Partial<Record<FixedSectionKey, FixedRenderer>>>
 >;
 
+export type BlocksRenderer = React.ComponentType<{
+  blocks: CmsPage["blocks"];
+  adminMode?: boolean;
+  pageId?: string;
+}>;
+
 type SafeSectionBoundaryProps = {
   sectionKey: string;
   mode: SectionRenderMode;
@@ -76,6 +82,11 @@ export type PageLayoutRendererProps = {
   page: CmsPage;
   pageKey: BuiltinPageKey;
   renderers: PageSectionRenderers;
+  /**
+   * Optional eager block renderer for routes whose first block is LCP-critical.
+   * Other routes retain the lazy default so below-fold CMS blocks stay split.
+   */
+  blocksRenderer?: BlocksRenderer;
   mode?: SectionRenderMode;
   /** When false, hidden fixed sections are still rendered (admin). Default: true for public. */
   respectHidden?: boolean;
@@ -290,6 +301,7 @@ export function PageLayoutRenderer({
   page,
   pageKey,
   renderers,
+  blocksRenderer,
   mode = "public",
   respectHidden = mode === "public",
 }: PageLayoutRendererProps) {
@@ -318,6 +330,7 @@ export function PageLayoutRenderer({
           pageId={page.id}
           registry={registry}
           blockById={blockById}
+          blocksRenderer={blocksRenderer}
           mode={mode}
           respectHidden={respectHidden}
           suppressFixed={suppressFixed}
@@ -332,6 +345,7 @@ function LayoutItemView({
   pageId,
   registry,
   blockById,
+  blocksRenderer,
   mode,
   respectHidden,
   suppressFixed,
@@ -340,6 +354,7 @@ function LayoutItemView({
   pageId: string;
   registry: Partial<Record<FixedSectionKey, FixedRenderer>>;
   blockById: Map<string, CmsPage["blocks"][number]>;
+  blocksRenderer?: BlocksRenderer;
   mode: SectionRenderMode;
   respectHidden: boolean;
   suppressFixed: Set<FixedSectionKey>;
@@ -404,9 +419,15 @@ function LayoutItemView({
 
   if (respectHidden && item.hidden) return null;
 
-  const blockBody = (
+  const BlocksComponent = blocksRenderer ?? BlocksView;
+  const renderedBlocks = <BlocksComponent blocks={[block]} pageId={pageId} />;
+  // Eager renderers (Home LCP) must not sit behind the lazy 12rem hole — that
+  // lets the next fixed section (Partners) paint first.
+  const blockBody = blocksRenderer ? (
+    renderedBlocks
+  ) : (
     <React.Suspense fallback={<div className="min-h-[12rem]" aria-hidden />}>
-      <BlocksView blocks={[block]} pageId={pageId} />
+      {renderedBlocks}
     </React.Suspense>
   );
 

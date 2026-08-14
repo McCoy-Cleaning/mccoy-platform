@@ -59,10 +59,7 @@ function labelFromPath(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function blockMeta(
-  page: CmsPage,
-  path: string,
-): { blockId?: string; blockType?: string } {
+function blockMeta(page: CmsPage, path: string): { blockId?: string; blockType?: string } {
   if (!path.startsWith("block:")) return {};
   const blockId = path.split(":")[1];
   if (!blockId) return {};
@@ -114,9 +111,7 @@ export function scanTranslationCoverage(input: {
       sourceLocale: "nl",
       targetLocale: "en",
       sourceValue: nlRaw,
-      targetValue: Object.prototype.hasOwnProperty.call(drafts, path)
-        ? drafts[path]
-        : undefined,
+      targetValue: Object.prototype.hasOwnProperty.call(drafts, path) ? drafts[path] : undefined,
       sourceHash,
       translatedSourceHash,
       metadata: meta,
@@ -152,10 +147,7 @@ export function scanTranslationCoverage(input: {
 
   // Blocking incompleteness: missing / blank / invalid (stale is soft).
   const blocking = list.filter(
-    (f) =>
-      f.state === "missing" ||
-      f.state === "blank" ||
-      f.state === "invalid",
+    (f) => f.state === "missing" || f.state === "blank" || f.state === "invalid",
   );
 
   const complete =
@@ -211,7 +203,10 @@ export function selectTranslateMissingFromPage(
 ): TranslateMissingFieldSelection[] {
   const coverage = scanTranslationCoverage({ page });
   const nlFields = collectPageNlFieldDraftMap(page);
-  return selectFieldsForTranslateMissing({ coverage, nlFields, includeStates });
+  const drafts = page.enFieldDrafts ?? {};
+  return selectFieldsForTranslateMissing({ coverage, nlFields, includeStates }).filter(
+    (field) => !(drafts[field.path] ?? "").trim(),
+  );
 }
 
 /** True when EN publish should be blocked until missing/blank/invalid are resolved. */

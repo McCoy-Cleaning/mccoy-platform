@@ -56,6 +56,19 @@ function isEmptyResponse(errorCode: string | undefined): boolean {
   return errorCode === "empty_response";
 }
 
+const EXPLICIT_RATE_LIMIT_CODES = new Set([
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "too_many_requests",
+]);
+
+function isExplicitRateLimit(error: GroqErrorInfo): boolean {
+  return (
+    (error.code != null && EXPLICIT_RATE_LIMIT_CODES.has(error.code)) ||
+    (error.type != null && EXPLICIT_RATE_LIMIT_CODES.has(error.type))
+  );
+}
+
 function isGptOssModel(model: string): boolean {
   return model.includes("gpt-oss");
 }
@@ -167,11 +180,26 @@ export class GroqContentAiProvider implements ContentAiProvider {
   }
 
   private throwFromHttpError(httpStatus: number, error: GroqErrorInfo): never {
-    if (httpStatus === 429) {
+    if (httpStatus === 429 || isExplicitRateLimit(error)) {
       throw new ContentAiError(
         "rate_limit",
         "Groq rate limit bereikt. Wacht even en probeer opnieuw.",
       );
+    }
+
+    if (httpStatus === 401) {
+      throw new ContentAiError("provider", "Groq-authenticatie mislukt. Controleer GROQ_API_KEY.");
+    }
+
+    if (httpStatus === 403) {
+      throw new ContentAiError(
+        "provider",
+        "Groq heeft geen toegang verleend. Controleer account- en modeltoegang.",
+      );
+    }
+
+    if (httpStatus === 408 || httpStatus === 504) {
+      throw new ContentAiError("timeout", "Groq reageerde niet op tijd. Probeer opnieuw.");
     }
 
     if (error.code === "json_validate_failed") {
@@ -226,15 +254,17 @@ export class GroqContentAiProvider implements ContentAiProvider {
         signal: controller.signal,
       });
 
-      if (res.status === 429) {
-        throw new ContentAiError(
-          "rate_limit",
-          "Groq rate limit bereikt. Wacht even en probeer opnieuw.",
-        );
-      }
-
       if (!res.ok) {
         const error = await readGroqError(res);
+        console.warn(
+          JSON.stringify({
+            type: "content_ai.provider_error",
+            provider: "groq",
+            httpStatus: res.status,
+            code: error.code ?? null,
+            errorType: error.type ?? null,
+          }),
+        );
         return { ok: false, httpStatus: res.status, error };
       }
 

@@ -47,7 +47,7 @@ describe("collectTranslatableStringPaths", () => {
 });
 
 describe("classifyEnOverlayValidity", () => {
-  it("flags missing, blank, override_removed, source_echo as needing translation", () => {
+  it("translates empty values but protects a non-empty source echo", () => {
     expect(classifyEnOverlayValidity({ nl: "Welkom" })).toBe("missing");
     expect(classifyEnOverlayValidity({ nl: "Welkom", en: "" })).toBe("blank");
     expect(
@@ -59,7 +59,7 @@ describe("classifyEnOverlayValidity", () => {
     ).toBe("override_removed");
     expect(classifyEnOverlayValidity({ nl: "Welkom", en: "Welkom" })).toBe("source_echo");
     expect(enOverlayNeedsTranslation("override_removed")).toBe(true);
-    expect(enOverlayNeedsTranslation("source_echo")).toBe(true);
+    expect(enOverlayNeedsTranslation("source_echo")).toBe(false);
   });
 
   it("retains valid distinct EN and never auto-fills intentional_blank / manual", () => {
@@ -257,7 +257,7 @@ describe("planEnFieldDraftSync", () => {
     expect(plan.toTranslate).toEqual({});
   });
 
-  it("re-queues when EN draft is identical to Dutch (fake translation)", () => {
+  it("protects every non-empty EN draft even when it is identical to Dutch", () => {
     const plan = planEnFieldDraftSync({
       nlFields: {
         "section:hero:title": "Een blik op wat wij doen",
@@ -270,11 +270,12 @@ describe("planEnFieldDraftSync", () => {
         "block:b1:title": "Real English kept",
       },
     });
-    expect(plan.toTranslate).toEqual({
+    expect(plan.toTranslate).toEqual({});
+    expect(plan.retainedDrafts).toEqual({
       "section:hero:title": "Een blik op wat wij doen",
       "section:hero:body": "Alles voor een schone werkomgeving",
+      "block:b1:title": "Real English kept",
     });
-    expect(plan.retainedDrafts).toEqual({ "block:b1:title": "Real English kept" });
   });
 
   it("rejects Groq results that copy Dutch into EN drafts", () => {
@@ -343,6 +344,56 @@ describe("collectPageNlFieldDraftMap", () => {
     expect(map["block:blk_cols:title"]).toBe("Titel");
     expect(map["block:blk_cols:columns.c1.title"]).toBe("Kolom 1");
     expect(map["block:blk_cols:columns.c1.body"]).toBe("Tekst");
+  });
+
+  it("collects every legal article by stable id without mounted editors", () => {
+    const page = {
+      id: "page_terms",
+      kind: "builtin",
+      isCustom: false,
+      pageKey: "terms",
+      slug: "/algemene-voorwaarden",
+      title: "Voorwaarden",
+      description: "Voorwaarden van McCoy",
+      inNav: false,
+      blocks: [
+        {
+          id: "blk_legal",
+          type: "legalArticles",
+          data: {
+            heading: "Algemene Voorwaarden",
+            updatedAt: "2026-08-15",
+            articles: [
+              {
+                id: "article_one",
+                heading: "Artikel 1",
+                anchor: "artikel-1",
+                content: "Eerste inhoud.",
+              },
+              {
+                id: "article_two",
+                heading: "Artikel 2",
+                anchor: "artikel-2",
+                content: "Tweede inhoud.",
+              },
+            ],
+          },
+        },
+      ],
+      layout: [],
+      layoutVersion: 1,
+      sectionContent: {},
+      updatedAt: 1,
+      version: 1,
+    } as unknown as BuiltinCmsPage;
+
+    const map = collectPageNlFieldDraftMap(page);
+    expect(map["block:blk_legal:articles.article_one.heading"]).toBe("Artikel 1");
+    expect(map["block:blk_legal:articles.article_one.content"]).toBe("Eerste inhoud.");
+    expect(map["block:blk_legal:articles.article_two.heading"]).toBe("Artikel 2");
+    expect(map["block:blk_legal:articles.article_two.content"]).toBe("Tweede inhoud.");
+    expect(map["block:blk_legal:articles.article_one.anchor"]).toBeUndefined();
+    expect(map["block:blk_legal:updatedAt"]).toBeUndefined();
   });
 });
 
