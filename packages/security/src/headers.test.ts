@@ -95,6 +95,13 @@ describe("security headers", () => {
     expect(csp).toContain("https://www.fb.com");
   });
 
+  it("allows Vercel preview toolbar in storefront frame-src", () => {
+    const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+    const frameSrc =
+      csp.split(";").find((part) => part.trim().startsWith("frame-src")) ?? "";
+    expect(frameSrc.split(/\s+/)).toContain("https://vercel.live");
+  });
+
   it("applies headers onto an existing Response", () => {
     const secured = applySecurityHeaders(
       new Response("ok", { headers: { "content-type": "text/plain" } }),
@@ -132,8 +139,76 @@ describe("security headers", () => {
     expect(connectSrc).toContain("https://www.google-analytics.com");
     expect(connectSrc).toContain("https://region1.google-analytics.com");
     expect(connectSrc).toContain("https://analytics.google.com");
+    expect(connectSrc.split(/\s+/)).toContain("https://*.supabase.co");
+    expect(connectSrc.split(/\s+/)).toContain("wss://*.supabase.co");
     expect(connectSrc.split(/\s+/)).not.toContain("https:");
     expect(connectSrc.split(/\s+/)).not.toContain("wss:");
+  });
+
+  it("allows storefront connect-src to SUPABASE_URL origin without opening all https", () => {
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevVite = process.env.VITE_SUPABASE_URL;
+    process.env.SUPABASE_URL = "https://project-ref.supabase.co/";
+    delete process.env.VITE_SUPABASE_URL;
+    try {
+      const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+      const connectSrc =
+        csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
+      const tokens = connectSrc.split(/\s+/);
+      expect(tokens).toContain("https://project-ref.supabase.co");
+      expect(tokens).toContain("wss://project-ref.supabase.co");
+      expect(tokens).toContain("https://*.supabase.co");
+      expect(tokens).toContain("wss://*.supabase.co");
+      expect(tokens).not.toContain("https:");
+      expect(tokens).not.toContain("wss:");
+    } finally {
+      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = prevUrl;
+      if (prevVite === undefined) delete process.env.VITE_SUPABASE_URL;
+      else process.env.VITE_SUPABASE_URL = prevVite;
+    }
+  });
+
+  it("falls back to VITE_SUPABASE_URL when SUPABASE_URL is unset", () => {
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevVite = process.env.VITE_SUPABASE_URL;
+    delete process.env.SUPABASE_URL;
+    process.env.VITE_SUPABASE_URL = "https://vite-project.supabase.co";
+    try {
+      const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+      const connectSrc =
+        csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
+      const tokens = connectSrc.split(/\s+/);
+      expect(tokens).toContain("https://vite-project.supabase.co");
+      expect(tokens).toContain("wss://vite-project.supabase.co");
+    } finally {
+      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = prevUrl;
+      if (prevVite === undefined) delete process.env.VITE_SUPABASE_URL;
+      else process.env.VITE_SUPABASE_URL = prevVite;
+    }
+  });
+
+  it("keeps hosted Supabase connect-src when project URL env is unset", () => {
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevVite = process.env.VITE_SUPABASE_URL;
+    delete process.env.SUPABASE_URL;
+    delete process.env.VITE_SUPABASE_URL;
+    try {
+      const csp = buildContentSecurityPolicy("storefront", ["http://localhost:5174"]);
+      const connectSrc =
+        csp.split(";").find((part) => part.trim().startsWith("connect-src")) ?? "";
+      const tokens = connectSrc.split(/\s+/);
+      expect(tokens).toContain("https://*.supabase.co");
+      expect(tokens).toContain("wss://*.supabase.co");
+      expect(tokens).not.toContain("https:");
+      expect(tokens).not.toContain("wss:");
+    } finally {
+      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = prevUrl;
+      if (prevVite === undefined) delete process.env.VITE_SUPABASE_URL;
+      else process.env.VITE_SUPABASE_URL = prevVite;
+    }
   });
 
   it("builds distinct CSPs per app", () => {

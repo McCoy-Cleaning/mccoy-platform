@@ -73,6 +73,35 @@ function defaultAdminStorefrontOrigins(): string[] {
   ]);
 }
 
+/**
+ * Browser uploads (signed storage URLs), Auth, and Realtime talk to the
+ * configured Supabase project — never a hardcoded project ref.
+ * `https://*.supabase.co` / `wss://*.supabase.co` cover hosted projects when
+ * env is missing at header-build time (do not use bare `https:` / `wss:`).
+ */
+function supabaseConnectSrcOrigins(): string[] {
+  const exact = unique([
+    ...originsFromEnvValue(process.env.SUPABASE_URL),
+    ...originsFromEnvValue(process.env.VITE_SUPABASE_URL),
+  ]);
+  const sockets: string[] = [];
+  for (const origin of exact) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.protocol === "https:") sockets.push(`wss://${parsed.host}`);
+      else if (parsed.protocol === "http:") sockets.push(`ws://${parsed.host}`);
+    } catch {
+      // originsFromEnvValue already validates http(s) URLs.
+    }
+  }
+  return unique([
+    ...exact,
+    ...sockets,
+    "https://*.supabase.co",
+    "wss://*.supabase.co",
+  ]);
+}
+
 export function buildContentSecurityPolicy(
   app: SecurityHeaderApp,
   adminFrameAncestors: string[] = defaultAdminFrameAncestors(),
@@ -104,6 +133,27 @@ export function buildContentSecurityPolicy(
   }
 
   const ancestors = unique(["'self'", ...adminFrameAncestors]);
+  const connectSrc = unique([
+    "'self'",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://region1.google-analytics.com",
+    "https://analytics.google.com",
+    "https://vitals.vercel-insights.com",
+    "https://vercel.live",
+    "wss://ws-us3.pusher.com",
+    ...supabaseConnectSrcOrigins(),
+  ]);
+  const frameSrc = unique([
+    "'self'",
+    "https://www.youtube-nocookie.com",
+    "https://player.vimeo.com",
+    "https://www.facebook.com",
+    "https://web.facebook.com",
+    "https://www.fb.com",
+    // Vercel preview feedback toolbar iframe.
+    "https://vercel.live",
+  ]);
   return [
     "default-src 'self'",
     "base-uri 'self'",
@@ -114,12 +164,13 @@ export function buildContentSecurityPolicy(
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // GA4 gtag (consent-gated in storefront) + Vercel Analytics / preview toolbar.
     "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com",
-    // Same-origin app/server functions + explicit analytics/preview telemetry.
-    // Do not use bare https:/wss: here: that would let injected scripts exfiltrate anywhere.
-    "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com",
+    // Same-origin app/server functions + explicit analytics/preview telemetry
+    // + configured Supabase (form signed uploads). Do not use bare https:/wss:
+    // that would let injected scripts exfiltrate anywhere.
+    `connect-src ${connectSrc.join(" ")}`,
     "form-action 'self'",
     // CMS video embeds: YouTube, Vimeo, Facebook plugins (see resolveSafeVideoEmbed)
-    "frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.facebook.com https://web.facebook.com https://www.fb.com",
+    `frame-src ${frameSrc.join(" ")}`,
     "media-src 'self' blob: https:",
   ].join("; ");
 }
