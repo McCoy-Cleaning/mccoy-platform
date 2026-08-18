@@ -83,7 +83,7 @@ describe("sendStaffInviteEmail Graph delivery", () => {
     const { sendStaffInviteEmail } = await import("./staff-invite");
     const result = await sendStaffInviteEmail({
       to: "colleague@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite?token=abc",
+      inviteUrl: "https://admin.example.com/invite?token=abc",
       invitedByName: "Admin",
     });
 
@@ -120,7 +120,7 @@ describe("sendStaffInviteEmail Graph delivery", () => {
     const { sendStaffInviteEmail } = await import("./staff-invite");
     await sendStaffInviteEmail({
       to: "new.colleague@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite?token=abc",
+      inviteUrl: "https://admin.example.com/invite?token=abc",
     });
 
     const graphArgs = sendGraphAdminReply.mock.calls[0]?.[0] as { to: string; subject: string };
@@ -145,7 +145,7 @@ describe("sendStaffInviteEmail Graph delivery", () => {
     const { sendStaffInviteEmail } = await import("./staff-invite");
     const result = await sendStaffInviteEmail({
       to: "colleague@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite?token=abc",
+      inviteUrl: "https://admin.example.com/invite?token=abc",
     });
 
     expect(result.ok).toBe(false);
@@ -169,7 +169,7 @@ describe("sendStaffInviteEmail Graph delivery", () => {
     const { sendStaffInviteEmail } = await import("./staff-invite");
     const result = await sendStaffInviteEmail({
       to: "colleague@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite?token=abc",
+      inviteUrl: "https://admin.example.com/invite?token=abc",
     });
 
     expect(result.ok).toBe(true);

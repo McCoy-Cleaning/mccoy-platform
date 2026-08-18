@@ -332,7 +332,7 @@ function BrowserPermissionHint() {
   if (permission === "granted") {
     return (
       <Link
-        to="/admin/settings"
+        to="/settings"
         title="Bureaubladmeldingen zijn toegestaan — beheer per type in Instellingen"
         className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-white/50 transition hover:bg-white/10 hover:text-white"
       >

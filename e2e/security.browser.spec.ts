@@ -4,7 +4,7 @@ test.describe("Security (browser-observable)", () => {
   test("admin login page does not leak stack traces", async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await ctx.newPage();
-    await page.goto(`${ADMIN_ORIGIN}/admin/login`);
+    await page.goto(`${ADMIN_ORIGIN}/login`);
     await expect(page.locator("body")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/at Object\.|node_modules|SUPABASE_SECRET/i);
     await ctx.close();
@@ -29,7 +29,7 @@ test.describe("Security (browser-observable)", () => {
   });
 
   test("admin sends clickjacking denial headers", async ({ request }) => {
-    const res = await request.get(`${ADMIN_ORIGIN}/admin/login`);
+    const res = await request.get(`${ADMIN_ORIGIN}/login`);
     expect(res.headers()["x-content-type-options"]?.toLowerCase()).toBe("nosniff");
     expect(res.headers()["x-frame-options"]?.toUpperCase()).toBe("DENY");
     const csp = res.headers()["content-security-policy"] ?? "";

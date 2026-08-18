@@ -11,7 +11,7 @@ describe("readStaffAuthCallbackTypeFromLocation", () => {
       readStaffAuthCallbackTypeFromLocation({
         search: "?token_hash=abc&type=invite",
         hash: "",
-        href: "https://admin.example.com/admin/invite?token_hash=abc&type=invite",
+        href: "https://admin.example.com/invite?token_hash=abc&type=invite",
       }),
     ).toBe("invite");
   });
@@ -21,7 +21,7 @@ describe("readStaffAuthCallbackTypeFromLocation", () => {
       readStaffAuthCallbackTypeFromLocation({
         search: "",
         hash: "#access_token=x&type=recovery",
-        href: "https://admin.example.com/admin/invite#access_token=x&type=recovery",
+        href: "https://admin.example.com/invite#access_token=x&type=recovery",
       }),
     ).toBe("recovery");
   });
@@ -31,7 +31,7 @@ describe("isStaffInviteAuthCallback", () => {
   it("detects invite tokens on login path", () => {
     expect(
       isStaffInviteAuthCallback({
-        pathname: "/admin/login",
+        pathname: "/login",
         search: "",
         hash: "#access_token=abc&refresh_token=def&type=invite",
       }),
@@ -41,7 +41,7 @@ describe("isStaffInviteAuthCallback", () => {
   it("does not redirect when already on recover-mfa shell", () => {
     expect(
       isStaffInviteAuthCallback({
-        pathname: "/admin/recover-mfa",
+        pathname: "/recover-mfa",
         search: "?token_hash=abc&type=recovery",
         hash: "",
       }),
@@ -51,7 +51,7 @@ describe("isStaffInviteAuthCallback", () => {
   it("does not redirect when already on invite shell", () => {
     expect(
       isStaffInviteAuthCallback({
-        pathname: "/admin/invite",
+        pathname: "/invite",
         search: "?token_hash=abc&type=invite",
         hash: "",
       }),

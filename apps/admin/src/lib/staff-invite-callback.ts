@@ -1,12 +1,12 @@
 /**
  * Detect Auth invite/recovery callbacks that landed on the wrong path
- * (e.g. Site URL origin without /admin/invite → login shell).
+ * (e.g. Site URL origin without /invite → login shell).
  */
 
 const AUTH_SHELL_PATHS = new Set([
-  "/admin/invite",
-  "/admin/recover-mfa",
-  "/admin/mfa",
+  "/invite",
+  "/recover-mfa",
+  "/mfa",
 ]);
 
 function readAuthCallbackType(url: URL): string | null {
@@ -90,7 +90,7 @@ export function isStaffInviteAuthCallback(locationLike: {
 
 /**
  * If Auth dumped the user on `/` or a non-auth path with invite tokens,
- * hard-navigate to `/admin/invite` preserving query + hash (one-shot).
+ * hard-navigate to `/invite` preserving query + hash (one-shot).
  */
 export function redirectStaffInviteAuthCallbackIfNeeded(): boolean {
   if (typeof window === "undefined") return false;
@@ -98,7 +98,7 @@ export function redirectStaffInviteAuthCallbackIfNeeded(): boolean {
   if (!isStaffInviteAuthCallback({ pathname, search, hash, href: window.location.href })) {
     return false;
   }
-  const next = `/admin/invite${search}${hash}`;
+  const next = `/invite${search}${hash}`;
   window.location.replace(next);
   return true;
 }

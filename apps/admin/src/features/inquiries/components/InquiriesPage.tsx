@@ -17,7 +17,7 @@ import { InboxDetail } from "./InboxDetail";
 import { InquiriesList } from "./InquiriesList";
 import { InquiryListDeleteDialogs } from "./InquiryListDeleteDialogs";
 
-const inquiriesRouteApi = getRouteApi("/admin/inquiries");
+const inquiriesRouteApi = getRouteApi("/_app/inquiries");
 
 export function InquiriesPage() {
   const navigate = inquiriesRouteApi.useNavigate();

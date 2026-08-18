@@ -127,50 +127,50 @@ function isAllowedInviteOrigin(origin: string): boolean {
 
 /**
  * Absolute redirect for super-admin MFA account recovery links.
- * Distinct from /admin/invite so recovery skips password and goes straight to TOTP enroll.
+ * Distinct from /invite so recovery skips password and goes straight to TOTP enroll.
  */
 function staffRecoverMfaRedirectUrl(preferredOrigin?: string | null): string {
   const explicitRaw = (readServerEnv("STAFF_INVITE_REDIRECT_URL") || "").trim();
   if (explicitRaw) {
     const origin = normalizeInviteOrigin(explicitRaw);
-    if (origin) return `${origin}/admin/recover-mfa`;
+    if (origin) return `${origin}/recover-mfa`;
   }
 
   const preferred = preferredOrigin ? normalizeInviteOrigin(preferredOrigin) : null;
   if (preferred && isAllowedInviteOrigin(preferred)) {
-    return `${preferred}/admin/recover-mfa`;
+    return `${preferred}/recover-mfa`;
   }
 
   const configured =
     normalizeInviteOrigin(readServerEnv("VITE_ADMIN_ORIGIN") || "") ||
     normalizeInviteOrigin(readServerEnv("VERCEL_URL") || "") ||
     "http://localhost:5174";
-  return `${configured}/admin/recover-mfa`;
+  return `${configured}/recover-mfa`;
 }
 
 /**
- * Always ends with `/admin/invite`.
+ * Always ends with `/invite`.
  * Never return a bare origin — that sends Auth to the app root → login.
  * If `STAFF_INVITE_REDIRECT_URL` is set to an origin only (common on Vercel),
- * we still append `/admin/invite` (older deploys returned the env value as-is).
+ * we still append `/invite` (older deploys returned the env value as-is).
  */
 function staffInviteRedirectUrl(preferredOrigin?: string | null): string {
   const explicitRaw = (readServerEnv("STAFF_INVITE_REDIRECT_URL") || "").trim();
   if (explicitRaw) {
     const origin = normalizeInviteOrigin(explicitRaw);
-    if (origin) return `${origin}/admin/invite`;
+    if (origin) return `${origin}/invite`;
   }
 
   const preferred = preferredOrigin ? normalizeInviteOrigin(preferredOrigin) : null;
   if (preferred && isAllowedInviteOrigin(preferred)) {
-    return `${preferred}/admin/invite`;
+    return `${preferred}/invite`;
   }
 
   const configured =
     normalizeInviteOrigin(readServerEnv("VITE_ADMIN_ORIGIN") || "") ||
     normalizeInviteOrigin(readServerEnv("VERCEL_URL") || "") ||
     "http://localhost:5174";
-  return `${configured}/admin/invite`;
+  return `${configured}/invite`;
 }
 
 function invitationAcceptErrorMessage(
@@ -665,7 +665,7 @@ export const inviteAdminFn = createServerFn({ method: "POST" })
 
       // Always send invite-branded mail for operator-initiated invitations (incl. reinstate/resend/MFA reset).
       // Recovery tokens may still be used when Auth rejects invite for existing users; onboarding UI
-      // on /admin/invite is driven by staff profile + invitation state, not the token type alone.
+      // on /invite is driven by staff profile + invitation state, not the token type alone.
       const mailed = await deliverStaffAuthEmail({
         kind: "invite",
         to: email,
@@ -1155,7 +1155,7 @@ export const requestStaffPasswordResetFn = createServerFn({ method: "POST" })
   });
 
 /**
- * Context for active staff completing a recovery link on /admin/invite.
+ * Context for active staff completing a recovery link on /invite.
  */
 export const getStaffPasswordRecoveryContextFn = createServerFn({ method: "POST" }).handler(
   async () => {
@@ -1193,7 +1193,7 @@ export const completeStaffPasswordRecoveryFn = createServerFn({ method: "POST" }
   });
 
 /**
- * Context for super-admin MFA account recovery on /admin/recover-mfa.
+ * Context for super-admin MFA account recovery on /recover-mfa.
  */
 export const getStaffMfaRecoveryContextFn = createServerFn({ method: "POST" }).handler(async () => {
   const result = await getStaffMfaRecoveryContext();

@@ -25,7 +25,7 @@ export function PageEditor({ page, embedded = false }: { page: Page; embedded?: 
       {!embedded && (
       <div className="sticky top-0 z-30 -mx-4 lg:-mx-0 px-4 lg:px-0 backdrop-blur-xl">
         <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-black/60 p-2.5">
-          <Link to="/admin/website" aria-label="Terug naar alle pagina's" className="a-icon-btn">
+          <Link to="/website" aria-label="Terug naar alle pagina's" className="a-icon-btn">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1">

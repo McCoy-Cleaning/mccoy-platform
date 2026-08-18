@@ -9,33 +9,78 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppInquiriesRouteImport } from './routes/_app.inquiries'
+import { Route as AppInviteRouteImport } from './routes/_app.invite'
+import { Route as AppLoginRouteImport } from './routes/_app.login'
+import { Route as AppMfaRouteImport } from './routes/_app.mfa'
+import { Route as AppProductsRouteImport } from './routes/_app.products'
+import { Route as AppRecoverMfaRouteImport } from './routes/_app.recover-mfa'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSplatRouteImport } from './routes/admin.$'
-import { Route as AdminInquiriesRouteImport } from './routes/admin.inquiries'
-import { Route as AdminInviteRouteImport } from './routes/admin.invite'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AdminMfaRouteImport } from './routes/admin.mfa'
-import { Route as AdminProductsRouteImport } from './routes/admin.products'
-import { Route as AdminRecoverMfaRouteImport } from './routes/admin.recover-mfa'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AdminWebsiteIndexRouteImport } from './routes/admin.website.index'
-import { Route as AdminWebsitePageIdRouteImport } from './routes/admin.website.$pageId'
-import { Route as AdminWebsiteMediaRouteImport } from './routes/admin.website.media'
-import { Route as AdminWebsiteOtherFooterRouteImport } from './routes/admin.website.other.footer'
-import { Route as AdminWebsiteOtherNavigationRouteImport } from './routes/admin.website.other.navigation'
+import { Route as AppWebsiteIndexRouteImport } from './routes/_app.website.index'
+import { Route as AppWebsitePageIdRouteImport } from './routes/_app.website.$pageId'
+import { Route as AppWebsiteMediaRouteImport } from './routes/_app.website.media'
+import { Route as AppWebsiteOtherFooterRouteImport } from './routes/_app.website.other.footer'
+import { Route as AppWebsiteOtherNavigationRouteImport } from './routes/_app.website.other.navigation'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInquiriesRoute = AppInquiriesRouteImport.update({
+  id: '/inquiries',
+  path: '/inquiries',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInviteRoute = AppInviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLoginRoute = AppLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMfaRoute = AppMfaRouteImport.update({
+  id: '/mfa',
+  path: '/mfa',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProductsRoute = AppProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecoverMfaRoute = AppRecoverMfaRouteImport.update({
+  id: '/recover-mfa',
+  path: '/recover-mfa',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsersRoute = AppUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
@@ -47,201 +92,163 @@ const AdminSplatRoute = AdminSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminInquiriesRoute = AdminInquiriesRouteImport.update({
-  id: '/inquiries',
-  path: '/inquiries',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminInviteRoute = AdminInviteRouteImport.update({
-  id: '/invite',
-  path: '/invite',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminMfaRoute = AdminMfaRouteImport.update({
-  id: '/mfa',
-  path: '/mfa',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminProductsRoute = AdminProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminRecoverMfaRoute = AdminRecoverMfaRouteImport.update({
-  id: '/recover-mfa',
-  path: '/recover-mfa',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminWebsiteIndexRoute = AdminWebsiteIndexRouteImport.update({
+const AppWebsiteIndexRoute = AppWebsiteIndexRouteImport.update({
   id: '/website/',
   path: '/website/',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => AppRoute,
 } as any)
-const AdminWebsitePageIdRoute = AdminWebsitePageIdRouteImport.update({
+const AppWebsitePageIdRoute = AppWebsitePageIdRouteImport.update({
   id: '/website/$pageId',
   path: '/website/$pageId',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => AppRoute,
 } as any)
-const AdminWebsiteMediaRoute = AdminWebsiteMediaRouteImport.update({
+const AppWebsiteMediaRoute = AppWebsiteMediaRouteImport.update({
   id: '/website/media',
   path: '/website/media',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => AppRoute,
 } as any)
-const AdminWebsiteOtherFooterRoute = AdminWebsiteOtherFooterRouteImport.update({
+const AppWebsiteOtherFooterRoute = AppWebsiteOtherFooterRouteImport.update({
   id: '/website/other/footer',
   path: '/website/other/footer',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => AppRoute,
 } as any)
-const AdminWebsiteOtherNavigationRoute =
-  AdminWebsiteOtherNavigationRouteImport.update({
+const AppWebsiteOtherNavigationRoute =
+  AppWebsiteOtherNavigationRouteImport.update({
     id: '/website/other/navigation',
     path: '/website/other/navigation',
-    getParentRoute: () => AdminRoute,
+    getParentRoute: () => AppRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/inquiries': typeof AppInquiriesRoute
+  '/invite': typeof AppInviteRoute
+  '/login': typeof AppLoginRoute
+  '/mfa': typeof AppMfaRoute
+  '/products': typeof AppProductsRoute
+  '/recover-mfa': typeof AppRecoverMfaRoute
+  '/settings': typeof AppSettingsRoute
+  '/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
-  '/admin/inquiries': typeof AdminInquiriesRoute
-  '/admin/invite': typeof AdminInviteRoute
-  '/admin/login': typeof AdminLoginRoute
-  '/admin/mfa': typeof AdminMfaRoute
-  '/admin/products': typeof AdminProductsRoute
-  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
-  '/admin/settings': typeof AdminSettingsRoute
-  '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
-  '/admin/website/media': typeof AdminWebsiteMediaRoute
-  '/admin/website/': typeof AdminWebsiteIndexRoute
-  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
-  '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
+  '/website/$pageId': typeof AppWebsitePageIdRoute
+  '/website/media': typeof AppWebsiteMediaRoute
+  '/website/': typeof AppWebsiteIndexRoute
+  '/website/other/footer': typeof AppWebsiteOtherFooterRoute
+  '/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/inquiries': typeof AppInquiriesRoute
+  '/invite': typeof AppInviteRoute
+  '/login': typeof AppLoginRoute
+  '/mfa': typeof AppMfaRoute
+  '/products': typeof AppProductsRoute
+  '/recover-mfa': typeof AppRecoverMfaRoute
+  '/settings': typeof AppSettingsRoute
+  '/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
-  '/admin/inquiries': typeof AdminInquiriesRoute
-  '/admin/invite': typeof AdminInviteRoute
-  '/admin/login': typeof AdminLoginRoute
-  '/admin/mfa': typeof AdminMfaRoute
-  '/admin/products': typeof AdminProductsRoute
-  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
-  '/admin/settings': typeof AdminSettingsRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/': typeof AppIndexRoute
   '/admin': typeof AdminIndexRoute
-  '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
-  '/admin/website/media': typeof AdminWebsiteMediaRoute
-  '/admin/website': typeof AdminWebsiteIndexRoute
-  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
-  '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
+  '/website/$pageId': typeof AppWebsitePageIdRoute
+  '/website/media': typeof AppWebsiteMediaRoute
+  '/website': typeof AppWebsiteIndexRoute
+  '/website/other/footer': typeof AppWebsiteOtherFooterRoute
+  '/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
+  '/_app/inquiries': typeof AppInquiriesRoute
+  '/_app/invite': typeof AppInviteRoute
+  '/_app/login': typeof AppLoginRoute
+  '/_app/mfa': typeof AppMfaRoute
+  '/_app/products': typeof AppProductsRoute
+  '/_app/recover-mfa': typeof AppRecoverMfaRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
-  '/admin/inquiries': typeof AdminInquiriesRoute
-  '/admin/invite': typeof AdminInviteRoute
-  '/admin/login': typeof AdminLoginRoute
-  '/admin/mfa': typeof AdminMfaRoute
-  '/admin/products': typeof AdminProductsRoute
-  '/admin/recover-mfa': typeof AdminRecoverMfaRoute
-  '/admin/settings': typeof AdminSettingsRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/_app/': typeof AppIndexRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/website/$pageId': typeof AdminWebsitePageIdRoute
-  '/admin/website/media': typeof AdminWebsiteMediaRoute
-  '/admin/website/': typeof AdminWebsiteIndexRoute
-  '/admin/website/other/footer': typeof AdminWebsiteOtherFooterRoute
-  '/admin/website/other/navigation': typeof AdminWebsiteOtherNavigationRoute
+  '/_app/website/$pageId': typeof AppWebsitePageIdRoute
+  '/_app/website/media': typeof AppWebsiteMediaRoute
+  '/_app/website/': typeof AppWebsiteIndexRoute
+  '/_app/website/other/footer': typeof AppWebsiteOtherFooterRoute
+  '/_app/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/inquiries'
+    | '/invite'
+    | '/login'
+    | '/mfa'
+    | '/products'
+    | '/recover-mfa'
+    | '/settings'
+    | '/users'
     | '/admin/$'
-    | '/admin/inquiries'
-    | '/admin/invite'
-    | '/admin/login'
-    | '/admin/mfa'
-    | '/admin/products'
-    | '/admin/recover-mfa'
-    | '/admin/settings'
-    | '/admin/users'
     | '/admin/'
-    | '/admin/website/$pageId'
-    | '/admin/website/media'
-    | '/admin/website/'
-    | '/admin/website/other/footer'
-    | '/admin/website/other/navigation'
+    | '/website/$pageId'
+    | '/website/media'
+    | '/website/'
+    | '/website/other/footer'
+    | '/website/other/navigation'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
+    | '/inquiries'
+    | '/invite'
+    | '/login'
+    | '/mfa'
+    | '/products'
+    | '/recover-mfa'
+    | '/settings'
+    | '/users'
     | '/admin/$'
-    | '/admin/inquiries'
-    | '/admin/invite'
-    | '/admin/login'
-    | '/admin/mfa'
-    | '/admin/products'
-    | '/admin/recover-mfa'
-    | '/admin/settings'
-    | '/admin/users'
+    | '/'
     | '/admin'
-    | '/admin/website/$pageId'
-    | '/admin/website/media'
-    | '/admin/website'
-    | '/admin/website/other/footer'
-    | '/admin/website/other/navigation'
+    | '/website/$pageId'
+    | '/website/media'
+    | '/website'
+    | '/website/other/footer'
+    | '/website/other/navigation'
   id:
     | '__root__'
-    | '/'
+    | '/_app'
     | '/admin'
+    | '/_app/inquiries'
+    | '/_app/invite'
+    | '/_app/login'
+    | '/_app/mfa'
+    | '/_app/products'
+    | '/_app/recover-mfa'
+    | '/_app/settings'
+    | '/_app/users'
     | '/admin/$'
-    | '/admin/inquiries'
-    | '/admin/invite'
-    | '/admin/login'
-    | '/admin/mfa'
-    | '/admin/products'
-    | '/admin/recover-mfa'
-    | '/admin/settings'
-    | '/admin/users'
+    | '/_app/'
     | '/admin/'
-    | '/admin/website/$pageId'
-    | '/admin/website/media'
-    | '/admin/website/'
-    | '/admin/website/other/footer'
-    | '/admin/website/other/navigation'
+    | '/_app/website/$pageId'
+    | '/_app/website/media'
+    | '/_app/website/'
+    | '/_app/website/other/footer'
+    | '/_app/website/other/navigation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -250,6 +257,69 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/inquiries': {
+      id: '/_app/inquiries'
+      path: '/inquiries'
+      fullPath: '/inquiries'
+      preLoaderRoute: typeof AppInquiriesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invite': {
+      id: '/_app/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof AppInviteRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/login': {
+      id: '/_app/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof AppLoginRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/mfa': {
+      id: '/_app/mfa'
+      path: '/mfa'
+      fullPath: '/mfa'
+      preLoaderRoute: typeof AppMfaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/products': {
+      id: '/_app/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AppProductsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/recover-mfa': {
+      id: '/_app/recover-mfa'
+      path: '/recover-mfa'
+      fullPath: '/recover-mfa'
+      preLoaderRoute: typeof AppRecoverMfaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/users': {
+      id: '/_app/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -265,140 +335,94 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSplatRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/inquiries': {
-      id: '/admin/inquiries'
-      path: '/inquiries'
-      fullPath: '/admin/inquiries'
-      preLoaderRoute: typeof AdminInquiriesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/invite': {
-      id: '/admin/invite'
-      path: '/invite'
-      fullPath: '/admin/invite'
-      preLoaderRoute: typeof AdminInviteRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/mfa': {
-      id: '/admin/mfa'
-      path: '/mfa'
-      fullPath: '/admin/mfa'
-      preLoaderRoute: typeof AdminMfaRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/products': {
-      id: '/admin/products'
-      path: '/products'
-      fullPath: '/admin/products'
-      preLoaderRoute: typeof AdminProductsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/recover-mfa': {
-      id: '/admin/recover-mfa'
-      path: '/recover-mfa'
-      fullPath: '/admin/recover-mfa'
-      preLoaderRoute: typeof AdminRecoverMfaRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/website/': {
-      id: '/admin/website/'
+    '/_app/website/': {
+      id: '/_app/website/'
       path: '/website'
-      fullPath: '/admin/website/'
-      preLoaderRoute: typeof AdminWebsiteIndexRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/website/'
+      preLoaderRoute: typeof AppWebsiteIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/admin/website/$pageId': {
-      id: '/admin/website/$pageId'
+    '/_app/website/$pageId': {
+      id: '/_app/website/$pageId'
       path: '/website/$pageId'
-      fullPath: '/admin/website/$pageId'
-      preLoaderRoute: typeof AdminWebsitePageIdRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/website/$pageId'
+      preLoaderRoute: typeof AppWebsitePageIdRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/admin/website/media': {
-      id: '/admin/website/media'
+    '/_app/website/media': {
+      id: '/_app/website/media'
       path: '/website/media'
-      fullPath: '/admin/website/media'
-      preLoaderRoute: typeof AdminWebsiteMediaRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/website/media'
+      preLoaderRoute: typeof AppWebsiteMediaRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/admin/website/other/footer': {
-      id: '/admin/website/other/footer'
+    '/_app/website/other/footer': {
+      id: '/_app/website/other/footer'
       path: '/website/other/footer'
-      fullPath: '/admin/website/other/footer'
-      preLoaderRoute: typeof AdminWebsiteOtherFooterRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/website/other/footer'
+      preLoaderRoute: typeof AppWebsiteOtherFooterRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/admin/website/other/navigation': {
-      id: '/admin/website/other/navigation'
+    '/_app/website/other/navigation': {
+      id: '/_app/website/other/navigation'
       path: '/website/other/navigation'
-      fullPath: '/admin/website/other/navigation'
-      preLoaderRoute: typeof AdminWebsiteOtherNavigationRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/website/other/navigation'
+      preLoaderRoute: typeof AppWebsiteOtherNavigationRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppInquiriesRoute: typeof AppInquiriesRoute
+  AppInviteRoute: typeof AppInviteRoute
+  AppLoginRoute: typeof AppLoginRoute
+  AppMfaRoute: typeof AppMfaRoute
+  AppProductsRoute: typeof AppProductsRoute
+  AppRecoverMfaRoute: typeof AppRecoverMfaRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppUsersRoute: typeof AppUsersRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppWebsitePageIdRoute: typeof AppWebsitePageIdRoute
+  AppWebsiteMediaRoute: typeof AppWebsiteMediaRoute
+  AppWebsiteIndexRoute: typeof AppWebsiteIndexRoute
+  AppWebsiteOtherFooterRoute: typeof AppWebsiteOtherFooterRoute
+  AppWebsiteOtherNavigationRoute: typeof AppWebsiteOtherNavigationRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppInquiriesRoute: AppInquiriesRoute,
+  AppInviteRoute: AppInviteRoute,
+  AppLoginRoute: AppLoginRoute,
+  AppMfaRoute: AppMfaRoute,
+  AppProductsRoute: AppProductsRoute,
+  AppRecoverMfaRoute: AppRecoverMfaRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppUsersRoute: AppUsersRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppWebsitePageIdRoute: AppWebsitePageIdRoute,
+  AppWebsiteMediaRoute: AppWebsiteMediaRoute,
+  AppWebsiteIndexRoute: AppWebsiteIndexRoute,
+  AppWebsiteOtherFooterRoute: AppWebsiteOtherFooterRoute,
+  AppWebsiteOtherNavigationRoute: AppWebsiteOtherNavigationRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 interface AdminRouteChildren {
   AdminSplatRoute: typeof AdminSplatRoute
-  AdminInquiriesRoute: typeof AdminInquiriesRoute
-  AdminInviteRoute: typeof AdminInviteRoute
-  AdminLoginRoute: typeof AdminLoginRoute
-  AdminMfaRoute: typeof AdminMfaRoute
-  AdminProductsRoute: typeof AdminProductsRoute
-  AdminRecoverMfaRoute: typeof AdminRecoverMfaRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  AdminWebsitePageIdRoute: typeof AdminWebsitePageIdRoute
-  AdminWebsiteMediaRoute: typeof AdminWebsiteMediaRoute
-  AdminWebsiteIndexRoute: typeof AdminWebsiteIndexRoute
-  AdminWebsiteOtherFooterRoute: typeof AdminWebsiteOtherFooterRoute
-  AdminWebsiteOtherNavigationRoute: typeof AdminWebsiteOtherNavigationRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminSplatRoute: AdminSplatRoute,
-  AdminInquiriesRoute: AdminInquiriesRoute,
-  AdminInviteRoute: AdminInviteRoute,
-  AdminLoginRoute: AdminLoginRoute,
-  AdminMfaRoute: AdminMfaRoute,
-  AdminProductsRoute: AdminProductsRoute,
-  AdminRecoverMfaRoute: AdminRecoverMfaRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
-  AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
-  AdminWebsitePageIdRoute: AdminWebsitePageIdRoute,
-  AdminWebsiteMediaRoute: AdminWebsiteMediaRoute,
-  AdminWebsiteIndexRoute: AdminWebsiteIndexRoute,
-  AdminWebsiteOtherFooterRoute: AdminWebsiteOtherFooterRoute,
-  AdminWebsiteOtherNavigationRoute: AdminWebsiteOtherNavigationRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
 }
 export const routeTree = rootRouteImport

@@ -102,7 +102,7 @@ export async function expectAanvraagListed(
   marker: string,
   options?: { kindLabel?: RegExp },
 ) {
-  await page.goto("/admin/inquiries");
+  await page.goto("/inquiries");
   await expect(page.getByRole("heading", { name: /Aanvragen/i })).toBeVisible({
     timeout: 30_000,
   });

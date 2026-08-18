@@ -23,7 +23,7 @@ test.describe("Responsive shells", () => {
     test(`admin website @ ${vp.name}`, async ({ page, failureSink }) => {
       void failureSink;
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await page.goto(`${ADMIN_ORIGIN}/admin/website`);
+      await page.goto(`${ADMIN_ORIGIN}/website`);
       await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible({
         timeout: 30_000,
       });

@@ -22,7 +22,7 @@ test.describe("Accessibility (critical surfaces)", () => {
   test("admin website hub has no serious axe violations", async ({ page, failureSink }) => {
     void failureSink;
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(`${ADMIN_ORIGIN}/admin/website`);
+    await page.goto(`${ADMIN_ORIGIN}/website`);
     await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible();
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa"])

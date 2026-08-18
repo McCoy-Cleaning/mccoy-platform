@@ -13,7 +13,7 @@ import { redirectStaffInviteAuthCallbackIfNeeded } from "@/lib/staff-invite-call
 import { requestStaffPasswordResetFn } from "@/lib/api/staff-identity.functions";
 import logoUrl from "@/assets/logo-mccoy.png";
 
-export const Route = createFileRoute("/admin/login")({
+export const Route = createFileRoute("/_app/login")({
   head: () => ({
     meta: [
       { title: "Inloggen — McCoy Admin" },
@@ -78,20 +78,20 @@ function AdminLoginPage() {
     if (!ready || !session) return;
     if (redirectStaffInviteAuthCallbackIfNeeded()) return;
     if (session.mfaRequired || session.nextStep === "mfa_enroll" || session.nextStep === "mfa_verify") {
-      navigate({ to: "/admin/mfa", replace: true });
+      navigate({ to: "/mfa", replace: true });
       return;
     }
-    // Invited + aal2 should already be activated; never trap on /admin/invite.
+    // Invited + aal2 should already be activated; never trap on /invite.
     if (session.status === "invited" && session.aal === "aal2") {
-      navigate({ to: "/admin", replace: true });
+      navigate({ to: "/", replace: true });
       return;
     }
     // Invited staff who still need password/name onboarding (invite link / incomplete accept).
     if (session.status === "invited") {
-      navigate({ to: "/admin/invite", replace: true });
+      navigate({ to: "/invite", replace: true });
       return;
     }
-    navigate({ to: "/admin", replace: true });
+    navigate({ to: "/", replace: true });
   }, [ready, session, navigate]);
 
   const useSupabaseUi = Boolean(authMode?.supabaseEnabled) || hasBrowserSupabaseConfig();
@@ -109,10 +109,10 @@ function AdminLoginPage() {
         return;
       }
       if (result.nextStep === "mfa_enroll" || result.nextStep === "mfa_verify") {
-        navigate({ to: "/admin/mfa", replace: true });
+        navigate({ to: "/mfa", replace: true });
         return;
       }
-      navigate({ to: "/admin", replace: true });
+      navigate({ to: "/", replace: true });
     } catch (error) {
       setError(
         error instanceof Error && error.message.trim()

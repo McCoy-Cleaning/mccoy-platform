@@ -3,7 +3,7 @@ import { test, expect, STOREFRONT_ORIGIN, ADMIN_ORIGIN } from "./fixtures/base";
 test.describe("P0 smoke — admin + storefront shell", () => {
   test("admin website hub loads for authenticated staff", async ({ page, failureSink }) => {
     void failureSink;
-    await page.goto(`${ADMIN_ORIGIN}/admin/website`);
+    await page.goto(`${ADMIN_ORIGIN}/website`);
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible({
       timeout: 30_000,
@@ -16,7 +16,7 @@ test.describe("P0 smoke — admin + storefront shell", () => {
     failureSink,
   }) => {
     void failureSink;
-    await page.goto(`${ADMIN_ORIGIN}/admin/inquiries`);
+    await page.goto(`${ADMIN_ORIGIN}/inquiries`);
     await expect(page.getByRole("heading", { name: /Aanvragen/i })).toBeVisible({
       timeout: 30_000,
     });

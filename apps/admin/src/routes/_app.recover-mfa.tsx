@@ -17,7 +17,7 @@ import {
 } from "@/lib/staff-auth-callback-params";
 import logoUrl from "@/assets/logo-mccoy.png";
 
-export const Route = createFileRoute("/admin/recover-mfa")({
+export const Route = createFileRoute("/_app/recover-mfa")({
   head: () => ({
     meta: [
       { title: "Authenticator herstellen — McCoy Admin" },
@@ -46,7 +46,7 @@ function AdminRecoverMfaPage() {
     }
     setEmail(context.email);
     setPhase("ready");
-    navigate({ to: "/admin/mfa", search: { recovery: "1" }, replace: true });
+    navigate({ to: "/mfa", search: { recovery: "1" }, replace: true });
   }, [navigate]);
 
   React.useEffect(() => {
@@ -155,7 +155,7 @@ function AdminRecoverMfaPage() {
             type="button"
             className="mt-4 text-xs text-white/70 underline-offset-2 hover:text-white hover:underline"
             onClick={() => {
-              void signOutAdmin().then(() => navigate({ to: "/admin/login", replace: true }));
+              void signOutAdmin().then(() => navigate({ to: "/login", replace: true }));
             }}
           >
             Naar inloggen

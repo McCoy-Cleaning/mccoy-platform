@@ -45,6 +45,11 @@ function isLocalHost(host: string): boolean {
   return h === "localhost" || h === "127.0.0.1" || h === "::1" || h.endsWith(".localhost");
 }
 
+/** Vercel preview / deployment hosts — never force-canonical to production. */
+function isVercelPreviewHost(host: string): boolean {
+  return stripPort(host).endsWith(".vercel.app");
+}
+
 /** Strip trailing slash except for `/`. Aligns with normalizeCmsPath. */
 export function stripTrailingSlashPath(pathname: string): string {
   if (!pathname || pathname === "/") return "/";
@@ -59,6 +64,9 @@ export function resolveHostSurface(hostHeader: string | undefined): HostSurface 
 
   if (!host) return "shared";
   if (isLocalHost(host) && enforce !== "strict") return "shared";
+  // Preview deployments (stable git URL and unique *-xxxxx-*.vercel.app) stay shared
+  // so admin never 301s to www / admin.mccoy.nl and creates a bounce loop.
+  if (isVercelPreviewHost(host)) return "shared";
 
   if (adminHosts.includes(host)) return "admin";
   if (publicHosts.includes(host)) return "public";

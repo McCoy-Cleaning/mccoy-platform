@@ -80,7 +80,7 @@ PUBLIC_HOST=www.mccoy.nl,mccoy.nl
 HOST_ENFORCE=strict
 ```
 
-Storefront host middleware uses `app: "storefront"` and redirects `/admin*` to `ADMIN_HOST`. Admin uses `app: "admin"` and redirects `/` → `/admin`.
+Storefront host middleware uses `app: "storefront"` and redirects leftover `/admin*` URLs to `ADMIN_HOST` with the `/admin` prefix removed. Admin uses `app: "admin"`; `/` is the dashboard and `/admin/*` 301s to `/*`. Vercel `*.vercel.app` preview hosts stay on the request host (never bounced to `admin.mccoy.nl` / `www.mccoy.nl`).
 
 Infrastructure paths such as `/_serverFn/*` are never host-gated.
 
@@ -122,8 +122,8 @@ Admin embeds the Storefront origin in an iframe (`VITE_STOREFRONT_ORIGIN`). Stor
 
 Site chrome editors (not per-page sections):
 
-- **Navigatie** — `/admin/website/other/navigation`
-- **Footer** — `/admin/website/other/footer`
+- **Navigatie** — `/website/other/navigation`
+- **Footer** — `/website/other/footer`
 
 ### Staging admin → production www
 

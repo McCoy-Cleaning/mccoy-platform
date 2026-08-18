@@ -241,7 +241,7 @@ class AdminNotificationService {
     } catch {
       // Fall through to the safe default below.
     }
-    return "/admin";
+    return "/";
   }
 
   private notify(): void {

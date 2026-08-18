@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Package, Plus, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/admin/AdminBits";
 
-export const Route = createFileRoute("/admin/products")({
+export const Route = createFileRoute("/_app/products")({
   component: ProductsAdminPage,
 });
 

@@ -20,7 +20,7 @@ function outboxRow(overrides: Partial<NotificationOutboxRow> = {}): Notification
     payload: {
       title: "Nieuwe aanvraag",
       body: null,
-      destinationPath: "/admin/inquiries",
+      destinationPath: "/inquiries",
       entityType: "website_request",
       entityId: "req-1",
       metadata: { requestId: "a0000000-0000-4000-8000-000000000101" },

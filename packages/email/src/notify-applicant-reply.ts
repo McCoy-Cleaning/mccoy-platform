@@ -38,7 +38,7 @@ export async function notifyApplicantReplyAppended(options: {
     await enqueueNotificationOutbox({
       type: "website_request.applicant_replied",
       title: `${name.slice(0, 80)} heeft gereageerd op je e-mail.`,
-      destinationPath: "/admin/inquiries",
+      destinationPath: "/inquiries",
       entityType: "website_request",
       entityId: options.requestId,
       metadata: {

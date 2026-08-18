@@ -70,7 +70,7 @@ async function notifyCmsPublishFailed(
     await enqueueNotificationOutbox({
       type: "cms.publish_failed",
       title: "Publiceren van pagina mislukt",
-      destinationPath: "/admin/website",
+      destinationPath: "/website",
       entityType: "cms_page",
       entityId: pageId,
       metadata: { pageId, attemptId },

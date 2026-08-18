@@ -27,7 +27,7 @@ import {
 import logoUrl from "@/assets/logo-mccoy.png";
 import { staffPasswordStrengthError } from "@mccoy/domain";
 
-export const Route = createFileRoute("/admin/invite")({
+export const Route = createFileRoute("/_app/invite")({
   head: () => ({
     meta: [
       { title: "Uitnodiging — McCoy Admin" },
@@ -77,11 +77,11 @@ function AdminInvitePage() {
     if (result.ok) {
       if (result.alreadyComplete) {
         setPhase("already_complete");
-        navigate({ to: "/admin", replace: true });
+        navigate({ to: "/", replace: true });
         return;
       }
       if (result.registrationComplete) {
-        navigate({ to: "/admin/mfa", replace: true });
+        navigate({ to: "/mfa", replace: true });
         return;
       }
       setFlowMode("invite");
@@ -98,7 +98,7 @@ function AdminInvitePage() {
 
     const mfaRecovery = await getStaffMfaRecoveryContextFn();
     if (mfaRecovery.ok) {
-      navigate({ to: "/admin/recover-mfa", replace: true });
+      navigate({ to: "/recover-mfa", replace: true });
       return;
     }
 
@@ -171,7 +171,7 @@ function AdminInvitePage() {
           exchanged.session.status === "active" &&
           exchanged.session.aal === "aal2"
         ) {
-          if (!cancelled) navigate({ to: "/admin", replace: true });
+          if (!cancelled) navigate({ to: "/", replace: true });
           return;
         }
 
@@ -243,14 +243,14 @@ function AdminInvitePage() {
         if (completed.nextStep === "mfa_enroll") {
           refreshAdminSessionClient();
           clearStaffInviteAuthCallbackFromUrl();
-          navigate({ to: "/admin/mfa", replace: true });
+          navigate({ to: "/mfa", replace: true });
           return;
         }
 
         await signOutAdmin();
         setPhase("recovery_complete");
         setError(null);
-        navigate({ to: "/admin/login", replace: true });
+        navigate({ to: "/login", replace: true });
         return;
       }
 
@@ -269,7 +269,7 @@ function AdminInvitePage() {
 
       refreshAdminSessionClient();
       clearStaffInviteAuthCallbackFromUrl();
-      navigate({ to: "/admin/mfa", replace: true });
+      navigate({ to: "/mfa", replace: true });
     } catch {
       setPhase("ready");
       setError("Registratie mislukt. Probeer het opnieuw.");
@@ -323,7 +323,7 @@ function AdminInvitePage() {
               type="button"
               className="mt-4 text-xs text-white/70 underline-offset-2 hover:text-white hover:underline"
               onClick={() => {
-                void signOutAdmin().then(() => navigate({ to: "/admin/login", replace: true }));
+                void signOutAdmin().then(() => navigate({ to: "/login", replace: true }));
               }}
             >
               Naar inloggen

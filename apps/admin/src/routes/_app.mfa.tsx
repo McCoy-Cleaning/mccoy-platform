@@ -21,7 +21,7 @@ type MfaSearch = {
   recovery?: string;
 };
 
-export const Route = createFileRoute("/admin/mfa")({
+export const Route = createFileRoute("/_app/mfa")({
   validateSearch: (search: Record<string, unknown>): MfaSearch => ({
     recovery: typeof search.recovery === "string" ? search.recovery : undefined,
   }),
@@ -58,11 +58,11 @@ function AdminMfaPage() {
   React.useEffect(() => {
     if (!ready) return;
     if (!session) {
-      navigate({ to: "/admin/login", replace: true });
+      navigate({ to: "/login", replace: true });
       return;
     }
     if (!session.mfaRequired && session.nextStep === "none" && session.aal === "aal2") {
-      navigate({ to: "/admin", replace: true });
+      navigate({ to: "/", replace: true });
     }
   }, [ready, session, navigate]);
 
@@ -251,7 +251,7 @@ function AdminMfaPage() {
 
         await signOutAdmin();
         refreshAdminSessionClient();
-        navigate({ to: "/admin/login", search: { recovered: "1" }, replace: true });
+        navigate({ to: "/login", search: { recovered: "1" }, replace: true });
         return;
       }
 
@@ -271,7 +271,7 @@ function AdminMfaPage() {
       destroyMfaBrowserSessionLocally();
       await adminCompleteMfaBrowserFlow().catch(() => undefined);
       refreshAdminSessionClient();
-      navigate({ to: "/admin", replace: true });
+      navigate({ to: "/", replace: true });
     } catch {
       setError("MFA verifiëren mislukt.");
       setBusy(false);
@@ -406,7 +406,7 @@ function AdminMfaPage() {
             type="button"
             className="mt-3 w-full text-center text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
             onClick={() => {
-              void signOutAdmin().then(() => navigate({ to: "/admin/login", replace: true }));
+              void signOutAdmin().then(() => navigate({ to: "/login", replace: true }));
             }}
           >
             Uitloggen en opnieuw beginnen

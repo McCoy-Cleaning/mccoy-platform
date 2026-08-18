@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users, Shield, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/admin/AdminBits";
 
-export const Route = createFileRoute("/admin/users")({
+export const Route = createFileRoute("/_app/users")({
   component: UsersPage,
 });
 

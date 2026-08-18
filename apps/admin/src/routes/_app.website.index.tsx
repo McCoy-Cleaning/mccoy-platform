@@ -22,7 +22,7 @@ import {
   effectiveSiteNavigation,
 } from "@mccoy/cms-schema";
 
-export const Route = createFileRoute("/admin/website/")({
+export const Route = createFileRoute("/_app/website/")({
   component: WebsitePage,
 });
 
@@ -93,7 +93,7 @@ function WebsitePage() {
                 className="group relative flex flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07] hover:shadow-[0_24px_60px_-24px_rgba(0,0,0,0.7)]"
               >
                 <Link
-                  to="/admin/website/$pageId"
+                  to="/website/$pageId"
                   params={{ pageId: p.id }}
                   className="block min-w-0 flex-1"
                   aria-label={`${p.title} aanpassen`}
@@ -125,7 +125,7 @@ function WebsitePage() {
                 </Link>
                 <div className="mt-5 flex items-center gap-2 border-t border-white/5 pt-4">
                   <Link
-                    to="/admin/website/$pageId"
+                    to="/website/$pageId"
                     params={{ pageId: p.id }}
                     className="a-btn a-btn-primary flex-1"
                   >
@@ -192,7 +192,7 @@ function WebsitePage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
-            to="/admin/website/media"
+            to="/website/media"
             className="group relative rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07]"
           >
             <div className="flex items-center gap-4">
@@ -209,7 +209,7 @@ function WebsitePage() {
             </p>
           </Link>
           <Link
-            to="/admin/website/other/navigation"
+            to="/website/other/navigation"
             className="group relative rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07]"
           >
             <div className="flex items-center gap-4">
@@ -226,7 +226,7 @@ function WebsitePage() {
             </p>
           </Link>
           <Link
-            to="/admin/website/other/footer"
+            to="/website/other/footer"
             className="group relative rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-[#1e88e5]/40 hover:bg-white/[0.07]"
           >
             <div className="flex items-center gap-4">

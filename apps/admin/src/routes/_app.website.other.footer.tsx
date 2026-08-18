@@ -3,7 +3,7 @@ import { ArrowLeft, PanelBottom } from "lucide-react";
 import { PageHeader } from "@/components/admin/AdminBits";
 import { FooterEditor } from "@/components/admin/cms/FooterEditor";
 
-export const Route = createFileRoute("/admin/website/other/footer")({
+export const Route = createFileRoute("/_app/website/other/footer")({
   component: FooterPage,
 });
 
@@ -11,7 +11,7 @@ function FooterPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 text-[11px] text-white/45">
-        <Link to="/admin/website" className="inline-flex items-center gap-1 hover:text-white">
+        <Link to="/website" className="inline-flex items-center gap-1 hover:text-white">
           <ArrowLeft className="h-3.5 w-3.5" />
           Website
         </Link>

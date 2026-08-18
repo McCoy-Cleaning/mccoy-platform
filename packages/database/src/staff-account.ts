@@ -870,7 +870,7 @@ export type SuperAdminSettingsOverview = {
   cmsPageCount: number;
   websiteRequestCount: number;
   links: Array<{
-    to: "/admin/website" | "/admin/inquiries" | "/admin/users";
+    to: "/website" | "/inquiries" | "/users";
     label: string;
     hint: string;
   }>;
@@ -918,9 +918,9 @@ export async function getSuperAdminSettingsOverview(): Promise<
         cmsPageCount,
         websiteRequestCount,
         links: [
-          { to: "/admin/website", label: "Website / CMS", hint: "Pagina's en content" },
-          { to: "/admin/inquiries", label: "Aanvragen", hint: "Inkomende berichten" },
-          { to: "/admin/users", label: "Gebruikers", hint: "Teamoverzicht" },
+          { to: "/website", label: "Website / CMS", hint: "Pagina's en content" },
+          { to: "/inquiries", label: "Aanvragen", hint: "Inkomende berichten" },
+          { to: "/users", label: "Gebruikers", hint: "Teamoverzicht" },
         ],
       },
     };

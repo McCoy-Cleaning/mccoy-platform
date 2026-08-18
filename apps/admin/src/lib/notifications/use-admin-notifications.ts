@@ -66,7 +66,7 @@ export function useAdminNotifications(): UseAdminNotifications {
 
   const open = React.useCallback(
     async (notificationId: string): Promise<string> => {
-      if (!userId) return "/admin";
+      if (!userId) return "/";
       return getAdminNotificationService(userId).open(notificationId);
     },
     [userId],

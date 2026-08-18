@@ -19,7 +19,7 @@ describe("edit-origins", () => {
     const origins = resolveAdminParentOrigins({
       currentOrigin: "http://localhost:5173",
       envAdminOrigin: "http://127.0.0.1:5174/",
-      referrer: "http://127.0.0.1:5174/admin/website/page_home",
+      referrer: "http://127.0.0.1:5174/website/page_home",
     });
     expect(origins).toContain("http://127.0.0.1:5174");
   });

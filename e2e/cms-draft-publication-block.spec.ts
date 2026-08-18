@@ -36,7 +36,7 @@ test.describe("Draft-only publication blocking", () => {
   });
 
   test("seeded custom page opens in editor (create remains forbidden)", async ({ page }) => {
-    await page.goto("/admin/website");
+    await page.goto("/website");
     await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Nieuwe pagina|Pagina toevoegen/i })).toHaveCount(
       0,

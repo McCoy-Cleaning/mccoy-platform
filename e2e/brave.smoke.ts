@@ -5,6 +5,6 @@ import { test, expect } from "@playwright/test";
  * and the brave-smoke project is enabled in playwright.config.ts.
  */
 test("Brave smoke: admin website loads", async ({ page }) => {
-  await page.goto("/admin/website");
+  await page.goto("/website");
   await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible();
 });

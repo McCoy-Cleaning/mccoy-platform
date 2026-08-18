@@ -3,7 +3,17 @@ import {
   encodeWebsiteRequestInboxId,
   resolveAdminNotificationDestination,
   resolveInquiryNotificationHref,
+  rewriteLegacyAdminDestination,
 } from "./destinations";
+
+describe("rewriteLegacyAdminDestination", () => {
+  it("drops the /admin prefix from stored destinations", () => {
+    expect(rewriteLegacyAdminDestination("/admin")).toBe("/");
+    expect(rewriteLegacyAdminDestination("/admin/inquiries")).toBe("/inquiries");
+    expect(rewriteLegacyAdminDestination("/admin/inquiries?id=x")).toBe("/inquiries?id=x");
+    expect(rewriteLegacyAdminDestination("/inquiries")).toBe("/inquiries");
+  });
+});
 
 describe("resolveInquiryNotificationHref", () => {
   const requestId = "11111111-1111-4111-8111-111111111111";
@@ -18,7 +28,7 @@ describe("resolveInquiryNotificationHref", () => {
       encodeRequestMessageId: encodeWebsiteRequestInboxId,
     });
     expect(href).toBe(
-      `/admin/inquiries?id=${encodeURIComponent(encodeWebsiteRequestInboxId(requestId))}`,
+      `/inquiries?id=${encodeURIComponent(encodeWebsiteRequestInboxId(requestId))}`,
     );
   });
 
@@ -34,8 +44,10 @@ describe("resolveInquiryNotificationHref", () => {
     expect(href).toContain(encodeURIComponent(inboxMessageId));
   });
 
-  it("falls back to allowlisted path", () => {
-    expect(resolveAdminNotificationDestination("/admin/inquiries")).toBe("/admin/inquiries");
-    expect(resolveAdminNotificationDestination("/evil")).toBe("/admin");
+  it("allowlists current paths and rewrites legacy /admin destinations", () => {
+    expect(resolveAdminNotificationDestination("/inquiries")).toBe("/inquiries");
+    expect(resolveAdminNotificationDestination("/admin/inquiries")).toBe("/inquiries");
+    expect(resolveAdminNotificationDestination("/admin")).toBe("/");
+    expect(resolveAdminNotificationDestination("/evil")).toBe("/");
   });
 });

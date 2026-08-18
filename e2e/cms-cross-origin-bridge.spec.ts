@@ -52,7 +52,7 @@ test.describe("Cross-origin iframe bridge", () => {
       });
     });
 
-    await page.goto(`/admin/website/${PAGES.home}`);
+    await page.goto(`/website/${PAGES.home}`);
     await expect(page.locator('iframe[title="edit"]')).toBeVisible({ timeout: 60_000 });
     await expect(editFrame(page).locator("[data-cms-edit-guard='edit']").first()).toBeAttached({
       timeout: 60_000,

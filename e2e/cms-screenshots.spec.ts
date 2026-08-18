@@ -39,7 +39,7 @@ test.describe("CMS pixel screenshots (targeted)", () => {
     // Full-suite runs may have published extra CMS blocks onto home; baselines
     // assume the four fixed seed sections only.
     await resetHomeToBuiltinSeed();
-    await page.goto("/admin/website");
+    await page.goto("/website");
     await syncHomeLocalStorageFromStore(page);
   });
 

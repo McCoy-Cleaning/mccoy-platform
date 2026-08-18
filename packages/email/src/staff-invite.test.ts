@@ -13,7 +13,7 @@ describe("buildStaffInviteEmail", () => {
   it("renders a professional McCoy invite with escaped user content and CTA", () => {
     const built = buildStaffInviteEmail({
       to: "oana@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite?token=abc",
+      inviteUrl: "https://admin.example.com/invite?token=abc",
       invitedByName: 'Ra <script>alert(1)</script>',
       inviteeFullName: "Oana & Co",
       expiresAt: "2026-08-06T12:00:00.000Z",
@@ -23,7 +23,7 @@ describe("buildStaffInviteEmail", () => {
     expect(built.html).toContain("McCoy Cleaning");
     expect(built.html).toContain("Admin-uitnodiging");
     expect(built.html).toContain("Uitnodiging accepteren");
-    expect(built.html).toContain("https://admin.example.com/admin/invite?token=abc");
+    expect(built.html).toContain("https://admin.example.com/invite?token=abc");
     expect(built.html).toContain("Beste Oana &amp; Co,");
     expect(built.html).toContain("Ra &lt;script&gt;alert(1)&lt;/script&gt;");
     expect(built.html).not.toContain("<script>alert(1)</script>");
@@ -32,13 +32,13 @@ describe("buildStaffInviteEmail", () => {
     expect(built.html).toContain('alt="McCoy Cleaning"');
     expect(built.html).toMatch(/src="https?:\/\/[^"]+\/images\/cms\/logo-mccoy\.png"/);
     expect(built.text).toContain("Uitnodiging accepteren:");
-    expect(built.text).toContain("https://admin.example.com/admin/invite?token=abc");
+    expect(built.text).toContain("https://admin.example.com/invite?token=abc");
   });
 
   it("asks for name when invitee full name is missing", () => {
     const built = buildStaffInviteEmail({
       to: "new@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite",
+      inviteUrl: "https://admin.example.com/invite",
       invitedByEmail: "admin@mccoy.nl",
     });
 
@@ -51,7 +51,7 @@ describe("buildStaffInviteEmail", () => {
   it("uses generic uitgenodigde greeting for test placeholder names", () => {
     const built = buildStaffInviteEmail({
       to: "new@example.com",
-      inviteUrl: "https://admin.example.com/admin/invite",
+      inviteUrl: "https://admin.example.com/invite",
       inviteeFullName: "Test invitee",
     });
 
@@ -65,20 +65,20 @@ describe("buildStaffPasswordResetEmail", () => {
   it("renders Dutch password-reset copy with CTA", () => {
     const built = buildStaffPasswordResetEmail({
       to: "admin@example.com",
-      resetUrl: "https://admin.example.com/admin/invite?token=abc",
+      resetUrl: "https://admin.example.com/invite?token=abc",
       staffFullName: "Maria",
     });
 
     expect(built.subject).toBe("Wachtwoord resetten — McCoy Admin");
     expect(built.html).toContain("Nieuw wachtwoord instellen");
     expect(built.html).toContain("Beste Maria,");
-    expect(built.text).toContain("https://admin.example.com/admin/invite?token=abc");
+    expect(built.text).toContain("https://admin.example.com/invite?token=abc");
   });
 
   it("uses uitgenodigde greeting when name is missing", () => {
     const built = buildStaffPasswordResetEmail({
       to: "admin@example.com",
-      resetUrl: "https://admin.example.com/admin/invite?token=abc",
+      resetUrl: "https://admin.example.com/invite?token=abc",
     });
 
     expect(built.html).toContain("Beste uitgenodigde,");

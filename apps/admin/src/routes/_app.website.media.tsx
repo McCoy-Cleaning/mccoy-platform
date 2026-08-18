@@ -14,7 +14,7 @@ import {
 } from "@/lib/cms/media-client";
 import { appConfirm, appPrompt } from "@/lib/app-dialogs";
 
-export const Route = createFileRoute("/admin/website/media")({
+export const Route = createFileRoute("/_app/website/media")({
   component: MediaLibraryPage,
 });
 
@@ -246,7 +246,7 @@ function MediaLibraryPage() {
       />
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-white/50">
-        <Link to="/admin/website" className="hover:text-white">
+        <Link to="/website" className="hover:text-white">
           Website
         </Link>
         <span>/</span>

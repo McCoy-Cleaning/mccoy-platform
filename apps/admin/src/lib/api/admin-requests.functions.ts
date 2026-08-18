@@ -171,7 +171,7 @@ async function reportMailboxConnectionOk(): Promise<void> {
     await enqueueNotificationOutbox({
       type: "mailbox.connection_restored",
       title: "Postvak-verbinding hersteld",
-      destinationPath: "/admin/inquiries",
+      destinationPath: "/inquiries",
       entityType: "mailbox",
       entityId: provider,
       metadata: { provider },
@@ -208,7 +208,7 @@ async function reportMailboxConnectionFailed(error: unknown): Promise<void> {
     await enqueueNotificationOutbox({
       type: "mailbox.connection_failed",
       title: "Postvak-verbinding mislukt",
-      destinationPath: "/admin/inquiries",
+      destinationPath: "/inquiries",
       entityType: "mailbox",
       entityId: provider,
       metadata: { provider, errorCode },

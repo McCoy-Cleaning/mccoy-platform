@@ -46,7 +46,7 @@ import type { ActiveNotificationType } from "@mccoy/notifications";
 import { staffPasswordStrengthError } from "@mccoy/domain";
 import { appConfirm } from "@/lib/app-dialogs";
 
-export const Route = createFileRoute("/admin/settings")({
+export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
 });
 
@@ -383,7 +383,7 @@ function SettingsPage() {
             "Gebruiker aangemaakt, maar de uitnodigingsmail is niet verzonden. Controleer Graph Mail.Send / SMTP en de map Verzonden items van GRAPH_MAILBOX.",
             providerDetail.trim(),
             link
-              ? "Gebruik deze eenmalige link (niet doorsturen via chat die de URL inkort). De link moet naar https://…/admin/invite gaan — niet naar supabase.co:"
+              ? "Gebruik deze eenmalige link (niet doorsturen via chat die de URL inkort). De link moet naar https://…/invite gaan — niet naar supabase.co:"
               : "Probeer later opnieuw, of controleer de e-mailconfiguratie op de server.",
             link,
             reinstateHint.trim(),
@@ -727,7 +727,7 @@ function SettingsPage() {
               >
                 <StaffAuthenticatorReplacePanel
                   aal={session?.aal}
-                  onRequireMfa={() => navigate({ to: "/admin/mfa", replace: true })}
+                  onRequireMfa={() => navigate({ to: "/mfa", replace: true })}
                 />
               </SettingsCard>
             )}
@@ -872,14 +872,14 @@ function SettingsPage() {
                   label="Websitepagina's"
                   value={String(overview.cmsPageCount)}
                   hint="Website content"
-                  to="/admin/website"
+                  to="/website"
                 />
                 <StatTile
                   icon={Inbox}
                   label="Website-aanvragen"
                   value={String(overview.websiteRequestCount)}
                   hint="Gestructureerde store (lokaal/JSON)"
-                  to="/admin/inquiries"
+                  to="/inquiries"
                 />
               </div>
 
@@ -1228,7 +1228,7 @@ function StatTile({
   label: string;
   value: string;
   hint?: string;
-  to?: "/admin/website" | "/admin/inquiries" | "/admin/users";
+  to?: "/website" | "/inquiries" | "/users";
 }) {
   const inner = (
     <>

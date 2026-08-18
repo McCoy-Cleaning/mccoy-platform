@@ -29,7 +29,7 @@ test.describe("CMS M5 fixed/block inventory", () => {
     failureSink,
   }) => {
     void failureSink;
-    await page.goto(`${ADMIN_ORIGIN}/admin/website`);
+    await page.goto(`${ADMIN_ORIGIN}/website`);
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page.getByRole("heading", { name: /Website/i })).toBeVisible({
       timeout: 30_000,
@@ -55,7 +55,7 @@ test.describe("CMS M5 fixed/block inventory", () => {
 
   test("custom page editor opens (blocks-only, no fixed keys)", async ({ page, failureSink }) => {
     void failureSink;
-    await page.goto(`${ADMIN_ORIGIN}/admin/website/${PAGES.custom}`);
+    await page.goto(`${ADMIN_ORIGIN}/website/${PAGES.custom}`);
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page.getByRole("button", { name: /^Pagina$/i }).or(page.locator("[data-cms-toolbar='custom-page']"))).toBeVisible({
       timeout: 60_000,

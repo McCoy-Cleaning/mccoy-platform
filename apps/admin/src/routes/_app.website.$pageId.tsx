@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { appConfirm } from "@/lib/app-dialogs";
 import { notifyToast } from "@/lib/notify-toast";
 
-export const Route = createFileRoute("/admin/website/$pageId")({
+export const Route = createFileRoute("/_app/website/$pageId")({
   component: PageEditorRoute,
 });
 
@@ -216,7 +216,7 @@ function PageEditorRoute() {
   const page = state.pages.find((p) => p.id === pageId);
 
   React.useEffect(() => {
-    if (!page) navigate({ to: "/admin/website", replace: true });
+    if (!page) navigate({ to: "/website", replace: true });
   }, [page, navigate]);
 
   React.useEffect(() => {
@@ -636,7 +636,7 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       cms.discardDraft(pageId);
       cms.clearPreviewSnapshot(pageId);
       if (wasDraftOnly) {
-        navigate({ to: "/admin/website" });
+        navigate({ to: "/website" });
         return;
       }
       setTimeout(() => {
@@ -1004,7 +1004,7 @@ function SplitToolbar({
     <div className="rounded-3xl border border-white/10 bg-black/60 p-3 shadow-[0_24px_60px_-32px_rgba(0,0,0,0.9)] backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          to="/admin/website"
+          to="/website"
           onClick={(e) => {
             if (!hasDraft) return;
             e.preventDefault();
@@ -1020,7 +1020,7 @@ function SplitToolbar({
               ) {
                 return;
               }
-              void navigate({ to: "/admin/website" });
+              void navigate({ to: "/website" });
             })();
           }}
           aria-label="Terug naar alle pagina's"

@@ -83,7 +83,7 @@ describe("MFA path contracts", () => {
   });
 
   it("MFA page uses requireAal2 and local teardown without signOut", () => {
-    const mfa = readFileSync(join(here, "../routes/admin.mfa.tsx"), "utf8");
+    const mfa = readFileSync(join(here, "../routes/_app.mfa.tsx"), "utf8");
     expect(mfa).toContain("requireAal2: true");
     expect(mfa).toContain("destroyMfaBrowserSessionLocally");
     expect(mfa).toContain("ensureMfaBrowserSessionForPurpose");

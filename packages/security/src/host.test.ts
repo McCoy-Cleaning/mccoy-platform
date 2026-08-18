@@ -41,7 +41,18 @@ describe("shouldRedirectForHost admin app", () => {
     ).toBeNull();
   });
 
-  it("301s /admin/website to /website and keeps the query", () => {
+  it("does not redirect / to /admin", () => {
+    expect(
+      shouldRedirectForHost({
+        host: "admin.mccoy.nl",
+        pathname: "/",
+        protocol: "https",
+        app: "admin",
+      }),
+    ).toBeNull();
+  });
+
+  it("301s /admin/website to /website once and keeps the query", () => {
     expect(
       shouldRedirectForHost({
         host: "admin.mccoy.nl",
@@ -74,6 +85,37 @@ describe("shouldRedirectForHost admin app", () => {
         app: "admin",
       }),
     ).toBeNull();
+  });
+
+  it("does not redirect vercel.app preview hosts to admin.mccoy.nl", () => {
+    expect(
+      shouldRedirectForHost({
+        host: "mccoy-platform-admin-3ghydymsu-mccoy1.vercel.app",
+        pathname: "/",
+        protocol: "https",
+        app: "admin",
+      }),
+    ).toBeNull();
+
+    expect(
+      shouldRedirectForHost({
+        host: "mccoy-platform-admin-git-development-mccoy1.vercel.app",
+        pathname: "/website",
+        protocol: "https",
+        app: "admin",
+      }),
+    ).toBeNull();
+  });
+
+  it("strips /admin on vercel.app without bouncing to production admin host", () => {
+    expect(
+      shouldRedirectForHost({
+        host: "mccoy-platform-admin-3ghydymsu-mccoy1.vercel.app",
+        pathname: "/admin/website",
+        protocol: "https",
+        app: "admin",
+      }),
+    ).toEqual({ redirectTo: "/website", status: 301 });
   });
 });
 

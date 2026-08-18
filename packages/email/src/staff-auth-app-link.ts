@@ -1,5 +1,5 @@
 /**
- * Build McCoy-owned staff auth links that land on `/admin/invite` directly.
+ * Build McCoy-owned staff auth links that land on `/invite` directly.
  * Avoids Supabase-hosted `/auth/v1/verify` pages that can show recovery UI
  * or redirect to the wrong Site URL when redirect allowlists drift.
  */
@@ -44,7 +44,7 @@ export function withInviteRedirectTo(actionLink: string, redirectTo: string): st
 }
 
 /**
- * Prefer a McCoy app link (`/admin/invite?token_hash=&type=`) over Supabase `action_link`.
+ * Prefer a McCoy app link (`/invite?token_hash=&type=`) over Supabase `action_link`.
  * Falls back to `action_link` with an enforced `redirect_to` when hashed_token is missing.
  */
 export function resolveStaffAuthEmailLink(input: {

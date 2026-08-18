@@ -38,14 +38,14 @@ setup("authenticate admin (legacy)", async ({ page }) => {
     },
   ]);
 
-  await page.goto("/admin/website");
+  await page.goto("/website");
   await expect(page).not.toHaveURL(/\/admin\/login/);
   await expect(page.getByRole("link", { name: "Website" }).first()).toBeVisible({
     timeout: 30_000,
   });
 
   // Seeded custom pages live in the durable file store. Ensure the admin editor
-  // localStorage also lists them so /admin/website/$id is reachable.
+  // localStorage also lists them so /website/$id is reachable.
   const store = createFileCmsStore();
   const revision = await store.getActivePublishedRevision("page_e2e_custom");
   if (!revision?.payload) {

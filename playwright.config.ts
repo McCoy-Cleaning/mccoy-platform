@@ -201,7 +201,7 @@ export default defineConfig({
       command: usePreview
         ? `${cleanDistCommand("apps/admin/dist")} && npm run ${buildScript} -w @mccoy/admin && npm run preview -w @mccoy/admin -- --host localhost --port ${ADMIN_PORT} --strictPort`
         : `npm run dev -w @mccoy/admin -- --host localhost --port ${ADMIN_PORT} --strictPort`,
-      url: `${ADMIN_ORIGIN}/admin/login`,
+      url: `${ADMIN_ORIGIN}/login`,
       reuseExistingServer: reuse,
       timeout: 600_000,
       env: sharedEnv,

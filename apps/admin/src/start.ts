@@ -52,7 +52,7 @@ const hostMiddleware = createMiddleware().server(async ({ next }) => {
 
   if (redirect) {
     return new Response(null, {
-      status: 302,
+      status: redirect.status ?? 302,
       headers: { Location: redirect.redirectTo },
     });
   }

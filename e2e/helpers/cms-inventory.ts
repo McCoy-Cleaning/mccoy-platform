@@ -50,7 +50,7 @@ export function missingFixedInventoryKeys(
  * Does not require the storefront edit iframe (preview may be unreachable in some envs).
  */
 export async function openBuiltinEditorForInventory(page: Page, pageId: string) {
-  await page.goto(`/admin/website/${pageId}`);
+  await page.goto(`/website/${pageId}`);
   await expect(page).not.toHaveURL(/\/admin\/website\/?$/);
   await expect(page).not.toHaveURL(/\/admin\/login/);
   const secties = page
@@ -129,7 +129,7 @@ export async function openAddSectionPickerAlle(page: Page) {
  * Custom (or offerte) editor chrome for picker inventory — no storefront iframe required.
  */
 export async function openEditorChromeForPickerInventory(page: Page, pageId: string) {
-  await page.goto(`/admin/website/${pageId}`);
+  await page.goto(`/website/${pageId}`);
   await expect(page).not.toHaveURL(/\/admin\/login/);
   if (pageId === PAGES.custom) {
     await expect(page.locator('[data-cms-toolbar="custom-page"]')).toBeVisible({

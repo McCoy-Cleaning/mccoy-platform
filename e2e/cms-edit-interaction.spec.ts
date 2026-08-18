@@ -37,7 +37,7 @@ test.describe("Edit-mode interaction blocking", () => {
       });
       await expect(page).toHaveURL(beforeUrl);
       await expect(frame.locator("[data-cms-edit-guard='edit']").first()).toBeAttached();
-      expect(navigations.every((u) => u.includes("_cmsMode=edit") || u.includes("/admin/"))).toBe(
+      expect(navigations.every((u) => u.includes("_cmsMode=edit") || u.includes("localhost:5174"))).toBe(
         true,
       );
     }

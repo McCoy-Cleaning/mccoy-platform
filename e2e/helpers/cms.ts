@@ -113,7 +113,7 @@ export function editFrame(page: Page): FrameLocator {
 
 export async function openPageEditor(page: Page, pageId: string) {
   // Prefer direct URL — hub listing can race with localStorage ↔ durable reconcile.
-  await page.goto(`/admin/website/${pageId}`);
+  await page.goto(`/website/${pageId}`);
   await expect(page).not.toHaveURL(/\/admin\/website\/?$/);
   await expect(page).not.toHaveURL(/\/admin\/login/);
   await expect(page.locator('iframe[title="edit"]')).toBeVisible({ timeout: 60_000 });

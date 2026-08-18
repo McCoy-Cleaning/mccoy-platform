@@ -1,23 +1,31 @@
 /**
  * Internal admin routes that a notification is allowed to deep-link to.
- * Mirrors `ADMIN_NAV` in `@/routes/admin` plus `/admin/settings`, kept as a
+ * Mirrors `ADMIN_NAV` in `@/routes/_app` plus `/settings`, kept as a
  * separate literal list to avoid a route ↔ notification module import cycle.
  */
 const ADMIN_DESTINATION_ALLOWLIST = [
-  "/admin",
-  "/admin/website",
-  "/admin/inquiries",
-  "/admin/users",
-  "/admin/products",
-  "/admin/settings",
+  "/",
+  "/website",
+  "/inquiries",
+  "/users",
+  "/products",
+  "/settings",
 ] as const;
 
-const FALLBACK_DESTINATION = "/admin";
+const FALLBACK_DESTINATION = "/";
 
 const INBOX_MESSAGE_ID_RE =
   /^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/;
 const REQUEST_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Drop legacy `/admin` prefix from stored notification destinations. */
+export function rewriteLegacyAdminDestination(path: string): string {
+  if (path === "/admin") return "/";
+  if (path.startsWith("/admin?")) return `/${path.slice("/admin".length)}`;
+  if (path.startsWith("/admin/")) return path.slice("/admin".length) || "/";
+  return path;
+}
 
 /**
  * `destination_path` is written by trusted server workers (see the
@@ -27,13 +35,15 @@ const REQUEST_UUID_RE =
  */
 export function resolveAdminNotificationDestination(path: string | null | undefined): string {
   if (!path) return FALLBACK_DESTINATION;
+  const normalized = rewriteLegacyAdminDestination(path);
   const isAllowed = ADMIN_DESTINATION_ALLOWLIST.some(
     (allowed) =>
-      path === allowed ||
-      path.startsWith(`${allowed}/`) ||
-      path.startsWith(`${allowed}?`),
+      normalized === allowed ||
+      (allowed !== "/" &&
+        (normalized.startsWith(`${allowed}/`) || normalized.startsWith(`${allowed}?`))) ||
+      (allowed === "/" && (normalized === "/" || normalized.startsWith("/?"))),
   );
-  return isAllowed ? path : FALLBACK_DESTINATION;
+  return isAllowed ? normalized : FALLBACK_DESTINATION;
 }
 
 /**
@@ -53,7 +63,7 @@ export function resolveInquiryNotificationHref(options: {
     typeof meta.inboxMessageId === "string" ? meta.inboxMessageId.trim() : "";
   if (inboxMessageId && INBOX_MESSAGE_ID_RE.test(inboxMessageId)) {
     return resolveAdminNotificationDestination(
-      `/admin/inquiries?id=${encodeURIComponent(inboxMessageId)}`,
+      `/inquiries?id=${encodeURIComponent(inboxMessageId)}`,
     );
   }
 
@@ -70,7 +80,7 @@ export function resolveInquiryNotificationHref(options: {
   if (isRequestNotification && requestIdRaw && REQUEST_UUID_RE.test(requestIdRaw)) {
     const inboxId = options.encodeRequestMessageId(requestIdRaw);
     return resolveAdminNotificationDestination(
-      `/admin/inquiries?id=${encodeURIComponent(inboxId)}`,
+      `/inquiries?id=${encodeURIComponent(inboxId)}`,
     );
   }
 
