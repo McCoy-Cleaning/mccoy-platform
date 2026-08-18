@@ -101,6 +101,14 @@ export {
   SectionIndex,
   SectionSurface,
 } from "./sectionChromeUi";
+export {
+  collectFormFileAttachments,
+  prepareFormFileAttachments,
+  MAX_FORM_ATTACHMENT_COUNT,
+  MAX_FORM_ATTACHMENT_FILE_BYTES,
+  MAX_FORM_ATTACHMENT_TOTAL_BYTES,
+} from "./form-file-attachments";
+export type { PreparedFormFileAttachment } from "./form-file-attachments";
 
 export function HomeHeroView({
   content,

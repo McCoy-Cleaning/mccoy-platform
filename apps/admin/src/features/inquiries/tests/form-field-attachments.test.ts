@@ -116,6 +116,23 @@ describe("partitionFormAttachments", () => {
     expect(result.fileAttachments.map((item) => item.filename)).toEqual(["plattegrond.pdf"]);
     expect(result.unmappedImages).toEqual([]);
   });
+
+  it("keeps sollicitatie CV PDFs in Bijlagen (non-image file rows)", () => {
+    const result = partitionFormAttachments(
+      [
+        field("name", "Anna"),
+        field("email", "anna@example.com"),
+        field("role", "Schoonmaker"),
+        field("cv", "cv-anna.pdf"),
+      ],
+      [attachment("cv-anna.pdf", "application/pdf", 48_000)],
+    );
+
+    expect(result.imagesByFieldKey.size).toBe(0);
+    expect(result.unmappedImages).toEqual([]);
+    expect(result.fileAttachments.map((item) => item.filename)).toEqual(["cv-anna.pdf"]);
+    expect(isPreviewableImageAttachment(result.fileAttachments[0]!)).toBe(false);
+  });
 });
 
 describe("shouldHideAttachmentFieldText", () => {

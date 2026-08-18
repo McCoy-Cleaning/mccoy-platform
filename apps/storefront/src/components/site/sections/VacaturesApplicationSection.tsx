@@ -70,7 +70,7 @@ export function VacaturesApplicationSection() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeRoleIndex, setActiveRoleIndex] = useState(0);
-  const [fileNames, setFileNames] = useState<Record<string, string | null>>({});
+  const [fileValues, setFileValues] = useState<Record<string, File | null>>({});
 
   const applicationRoles = useMemo(() => {
     if (page?.kind === "builtin") {
@@ -161,6 +161,15 @@ export function VacaturesApplicationSection() {
                   if (!clientReady || submitting) return;
                   setSubmitting(true);
                   setError(null);
+                  const selectedFiles = Object.values(fileValues).filter(
+                    (file): file is File => file instanceof File && file.size > 0,
+                  );
+                  const fileFieldNames: Record<string, string> = {};
+                  for (const [key, file] of Object.entries(fileValues)) {
+                    if (file && file.size > 0 && file.name.trim()) {
+                      fileFieldNames[key] = file.name.trim();
+                    }
+                  }
                   const result = await submitSiteForm({
                     kind: "job_application",
                     pageId: "page_vacatures",
@@ -171,7 +180,9 @@ export function VacaturesApplicationSection() {
                       vacancySlug: activeVacancySlug,
                       vacancyTitleSnapshot: activeRoleTitle,
                       role: activeRoleTitle,
+                      ...fileFieldNames,
                     },
+                    extraFiles: selectedFiles,
                   });
                   setSubmitting(false);
                   if (!result.ok) {
@@ -179,6 +190,7 @@ export function VacaturesApplicationSection() {
                     return;
                   }
                   setSent(true);
+                  setFileValues({});
                 }}
                 className="mt-8 grid gap-4 sm:grid-cols-2"
               >
@@ -243,11 +255,11 @@ export function VacaturesApplicationSection() {
                   <JobApplicationField
                     key={field.id}
                     field={field}
-                    fileName={fileNames[formFieldPayloadKey(field)] ?? null}
-                    onPickFile={(name) =>
-                      setFileNames((prev) => ({
+                    file={fileValues[formFieldPayloadKey(field)] ?? null}
+                    onPickFile={(next) =>
+                      setFileValues((prev) => ({
                         ...prev,
-                        [formFieldPayloadKey(field)]: name,
+                        [formFieldPayloadKey(field)]: next,
                       }))
                     }
                     pickLabel={t.jobs.cvPick}
@@ -343,13 +355,13 @@ export function VacaturesApplicationSection() {
 
 function JobApplicationField({
   field,
-  fileName,
+  file,
   onPickFile,
   pickLabel,
 }: {
   field: FormFieldItem;
-  fileName: string | null;
-  onPickFile: (name: string | null) => void;
+  file: File | null;
+  onPickFile: (file: File | null) => void;
   pickLabel: string;
 }) {
   const key = formFieldPayloadKey(field);
@@ -364,9 +376,9 @@ function JobApplicationField({
         label={label}
         icon={Icon}
         name={key}
-        required={required}
-        fileName={fileName}
-        onPick={(f) => onPickFile(f?.name ?? null)}
+        required={required && !file}
+        fileName={file?.name ?? null}
+        onPick={onPickFile}
         pick={pickLabel}
       />
     );
