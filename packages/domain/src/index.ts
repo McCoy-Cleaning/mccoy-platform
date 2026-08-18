@@ -1,8 +1,13 @@
 export {
   FORM_KINDS,
   FORM_SUBJECTS,
+  MAX_WEBSITE_FORM_ATTACHMENT_COUNT,
+  MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES,
+  MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
   type FormKind,
   type FormAttachment,
+  type FormUploadFileIntent,
+  type UploadedFormAttachment,
   type WebsiteFormPayload,
 } from "./forms";
 

@@ -14,19 +14,28 @@ function megabytes(bytes: number): number {
   return Math.round(bytes / (1024 * 1024));
 }
 
+/** Named File entries count as real upload selections for limit checks. */
+function isNamedUploadCandidate(file: File): boolean {
+  return Boolean(file.name?.trim());
+}
+
 /**
  * Validate browser files without converting them to Base64. The caller uploads
  * the original bytes directly to private storage, bypassing the host function
  * request limit. Every rejected selection produces a visible error.
+ *
+ * Count and size limits are enforced on named files before empty/zero-size
+ * junk is filtered out.
  */
 export async function prepareFormFileAttachments(files: File[]): Promise<File[]> {
-  const nonEmpty = files.filter((file) => file.size > 0);
-  if (nonEmpty.length > MAX_FORM_ATTACHMENT_COUNT) {
+  const candidates = files.filter(isNamedUploadCandidate);
+
+  if (candidates.length > MAX_FORM_ATTACHMENT_COUNT) {
     throw new Error(`U kunt maximaal ${MAX_FORM_ATTACHMENT_COUNT} bestanden toevoegen.`);
   }
 
   let totalBytes = 0;
-  for (const file of nonEmpty) {
+  for (const file of candidates) {
     if (file.size > MAX_FORM_ATTACHMENT_FILE_BYTES) {
       throw new Error(
         `Bestand “${file.name}” is te groot. Het maximum is ${megabytes(MAX_FORM_ATTACHMENT_FILE_BYTES)} MB per bestand.`,
@@ -41,7 +50,7 @@ export async function prepareFormFileAttachments(files: File[]): Promise<File[]>
     );
   }
 
-  return nonEmpty;
+  return candidates.filter((file) => file.size > 0);
 }
 
 export async function collectFormFileAttachments(
@@ -53,7 +62,7 @@ export async function collectFormFileAttachments(
   const files: File[] = [];
 
   const append = (file: File) => {
-    if (file.size <= 0) return;
+    if (!isNamedUploadCandidate(file)) return;
     const key = `${file.name}:${file.size}:${file.lastModified}`;
     if (seen.has(key)) return;
     seen.add(key);

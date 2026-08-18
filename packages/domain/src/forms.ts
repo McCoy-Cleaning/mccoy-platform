@@ -24,6 +24,31 @@ export type FormAttachment = {
   contentType: string;
 };
 
+/** Browser upload intent — metadata only; bytes go straight to private storage. */
+export type FormUploadFileIntent = {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
+/** Attachment already uploaded to private storage (no Base64 in the form payload). */
+export type UploadedFormAttachment = {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  storagePath: string;
+};
+
+/** Max files per website form submission (private storage path). */
+export const MAX_WEBSITE_FORM_ATTACHMENT_COUNT = 8;
+
+/** Max bytes per attachment in private storage (25 MB). */
+export const MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES = 25 * 1024 * 1024;
+
+/** Max combined attachment bytes per submission. */
+export const MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES =
+  MAX_WEBSITE_FORM_ATTACHMENT_COUNT * MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES;
+
 export type WebsiteFormPayload = {
   kind: FormKind;
   /** Published CMS page id, e.g. page_contact */
