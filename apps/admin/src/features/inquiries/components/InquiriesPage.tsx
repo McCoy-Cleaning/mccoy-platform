@@ -4,7 +4,7 @@ import { Inbox, RefreshCw, Search } from "lucide-react";
 import { PageHeader } from "@/components/admin/AdminBits";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { FormInboxThreadItem } from "@mccoy/email/contracts";
+import { filterInboxMessages, type FormInboxThreadItem } from "@mccoy/email/contracts";
 import { useInquiriesListQuery } from "../hooks/useInquiriesListQuery";
 import { useInquiriesRealtimeRefresh } from "../hooks/useInquiriesRealtimeRefresh";
 import { useInquiryDetailQuery } from "../hooks/useInquiryDetailQuery";
@@ -82,9 +82,18 @@ export function InquiriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL id
   }, [search.id]);
 
+  const displayItems = React.useMemo(
+    () =>
+      sortInboxItemsByPins(
+        filterInboxMessages(items, { kind, scopeKey, q: debouncedQ }),
+        pinnedIds,
+      ),
+    [items, pinnedIds, kind, scopeKey, debouncedQ],
+  );
+
   const { selectedIds, setSelectedIds, toggleSelected, toggleSelectAllVisible } =
     useInquirySelection({
-      items,
+      items: displayItems,
       kind,
       scopeKey,
       debouncedQ,
@@ -125,11 +134,6 @@ export function InquiriesPage() {
       window.setTimeout(() => setPinStatus(null), 2500);
     },
     [togglePin],
-  );
-
-  const displayItems = React.useMemo(
-    () => sortInboxItemsByPins(items, pinnedIds),
-    [items, pinnedIds],
   );
 
   React.useEffect(() => {

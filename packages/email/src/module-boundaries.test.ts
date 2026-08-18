@@ -25,6 +25,19 @@ describe("Aanvragen Graph module dependency boundaries", () => {
     expect(requestSync).toMatch(/from ["']\.\/graph-mail["']/);
   });
 
+
+  it("listFormInboxMessages only calls Graph mailbox on fresh Vernieuwen", () => {
+    const src = sourceOf("form-inbox.ts");
+    const start = src.indexOf("export async function listFormInboxMessages");
+    const next = src.indexOf("export async function getFormInboxMessage", start + 1);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(next).toBeGreaterThan(start);
+    const body = src.slice(start, next);
+    expect(body).toMatch(/const mailboxPromise = fresh/);
+    expect(body).toMatch(/listMailboxFormInboxMessages/);
+    expect(body).toMatch(/mailboxPromise = fresh\s*\?[\s\S]*listMailboxFormInboxMessages[\s\S]*:\s*Promise\.resolve/);
+  });
+
   it("keeps isReplyOrForwardSubject in a leaf module", () => {
     const subject = sourceOf("form-mail-subject.ts");
     expect(subject).toMatch(/export function isReplyOrForwardSubject/);
