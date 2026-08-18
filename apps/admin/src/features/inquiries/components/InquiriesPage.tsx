@@ -181,7 +181,7 @@ export function InquiriesPage() {
             label: "Vernieuwen",
             icon: RefreshCw,
             onClick: () => {
-              void loadList();
+              void loadList({ fresh: true });
               if (selectedId) softRefreshDetail(selectedId);
             },
           },

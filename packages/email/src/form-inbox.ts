@@ -1205,13 +1205,15 @@ async function listMailboxFormInboxMessages(options?: {
   scopeKey?: string | "all";
   q?: string;
   limit?: number;
+  signal?: AbortSignal;
+  skipSync?: boolean;
 }): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   if (shouldAttemptGraphMail()) {
     try {
       const listed = await listGraphFormInboxMessages(options);
-      if (listed.syncCandidates && listed.syncCandidates.length > 0) {
-        // Await sync so applicant-reply notifications are enqueued before the
-        // request ends (fire-and-forget was dropped on serverless / early exit).
+      // List paint must not wait on N+1 Graph identity/reply ingest. Applicant
+      // replies already sync when a conversation is opened.
+      if (!options?.skipSync && listed.syncCandidates && listed.syncCandidates.length > 0) {
         try {
           const { syncGraphInboxAfterList } = await import("./graph-inbox-sync");
           const { getGraphMailConfig } = await import("./graph-config");
@@ -1227,6 +1229,9 @@ async function listMailboxFormInboxMessages(options?: {
       }
       return { items: listed.items, facets: listed.facets };
     } catch (error) {
+      if (options?.signal?.aborted) {
+        return { items: [], facets: { kinds: [], scopes: [] } };
+      }
       const imapConfig =
         shouldFallbackFromGraph() && shouldAllowImapInbox() ? getInboxConfig() : null;
       const canFallback =
@@ -1291,6 +1296,7 @@ export async function listFormInboxMessages(options?: {
   scopeKey?: string | "all";
   q?: string;
   limit?: number;
+  fresh?: boolean;
 }): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   if (process.env.MCCOY_E2E === "1") {
     const { listE2eFormInboxMessages } = await import("./e2e-form-inbox");
@@ -1298,64 +1304,88 @@ export async function listFormInboxMessages(options?: {
   }
 
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
+  const fresh = options?.fresh === true;
+  const { getOrLoadInboxListSnapshot, graphListBudgetMs } = await import("./form-inbox-list-cache");
 
-  // Parallel mailbox + website_requests + suppress list — list must not wait serially.
-  const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
-    listMailboxFormInboxMessages({
-      ...options,
-      kind: "all",
-      scopeKey: "all",
-      limit: MAX_LIMIT,
-    }),
-    (async () => {
-      const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
-      return listWebsiteRequestInboxSummaries({
-        kind: "all",
-        scopeKey: "all",
-        limit: 200,
-      });
-    })(),
-    (async () => {
-      const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
-      return listHiddenWebsiteRequestNumbers();
-    })(),
-  ]);
+  type InboxListSnapshot = {
+    mailboxItems: FormInboxMessageSummary[];
+    requestItems: FormInboxMessageSummary[];
+    hiddenRequestNumbers: string[];
+  };
 
-  let mailboxItems: FormInboxMessageSummary[] = [];
-  if (mailboxSettled.status === "fulfilled") {
-    mailboxItems = mailboxSettled.value.items;
-  } else {
-    console.error("[form-inbox] mailbox list failed; continuing with website requests", {
-      message:
-        mailboxSettled.reason instanceof Error
-          ? mailboxSettled.reason.message.slice(0, 160)
-          : "unknown",
-    });
-  }
+  const snapshot = await getOrLoadInboxListSnapshot<InboxListSnapshot>(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), graphListBudgetMs(fresh));
+    try {
+      // website_requests are the list source of truth. Graph is opportunistic
+      // and aborted at the list budget so production paint cannot wait on it.
+      const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
+        listMailboxFormInboxMessages({
+          kind: "all",
+          scopeKey: "all",
+          limit: MAX_LIMIT,
+          signal: controller.signal,
+          skipSync: true,
+        }),
+        (async () => {
+          const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
+          return listWebsiteRequestInboxSummaries({
+            kind: "all",
+            scopeKey: "all",
+            limit: 200,
+          });
+        })(),
+        (async () => {
+          const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
+          return listHiddenWebsiteRequestNumbers();
+        })(),
+      ]);
 
-  let requestItems: FormInboxMessageSummary[] = [];
-  if (requestSettled.status === "fulfilled") {
-    requestItems = requestSettled.value;
-  } else {
-    console.error("[form-inbox] website request list failed", {
-      message:
-        requestSettled.reason instanceof Error
-          ? requestSettled.reason.message.slice(0, 160)
-          : "unknown",
-    });
-  }
+      let mailboxItems: FormInboxMessageSummary[] = [];
+      if (mailboxSettled.status === "fulfilled") {
+        mailboxItems = mailboxSettled.value.items;
+      } else if (!controller.signal.aborted) {
+        console.error("[form-inbox] mailbox list failed; continuing with website requests", {
+          message:
+            mailboxSettled.reason instanceof Error
+              ? mailboxSettled.reason.message.slice(0, 160)
+              : "unknown",
+        });
+      }
 
-  let hiddenRequestNumbers = new Set<string>();
-  if (hiddenSettled.status === "fulfilled") {
-    hiddenRequestNumbers = new Set(hiddenSettled.value);
-  } else {
-    console.error("[form-inbox] closed-request suppress list failed", {
-      message:
-        hiddenSettled.reason instanceof Error
-          ? hiddenSettled.reason.message.slice(0, 160)
-          : "unknown",
-    });
-  }
+      let requestItems: FormInboxMessageSummary[] = [];
+      if (requestSettled.status === "fulfilled") {
+        requestItems = requestSettled.value;
+      } else {
+        console.error("[form-inbox] website request list failed", {
+          message:
+            requestSettled.reason instanceof Error
+              ? requestSettled.reason.message.slice(0, 160)
+              : "unknown",
+        });
+      }
+
+      let hiddenRequestNumbers: string[] = [];
+      if (hiddenSettled.status === "fulfilled") {
+        hiddenRequestNumbers = hiddenSettled.value;
+      } else {
+        console.error("[form-inbox] closed-request suppress list failed", {
+          message:
+            hiddenSettled.reason instanceof Error
+              ? hiddenSettled.reason.message.slice(0, 160)
+              : "unknown",
+        });
+      }
+
+      return { mailboxItems, requestItems, hiddenRequestNumbers };
+    } finally {
+      clearTimeout(timer);
+    }
+  }, { fresh });
+
+  const mailboxItems = snapshot.mailboxItems;
+  const requestItems = snapshot.requestItems;
+  const hiddenRequestNumbers = new Set(snapshot.hiddenRequestNumbers);
 
   const { mergeMailboxAndWebsiteRequestSummaries } = await import("./enrich-inbox-scopes");
   const merged = mergeMailboxAndWebsiteRequestSummaries(mailboxItems, requestItems, {

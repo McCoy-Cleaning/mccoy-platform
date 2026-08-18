@@ -45,7 +45,7 @@ export function useInquiriesListQuery(params: {
     bumpTombstones((n) => n + 1);
   }, []);
 
-  const loadList = React.useCallback(async () => {
+  const loadList = React.useCallback(async (opts?: { fresh?: boolean }) => {
     const { kind: k, scopeKey: s, debouncedQ: q } = loadParamsRef.current;
     const generation = ++requestGenerationRef.current;
     const hadData = hasSuccessfulDataRef.current;
@@ -65,6 +65,7 @@ export function useInquiriesListQuery(params: {
           kind: k,
           scopeKey: s,
           q: q || undefined,
+          fresh: opts?.fresh,
         },
       });
 

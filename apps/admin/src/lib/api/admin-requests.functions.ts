@@ -434,6 +434,7 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
           scopeKey: data.scopeKey,
           q: data.q,
           limit: data.limit,
+          fresh: data.fresh,
         });
         await reportMailboxConnectionOk();
       } catch (inboxError) {

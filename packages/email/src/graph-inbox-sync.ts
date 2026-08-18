@@ -6,7 +6,7 @@
  * ingest/database side effects (avoids circular imports).
  */
 import {
-  listWebsiteRequests,
+  findWebsiteRequestIdByNumber,
   upsertWebsiteRequestMailMessage,
 } from "@mccoy/database/server";
 
@@ -30,11 +30,10 @@ async function persistGraphFormRootIdentities(options: {
     if (!msg.isFormCandidate) continue;
     const number = extractRequestNumber(msg.subject || "", msg.bodyPreview || "");
     if (!number) continue;
-    const matches = await listWebsiteRequests({ q: number });
-    const match = matches.find((row) => row.number.toUpperCase() === number.toUpperCase());
-    if (!match) continue;
+    const requestId = await findWebsiteRequestIdByNumber(number);
+    if (!requestId) continue;
     const result = await upsertWebsiteRequestMailMessage({
-      requestId: match.id,
+      requestId,
       direction: "inbound",
       provider: "website_form",
       mailbox,

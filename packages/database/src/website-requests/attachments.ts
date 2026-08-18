@@ -41,6 +41,63 @@ export type WebsiteRequestAttachmentAccess = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STAGED_PATH_RE = /^uploads\/[0-9a-f-]{36}\/\d{2}-[^/]+$/i;
 
+/**
+ * Storage object names must never contain URL-encoding (`%20`) or other
+ * characters Supabase rejects with "Invalid key". Display names stay separate.
+ */
+export function sanitizeStorageObjectName(filename: string): string {
+  const trimmed = filename.trim() || "bijlage";
+  const lastDot = trimmed.lastIndexOf(".");
+  const ext = lastDot > 0 ? trimmed.slice(lastDot + 1) : "";
+  const stem = lastDot > 0 ? trimmed.slice(0, lastDot) : trimmed;
+  const safeStem =
+    stem
+      .replace(/%[0-9A-Fa-f]{2}/g, "_")
+      .replace(/%/g, "")
+      .replace(/[^\w.\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 160) || "bijlage";
+  const safeExt = ext.replace(/[^A-Za-z0-9]+/g, "").slice(0, 16);
+  const name = safeExt ? `${safeStem}.${safeExt}` : safeStem;
+  if (!name || name.includes("%") || /[\\/]/.test(name)) {
+    throw new Error("Invalid website request attachment filename.");
+  }
+  return name.slice(0, 180);
+}
+
+export function uniqueStorageObjectName(filename: string, used: Set<string>): string {
+  const base = sanitizeStorageObjectName(filename);
+  if (!used.has(base.toLowerCase())) {
+    used.add(base.toLowerCase());
+    return base;
+  }
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot) : "";
+  let n = 2;
+  let candidate = `${stem}-${n}${ext}`;
+  while (used.has(candidate.toLowerCase())) {
+    n += 1;
+    candidate = `${stem}-${n}${ext}`;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+}
+
+/** Human-readable download name. Spaces are allowed; `%` and path chars are not. */
+export function sanitizeAttachmentFilename(name: string): string {
+  return (
+    name
+      .replace(/%[0-9A-Fa-f]{2}/g, " ")
+      .replace(/%/g, "")
+      .replace(/[^\w.\- ()[\]]+/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 180) || "bijlage"
+  );
+}
+
 export function websiteRequestAttachmentStoragePath(requestId: string, filename: string): string {
   const id = requestId.trim();
   if (!UUID_RE.test(id)) throw new Error("Invalid website request id.");
@@ -48,7 +105,8 @@ export function websiteRequestAttachmentStoragePath(requestId: string, filename:
   if (!name || name.length > 180 || /[\\/]/.test(name)) {
     throw new Error("Invalid website request attachment filename.");
   }
-  return `${id}/${encodeURIComponent(name)}`;
+  const objectName = sanitizeStorageObjectName(name);
+  return `${id}/${objectName}`;
 }
 
 export function isWebsiteRequestUploadStoragePath(path: string): boolean {
@@ -61,18 +119,20 @@ export function isWebsiteRequestUploadStoragePath(path: string): boolean {
 export function websiteRequestUploadStorageFilename(path: string): string | null {
   if (!isWebsiteRequestUploadStoragePath(path)) return null;
   const objectName = path.trim().split("/")[2] ?? "";
+  const raw = objectName.slice(3);
+  if (!raw) return null;
   try {
-    return decodeURIComponent(objectName.slice(3));
+    return decodeURIComponent(raw);
   } catch {
-    return null;
+    return raw;
   }
 }
 
 function assertReadableStoragePath(path: string): string {
   const trimmed = path.trim();
   if (isWebsiteRequestUploadStoragePath(trimmed)) return trimmed;
-  const [requestId, encodedName, extra] = trimmed.split("/");
-  if (!extra && requestId && encodedName && UUID_RE.test(requestId)) return trimmed;
+  const [requestId, objectName, extra] = trimmed.split("/");
+  if (!extra && requestId && objectName && UUID_RE.test(requestId)) return trimmed;
   throw new Error("Invalid website request attachment storage path.");
 }
 
@@ -90,11 +150,13 @@ export async function createWebsiteRequestAttachmentUploadSlots(
   const supabase = createSupabaseServiceClient();
   const batchId = randomUUID();
   const slots: WebsiteRequestAttachmentUploadSlot[] = [];
+  const usedObjectNames = new Set<string>();
 
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index]!;
     const prefix = String(index + 1).padStart(2, "0");
-    const storagePath = `uploads/${batchId}/${prefix}-${encodeURIComponent(file.filename)}`;
+    const objectName = uniqueStorageObjectName(file.filename, usedObjectNames);
+    const storagePath = `uploads/${batchId}/${prefix}-${objectName}`;
     const { data, error } = await supabase.storage
       .from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET)
       .createSignedUploadUrl(storagePath, { upsert: false });
@@ -125,8 +187,10 @@ export async function storeWebsiteRequestAttachments(
 
   const supabase = createSupabaseServiceClient();
   const uploadedPaths: string[] = [];
+  const usedObjectNames = new Set<string>();
   for (const attachment of attachments) {
-    const path = websiteRequestAttachmentStoragePath(requestId, attachment.filename);
+    const objectName = uniqueStorageObjectName(attachment.filename, usedObjectNames);
+    const path = websiteRequestAttachmentStoragePath(requestId, objectName);
     const bytes = Buffer.from(attachment.contentBase64, "base64");
     if (bytes.length <= 0 || bytes.length > WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES) {
       if (uploadedPaths.length > 0) {
@@ -168,10 +232,6 @@ export async function storeWebsiteRequestAttachments(
   return { status: "stored", count: attachments.length };
 }
 
-function sanitizeAttachmentFilename(name: string): string {
-  return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "bijlage";
-}
-
 /**
  * Move browser-staged uploads (`uploads/{batch}/…`) into the durable
  * `{requestId}/{filename}` prefix used by Admin Aanvragen downloads.
@@ -194,6 +254,7 @@ export async function finalizeWebsiteRequestUploadedAttachments(
   let totalBytes = 0;
   const prepared: Array<UploadedFormAttachment & { destPath: string }> = [];
   const usedNames = new Set<string>();
+  const usedObjectNames = new Set<string>();
 
   for (const file of uploaded) {
     if (!isWebsiteRequestUploadStoragePath(file.storagePath)) {
@@ -217,10 +278,11 @@ export async function finalizeWebsiteRequestUploadedAttachments(
       filename = `${stem}-${n}${ext}`;
     }
     usedNames.add(filename.toLowerCase());
+    const objectName = uniqueStorageObjectName(filename, usedObjectNames);
     prepared.push({
       ...file,
       filename,
-      destPath: websiteRequestAttachmentStoragePath(requestId, filename),
+      destPath: websiteRequestAttachmentStoragePath(requestId, objectName),
     });
   }
 
@@ -248,6 +310,7 @@ export async function finalizeWebsiteRequestUploadedAttachments(
       filename: file.filename,
       contentType: file.contentType || "application/octet-stream",
       sizeBytes: file.sizeBytes,
+      storagePath: file.destPath,
     })),
   };
 }
@@ -271,17 +334,39 @@ export async function getStoredWebsiteRequestAttachmentByPath(
   };
 }
 
+function candidateStoragePaths(requestId: string, filename: string, storagePath?: string): string[] {
+  const paths: string[] = [];
+  if (storagePath?.trim()) {
+    try {
+      paths.push(assertReadableStoragePath(storagePath));
+    } catch {
+      /* ignore invalid stored path and fall back */
+    }
+  }
+  const sanitized = websiteRequestAttachmentStoragePath(requestId, filename);
+  if (!paths.includes(sanitized)) paths.push(sanitized);
+  const legacyEncoded = `${requestId.trim()}/${encodeURIComponent(filename.trim())}`;
+  if (legacyEncoded !== sanitized && !paths.includes(legacyEncoded)) {
+    paths.push(legacyEncoded);
+  }
+  return paths;
+}
+
 /** Read one attachment server-side for validation or historical recovery. */
 export async function getStoredWebsiteRequestAttachment(
   requestId: string,
   filename: string,
   storagePath?: string,
 ): Promise<{ contentBase64: string; sizeBytes: number } | null> {
-  const path = storagePath
-    ? assertReadableStoragePath(storagePath)
-    : websiteRequestAttachmentStoragePath(requestId, filename);
-  const stored = await getStoredWebsiteRequestAttachmentByPath(path);
-  return stored ? { contentBase64: stored.contentBase64, sizeBytes: stored.sizeBytes } : null;
+  for (const path of candidateStoragePaths(requestId, filename, storagePath)) {
+    try {
+      const stored = await getStoredWebsiteRequestAttachmentByPath(path);
+      if (stored) return { contentBase64: stored.contentBase64, sizeBytes: stored.sizeBytes };
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return null;
 }
 
 /** Short-lived URLs are returned only after the Admin server has authorized the caller. */
@@ -291,27 +376,33 @@ export async function createStoredWebsiteRequestAttachmentAccess(input: {
   storagePath?: string;
 }): Promise<WebsiteRequestAttachmentAccess | null> {
   if (!hasSupabaseServiceConfig()) return null;
-  const path = input.storagePath
-    ? assertReadableStoragePath(input.storagePath)
-    : websiteRequestAttachmentStoragePath(input.requestId, input.filename);
   const supabase = createSupabaseServiceClient();
   const bucket = supabase.storage.from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET);
-  const { data: info, error: infoError } = await bucket.info(path);
-  const sizeBytes = Number(info?.size ?? 0);
-  if (infoError || !info || sizeBytes <= 0 || sizeBytes > WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES) {
-    return null;
+
+  for (const path of candidateStoragePaths(input.requestId, input.filename, input.storagePath)) {
+    try {
+      assertReadableStoragePath(path);
+    } catch {
+      continue;
+    }
+    const { data: info, error: infoError } = await bucket.info(path);
+    const sizeBytes = Number(info?.size ?? 0);
+    if (infoError || !info || sizeBytes <= 0 || sizeBytes > WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES) {
+      continue;
+    }
+    const [content, download] = await Promise.all([
+      bucket.createSignedUrl(path, WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS),
+      bucket.createSignedUrl(path, WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS, {
+        download: input.filename,
+      }),
+    ]);
+    if (content.error || download.error || !content.data || !download.data) continue;
+    return {
+      contentUrl: content.data.signedUrl,
+      downloadUrl: download.data.signedUrl,
+      expiresAt: new Date(Date.now() + WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS * 1000).toISOString(),
+      sizeBytes,
+    };
   }
-  const [content, download] = await Promise.all([
-    bucket.createSignedUrl(path, WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS),
-    bucket.createSignedUrl(path, WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS, {
-      download: input.filename,
-    }),
-  ]);
-  if (content.error || download.error || !content.data || !download.data) return null;
-  return {
-    contentUrl: content.data.signedUrl,
-    downloadUrl: download.data.signedUrl,
-    expiresAt: new Date(Date.now() + WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS * 1000).toISOString(),
-    sizeBytes,
-  };
+  return null;
 }

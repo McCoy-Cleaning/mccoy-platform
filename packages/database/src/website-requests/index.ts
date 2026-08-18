@@ -86,6 +86,8 @@ export {
   WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES,
   WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS,
   websiteRequestAttachmentStoragePath,
+  sanitizeStorageObjectName,
+  sanitizeAttachmentFilename,
   isWebsiteRequestUploadStoragePath,
   websiteRequestUploadStorageFilename,
   createWebsiteRequestAttachmentUploadSlots,

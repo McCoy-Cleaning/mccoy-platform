@@ -321,7 +321,7 @@ export async function getWebsiteRequestFormInboxAttachment(
     const access = await createStoredWebsiteRequestAttachmentAccess({
       requestId: request.id,
       filename: attachmentMeta.filename,
-      storagePath: undefined,
+      storagePath: matched?.storagePath,
     });
     if (access) {
       return {
@@ -339,6 +339,7 @@ export async function getWebsiteRequestFormInboxAttachment(
     const stored = await getStoredWebsiteRequestAttachment(
       request.id,
       attachmentMeta.filename,
+      matched?.storagePath,
     );
     if (stored?.contentBase64) {
       return {

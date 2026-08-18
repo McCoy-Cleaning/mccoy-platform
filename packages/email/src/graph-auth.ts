@@ -29,6 +29,7 @@ type TokenResponse = {
 
 export async function getGraphAccessToken(
   config = getGraphMailConfig(),
+  options?: { signal?: AbortSignal },
 ): Promise<string> {
   if (!config) {
     throw new FormInboxConfigError(
@@ -56,7 +57,7 @@ export async function getGraphAccessToken(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
-      signal: AbortSignal.timeout(20_000),
+      signal: options?.signal ?? AbortSignal.timeout(20_000),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 160) : "network error";

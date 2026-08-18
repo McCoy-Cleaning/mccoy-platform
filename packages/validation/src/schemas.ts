@@ -158,6 +158,8 @@ export const adminInboxListSchema = z.object({
     .default("all"),
   q: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(200).optional(),
+  /** Explicit Vernieuwen — bypass list snapshot cache and allow a longer Graph window. */
+  fresh: z.boolean().optional(),
 });
 
 /** imap:mailbox:uid | graph:mailbox:encodedMessageId | e2e:mailbox:requestId */

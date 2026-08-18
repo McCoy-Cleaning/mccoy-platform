@@ -789,7 +789,7 @@ function toThreadItem(
 async function listRecentMessages(
   config: GraphMailConfig,
   accessToken: string,
-  options?: { stopWhen?: (accumulated: GraphMessage[]) => boolean },
+  options?: { stopWhen?: (accumulated: GraphMessage[]) => boolean; signal?: AbortSignal },
 ): Promise<{ messages: GraphMessage[]; pageCount: number }> {
   const select = [
     "id",
@@ -816,6 +816,7 @@ async function listRecentMessages(
   for (let page = 0; page < LIST_MAX_PAGES; page++) {
     const data = await graphFetch<GraphListResponse<GraphMessage>>(url, {
       accessToken,
+      signal: options?.signal,
     });
     pageCount += 1;
     const batch = data.value ?? [];
@@ -832,6 +833,7 @@ export async function listGraphFormInboxMessages(options?: {
   scopeKey?: string | "all";
   q?: string;
   limit?: number;
+  signal?: AbortSignal;
 }): Promise<{
   items: FormInboxMessageSummary[];
   facets: InboxFacets;
@@ -846,10 +848,11 @@ export async function listGraphFormInboxMessages(options?: {
 
   const started = Date.now();
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
-  const accessToken = await getGraphAccessToken(config);
+  const accessToken = await getGraphAccessToken(config, { signal: options?.signal });
   const showAll = showAllGraphInboxMessages();
 
   const { messages: recent, pageCount } = await listRecentMessages(config, accessToken, {
+    signal: options?.signal,
     stopWhen: (accumulated) => {
       if (showAll) return accumulated.length >= limit;
       let formCount = 0;

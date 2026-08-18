@@ -160,7 +160,9 @@ export async function listWebsiteRequests(
   const supabase = createSupabaseServiceClient();
   let query = supabase
     .from("website_requests")
-    .select("*, website_request_replies(count)")
+    .select(
+      "id, number, kind, status, submitter_name, submitter_email, subject, attachments, form_id, source_page_id, scope_key, scope_label, created_at, updated_at, last_replied_at, website_request_replies(count)",
+    )
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
 

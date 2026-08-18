@@ -15,6 +15,8 @@ export type AttachmentMeta = {
   filename: string;
   contentType: string;
   sizeBytes: number;
+  /** Durable private-storage object key when known. */
+  storagePath?: string;
 };
 
 export type RequestReply = {
