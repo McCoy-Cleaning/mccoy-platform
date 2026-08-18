@@ -1,10 +1,12 @@
-import type { FormAttachment, FormKind, WebsiteFormPayload } from "@mccoy/domain";
+import type { FormAttachment, FormKind, UploadedFormAttachment, WebsiteFormPayload } from "@mccoy/domain";
 import { sanitizeScopeForSubject } from "@mccoy/domain";
 import {
   attachmentMetaFromBase64,
   createWebsiteRequest,
+  finalizeWebsiteRequestUploadedAttachments,
   hasSupabaseServiceConfig,
   processNotificationOutbox,
+  storeWebsiteRequestAttachments,
   updateRequestNotification,
 } from "@mccoy/database/server";
 import {
@@ -26,6 +28,8 @@ export { FormSubmitError } from "./form-submit-error";
 const DEFAULT_TO = "oana.dine1571@gmail.com";
 const MAX_ATTACHMENT_BYTES = 4.5 * 1024 * 1024;
 const MAX_FIELD_LENGTH = 2000;
+const IMAGE_CONTENT_TYPE_RE = /^image\//i;
+const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|jpe?g|png|webp)$/i;
 
 function getFormEmailConfig() {
   return {
@@ -49,6 +53,10 @@ function sanitizeFields(fields: Record<string, string>): Record<string, string> 
   return out;
 }
 
+function sanitizeAttachmentFilename(name: string): string {
+  return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "bijlage";
+}
+
 function filterAttachments(attachments: FormAttachment[] | undefined): FormAttachment[] {
   if (!attachments?.length) return [];
   const accepted: FormAttachment[] = [];
@@ -59,13 +67,58 @@ function filterAttachments(attachments: FormAttachment[] | undefined): FormAttac
     if (total + approxBytes > MAX_ATTACHMENT_BYTES) continue;
     if (!file.filename || file.filename.length > 180) continue;
     accepted.push({
-      filename: file.filename.replace(/[^\w.\- ()[\]]+/g, "_"),
+      filename: sanitizeAttachmentFilename(file.filename),
       contentBase64: file.contentBase64,
       contentType: file.contentType || "application/octet-stream",
     });
     total += approxBytes;
   }
   return accepted;
+}
+
+function filterUploadedAttachments(
+  uploaded: UploadedFormAttachment[] | undefined,
+): UploadedFormAttachment[] {
+  if (!uploaded?.length) return [];
+  const used = new Set<string>();
+  return uploaded.slice(0, 8).map((file) => {
+    let filename = sanitizeAttachmentFilename(file.filename);
+    if (used.has(filename.toLowerCase())) {
+      const dot = filename.lastIndexOf(".");
+      const stem = dot > 0 ? filename.slice(0, dot) : filename;
+      const ext = dot > 0 ? filename.slice(dot) : "";
+      let n = 2;
+      while (used.has(`${stem}-${n}${ext}`.toLowerCase())) n += 1;
+      filename = `${stem}-${n}${ext}`;
+    }
+    used.add(filename.toLowerCase());
+    return {
+      filename,
+      contentType: file.contentType || "application/octet-stream",
+      sizeBytes: file.sizeBytes,
+      storagePath: file.storagePath.trim(),
+    };
+  });
+}
+
+function isImageAttachment(filename: string, contentType: string): boolean {
+  if (IMAGE_CONTENT_TYPE_RE.test(contentType)) return true;
+  return IMAGE_EXTENSION_RE.test(filename);
+}
+
+function enrichFieldsWithAttachmentNames(
+  fields: Record<string, string>,
+  attachments: Array<{ filename: string; contentType: string }>,
+): Record<string, string> {
+  if (!attachments.length) return fields;
+  const next = { ...fields };
+  const imageNames = attachments
+    .filter((item) => isImageAttachment(item.filename, item.contentType))
+    .map((item) => item.filename);
+  if (imageNames.length > 0 && !next.photos?.trim()) {
+    next.photos = imageNames.join(", ");
+  }
+  return next;
 }
 
 function htmlToPlainText(html: string): string {
@@ -92,7 +145,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   }
 
   const kind = payload.kind as FormKind;
-  const fields = sanitizeFields(payload.fields ?? {});
+  let fields = sanitizeFields(payload.fields ?? {});
 
   if (kind === "newsletter") {
     if (!fields.email) {
@@ -131,10 +184,21 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     throw error;
   }
 
-  const attachments = filterAttachments(payload.attachments);
-  const attachmentMeta = attachments.map((a) =>
-    attachmentMetaFromBase64(a.filename, a.contentType, a.contentBase64),
-  );
+  const legacyAttachments = filterAttachments(payload.attachments);
+  const uploadedAttachments = filterUploadedAttachments(payload.uploadedAttachments);
+
+  const attachmentMeta =
+    uploadedAttachments.length > 0
+      ? uploadedAttachments.map((a) => ({
+          filename: a.filename,
+          contentType: a.contentType,
+          sizeBytes: a.sizeBytes,
+        }))
+      : legacyAttachments.map((a) =>
+          attachmentMetaFromBase64(a.filename, a.contentType, a.contentBase64),
+        );
+
+  fields = enrichFieldsWithAttachmentNames(fields, attachmentMeta);
 
   // Scope on the payload is already server-resolved by submitWebsiteForm.
   // Never invent tabs from a raw client label.
@@ -152,6 +216,31 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     scopeLabel: scope?.label ?? null,
   });
 
+  if (uploadedAttachments.length > 0) {
+    const finalized = await finalizeWebsiteRequestUploadedAttachments(
+      request.id,
+      uploadedAttachments,
+    );
+    if (!finalized.ok) {
+      throw new FormSubmitError(finalized.error, "provider");
+    }
+  } else if (legacyAttachments.length > 0 && hasSupabaseServiceConfig()) {
+    const stored = await storeWebsiteRequestAttachments(
+      request.id,
+      legacyAttachments.map((a) => ({
+        filename: a.filename,
+        contentType: a.contentType,
+        contentBase64: a.contentBase64,
+      })),
+    );
+    if (stored.status === "failed") {
+      console.error("[forms] private attachment store failed", {
+        requestId: request.id,
+        error: stored.error,
+      });
+    }
+  }
+
   // Postgres-backed store enqueues `website_request.received` in the same
   // transaction as the request row (create_website_request_with_notification RPC).
   // Drain the outbox inline — same pattern as CMS's processCmsOutbox after publish.
@@ -167,7 +256,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   const email = buildFormEmail(
     kind,
     fields,
-    attachments.map((a) => a.filename),
+    attachmentMeta.map((a) => a.filename),
     scope,
   );
 
@@ -212,6 +301,9 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     return { ok: true };
   }
 
+  // Prefer durable private storage for Admin; email may still carry small Base64 copies.
+  const mailAttachments = legacyAttachments;
+
   try {
     if (canGraph) {
       const sent = await sendGraphAdminReply({
@@ -224,7 +316,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
         // Form notifications to the shared mailbox must not also land in Sent Items
         // (saveToSentItems would duplicate the same submission in Aanvragen).
         saveToSentItems: false,
-        attachments: attachments.map((a) => ({
+        attachments: mailAttachments.map((a) => ({
           filename: a.filename,
           contentBase64: a.contentBase64,
           contentType: a.contentType,
@@ -257,7 +349,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
       html: email.html,
       replyTo: fields.email,
       headers,
-      attachments: attachments.map((a) => ({
+      attachments: mailAttachments.map((a) => ({
         filename: a.filename,
         content: a.contentBase64,
         contentType: a.contentType,

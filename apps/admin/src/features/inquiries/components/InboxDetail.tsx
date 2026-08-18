@@ -11,7 +11,14 @@ import type { DetailState } from "../hooks/useInquiryDetailQuery";
 import { useInquiryDetailDelete } from "../hooks/useInquiryDetailDelete";
 import { useInquiryReply } from "../hooks/useInquiryReply";
 import { isFullWidthFormField, isHeaderContactFormField } from "../lib/form-fields";
+import {
+  FORM_PHOTOS_FIELD_KEY,
+  FORM_PHOTOS_FIELD_LABEL,
+  partitionFormAttachments,
+  shouldHideAttachmentFieldText,
+} from "../lib/form-field-attachments";
 import { formatWhen } from "../lib/format";
+import { AttachmentImageThumbs } from "./AttachmentImageThumbs";
 import { AttachmentsBlock } from "./AttachmentsBlock";
 import { ConversationThread } from "./ConversationThread";
 import { FormFieldValue } from "./FormFieldValue";
@@ -64,8 +71,38 @@ export function InboxDetail({
     detail?.subject ??
     "Aanvraag";
 
-  const bodyFields =
+  const bodyFieldsBase =
     detail?.fields.filter((field) => !isHeaderContactFormField(field.key)) ?? [];
+  const attachmentPartition = detail
+    ? partitionFormAttachments(detail.fields, detail.attachments)
+    : {
+        imagesByFieldKey: new Map(),
+        unmappedImages: [] as FormInboxMessage["attachments"],
+        fileAttachments: [] as FormInboxMessage["attachments"],
+      };
+
+  const bodyFields = (() => {
+    const fields = [...bodyFieldsBase];
+    const hasPhotosField = fields.some((field) => field.key === FORM_PHOTOS_FIELD_KEY);
+    if (!hasPhotosField && attachmentPartition.unmappedImages.length > 0) {
+      fields.push({
+        key: FORM_PHOTOS_FIELD_KEY,
+        label: FORM_PHOTOS_FIELD_LABEL,
+        value: attachmentPartition.unmappedImages.map((item) => item.filename).join(", "),
+      });
+      attachmentPartition.imagesByFieldKey.set(
+        FORM_PHOTOS_FIELD_KEY,
+        attachmentPartition.unmappedImages,
+      );
+    } else if (hasPhotosField && attachmentPartition.unmappedImages.length > 0) {
+      const current = attachmentPartition.imagesByFieldKey.get(FORM_PHOTOS_FIELD_KEY) ?? [];
+      attachmentPartition.imagesByFieldKey.set(FORM_PHOTOS_FIELD_KEY, [
+        ...current,
+        ...attachmentPartition.unmappedImages,
+      ]);
+    }
+    return fields;
+  })();
   const submitterPhone =
     detail?.fields.find((f) => f.key === "phone")?.value?.trim() || null;
 
@@ -209,13 +246,16 @@ export function InboxDetail({
                   {bodyFields.map((field) => {
                     const label = FIELD_LABELS_NL[field.key] ?? field.label;
                     const fullWidth = isFullWidthFormField(field.key);
+                    const fieldImages =
+                      attachmentPartition.imagesByFieldKey.get(field.key) ?? [];
+                    const hideText = shouldHideAttachmentFieldText(field.value, fieldImages);
 
                     return (
                       <div
                         key={`${field.key}-${field.label}`}
                         className={cn(
                           "bg-[#0c1220]",
-                          fullWidth
+                          fullWidth || fieldImages.length > 0
                             ? "col-span-full grid gap-1 px-5 py-4 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:gap-6 sm:px-6"
                             : "px-4 py-2.5 sm:px-5 sm:py-3",
                         )}
@@ -223,13 +263,29 @@ export function InboxDetail({
                         <dt
                           className={cn(
                             "text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40",
-                            !fullWidth && "leading-snug",
+                            !fullWidth && fieldImages.length === 0 && "leading-snug",
                           )}
                         >
                           {label}
                         </dt>
-                        <dd className={cn("min-w-0", !fullWidth && "mt-0.5")}>
-                          <FormFieldValue fieldKey={field.key} label={label} value={field.value} />
+                        <dd className={cn("min-w-0", !fullWidth && fieldImages.length === 0 && "mt-0.5")}>
+                          {fieldImages.length > 0 ? (
+                            <div className="space-y-3">
+                              <AttachmentImageThumbs
+                                messageId={detail?.id}
+                                attachments={fieldImages}
+                              />
+                              {!hideText ? (
+                                <FormFieldValue
+                                  fieldKey={field.key}
+                                  label={label}
+                                  value={field.value}
+                                />
+                              ) : null}
+                            </div>
+                          ) : (
+                            <FormFieldValue fieldKey={field.key} label={label} value={field.value} />
+                          )}
                         </dd>
                       </div>
                     );
@@ -244,7 +300,10 @@ export function InboxDetail({
               )}
             </section>
 
-            <AttachmentsBlock messageId={detail.id} attachments={detail.attachments} />
+            <AttachmentsBlock
+              messageId={detail.id}
+              attachments={attachmentPartition.fileAttachments}
+            />
 
             <ConversationThread
               thread={detail.thread}

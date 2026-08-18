@@ -80,3 +80,22 @@ export {
   reconcileOrphanWebsiteRequestScopes,
   type ReconcileOrphanScopesResult,
 } from "./reconcile-orphan-scopes";
+
+export {
+  WEBSITE_REQUEST_ATTACHMENTS_BUCKET,
+  WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES,
+  WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS,
+  websiteRequestAttachmentStoragePath,
+  isWebsiteRequestUploadStoragePath,
+  websiteRequestUploadStorageFilename,
+  createWebsiteRequestAttachmentUploadSlots,
+  storeWebsiteRequestAttachments,
+  finalizeWebsiteRequestUploadedAttachments,
+  getStoredWebsiteRequestAttachmentByPath,
+  getStoredWebsiteRequestAttachment,
+  createStoredWebsiteRequestAttachmentAccess,
+  type WebsiteRequestAttachmentContent,
+  type WebsiteRequestAttachmentUploadSlot,
+  type StoreWebsiteRequestAttachmentsResult,
+  type WebsiteRequestAttachmentAccess,
+} from "./attachments";

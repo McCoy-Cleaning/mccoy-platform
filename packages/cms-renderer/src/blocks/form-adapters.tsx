@@ -13,6 +13,8 @@ export type ContactFormSubmitInput = {
   blockId: string;
   pageId: string;
   fields: Record<string, string>;
+  /** Selected file inputs — uploaded by the storefront adapter before submit. */
+  files?: File[];
   /** Honeypot — must stay empty */
   website?: string;
 };
@@ -22,6 +24,8 @@ export type QuoteFormSubmitInput = {
   pageId: string;
   kind: "glass_washing" | "furniture_cleaning";
   fields: Record<string, string>;
+  /** Selected file inputs — uploaded by the storefront adapter before submit. */
+  files?: File[];
   /** Honeypot — must stay empty */
   website?: string;
 };

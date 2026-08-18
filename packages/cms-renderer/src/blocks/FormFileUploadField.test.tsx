@@ -76,4 +76,33 @@ describe("FormFileUploadField", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).not.toContain("situatie.png");
   });
+
+  it("shows the filename for non-image files without a broken image", async () => {
+    function Harness() {
+      const [files, setFiles] = React.useState<File[]>([]);
+      return (
+        <FormFileUploadField
+          id="docs"
+          name="docs"
+          files={files}
+          onFilesChange={setFiles}
+          inputClassName="input"
+        />
+      );
+    }
+
+    await act(async () => root.render(<Harness />));
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const pdf = new File(["%PDF"], "plattegrond.pdf", {
+      type: "application/pdf",
+      lastModified: 11,
+    });
+    Object.defineProperty(input, "files", { configurable: true, value: [pdf] });
+
+    await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).toContain("plattegrond.pdf");
+    expect(container.textContent).toContain("PDF");
+  });
 });

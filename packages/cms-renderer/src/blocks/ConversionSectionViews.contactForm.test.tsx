@@ -1,7 +1,7 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { createDefaultBlock, getBlockDataDefinition } from "@mccoy/cms-schema";
+import { createDefaultBlock, createFormFieldItem, getBlockDataDefinition } from "@mccoy/cms-schema";
 import { ContactFormSectionView } from "./ConversionSectionViews";
 
 describe("ContactFormSectionView formColumnsDesktop", () => {
@@ -34,5 +34,23 @@ describe("ContactFormSectionView formColumnsDesktop", () => {
     );
     expect(html).toContain('data-form-columns="1"');
     expect(html).not.toContain("sm:grid-cols-2");
+  });
+
+  it("renders the preview-capable file input when a file field is configured", () => {
+    const def = getBlockDataDefinition("contactForm");
+    const data = def.normalize({
+      title: "Contact",
+      fields: [createFormFieldItem("Foto's", "file")],
+    });
+    const html = renderToStaticMarkup(
+      React.createElement(ContactFormSectionView, {
+        data,
+        blockId: "cf-files",
+        mode: "preview",
+      }),
+    );
+    expect(html).toContain('type="file"');
+    expect(html).toContain("form-file-upload");
+    expect(html).toContain("multiple");
   });
 });

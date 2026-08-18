@@ -137,6 +137,21 @@ export function resolveCanonicalHostRedirect(options: {
   return { redirectTo: target, status: 301, reason };
 }
 
+/** True for the legacy `/admin` path prefix (bookmarks and old email links). */
+export function isAdminPathPrefix(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+/**
+ * Drop the legacy `/admin` prefix: `/admin` → `/`, `/admin/website` → `/website`.
+ * Returns null when the path is not prefixed.
+ */
+export function dropAdminPathPrefix(pathname: string): string | null {
+  if (!isAdminPathPrefix(pathname)) return null;
+  if (pathname === "/admin" || pathname === "/admin/") return "/";
+  return pathname.slice("/admin".length) || "/";
+}
+
 /**
  * @param app - Which app is handling the request.
  *              Dedicated apps only redirect away from foreign surfaces.
@@ -154,11 +169,14 @@ export function shouldRedirectForHost(options: {
   if (isInfrastructurePath(pathname)) return null;
 
   const app = options.app ?? "combined";
-  const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminPath = isAdminPathPrefix(pathname);
   const { adminHosts, publicHosts } = getHostConfig();
   const protocol = options.protocol === "http" ? "http" : "https";
   const adminHost = adminHosts[0] ?? "admin.mccoy.nl";
   const publicHost = publicHosts[0] ?? "www.mccoy.nl";
+  const search = options.search ?? "";
+  const unprefixedPath = dropAdminPathPrefix(pathname) ?? pathname;
+  const unprefixedLocation = `${unprefixedPath === "/" ? "/" : unprefixedPath}${search}`;
 
   if (app === "storefront") {
     // Prefer one-hop canonical host/slash before surface redirects.
@@ -172,40 +190,39 @@ export function shouldRedirectForHost(options: {
       return { redirectTo: canonical.redirectTo, status: canonical.status };
     }
 
-    // Storefront never serves /admin*; send browsers to the admin host.
+    // Storefront never serves /admin*; send browsers to the admin host (prefix dropped).
     if (isAdminPath) {
-      return { redirectTo: `${protocol}://${adminHost}${pathname}` };
+      return {
+        redirectTo: `${protocol}://${adminHost}${unprefixedLocation}`,
+        status: 301,
+      };
     }
     if (surface === "admin") {
-      return { redirectTo: `${protocol}://${adminHost}/admin` };
+      return { redirectTo: `${protocol}://${adminHost}/` };
     }
     return null;
   }
 
   if (app === "admin") {
-    // Dedicated admin app: keep traffic on /admin* paths.
     if (surface === "public" && !isLocalHost(options.host ?? "")) {
       return { redirectTo: `${protocol}://${publicHost}/` };
     }
-    if (!isAdminPath && pathname !== "/") {
-      // Allow root → /admin convenience redirect.
-      if (pathname === "/" || pathname === "") {
-        return { redirectTo: "/admin" };
-      }
-    }
-    if (pathname === "/" || pathname === "") {
-      return { redirectTo: "/admin" };
+    // Bookmarks and old emails: /admin/website → /website (keep query).
+    if (isAdminPath) {
+      return { redirectTo: unprefixedLocation, status: 301 };
     }
     return null;
   }
 
   // Combined (legacy) — both route trees in one process.
-  if (surface === "admin" && !isAdminPath) {
-    return { redirectTo: "/admin" };
-  }
-
-  if (surface === "public" && isAdminPath) {
-    return { redirectTo: `${protocol}://${adminHost}${pathname}` };
+  if (isAdminPath) {
+    if (surface === "public") {
+      return {
+        redirectTo: `${protocol}://${adminHost}${unprefixedLocation}`,
+        status: 301,
+      };
+    }
+    return { redirectTo: unprefixedLocation, status: 301 };
   }
 
   return null;

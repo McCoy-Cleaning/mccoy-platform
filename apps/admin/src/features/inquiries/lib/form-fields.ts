@@ -3,7 +3,13 @@ export const COLLAPSE_FIELD_KEYS = new Set(["motivation", "letter"]);
 export const COLLAPSE_CHAR_THRESHOLD = 220;
 
 /** Long-text fields stay full-width with readable spacing; scalars use the compact grid. */
-export const FULL_WIDTH_FIELD_KEYS = new Set(["message", "motivation", "letter", "description"]);
+export const FULL_WIDTH_FIELD_KEYS = new Set([
+  "message",
+  "motivation",
+  "letter",
+  "description",
+  "photos",
+]);
 
 /**
  * Contact fields already shown in the Aanvragen detail header ("Antwoord naar" /

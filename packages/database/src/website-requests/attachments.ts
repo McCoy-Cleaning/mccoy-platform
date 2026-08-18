@@ -2,7 +2,10 @@ import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 
 import {
+  MAX_WEBSITE_FORM_ATTACHMENT_COUNT,
   MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES,
+  MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
+  type AttachmentMeta,
   type FormUploadFileIntent,
   type UploadedFormAttachment,
 } from "@mccoy/domain";
@@ -163,6 +166,90 @@ export async function storeWebsiteRequestAttachments(
   }
 
   return { status: "stored", count: attachments.length };
+}
+
+function sanitizeAttachmentFilename(name: string): string {
+  return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "bijlage";
+}
+
+/**
+ * Move browser-staged uploads (`uploads/{batch}/…`) into the durable
+ * `{requestId}/{filename}` prefix used by Admin Aanvragen downloads.
+ */
+export async function finalizeWebsiteRequestUploadedAttachments(
+  requestId: string,
+  uploaded: UploadedFormAttachment[],
+): Promise<
+  | { ok: true; attachments: AttachmentMeta[] }
+  | { ok: false; error: string }
+> {
+  if (!uploaded.length) return { ok: true, attachments: [] };
+  if (!hasSupabaseServiceConfig()) {
+    return { ok: false, error: "Private attachment storage is not configured." };
+  }
+  if (uploaded.length > MAX_WEBSITE_FORM_ATTACHMENT_COUNT) {
+    return { ok: false, error: `U kunt maximaal ${MAX_WEBSITE_FORM_ATTACHMENT_COUNT} bestanden toevoegen.` };
+  }
+
+  let totalBytes = 0;
+  const prepared: Array<UploadedFormAttachment & { destPath: string }> = [];
+  const usedNames = new Set<string>();
+
+  for (const file of uploaded) {
+    if (!isWebsiteRequestUploadStoragePath(file.storagePath)) {
+      return { ok: false, error: "Ongeldig uploadpad voor bijlage." };
+    }
+    if (file.sizeBytes <= 0 || file.sizeBytes > MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES) {
+      return { ok: false, error: `Bestand “${file.filename}” heeft een ongeldige grootte.` };
+    }
+    totalBytes += file.sizeBytes;
+    if (totalBytes > MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES) {
+      return { ok: false, error: "De geselecteerde bestanden zijn samen te groot." };
+    }
+
+    let filename = sanitizeAttachmentFilename(file.filename);
+    if (usedNames.has(filename.toLowerCase())) {
+      const dot = filename.lastIndexOf(".");
+      const stem = dot > 0 ? filename.slice(0, dot) : filename;
+      const ext = dot > 0 ? filename.slice(dot) : "";
+      let n = 2;
+      while (usedNames.has(`${stem}-${n}${ext}`.toLowerCase())) n += 1;
+      filename = `${stem}-${n}${ext}`;
+    }
+    usedNames.add(filename.toLowerCase());
+    prepared.push({
+      ...file,
+      filename,
+      destPath: websiteRequestAttachmentStoragePath(requestId, filename),
+    });
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const bucket = supabase.storage.from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET);
+  const moved: string[] = [];
+
+  for (const file of prepared) {
+    const { error } = await bucket.move(file.storagePath, file.destPath);
+    if (error) {
+      if (moved.length > 0) {
+        await bucket.remove(moved).catch(() => undefined);
+      }
+      return {
+        ok: false,
+        error: `Bijlage “${file.filename}” kon niet worden opgeslagen: ${safeStorageError(error.message)}`,
+      };
+    }
+    moved.push(file.destPath);
+  }
+
+  return {
+    ok: true,
+    attachments: prepared.map((file) => ({
+      filename: file.filename,
+      contentType: file.contentType || "application/octet-stream",
+      sizeBytes: file.sizeBytes,
+    })),
+  };
 }
 
 export async function getStoredWebsiteRequestAttachmentByPath(

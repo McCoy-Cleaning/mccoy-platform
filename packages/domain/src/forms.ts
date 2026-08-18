@@ -56,7 +56,10 @@ export type WebsiteFormPayload = {
   /** Block id or fixed source id, e.g. fixed:contact:form */
   sourceId: string;
   fields: Record<string, string>;
+  /** Legacy Base64 path (small files / mail recovery). Prefer uploadedAttachments. */
   attachments?: FormAttachment[];
+  /** Files already uploaded to private storage (no Base64 in the function payload). */
+  uploadedAttachments?: UploadedFormAttachment[];
   /** Honeypot — must stay empty */
   website?: string;
   /**

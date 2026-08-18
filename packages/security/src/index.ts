@@ -6,7 +6,9 @@ export {
 
 export {
   CANONICAL_PUBLIC_HOST,
+  dropAdminPathPrefix,
   getHostConfig,
+  isAdminPathPrefix,
   resolveHostSurface,
   resolveCanonicalHostRedirect,
   shouldRedirectForHost,

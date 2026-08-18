@@ -8,6 +8,12 @@ export type FormInboxAttachment = {
   size: number;
   /** Present when size is within limits (base64). */
   contentBase64?: string;
+  /** Short-lived private-storage preview URL (Admin-authorized). */
+  contentUrl?: string;
+  /** Short-lived private-storage download URL (Admin-authorized). */
+  downloadUrl?: string;
+  /** ISO expiry for contentUrl / downloadUrl. */
+  urlExpiresAt?: string;
   omitted?: boolean;
   /** IMAP BODYSTRUCTURE part id for on-demand download. */
   part?: string;

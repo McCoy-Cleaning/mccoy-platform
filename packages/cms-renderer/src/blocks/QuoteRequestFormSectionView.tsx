@@ -16,6 +16,7 @@ import { SectionEyebrow, SectionSurface } from "../sectionChromeUi";
 import { SECTION_PAGE_RAIL } from "../sectionLayout";
 import { SectionShell } from "../SectionShell";
 import { cn } from "./blockViewShared";
+import { FormFileUploadField } from "./FormFileUploadField";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
 
 type ConversionRenderMode = "storefront" | "preview";
@@ -61,16 +62,25 @@ function iconForTab(tab: QuoteRequestFormTab): React.ComponentType<{ className?:
   return GlassIcon;
 }
 
+const QUOTE_FILE_INPUT_CLASS =
+  "w-full rounded-2xl border border-dashed border-white/15 bg-background/40 px-4 py-3 text-sm text-white/75 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground";
+
 function FieldControl({
   field,
   value,
   onChange,
   idPrefix,
+  files,
+  onFilesChange,
+  disabled = false,
 }: {
   field: FormFieldItem;
   value: string;
   onChange: (v: string) => void;
   idPrefix: string;
+  files: File[];
+  onFilesChange: (files: File[]) => void;
+  disabled?: boolean;
 }) {
   const id = `${idPrefix}-${formFieldPayloadKey(field)}`;
   const key = formFieldPayloadKey(field);
@@ -130,13 +140,15 @@ function FieldControl({
     return (
       <div className="sm:col-span-2">
         {label}
-        <input
+        <FormFileUploadField
           id={id}
           name={key}
-          type="file"
+          files={files}
+          onFilesChange={onFilesChange}
+          disabled={disabled}
+          required={field.required}
           accept="image/*,application/pdf"
-          multiple
-          className="w-full rounded-2xl border border-dashed border-white/15 bg-background/40 px-4 py-3 text-sm text-white/75 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground"
+          inputClassName={QUOTE_FILE_INPUT_CLASS}
         />
         {field.placeholder ? (
           <p className="mt-1 text-[11px] text-white/45">{field.placeholder}</p>
@@ -186,6 +198,7 @@ function TabForm({
     [tab.fields],
   );
   const [values, setValues] = React.useState<Record<string, string>>({});
+  const [fileValues, setFileValues] = React.useState<Record<string, File[]>>({});
   const [honeypot, setHoneypot] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
@@ -198,8 +211,17 @@ function TabForm({
     if (preview || !clientReady) return;
     setError(null);
     const payload: Record<string, string> = {};
+    const files: File[] = [];
     for (const field of fields) {
       const key = formFieldPayloadKey(field);
+      if (field.type === "file") {
+        const selected = fileValues[key] ?? [];
+        files.push(...selected);
+        if (selected.length > 0) {
+          payload[key] = selected.map((file) => file.name).join(", ");
+        }
+        continue;
+      }
       payload[key] = (values[key] ?? "").trim();
     }
     if (!payload.name || !payload.email) {
@@ -213,20 +235,31 @@ function TabForm({
       return;
     }
     setStatus("loading");
-    const result = await adapters.submitQuoteForm({
-      blockId,
-      pageId,
-      kind: tab.kind,
-      fields: payload,
-      website: honeypot,
-    });
-    if (!result.ok) {
+    try {
+      const result = await adapters.submitQuoteForm({
+        blockId,
+        pageId,
+        kind: tab.kind,
+        fields: payload,
+        files,
+        website: honeypot,
+      });
+      if (!result.ok) {
+        setStatus("error");
+        setError(result.error);
+        return;
+      }
+      setStatus("success");
+      setValues({});
+      setFileValues({});
+    } catch (submitError) {
       setStatus("error");
-      setError(result.error);
-      return;
+      setError(
+        submitError instanceof Error && submitError.message
+          ? submitError.message
+          : "Verzenden is mislukt. Probeer het opnieuw.",
+      );
     }
-    setStatus("success");
-    setValues({});
   };
 
   return (
@@ -277,6 +310,11 @@ function TabForm({
                   idPrefix={`quote-${tab.id}`}
                   value={values[key] ?? ""}
                   onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
+                  files={fileValues[key] ?? []}
+                  onFilesChange={(next) =>
+                    setFileValues((prev) => ({ ...prev, [key]: next }))
+                  }
+                  disabled={!clientReady || status === "loading" || preview}
                 />
               );
             })}

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   createDefaultBlock,
   createFormFieldItem,
+  formFieldPayloadKey,
   type QuoteRequestFormBlockData,
 } from "@mccoy/cms-schema";
 import { QuoteRequestFormSectionView } from "./QuoteRequestFormSectionView";
@@ -29,6 +30,12 @@ describe("QuoteRequestFormSectionView file previews", () => {
       expect(html).toContain('type="file"');
       expect(html).toContain("multiple");
       expect(html).toContain('accept="image/*,application/pdf"');
+      expect(html).toContain("form-file-upload");
     }
+  });
+
+  it("maps offerte photo file fields to the photos payload key", () => {
+    const field = createFormFieldItem("Foto's van de situatie (optioneel)", "file");
+    expect(formFieldPayloadKey(field)).toBe("photos");
   });
 });

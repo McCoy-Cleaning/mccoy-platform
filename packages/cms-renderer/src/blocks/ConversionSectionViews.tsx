@@ -19,6 +19,7 @@ import {
 import { SectionShell } from "../SectionShell";
 import { SectionEyebrow, SectionHeader, SectionSurface } from "../sectionChromeUi";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
+import { FormFileUploadField } from "./FormFileUploadField";
 import { CmsButtonView } from "./CmsButtonView";
 import type { LinkResolverPages } from "./CmsImageView";
 
@@ -41,6 +42,8 @@ const CONTACT_FORM_SUCCESS_NL = "Bedankt voor uw bericht.";
 
 const FIELD_INPUT_CLASS =
   "w-full rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60";
+
+const FIELD_FILE_INPUT_CLASS = `${FIELD_INPUT_CLASS} border-dashed file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground`;
 
 const FIELD_LABEL_CLASS =
   "mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
@@ -185,6 +188,8 @@ function ContactFormFieldInput({
   blockId,
   value,
   onChange,
+  files,
+  onFilesChange,
   disabled,
   placeholder,
 }: {
@@ -192,12 +197,28 @@ function ContactFormFieldInput({
   blockId: string;
   value: string;
   onChange: (next: string) => void;
+  files: File[];
+  onFilesChange: (files: File[]) => void;
   disabled: boolean;
   placeholder?: string;
 }) {
   const fieldId = `cf-${blockId}-${field.id}`;
   const key = formFieldPayloadKey(field);
   const required = isFieldRequired(field);
+
+  if (field.type === "file") {
+    return (
+      <FormFileUploadField
+        id={fieldId}
+        name={key}
+        files={files}
+        onFilesChange={onFilesChange}
+        disabled={disabled}
+        required={required}
+        inputClassName={FIELD_FILE_INPUT_CLASS}
+      />
+    );
+  }
 
   if (field.type === "textarea") {
     return (
@@ -307,6 +328,7 @@ export function ContactFormSectionView({
   const pageId = useCmsPageId();
   const fields = React.useMemo(() => resolveContactFormFields(d.fields), [d.fields]);
   const [values, setValues] = React.useState<Record<string, string>>({});
+  const [fileValues, setFileValues] = React.useState<Record<string, File[]>>({});
   const [honeypot, setHoneypot] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
@@ -333,8 +355,17 @@ export function ContactFormSectionView({
     if (preview || !clientReady) return;
     setError(null);
     const payload: Record<string, string> = {};
+    const files: File[] = [];
     for (const field of fields) {
       const key = formFieldPayloadKey(field);
+      if (field.type === "file") {
+        const selected = fileValues[key] ?? [];
+        files.push(...selected);
+        if (selected.length > 0) {
+          payload[key] = selected.map((file) => file.name).join(", ");
+        }
+        continue;
+      }
       payload[key] = (values[key] ?? "").trim();
     }
     if (!payload.name || !payload.email) {
@@ -353,19 +384,30 @@ export function ContactFormSectionView({
       return;
     }
     setStatus("loading");
-    const result = await adapters.submitContactForm({
-      blockId,
-      pageId,
-      fields: payload,
-      website: honeypot,
-    });
-    if (!result.ok) {
+    try {
+      const result = await adapters.submitContactForm({
+        blockId,
+        pageId,
+        fields: payload,
+        files,
+        website: honeypot,
+      });
+      if (!result.ok) {
+        setStatus("error");
+        setError(result.error);
+        return;
+      }
+      setStatus("success");
+      setValues({});
+      setFileValues({});
+    } catch (submitError) {
       setStatus("error");
-      setError(result.error);
-      return;
+      setError(
+        submitError instanceof Error && submitError.message
+          ? submitError.message
+          : "Verzenden is mislukt. Probeer het opnieuw.",
+      );
     }
-    setStatus("success");
-    setValues({});
   };
 
   const copyColumn = (
@@ -431,7 +473,9 @@ export function ContactFormSectionView({
           {fields.map((field) => {
             const key = formFieldPayloadKey(field);
             const required = isFieldRequired(field);
-            const spanFull = twoCol && (field.type === "textarea" || field.type === "select");
+            const spanFull =
+              twoCol &&
+              (field.type === "textarea" || field.type === "select" || field.type === "file");
             return (
               <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
                 <label htmlFor={`cf-${blockId}-${field.id}`} className={FIELD_LABEL_CLASS}>
@@ -443,6 +487,10 @@ export function ContactFormSectionView({
                   blockId={blockId}
                   value={values[key] ?? ""}
                   onChange={(next) => setValues((current) => ({ ...current, [key]: next }))}
+                  files={fileValues[key] ?? []}
+                  onFilesChange={(next) =>
+                    setFileValues((current) => ({ ...current, [key]: next }))
+                  }
                   disabled={preview || status === "loading"}
                   placeholder={contactFieldPlaceholder(field, d.placeholders)}
                 />

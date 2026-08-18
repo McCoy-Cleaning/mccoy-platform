@@ -95,6 +95,27 @@ describe("partitionFormAttachments", () => {
     ]);
     expect(result.unmappedImages).toEqual([]);
   });
+  it("maps offerte photos into the Foto's row and keeps PDFs as file attachments", () => {
+    const result = partitionFormAttachments(
+      [
+        field("name", "Oana"),
+        field("email", "oana@example.com"),
+        field("photos", "gevel-1.jpg, gevel-2.jpg"),
+      ],
+      [
+        attachment("gevel-1.jpg", "image/jpeg"),
+        attachment("gevel-2.jpg", "image/jpeg"),
+        attachment("plattegrond.pdf", "application/pdf"),
+      ],
+    );
+
+    expect(result.imagesByFieldKey.get("photos")?.map((item) => item.filename)).toEqual([
+      "gevel-1.jpg",
+      "gevel-2.jpg",
+    ]);
+    expect(result.fileAttachments.map((item) => item.filename)).toEqual(["plattegrond.pdf"]);
+    expect(result.unmappedImages).toEqual([]);
+  });
 });
 
 describe("shouldHideAttachmentFieldText", () => {

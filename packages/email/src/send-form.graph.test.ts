@@ -35,9 +35,14 @@ vi.mock("@mccoy/database/server", () => ({
   attachmentMetaFromBase64: (filename: string, contentType: string) => ({
     filename,
     contentType,
-    size: 1,
+    sizeBytes: 1,
   }),
   createWebsiteRequest: (...args: unknown[]) => createWebsiteRequest(...args),
+  finalizeWebsiteRequestUploadedAttachments: vi.fn(async () => ({
+    ok: true,
+    attachments: [],
+  })),
+  storeWebsiteRequestAttachments: vi.fn(async () => ({ status: "stored", count: 0 })),
   hasSupabaseServiceConfig: () => hasSupabaseServiceConfig(),
   processNotificationOutbox: (...args: unknown[]) => processNotificationOutbox(...args),
   updateRequestNotification: (...args: unknown[]) => updateRequestNotification(...args),

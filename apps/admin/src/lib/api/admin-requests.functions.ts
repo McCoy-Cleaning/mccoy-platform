@@ -557,7 +557,16 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       }
 
       const attachment = await getFormInboxAttachment(data.id, data.filename);
-      if (!attachment?.contentBase64) {
+      if (!attachment) {
+        return {
+          ok: false as const,
+          error: "Bijlage niet gevonden of te groot om te downloaden.",
+          code: "not_found" as const,
+        };
+      }
+      const hasBytes = Boolean(attachment.contentBase64?.trim());
+      const hasSignedUrl = Boolean(attachment.contentUrl || attachment.downloadUrl);
+      if (!hasBytes && !hasSignedUrl) {
         return {
           ok: false as const,
           error: "Bijlage niet gevonden of te groot om te downloaden.",

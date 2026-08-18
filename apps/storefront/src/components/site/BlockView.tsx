@@ -13,9 +13,31 @@ import {
   type CmsFormAdapters,
 } from "@mccoy/cms-renderer";
 import { type Block, type QuoteFormKind, sanitizePublicCmsImageTree } from "@mccoy/cms-schema";
+import type { FormKind, UploadedFormAttachment } from "@mccoy/domain";
 import { submitWebsiteForm } from "@/lib/api/forms.functions";
+import { uploadWebsiteFormAttachments } from "@/lib/forms/upload-client";
 import { usesStorefrontPresentationAdapter } from "./block-presentation";
 import { renderStorefrontPresentationAdapter } from "./blockPresentationAdapters";
+
+async function uploadFilesForSubmit(input: {
+  kind: FormKind;
+  pageId: string;
+  sourceId: string;
+  fields: Record<string, string>;
+  files?: File[];
+  website?: string;
+}): Promise<UploadedFormAttachment[]> {
+  const files = input.files ?? [];
+  if (!files.length) return [];
+  return uploadWebsiteFormAttachments({
+    kind: input.kind,
+    pageId: input.pageId,
+    sourceId: input.sourceId,
+    fields: input.fields,
+    files,
+    website: input.website,
+  });
+}
 
 const storefrontFormAdapters: CmsFormAdapters = {
   async submitNewsletter(input) {
@@ -36,37 +58,75 @@ const storefrontFormAdapters: CmsFormAdapters = {
     return { ok: true };
   },
   async submitContactForm(input) {
-    const result = await submitWebsiteForm({
-      data: {
+    try {
+      const uploadedAttachments = await uploadFilesForSubmit({
         kind: "inquiry",
         pageId: input.pageId,
         sourceId: input.blockId,
-        fields: {
-          ...input.fields,
-          sourceBlockId: input.blockId.slice(0, 64),
+        fields: input.fields,
+        files: input.files,
+        website: input.website,
+      });
+      const result = await submitWebsiteForm({
+        data: {
+          kind: "inquiry",
+          pageId: input.pageId,
+          sourceId: input.blockId,
+          fields: {
+            ...input.fields,
+            sourceBlockId: input.blockId.slice(0, 64),
+          },
+          uploadedAttachments,
+          website: input.website ?? "",
         },
-        website: input.website ?? "",
-      },
-    });
-    if (!result.ok) return { ok: false, error: result.error };
-    return { ok: true };
+      });
+      if (!result.ok) return { ok: false, error: result.error };
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "Bestanden konden niet worden geüpload.",
+      };
+    }
   },
   async submitQuoteForm(input) {
     const kind = input.kind as QuoteFormKind;
-    const result = await submitWebsiteForm({
-      data: {
+    try {
+      const uploadedAttachments = await uploadFilesForSubmit({
         kind,
         pageId: input.pageId,
         sourceId: input.blockId,
-        fields: {
-          ...input.fields,
-          sourceBlockId: input.blockId.slice(0, 64),
+        fields: input.fields,
+        files: input.files,
+        website: input.website,
+      });
+      const result = await submitWebsiteForm({
+        data: {
+          kind,
+          pageId: input.pageId,
+          sourceId: input.blockId,
+          fields: {
+            ...input.fields,
+            sourceBlockId: input.blockId.slice(0, 64),
+          },
+          uploadedAttachments,
+          website: input.website ?? "",
         },
-        website: input.website ?? "",
-      },
-    });
-    if (!result.ok) return { ok: false, error: result.error };
-    return { ok: true };
+      });
+      if (!result.ok) return { ok: false, error: result.error };
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "Bestanden konden niet worden geüpload.",
+      };
+    }
   },
 };
 

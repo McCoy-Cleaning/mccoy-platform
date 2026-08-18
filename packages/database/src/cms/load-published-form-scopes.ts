@@ -7,7 +7,7 @@ import { builtinCmsSeedPages } from "./seeds";
 import { getFileCmsStore } from "./file-store";
 import { getCmsStore } from "./supabase-store";
 
-async function publishedPagesFromStore(store: {
+export async function publishedPagesFromStore(store: {
   seedBuiltinsIfEmpty: (pages: CmsPage[]) => Promise<void>;
   listPages: () => Promise<Array<{ id: string }>>;
   getActivePublishedRevision: (

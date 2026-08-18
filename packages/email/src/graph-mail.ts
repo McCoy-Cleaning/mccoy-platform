@@ -24,6 +24,14 @@ import { getGraphAccessToken } from "./graph-auth";
 import { getGraphMailConfig, type GraphMailConfig } from "./graph-config";
 import { formatGraphApiError, formatGraphMailWriteError } from "./graph-errors";
 import {
+  blockedGraphQuery,
+  illegalGraphMailQueryReason,
+  logIllegalGraphQuery,
+  logSkippedBlockedGraphQuery,
+  parseGraphQuery,
+  recordGraphQueryFailure,
+} from "./graph-query-guard";
+import {
   encodeGraphMessageId,
   graphIdToSyntheticUid,
 } from "./inbox-message-id";
@@ -532,6 +540,12 @@ async function graphFetch<T>(
         : undefined;
     const code = errObj?.code || `http_${response.status}`;
     const detail = (errObj?.message || "").slice(0, 220);
+    try {
+      const parsed = parseGraphQuery(url);
+      recordGraphQueryFailure(parsed, response.status, code);
+    } catch {
+      // Query logging must never break error handling.
+    }
     // InefficientFilter is an expected Graph limitation for some conversation
     // queries; callers fall back to a recent-mail scan. Keep logs quiet.
     if (code === "InefficientFilter") {
@@ -559,12 +573,15 @@ function usersPath(mailbox: string, suffix: string): string {
   return `/users/${encodeURIComponent(mailbox)}${suffix}`;
 }
 
-function mapAttachmentMeta(att: GraphAttachment): FormInboxAttachment | null {
+function mapAttachmentMeta(
+  att: GraphAttachment,
+  options?: { includeInline?: boolean },
+): FormInboxAttachment | null {
   const odataType = att["@odata.type"] || "";
   if (odataType.includes("itemAttachment") || odataType.includes("referenceAttachment")) {
     return null;
   }
-  if (att.isInline) return null;
+  if (att.isInline && !options?.includeInline) return null;
   const filename = (att.name || "bijlage").replace(/[^\w.\- ()[\]]+/g, "_");
   const size = typeof att.size === "number" ? att.size : 0;
   const contentType = att.contentType || "application/octet-stream";
@@ -582,11 +599,14 @@ function mapAttachmentMeta(att: GraphAttachment): FormInboxAttachment | null {
   return out;
 }
 
-function mapAttachments(list: GraphAttachment[] | undefined): FormInboxAttachment[] {
+function mapAttachments(
+  list: GraphAttachment[] | undefined,
+  options?: { includeInline?: boolean },
+): FormInboxAttachment[] {
   if (!list?.length) return [];
   const out: FormInboxAttachment[] = [];
-  for (const att of list.slice(0, MAX_ATTACHMENTS)) {
-    const mapped = mapAttachmentMeta(att);
+  for (const att of list) {
+    const mapped = mapAttachmentMeta(att, options);
     if (mapped) out.push(mapped);
   }
   return out;
@@ -1427,10 +1447,63 @@ export async function getGraphFormInboxThread(
   return dedupeInquiryThreadItems(thread).slice(-MAX_THREAD_MESSAGES);
 }
 
+/**
+ * Locate the form-notification message by WR- number when mail_messages has no
+ * graph_message_id. Uses a plain quoted $search phrase only (no KQL prefixes).
+ */
+export async function findGraphFormNotificationByRequestNumber(options: {
+  requestNumber: string;
+  mailbox?: string;
+  createdAt?: string;
+  filename?: string;
+}): Promise<{ id: string; mailbox: string; subject?: string } | null> {
+  const config = getGraphMailConfig();
+  if (!config) return null;
+  const box = (options.mailbox || config.mailbox).trim() || config.mailbox;
+  const number = options.requestNumber.trim();
+  if (!number) return null;
+
+  const searchPath = usersPath(
+    box,
+    `/messages?$search=${encodeURIComponent(`"${number}"`)}&$top=25`,
+  );
+  const parsed = parseGraphQuery(searchPath);
+  const illegal = illegalGraphMailQueryReason(parsed);
+  if (illegal) {
+    logIllegalGraphQuery(parsed, illegal);
+    return null;
+  }
+  const blocked = blockedGraphQuery(parsed);
+  if (blocked) {
+    logSkippedBlockedGraphQuery(parsed, blocked);
+    return null;
+  }
+
+  try {
+    const accessToken = await getGraphAccessToken(config);
+    const data = await graphFetch<GraphListResponse<GraphMessage>>(searchPath, { accessToken });
+    const rows = data.value ?? [];
+    const hit =
+      rows.find((msg) => {
+        const haystack = `${msg.subject || ""} ${msg.bodyPreview || ""}`;
+        return haystack.includes(number);
+      }) ?? rows[0];
+    if (!hit?.id) return null;
+    return { id: hit.id, mailbox: box, subject: hit.subject ?? undefined };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/http_400|badrequest/i.test(message)) {
+      recordGraphQueryFailure(parsed, 400, "BadRequest");
+    }
+    return null;
+  }
+}
+
 export async function getGraphFormInboxAttachment(
   graphId: string,
   filename: string,
   mailbox?: string,
+  options?: { sizeBytes?: number; maxBytes?: number },
 ): Promise<FormInboxAttachment | null> {
   const config = getGraphMailConfig();
   if (!config) {
@@ -1438,17 +1511,20 @@ export async function getGraphFormInboxAttachment(
   }
   const box = mailbox || config.mailbox;
   const accessToken = await getGraphAccessToken(config);
-  const wanted = filename.trim().toLowerCase();
 
   const data = await graphFetch<GraphListResponse<GraphAttachment>>(
     usersPath(box, `/messages/${encodeURIComponent(graphId)}/attachments`),
     { accessToken },
   );
 
-  const list = mapAttachments(data.value);
-  const hit =
-    list.find((a) => a.filename.toLowerCase() === wanted) ??
-    list.find((a) => a.filename.toLowerCase().includes(wanted));
+  // Include inline images so form photos (sometimes marked inline by Graph) download.
+  const list = mapAttachments(data.value, { includeInline: true });
+  const { pickFormInboxAttachmentForDownload } = await import("./form-inbox-attachment");
+  const hit = pickFormInboxAttachmentForDownload(
+    list,
+    filename,
+    options?.sizeBytes,
+  );
 
   if (!hit) return null;
 
@@ -1462,7 +1538,7 @@ export async function getGraphFormInboxAttachment(
       ),
       { accessToken },
     );
-    const mapped = mapAttachmentMeta(att);
+    const mapped = mapAttachmentMeta(att, { includeInline: true });
     if (mapped?.contentBase64) return mapped;
     if (mapped) return { ...mapped, omitted: true };
   }

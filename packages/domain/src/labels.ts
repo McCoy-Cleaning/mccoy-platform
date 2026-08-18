@@ -34,6 +34,7 @@ export const FIELD_LABELS_NL: Record<string, string> = {
   material: "Materiaal",
   area: "Oppervlakte (m²)",
   stains: "Vlekken / notities",
+  photos: "Foto's",
   role: "Functie",
   motivation: "Motivatie",
   cv: "CV",

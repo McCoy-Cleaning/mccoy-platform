@@ -39,10 +39,10 @@ export async function getE2eFormInboxThread(id: string): Promise<FormInboxThread
 }
 
 export async function getE2eFormInboxAttachment(
-  _id: string,
-  _filename: string,
+  id: string,
+  filename: string,
 ): Promise<FormInboxAttachment | null> {
-  return getWebsiteRequestFormInboxAttachment();
+  return getWebsiteRequestFormInboxAttachment(id, filename);
 }
 
 export async function deleteE2eFormInboxMessage(id: string): Promise<void> {

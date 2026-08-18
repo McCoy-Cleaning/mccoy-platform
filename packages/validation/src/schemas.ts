@@ -26,6 +26,19 @@ export const formAttachmentSchema = z.object({
   contentType: z.string().min(1).max(120),
 });
 
+export const formUploadFileIntentSchema = z.object({
+  filename: z.string().min(1).max(180),
+  contentType: z.string().min(1).max(120),
+  sizeBytes: z.number().int().positive().max(25 * 1024 * 1024),
+});
+
+export const uploadedFormAttachmentSchema = z.object({
+  filename: z.string().min(1).max(180),
+  contentType: z.string().min(1).max(120),
+  sizeBytes: z.number().int().positive().max(25 * 1024 * 1024),
+  storagePath: z.string().trim().min(1).max(500),
+});
+
 export const formScopeSnapshotSchema = z.object({
   key: z
     .string()
@@ -42,9 +55,20 @@ export const websiteFormPayloadSchema = z.object({
   sourceId: z.string().trim().min(1).max(120),
   fields: z.record(z.string().max(2000)).default({}),
   attachments: z.array(formAttachmentSchema).max(8).optional(),
+  uploadedAttachments: z.array(uploadedFormAttachmentSchema).max(8).optional(),
   website: z.string().max(200).optional(),
   /** Compatibility only — server overwrites from published CMS. */
   scope: formScopeSnapshotSchema.optional(),
+});
+
+/** Metadata-only prepare step before the browser uploads bytes to private storage. */
+export const websiteFormPrepareAttachmentsSchema = z.object({
+  kind: z.enum(FORM_KINDS),
+  pageId: z.string().trim().min(1).max(120),
+  sourceId: z.string().trim().min(1).max(120),
+  fields: z.record(z.string().max(2000)).default({}),
+  files: z.array(formUploadFileIntentSchema).min(1).max(8),
+  website: z.string().max(200).optional(),
 });
 
 /** Legacy username/password login (ADMIN_LEGACY_AUTH or no Supabase). */

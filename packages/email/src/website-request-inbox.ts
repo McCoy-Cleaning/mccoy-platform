@@ -288,9 +288,134 @@ export async function getWebsiteRequestFormInboxThread(
   return message?.thread ?? [];
 }
 
-export async function getWebsiteRequestFormInboxAttachment(): Promise<FormInboxAttachment | null> {
-  // Binary bodies are not retained on the request row — meta only in list/detail.
-  return null;
+export async function getWebsiteRequestFormInboxAttachment(
+  id: string,
+  filename: string,
+): Promise<FormInboxAttachment | null> {
+  const decoded = decodeInboxMessageId(id);
+  if (decoded.provider !== "request" && decoded.provider !== "e2e") return null;
+
+  const request = await getWebsiteRequest(decoded.requestId);
+  if (!request || !isActiveRequestStatus(request.status)) return null;
+
+  const wanted = filename.trim();
+  if (!wanted) return null;
+
+  const { attachmentFilenamesMatch } = await import("./form-inbox-attachment");
+  const matched =
+    request.attachments.find((item) => attachmentFilenamesMatch(wanted, item.filename)) ??
+    (request.attachments.length === 1 ? request.attachments[0] : null);
+  const attachmentMeta = matched ?? {
+    filename: wanted,
+    contentType: "application/octet-stream",
+    sizeBytes: 0,
+  };
+
+  try {
+    const {
+      createStoredWebsiteRequestAttachmentAccess,
+      getStoredWebsiteRequestAttachment,
+      storeWebsiteRequestAttachments,
+    } = await import("@mccoy/database/server");
+
+    const access = await createStoredWebsiteRequestAttachmentAccess({
+      requestId: request.id,
+      filename: attachmentMeta.filename,
+      storagePath: undefined,
+    });
+    if (access) {
+      return {
+        filename: attachmentMeta.filename,
+        contentType: attachmentMeta.contentType,
+        size: access.sizeBytes || attachmentMeta.sizeBytes,
+        contentUrl: access.contentUrl,
+        downloadUrl: access.downloadUrl,
+        urlExpiresAt: access.expiresAt,
+        omitted: false,
+      };
+    }
+
+    // Legacy rows may still have bytes under the request prefix without signed URL support.
+    const stored = await getStoredWebsiteRequestAttachment(
+      request.id,
+      attachmentMeta.filename,
+    );
+    if (stored?.contentBase64) {
+      return {
+        filename: attachmentMeta.filename,
+        contentType: attachmentMeta.contentType,
+        size: stored.sizeBytes || attachmentMeta.sizeBytes,
+        contentBase64: stored.contentBase64,
+        omitted: false,
+      };
+    }
+
+    const { shouldAttemptGraphMail } = await import("./form-inbox-provider");
+    const { getGraphMailConfig } = await import("./graph-config");
+    if (!shouldAttemptGraphMail()) return null;
+    const config = getGraphMailConfig();
+    if (!config) return null;
+
+    const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
+    const mailRows = await listWebsiteRequestMailMessages(request.id);
+    const formRoot = mailRows.find(
+      (row) => row.provider === "website_form" && row.graph_message_id?.trim(),
+    );
+
+    const {
+      getGraphFormInboxAttachment,
+      findGraphFormNotificationByRequestNumber,
+    } = await import("./graph-mail");
+
+    let graphId = formRoot?.graph_message_id?.trim() || "";
+    let mailbox = (formRoot?.mailbox || config.mailbox).trim() || config.mailbox;
+
+    if (!graphId) {
+      const found = await findGraphFormNotificationByRequestNumber({
+        requestNumber: request.number,
+        mailbox: config.mailbox,
+        createdAt: request.createdAt,
+      });
+      if (!found?.id) return null;
+      graphId = found.id;
+      mailbox = found.mailbox || mailbox;
+    }
+
+    const graphAttachment = await getGraphFormInboxAttachment(
+      graphId,
+      attachmentMeta.filename,
+      mailbox,
+      {
+        sizeBytes: attachmentMeta.sizeBytes > 0 ? attachmentMeta.sizeBytes : undefined,
+        maxBytes: 25 * 1024 * 1024,
+      },
+    );
+    if (!graphAttachment?.contentBase64) return null;
+
+    // Best-effort durable copy so future Admin opens skip Graph.
+    void storeWebsiteRequestAttachments(request.id, [
+      {
+        filename: attachmentMeta.filename,
+        contentType: graphAttachment.contentType || attachmentMeta.contentType,
+        contentBase64: graphAttachment.contentBase64,
+      },
+    ]).catch(() => undefined);
+
+    return {
+      filename: attachmentMeta.filename,
+      contentType: graphAttachment.contentType || attachmentMeta.contentType,
+      size: graphAttachment.size || attachmentMeta.sizeBytes,
+      contentBase64: graphAttachment.contentBase64,
+      omitted: false,
+      part: graphAttachment.part,
+    };
+  } catch (error) {
+    console.error("[website-request-inbox] attachment fetch failed", {
+      requestId: request.id,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+    return null;
+  }
 }
 
 /** Soft-delete: close the website request so it leaves Aanvragen. */

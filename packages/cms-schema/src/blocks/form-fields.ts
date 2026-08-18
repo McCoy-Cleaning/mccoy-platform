@@ -389,6 +389,7 @@ export function formFieldPayloadKey(field: FormFieldItem): string {
   if (/^(bedrijf|bedrijfsnaam|company|organisatie)$/i.test(lower)) return "company";
   if (/^(cv|curriculum|resumé|resume)(\b|\/|\s|$)/i.test(lower)) return "cv";
   if (/^(motivatiebrief|letter|cover\s*letter)$/i.test(lower)) return "letter";
+  if (field.type === "file" && /foto|photo|image|afbeelding/i.test(lower)) return "photos";
   return slugFromLabel(field.label, field.id);
 }
 
@@ -439,8 +440,14 @@ export function validateContactFormSubmission(
   const sanitized: Record<string, string> = {};
 
   for (const field of fields) {
-    // File inputs are submitted as attachments, not string fields.
-    if (field.type === "file") continue;
+    // File bytes travel as attachments; optional filename lists help Admin mapping.
+    if (field.type === "file") {
+      const key = formFieldPayloadKey(field);
+      const raw = payload[key] ?? payload[field.id] ?? "";
+      const value = typeof raw === "string" ? raw.trim().slice(0, 2000) : "";
+      if (value) sanitized[key] = value;
+      continue;
+    }
 
     const key = formFieldPayloadKey(field);
     const raw = payload[key] ?? payload[field.id] ?? "";

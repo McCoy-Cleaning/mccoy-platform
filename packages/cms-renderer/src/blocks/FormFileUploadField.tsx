@@ -70,8 +70,9 @@ export function FormFileUploadField({
         type="file"
         accept={accept}
         multiple
-        required={required}
+        required={required && files.length === 0}
         disabled={disabled}
+        data-testid="form-file-upload"
         className={inputClassName}
         onChange={(event) => {
           const selected = Array.from(event.currentTarget.files ?? []);

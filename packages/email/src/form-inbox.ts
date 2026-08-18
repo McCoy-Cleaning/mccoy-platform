@@ -1546,7 +1546,7 @@ export async function getFormInboxAttachment(
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
   if (decoded.provider === "e2e" || decoded.provider === "request") {
     const { getWebsiteRequestFormInboxAttachment } = await import("./website-request-inbox");
-    return getWebsiteRequestFormInboxAttachment();
+    return getWebsiteRequestFormInboxAttachment(id, filename);
   }
   if (decoded.provider === "graph") {
     if (!shouldAttemptGraphMail()) {

@@ -7,7 +7,16 @@ import {
   resolveVacancyApplication,
   validateContactFormSubmission,
 } from "@mccoy/cms-schema";
-import { websiteFormPayloadSchema } from "@mccoy/validation";
+import {
+  MAX_WEBSITE_FORM_ATTACHMENT_COUNT,
+  MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES,
+  MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
+} from "@mccoy/domain";
+import {
+  websiteFormPayloadSchema,
+  websiteFormPrepareAttachmentsSchema,
+} from "@mccoy/validation";
+import { isHoneypotTriggered } from "@mccoy/security";
 
 /**
  * Import `@mccoy/email/server` only inside handlers. The package root and
@@ -15,6 +24,73 @@ import { websiteFormPayloadSchema } from "@mccoy/validation";
  * Same pattern as cms-published.functions.ts — dynamic import of
  * `@mccoy/email/server` keeps Node-only modules out of the client graph.
  */
+export const prepareWebsiteFormAttachments = createServerFn({ method: "POST" })
+  .validator(websiteFormPrepareAttachmentsSchema)
+  .handler(async ({ data }) => {
+    try {
+      if (isHoneypotTriggered(data.website)) {
+        return { ok: true as const, slots: [] };
+      }
+
+      const files = data.files ?? [];
+      if (files.length > MAX_WEBSITE_FORM_ATTACHMENT_COUNT) {
+        return {
+          ok: false as const,
+          error: `U kunt maximaal ${MAX_WEBSITE_FORM_ATTACHMENT_COUNT} bestanden toevoegen.`,
+          code: "validation" as const,
+        };
+      }
+
+      let totalBytes = 0;
+      for (const file of files) {
+        if (file.sizeBytes > MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES) {
+          return {
+            ok: false as const,
+            error: `Bestand “${file.filename}” is te groot.`,
+            code: "validation" as const,
+          };
+        }
+        totalBytes += file.sizeBytes;
+      }
+      if (totalBytes > MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES) {
+        return {
+          ok: false as const,
+          error: "De geselecteerde bestanden zijn samen te groot.",
+          code: "validation" as const,
+        };
+      }
+
+      const { loadCmsPageForWebsiteForm, createWebsiteRequestAttachmentUploadSlots } =
+        await import("@mccoy/database/server");
+      const page = await loadCmsPageForWebsiteForm(data.pageId);
+      const resolvedForm = resolvePublishedFormScope(page, {
+        pageId: data.pageId,
+        sourceId: data.sourceId,
+        kind: data.kind,
+      });
+      if (!resolvedForm.ok) {
+        return {
+          ok: false as const,
+          error: resolvedForm.reason,
+          code: "validation" as const,
+        };
+      }
+
+      const slots = await createWebsiteRequestAttachmentUploadSlots(files);
+      return { ok: true as const, slots };
+    } catch (error) {
+      console.error("[forms] prepare attachments failed", error);
+      return {
+        ok: false as const,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "Bestandsupload kon niet worden voorbereid.",
+        code: "provider" as const,
+      };
+    }
+  });
+
 export const submitWebsiteForm = createServerFn({ method: "POST" })
   .validator(websiteFormPayloadSchema)
   .handler(async ({ data }) => {
