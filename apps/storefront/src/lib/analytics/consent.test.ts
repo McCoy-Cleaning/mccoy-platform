@@ -96,10 +96,10 @@ describe("analytics consent", () => {
   });
 
   it("parses consent from a Cookie header for SSR", () => {
-    expect(parseAnalyticsConsentFromCookie("foo=bar; mccoy-analytics-consent=denied")).toBe(
+    expect(parseAnalyticsConsentFromCookie("foo=bar; mccoy-analytics-consent-v2=denied")).toBe(
       "denied",
     );
-    expect(parseAnalyticsConsentFromCookie("mccoy-analytics-consent=maybe")).toBeNull();
+    expect(parseAnalyticsConsentFromCookie("mccoy-analytics-consent-v2=maybe")).toBeNull();
     expect(parseAnalyticsConsentFromCookie("")).toBeNull();
   });
 

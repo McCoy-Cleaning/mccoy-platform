@@ -3,7 +3,7 @@
  * Google Analytics scripts must not load until consent === "granted".
  */
 
-export const ANALYTICS_CONSENT_STORAGE_KEY = "mccoy-analytics-consent";
+export const ANALYTICS_CONSENT_STORAGE_KEY = "mccoy-analytics-consent-v2";
 export const ANALYTICS_CONSENT_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
 export type AnalyticsConsent = "granted" | "denied";
