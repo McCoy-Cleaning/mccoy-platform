@@ -23,6 +23,13 @@ export type WebsiteRequestMailMessageInput = {
   isRead?: boolean;
 };
 
+export type WebsiteRequestMailAttachmentMeta = {
+  filename: string;
+  contentType: string;
+  size: number;
+  graphAttachmentId?: string | null;
+};
+
 export type UpsertMailMessageResult =
   | { status: "appended"; id: string }
   | { status: "already_processed"; id: string };
@@ -46,6 +53,7 @@ export type WebsiteRequestMailMessageRow = {
   occurred_at: string;
   is_read: boolean;
   created_at: string;
+  attachments?: WebsiteRequestMailAttachmentMeta[] | null;
 };
 
 export async function upsertWebsiteRequestMailMessage(
@@ -229,4 +237,33 @@ export async function listKnownMailIdentitiesForMailbox(
     graphMessageIds: [...entry.graphMessageIds],
     conversationIds: [...entry.conversationIds],
   }));
+}
+
+export async function updateWebsiteRequestMailMessageAttachments(
+  id: string,
+  attachments: WebsiteRequestMailAttachmentMeta[],
+): Promise<boolean> {
+  if (!hasSupabaseServiceConfig()) return false;
+  const rowId = id.trim();
+  if (!rowId) return false;
+
+  const supabase = createSupabaseServiceClient();
+  const payload = attachments.slice(0, 40).map((item) => ({
+    filename: item.filename.trim().slice(0, 240),
+    contentType: (item.contentType || "application/octet-stream").trim().slice(0, 200),
+    size: Number.isFinite(item.size) && item.size > 0 ? Math.floor(item.size) : 0,
+    graphAttachmentId: item.graphAttachmentId?.trim().slice(0, 512) || null,
+  }));
+  const { error } = await supabase
+    .from("website_request_mail_messages")
+    .update({ attachments: payload })
+    .eq("id", rowId);
+
+  if (error) {
+    console.error("[website-request-mail] attachment persist failed", {
+      message: error.message.slice(0, 160),
+    });
+    return false;
+  }
+  return true;
 }

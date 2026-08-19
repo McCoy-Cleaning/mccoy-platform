@@ -1,6 +1,9 @@
 /**
  * Imperative GA4 (gtag) loader. Call only after analytics consent is granted.
  * Idempotent for a given measurement ID within the page lifetime.
+ *
+ * Consent Mode v2: default denied is applied before any config. Accept updates
+ * analytics_storage to granted, then loads gtag.js and sends page_view.
  */
 
 declare global {
@@ -12,19 +15,51 @@ declare global {
 
 const initializedIds = new Set<string>();
 const lastPagePathById = new Map<string, string>();
+let consentDefaultApplied = false;
 
-export function loadGoogleAnalyticsGtag(measurementId: string): boolean {
-  if (typeof window === "undefined" || typeof document === "undefined") return false;
-  if (initializedIds.has(measurementId)) return false;
+const DENIED_CONSENT = {
+  analytics_storage: "denied",
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
+  wait_for_update: 500,
+} as const;
 
+function ensureGtagStub(): boolean {
+  if (typeof window === "undefined") return false;
   window.dataLayer = window.dataLayer || [];
   if (typeof window.gtag !== "function") {
     window.gtag = function gtag(...args: unknown[]) {
       window.dataLayer?.push(args);
     };
   }
-  window.gtag("js", new Date());
-  window.gtag("config", measurementId, {
+  return true;
+}
+
+/** Consent Mode v2 default — before any gtag config. Does not load gtag.js. */
+export function applyGoogleConsentDefault(): boolean {
+  if (!ensureGtagStub()) return false;
+  if (consentDefaultApplied) return false;
+  window.gtag!("consent", "default", { ...DENIED_CONSENT });
+  consentDefaultApplied = true;
+  return true;
+}
+
+/** Accept: update analytics_storage only. Ads stay denied. */
+export function updateGoogleAnalyticsConsentGranted(): boolean {
+  if (!ensureGtagStub()) return false;
+  applyGoogleConsentDefault();
+  window.gtag!("consent", "update", { analytics_storage: "granted" });
+  return true;
+}
+
+export function loadGoogleAnalyticsGtag(measurementId: string): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  applyGoogleConsentDefault();
+  if (initializedIds.has(measurementId)) return false;
+
+  window.gtag!("js", new Date());
+  window.gtag!("config", measurementId, {
     anonymize_ip: true,
     send_page_view: false,
   });
@@ -40,6 +75,8 @@ export function loadGoogleAnalyticsGtag(measurementId: string): boolean {
     document.head.appendChild(script);
   }
   initializedIds.add(measurementId);
+  // First explicit page_view after init must not be dropped by the dedupe map.
+  lastPagePathById.delete(measurementId);
   return true;
 }
 
@@ -75,6 +112,23 @@ export function sendGoogleAnalyticsPageView(input: {
   return true;
 }
 
+/**
+ * Same-turn accept: consent update → load gtag.js → first page_view.
+ */
+export function activateGoogleAnalyticsAfterConsent(input: {
+  measurementId: string;
+  pathname: string;
+  title?: string;
+}): boolean {
+  updateGoogleAnalyticsConsentGranted();
+  loadGoogleAnalyticsGtag(input.measurementId);
+  return sendGoogleAnalyticsPageView({
+    measurementId: input.measurementId,
+    pathname: input.pathname,
+    title: input.title,
+  });
+}
+
 /** Exempt routes form a navigation boundary but never emit an event. */
 export function resetGoogleAnalyticsPageViewDedupe(measurementId: string): void {
   lastPagePathById.delete(measurementId);
@@ -84,4 +138,5 @@ export function resetGoogleAnalyticsPageViewDedupe(measurementId: string): void 
 export function resetGtagLoadStateForTests(): void {
   initializedIds.clear();
   lastPagePathById.clear();
+  consentDefaultApplied = false;
 }

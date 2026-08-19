@@ -107,6 +107,8 @@ export {
   MAX_FORM_ATTACHMENT_COUNT,
   MAX_FORM_ATTACHMENT_FILE_BYTES,
   MAX_FORM_ATTACHMENT_TOTAL_BYTES,
+  WEBSITE_FORM_CV_FILE_ACCEPT,
+  WEBSITE_FORM_MEDIA_FILE_ACCEPT,
 } from "./form-file-attachments";
 export type { PreparedFormFileAttachment } from "./form-file-attachments";
 

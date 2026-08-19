@@ -13,6 +13,7 @@ import {
   encodeImapMessageId,
   graphIdToSyntheticUid,
   INBOX_MESSAGE_ID_PATTERN,
+  splitWebsiteRequestInboxTarget,
 } from "./inbox-message-id";
 
 describe("inbox message ids", () => {
@@ -70,6 +71,15 @@ describe("inbox message ids", () => {
     expect(a).toBeGreaterThan(0);
   });
 
+
+  it("splits req thread mail-row suffixes", () => {
+    const requestId = "550e8400-e29b-41d4-a716-446655440000";
+    expect(splitWebsiteRequestInboxTarget(`${requestId}:mail:row-9`)).toEqual({
+      requestId,
+      mailRowId: "row-9",
+    });
+    expect(splitWebsiteRequestInboxTarget(requestId)).toEqual({ requestId });
+  });
   it("rejects invalid ids", () => {
     expect(() => decodeInboxMessageId("nope")).toThrow(FormInboxError);
   });

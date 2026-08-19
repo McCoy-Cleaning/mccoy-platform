@@ -24,8 +24,10 @@ export {
   upsertWebsiteRequestMailMessage,
   listWebsiteRequestMailMessages,
   listKnownMailIdentitiesForMailbox,
+  updateWebsiteRequestMailMessageAttachments,
   type WebsiteRequestMailMessageInput,
   type WebsiteRequestMailMessageRow,
+  type WebsiteRequestMailAttachmentMeta,
   type UpsertMailMessageResult,
 } from "./mail-messages";
 

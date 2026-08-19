@@ -1,9 +1,17 @@
-import type { FormAttachment, FormKind, UploadedFormAttachment, WebsiteFormPayload } from "@mccoy/domain";
+import { Buffer } from "node:buffer";
+import type {
+  AttachmentMeta,
+  FormAttachment,
+  FormKind,
+  UploadedFormAttachment,
+  WebsiteFormPayload,
+} from "@mccoy/domain";
 import { sanitizeScopeForSubject } from "@mccoy/domain";
 import {
   attachmentMetaFromBase64,
   createWebsiteRequest,
   finalizeWebsiteRequestUploadedAttachments,
+  getStoredWebsiteRequestAttachment,
   hasSupabaseServiceConfig,
   processNotificationOutbox,
   storeWebsiteRequestAttachments,
@@ -11,6 +19,7 @@ import {
 } from "@mccoy/database/server";
 import {
   assertRateLimit,
+  assertSafeWebsiteFormUpload,
   isHoneypotTriggered,
   RateLimitError,
   readServerEnv,
@@ -21,15 +30,17 @@ import { shouldAttemptGraphMail } from "./form-inbox-provider";
 import { isGraphMailConfigured } from "./graph-config";
 import { sendGraphAdminReply } from "./graph-mail";
 import { defaultTransactionalFrom, isSmtpConfigured, sendSmtpMail } from "./smtp";
-import { buildFormEmail } from "./templates";
+import { buildFormEmail, buildSubmitterConfirmationEmail } from "./templates";
 
 export { FormSubmitError } from "./form-submit-error";
 
 const DEFAULT_TO = "oana.dine1571@gmail.com";
-const MAX_ATTACHMENT_BYTES = 4.5 * 1024 * 1024;
+/** Whole-message mailbox cap (Exchange Online default ~25 MB). */
+export const MAILBOX_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MAX_MAIL_ATTACHMENTS = 8;
 const MAX_FIELD_LENGTH = 2000;
 const IMAGE_CONTENT_TYPE_RE = /^image\//i;
-const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|jpe?g|png|webp)$/i;
+const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i;
 
 function getFormEmailConfig() {
   return {
@@ -57,14 +68,20 @@ function sanitizeAttachmentFilename(name: string): string {
   return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "bijlage";
 }
 
+function approxBytesFromBase64(contentBase64: string): number {
+  if (!contentBase64) return 0;
+  const padding = contentBase64.endsWith("==") ? 2 : contentBase64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((contentBase64.length * 3) / 4) - padding);
+}
+
 function filterAttachments(attachments: FormAttachment[] | undefined): FormAttachment[] {
   if (!attachments?.length) return [];
   const accepted: FormAttachment[] = [];
   let total = 0;
-  for (const file of attachments.slice(0, 8)) {
-    const approxBytes = Math.floor((file.contentBase64.length * 3) / 4);
-    if (approxBytes <= 0 || approxBytes > MAX_ATTACHMENT_BYTES) continue;
-    if (total + approxBytes > MAX_ATTACHMENT_BYTES) continue;
+  for (const file of attachments.slice(0, MAX_MAIL_ATTACHMENTS)) {
+    const approxBytes = approxBytesFromBase64(file.contentBase64);
+    if (approxBytes <= 0 || approxBytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + approxBytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
     if (!file.filename || file.filename.length > 180) continue;
     accepted.push({
       filename: sanitizeAttachmentFilename(file.filename),
@@ -81,7 +98,7 @@ function filterUploadedAttachments(
 ): UploadedFormAttachment[] {
   if (!uploaded?.length) return [];
   const used = new Set<string>();
-  return uploaded.slice(0, 8).map((file) => {
+  return uploaded.slice(0, MAX_MAIL_ATTACHMENTS).map((file) => {
     let filename = sanitizeAttachmentFilename(file.filename);
     if (used.has(filename.toLowerCase())) {
       const dot = filename.lastIndexOf(".");
@@ -121,6 +138,31 @@ function enrichFieldsWithAttachmentNames(
   return next;
 }
 
+
+function scanFormAttachmentBytes(input: {
+  kind: FormKind;
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+}): { ok: true } | { ok: false; error: string } {
+  try {
+    const bytes = Buffer.from(input.contentBase64, "base64");
+    const result = assertSafeWebsiteFormUpload({
+      kind: input.kind,
+      filename: input.filename,
+      contentType: input.contentType,
+      bytes,
+    });
+    if (result.ok) return { ok: true };
+    return { ok: false, error: result.error };
+  } catch {
+    return {
+      ok: false,
+      error: `Bestand “${input.filename}” is onveilig en is geblokkeerd.`,
+    };
+  }
+}
+
 function htmlToPlainText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -132,6 +174,171 @@ function htmlToPlainText(html: string): string {
     .replace(/\s+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
+}
+
+/**
+ * Download staged storage files for the staff notification. Skip anything that
+ * would blow the mailbox cap; never fail the form when a download misses.
+ */
+async function collectNotificationMailAttachments(input: {
+  requestId: string;
+  kind: FormKind;
+  legacyAttachments: FormAttachment[];
+  uploaded: Array<AttachmentMeta | UploadedFormAttachment>;
+}): Promise<FormAttachment[]> {
+  const accepted: FormAttachment[] = [];
+  const usedNames = new Set<string>();
+  let total = 0;
+
+  for (const file of input.legacyAttachments) {
+    if (accepted.length >= MAX_MAIL_ATTACHMENTS) break;
+    const key = file.filename.trim().toLowerCase();
+    if (!key || usedNames.has(key)) continue;
+    const bytes = approxBytesFromBase64(file.contentBase64);
+    if (bytes <= 0 || bytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + bytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    const scan = scanFormAttachmentBytes({
+      kind: input.kind,
+      filename: file.filename,
+      contentType: file.contentType,
+      contentBase64: file.contentBase64,
+    });
+    if (!scan.ok) {
+      console.warn("[forms] skipped unsafe notification attachment", {
+        requestId: input.requestId,
+        filename: file.filename,
+      });
+      continue;
+    }
+    accepted.push(file);
+    usedNames.add(key);
+    total += bytes;
+  }
+
+  for (const file of input.uploaded) {
+    if (accepted.length >= MAX_MAIL_ATTACHMENTS) break;
+    const filename = sanitizeAttachmentFilename(file.filename);
+    const key = filename.toLowerCase();
+    if (!key || usedNames.has(key)) continue;
+    const declared = Number(file.sizeBytes) || 0;
+    if (declared <= 0 || declared > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + declared > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+
+    try {
+      const stored = await getStoredWebsiteRequestAttachment(
+        input.requestId,
+        filename,
+        "storagePath" in file ? file.storagePath : undefined,
+      );
+      if (!stored?.contentBase64) {
+        console.warn("[forms] staged attachment bytes missing for email", {
+          requestId: input.requestId,
+          filename,
+        });
+        continue;
+      }
+      const actual =
+        stored.sizeBytes > 0 ? stored.sizeBytes : approxBytesFromBase64(stored.contentBase64);
+      if (actual <= 0 || actual > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+      if (total + actual > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+      const scan = scanFormAttachmentBytes({
+        kind: input.kind,
+        filename,
+        contentType: file.contentType || "application/octet-stream",
+        contentBase64: stored.contentBase64,
+      });
+      if (!scan.ok) {
+        console.warn("[forms] skipped unsafe notification attachment", {
+          requestId: input.requestId,
+          filename,
+        });
+        continue;
+      }
+      accepted.push({
+        filename,
+        contentBase64: stored.contentBase64,
+        contentType: file.contentType || "application/octet-stream",
+      });
+      usedNames.add(key);
+      total += actual;
+    } catch (error) {
+      console.warn("[forms] staged attachment download failed; sending email without it", {
+        requestId: input.requestId,
+        filename,
+        error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      });
+    }
+  }
+
+  return accepted;
+}
+
+/** Customer confirmation: Graph then SMTP. Failures are logged and never fail the form. */
+async function sendSubmitterConfirmationMail(input: {
+  to: string;
+  kind: FormKind;
+  fields: Record<string, string>;
+  requestNumber: string;
+  requestId: string;
+  replyTo: string;
+  from: string;
+  canGraph: boolean;
+  canSmtp: boolean;
+}): Promise<void> {
+  const email = buildSubmitterConfirmationEmail(input.kind, input.fields, input.requestNumber);
+  const text = htmlToPlainText(email.html);
+  const headers: Record<string, string> = {
+    "X-McCoy-Form-Kind": input.kind,
+    "X-McCoy-Form-Submission-Id": input.requestNumber,
+    "X-McCoy-Confirmation": "1",
+  };
+
+  try {
+    if (input.canGraph) {
+      const sent = await sendGraphAdminReply({
+        to: input.to,
+        subject: email.subject,
+        html: email.html,
+        text,
+        replyTo: input.replyTo,
+        headers,
+        saveToSentItems: false,
+      });
+      if (sent.ok) return;
+      console.error("[forms] confirmation Graph send failed", {
+        detail: sent.error.slice(0, 300),
+        kind: input.kind,
+        to: input.to,
+        requestId: input.requestId,
+      });
+      if (!input.canSmtp) return;
+      console.error("[forms] confirmation falling back to SMTP after Graph failure");
+    }
+
+    if (!input.canSmtp) return;
+
+    const sent = await sendSmtpMail({
+      from: input.from,
+      to: input.to,
+      subject: email.subject,
+      html: email.html,
+      replyTo: input.replyTo,
+      headers,
+    });
+    if (!sent.ok) {
+      console.error("[forms] confirmation SMTP send failed", {
+        detail: sent.error.slice(0, 300),
+        kind: input.kind,
+        to: input.to,
+        requestId: input.requestId,
+      });
+    }
+  } catch (error) {
+    console.error("[forms] confirmation send failed", {
+      requestId: input.requestId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
 }
 
 /**
@@ -205,6 +412,26 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   const scope = payload.scope ?? null;
   const formId = `${payload.pageId}:${payload.sourceId}`;
 
+  for (const file of uploadedAttachments) {
+    const gate = assertSafeWebsiteFormUpload({
+      kind,
+      filename: file.filename,
+      contentType: file.contentType,
+    });
+    if (!gate.ok) throw new FormSubmitError(gate.error, "validation");
+  }
+  if (uploadedAttachments.length === 0) {
+    for (const file of legacyAttachments) {
+      const scan = scanFormAttachmentBytes({
+        kind,
+        filename: file.filename,
+        contentType: file.contentType,
+        contentBase64: file.contentBase64,
+      });
+      if (!scan.ok) throw new FormSubmitError(scan.error, "validation");
+    }
+  }
+
   const request = await createWebsiteRequest({
     kind,
     fields,
@@ -216,14 +443,17 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     scopeLabel: scope?.label ?? null,
   });
 
+  let finalizedUploaded: AttachmentMeta[] = [];
   if (uploadedAttachments.length > 0) {
     const finalized = await finalizeWebsiteRequestUploadedAttachments(
       request.id,
       uploadedAttachments,
+      kind,
     );
     if (!finalized.ok) {
       throw new FormSubmitError(finalized.error, "provider");
     }
+    finalizedUploaded = finalized.attachments;
   } else if (legacyAttachments.length > 0 && hasSupabaseServiceConfig()) {
     const stored = await storeWebsiteRequestAttachments(
       request.id,
@@ -301,9 +531,16 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     return { ok: true };
   }
 
-  // Prefer durable private storage for Admin; email may still carry small Base64 copies.
-  const mailAttachments = legacyAttachments;
+  // Durable private storage remains the source of truth for Admin / Aanvragen.
+  // Copy files onto the Graph/SMTP notification so Outlook has real attachments.
+  const mailAttachments = await collectNotificationMailAttachments({
+    requestId: request.id,
+    kind,
+    legacyAttachments,
+    uploaded: finalizedUploaded,
+  });
 
+  let staffDelivered = false;
   try {
     if (canGraph) {
       const sent = await sendGraphAdminReply({
@@ -325,51 +562,52 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
 
       if (sent.ok) {
         await updateRequestNotification(request.id, "sent");
-        return { ok: true };
-      }
+        staffDelivered = true;
+      } else {
+        console.error("[forms] Graph send failed", {
+          detail: sent.error.slice(0, 300),
+          kind,
+          to: config.to,
+          requestId: request.id,
+        });
 
-      console.error("[forms] Graph send failed", {
-        detail: sent.error.slice(0, 300),
-        kind,
+        if (!canSmtp) {
+          await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
+          staffDelivered = true;
+        } else {
+          console.error("[forms] falling back to SMTP after Graph failure");
+        }
+      }
+    }
+
+    if (!staffDelivered && canSmtp) {
+      const sent = await sendSmtpMail({
+        from: config.from,
         to: config.to,
-        requestId: request.id,
+        subject,
+        html: email.html,
+        replyTo: fields.email,
+        headers,
+        attachments: mailAttachments.map((a) => ({
+          filename: a.filename,
+          content: a.contentBase64,
+          contentType: a.contentType,
+          encoding: "base64" as const,
+        })),
       });
 
-      if (!canSmtp) {
+      if (!sent.ok) {
+        console.error("[forms] SMTP error", {
+          detail: sent.error.slice(0, 300),
+          kind,
+          to: config.to,
+          requestId: request.id,
+        });
         await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
-        return { ok: true };
+      } else {
+        await updateRequestNotification(request.id, "sent");
       }
-      console.error("[forms] falling back to SMTP after Graph failure");
     }
-
-    const sent = await sendSmtpMail({
-      from: config.from,
-      to: config.to,
-      subject,
-      html: email.html,
-      replyTo: fields.email,
-      headers,
-      attachments: mailAttachments.map((a) => ({
-        filename: a.filename,
-        content: a.contentBase64,
-        contentType: a.contentType,
-        encoding: "base64" as const,
-      })),
-    });
-
-    if (!sent.ok) {
-      console.error("[forms] SMTP error", {
-        detail: sent.error.slice(0, 300),
-        kind,
-        to: config.to,
-        requestId: request.id,
-      });
-      await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
-      return { ok: true };
-    }
-
-    await updateRequestNotification(request.id, "sent");
-    return { ok: true };
   } catch (error) {
     console.error("[forms] notification send failed", error);
     await updateRequestNotification(
@@ -377,6 +615,25 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
       "failed",
       error instanceof Error ? error.message : "unknown",
     );
-    return { ok: true };
   }
+
+  const confirmationReplyTo =
+    readServerEnv("FORM_TO_EMAIL") ||
+    readServerEnv("GRAPH_MAILBOX") ||
+    config.to ||
+    config.from;
+
+  await sendSubmitterConfirmationMail({
+    to: fields.email,
+    kind,
+    fields,
+    requestNumber: request.number,
+    requestId: request.id,
+    replyTo: confirmationReplyTo,
+    from: config.from,
+    canGraph,
+    canSmtp,
+  });
+
+  return { ok: true };
 }

@@ -18,6 +18,7 @@ import {
   SECTION_PAGE_RAIL,
   SectionEyebrow,
   SectionSurface,
+  WEBSITE_FORM_MEDIA_FILE_ACCEPT,
 } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
 
@@ -452,7 +453,7 @@ function PhotoUpload({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept={WEBSITE_FORM_MEDIA_FILE_ACCEPT}
           multiple
           className="hidden"
           onChange={(e) => {

@@ -14,7 +14,7 @@ import {
   websiteFormPayloadSchema,
   websiteFormPrepareAttachmentsSchema,
 } from "@mccoy/validation";
-import { isHoneypotTriggered } from "@mccoy/security";
+import { assertSafeWebsiteFormUpload, isHoneypotTriggered } from "@mccoy/security";
 
 export const prepareWebsiteFormAttachments = createServerFn({ method: "POST" })
   .validator(websiteFormPrepareAttachmentsSchema)
@@ -41,6 +41,14 @@ export const prepareWebsiteFormAttachments = createServerFn({ method: "POST" })
             error: `Bestand “${file.filename}” is te groot.`,
             code: "validation" as const,
           };
+        }
+        const gate = assertSafeWebsiteFormUpload({
+          kind: data.kind,
+          filename: file.filename,
+          contentType: file.contentType,
+        });
+        if (!gate.ok) {
+          return { ok: false as const, error: gate.error, code: "validation" as const };
         }
         totalBytes += file.sizeBytes;
       }

@@ -1314,19 +1314,29 @@ export async function listFormInboxMessages(options?: {
   };
 
   const snapshot = await getOrLoadInboxListSnapshot<InboxListSnapshot>(async () => {
+    // Default list (fresh !== true): website_requests + hidden numbers only.
+    // Never call Graph/IMAP here — Vercel memory cache is usually empty, so a
+    // cache miss must not wait on mailbox I/O. Graph only on Vernieuwen.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), graphListBudgetMs(fresh));
+    const timer = fresh
+      ? setTimeout(() => controller.abort(), graphListBudgetMs(true))
+      : undefined;
     try {
-      // website_requests are the list source of truth. Graph is opportunistic
-      // and aborted at the list budget so production paint cannot wait on it.
+      const mailboxPromise = fresh
+        ? listMailboxFormInboxMessages({
+            kind: "all",
+            scopeKey: "all",
+            limit: MAX_LIMIT,
+            signal: controller.signal,
+            skipSync: true,
+          })
+        : Promise.resolve({
+            items: [] as FormInboxMessageSummary[],
+            facets: { kinds: [], scopes: [] },
+          });
+
       const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
-        listMailboxFormInboxMessages({
-          kind: "all",
-          scopeKey: "all",
-          limit: MAX_LIMIT,
-          signal: controller.signal,
-          skipSync: true,
-        }),
+        mailboxPromise,
         (async () => {
           const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
           return listWebsiteRequestInboxSummaries({
@@ -1379,7 +1389,7 @@ export async function listFormInboxMessages(options?: {
 
       return { mailboxItems, requestItems, hiddenRequestNumbers };
     } finally {
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
     }
   }, { fresh });
 

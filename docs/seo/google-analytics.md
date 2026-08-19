@@ -6,24 +6,28 @@ Consent-gated GA4 (`gtag`) for the public storefront. Scripts load **only after*
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `VITE_GA_MEASUREMENT_ID` | Yes (to load gtag) | `G-MVMC3FS5GK` |
-| `VITE_GA_ENABLE_DEV` | No | `1` — allow consent UI + GA on localhost / non-prod builds |
+| `VITE_GA_MEASUREMENT_ID` | One of these IDs | `G-XXXXXXXX` |
+| `GA_MEASUREMENT_ID` | Alias (server / Vercel env, no `VITE_` prefix) | `G-XXXXXXXX` |
+| `GOOGLE_ANALYTICS_MEASUREMENT_ID` | Alias | `G-XXXXXXXX` |
+| `VITE_GA_ENABLE_DEV` | No | `1` — local/preview only. Production still requires a measurement ID. |
 
-`VITE_*` values are baked at **build** time — set them on the storefront Vercel project, then **redeploy**. Locally they are read from the **repo root** `.env` / `.env.local` (`apps/storefront` uses `envDir` = monorepo root). Restart `vite` after changing them.
+`VITE_*` values are baked at **build** time. Server aliases (`GA_MEASUREMENT_ID`, `GOOGLE_ANALYTICS_MEASUREMENT_ID`) are read at SSR and injected as `window.__MCCOY_GA_MEASUREMENT_ID__`, so production can work without the `VITE_` prefix after a storefront redeploy. Locally they are read from the **repo root** `.env` / `.env.local`. Restart `vite` after changing them.
 
 Also add the same keys (commented) to root `.env.example` if missing:
 
 ```bash
 # VITE_GA_MEASUREMENT_ID=G-XXXXXXXX
+# GA_MEASUREMENT_ID=G-XXXXXXXX
+# GOOGLE_ANALYTICS_MEASUREMENT_ID=G-XXXXXXXX
 # VITE_GA_ENABLE_DEV=1
 ```
 
 ## Behaviour
 
-1. Consent banner appears when runtime is allowed **and** either a valid measurement ID is set **or** `VITE_GA_ENABLE_DEV` is set (design preview without gtag). Two explicit buttons (Alleen noodzakelijk / Accepteer analytics cookies); banner copy does not describe script-load timing.
+1. Consent banner appears when runtime is allowed **and** a valid measurement ID is set. `VITE_GA_ENABLE_DEV` without an ID is local/design preview only (no fake production banner). Two explicit buttons (Alleen noodzakelijk / Accepteer analytics cookies); banner copy does not describe script-load timing.
 2. Runtime is allowed in production builds, or when `VITE_GA_ENABLE_DEV` is truthy (`1` / `true` / `yes`).
-3. Choice is stored in `localStorage` key `mccoy-analytics-consent` (`granted` | `denied`).
-4. `gtag.js` loads from `googletagmanager.com` only after `granted` **and** a valid `VITE_GA_MEASUREMENT_ID`.
+3. Choice is stored in `localStorage` **and** a first-party cookie, both keyed `mccoy-analytics-consent` (`granted` | `denied`), so SSR/other tabs can see it.
+4. Consent Mode v2: default `analytics_storage` / ads denied (`wait_for_update: 500`) before any `gtag` config. On accept: `gtag('consent', 'update', { analytics_storage: 'granted' })`, then load `gtag.js` and send `page_view` in the same turn. On reject: keep denied and do not load gtag.
 5. CMS bridge routes (`/cms-preview`, `/cms-sync`) never show the banner or load GA.
 6. `@vercel/analytics` remains separate (cookieless); left enabled.
 7. GA config uses `send_page_view: false`; the TanStack Router integration emits one explicit `page_view` for the initial accepted page and each SPA pathname change.
@@ -53,7 +57,7 @@ npm run dev
 Clear a prior choice so the banner shows again:
 
 ```powershell
-# In DevTools → Application → Local Storage, delete key:
+# In DevTools → Application, delete localStorage and cookie:
 # mccoy-analytics-consent
 ```
 
@@ -117,5 +121,5 @@ This is product privacy disclosure for the storefront, not formal legal advice.
 3. Reload → no banner; gtag loads again (consent persisted).
 4. Navigate between two storefront routes without reloading → one `g/collect` request with `en=page_view` per navigation; verify `dl`/`dp` uses the current pathname and contains no query values.
 5. Open `/cms-preview` or `/cms-sync` directly → no banner, `gtag/js`, or GA collect request.
-6. Clear `localStorage` key `mccoy-analytics-consent` to re-test the banner.
-7. Local with only `VITE_GA_ENABLE_DEV=1`: banner appears; Network must still show no `gtag/js`.
+6. Clear `localStorage` key `mccoy-analytics-consent` **and** the same-named cookie to re-test the banner.
+7. Local with only `VITE_GA_ENABLE_DEV=1`: banner appears; Network must still show no `gtag/js`. Production with enableDev and no ID must not show the banner.

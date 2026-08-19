@@ -168,4 +168,28 @@ describe("inquiry thread dedupe", () => {
       ),
     ).toBe(true);
   });
+
+  it("keeps the customer copy with attachments when body and time match", () => {
+    const items = dedupeInquiryThreadItems([
+      {
+        id: "req:website-requests:abc:mail:row-1",
+        direction: "customer" as const,
+        textBody: "Hier de foto's",
+        date: "2026-08-19T11:00:00.000Z",
+        messageId: "<in@yahoo.com>",
+        attachments: [],
+      },
+      {
+        id: "graph:info@mccoy.nl:g-in",
+        direction: "customer" as const,
+        textBody: "Hier de foto's",
+        date: "2026-08-19T11:00:05.000Z",
+        messageId: "<in@yahoo.com>",
+        attachments: [{ filename: "keuken.jpg" }],
+      },
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe("graph:info@mccoy.nl:g-in");
+    expect(items[0]?.attachments).toHaveLength(1);
+  });
 });

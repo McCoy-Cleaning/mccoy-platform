@@ -549,7 +549,8 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       const session = await requireAdminSession();
       assertInboxFetchRateLimit(session.username);
 
-      if (!isFormInboxConfigured()) {
+      // Request-backed Graph fallback must run even if IMAP inbox is not configured.
+      if (!isFormInboxConfigured() && !getGraphMailConfig()) {
         return {
           ok: false as const,
           error: formInboxConfigHelpMessage(),
@@ -561,7 +562,7 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       if (!attachment) {
         return {
           ok: false as const,
-          error: "Bijlage niet gevonden of te groot om te downloaden.",
+          error: "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
           code: "not_found" as const,
         };
       }
@@ -570,7 +571,7 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       if (!hasBytes && !hasSignedUrl) {
         return {
           ok: false as const,
-          error: "Bijlage niet gevonden of te groot om te downloaden.",
+          error: "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
           code: "not_found" as const,
         };
       }

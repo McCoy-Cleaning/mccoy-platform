@@ -220,10 +220,12 @@ export type ThreadDedupeItem = {
   messageId?: string | null;
   to?: string;
   from?: string;
+  attachments?: unknown[];
 };
 
 /**
  * Drop duplicate same-direction bubbles. Never collapses admin↔customer.
+ * Prefer the copy with more attachments when that field is present.
  * Admin: prefer plain typed body over HTML template text.
  */
 export function dedupeInquiryThreadItems<T extends ThreadDedupeItem>(items: T[]): T[] {
@@ -262,6 +264,17 @@ export function dedupeInquiryThreadItems<T extends ThreadDedupeItem>(items: T[])
     }
 
     const existing = kept[duplicateIndex]!;
+    const existingAtt = existing.attachments?.length ?? 0;
+    const candidateAtt = candidate.attachments?.length ?? 0;
+    const eitherHasAttachments =
+      existing.attachments != null || candidate.attachments != null;
+    if (eitherHasAttachments && candidateAtt !== existingAtt) {
+      if (candidateAtt > existingAtt) {
+        kept[duplicateIndex] = candidate;
+      }
+      continue;
+    }
+
     const preferCandidate =
       candidate.direction === "admin" &&
       (candidate.textBody.trim().length < existing.textBody.trim().length ||

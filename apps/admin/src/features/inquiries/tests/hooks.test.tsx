@@ -188,7 +188,7 @@ describe("useInquiriesListQuery", () => {
     expect((probe.latest as ReturnType<typeof useInquiriesListQuery>).items).toHaveLength(2);
 
     await act(async () => {
-      void (probe.latest as ReturnType<typeof useInquiriesListQuery>).loadList();
+      void (probe.latest as ReturnType<typeof useInquiriesListQuery>).loadList({ fresh: true });
       await Promise.resolve();
     });
 
@@ -196,6 +196,120 @@ describe("useInquiriesListQuery", () => {
     expect(refreshing.refreshing).toBe(true);
     expect(refreshing.listState).toBe("ready");
     expect(refreshing.items).toHaveLength(2);
+
+    await act(async () => {
+      resolveRefresh?.({
+        ok: true,
+        items: [summary("1"), summary("2"), summary("3")],
+        facets: { scopes: [] },
+        showAll: false,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const done = probe.latest as ReturnType<typeof useInquiriesListQuery>;
+    expect(done.refreshing).toBe(false);
+    expect(done.items).toHaveLength(3);
+  });
+
+  it("does not refetch when kind, scope, or q change", async () => {
+    listAdminFormInboxMock.mockResolvedValue({
+      ok: true,
+      items: [summary("1", { kind: "inquiry" }), summary("2", { kind: "job_application" })],
+      facets: { scopes: [] },
+      showAll: false,
+    } as never);
+
+    type Props = {
+      kind: "all" | "inquiry" | "job_application";
+      scopeKey: "all" | "test";
+      debouncedQ: string;
+    };
+    const probe: HookProbe = { latest: null };
+
+    function Harness(props: Props) {
+      probe.latest = useInquiriesListQuery(props);
+      return null;
+    }
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mounted = { container, root };
+
+    act(() => {
+      root.render(<Harness kind="all" scopeKey="all" debouncedQ="" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(listAdminFormInboxMock).toHaveBeenCalledTimes(1);
+    const firstCall = listAdminFormInboxMock.mock.calls[0]?.[0] as {
+      data: { kind?: string; scopeKey?: string; q?: string; fresh?: boolean };
+    };
+    expect(firstCall.data.kind).toBe("all");
+    expect(firstCall.data.scopeKey).toBe("all");
+    expect(firstCall.data.q).toBeUndefined();
+
+    act(() => {
+      root.render(<Harness kind="job_application" scopeKey="all" debouncedQ="" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      root.render(<Harness kind="job_application" scopeKey="test" debouncedQ="ada" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(listAdminFormInboxMock).toHaveBeenCalledTimes(1);
+    expect((probe.latest as ReturnType<typeof useInquiriesListQuery>).refreshing).toBe(false);
+    expect((probe.latest as ReturnType<typeof useInquiriesListQuery>).items).toHaveLength(2);
+  });
+
+  it("does not flash Vernieuwen on a background loadList", async () => {
+    let resolveRefresh: ((value: unknown) => void) | null = null;
+    listAdminFormInboxMock
+      .mockResolvedValueOnce({
+        ok: true,
+        items: [summary("1"), summary("2")],
+        facets: { scopes: [] },
+        showAll: false,
+      } as never)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve;
+          }) as never,
+      );
+
+    const { container, root, probe } = mountHook(() =>
+      useInquiriesListQuery({ kind: "all", scopeKey: "all", debouncedQ: "" }),
+    );
+    mounted = { container, root };
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      void (probe.latest as ReturnType<typeof useInquiriesListQuery>).loadList();
+      await Promise.resolve();
+    });
+
+    const background = probe.latest as ReturnType<typeof useInquiriesListQuery>;
+    expect(background.refreshing).toBe(false);
+    expect(background.listState).toBe("ready");
+    expect(background.items).toHaveLength(2);
 
     await act(async () => {
       resolveRefresh?.({

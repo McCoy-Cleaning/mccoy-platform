@@ -3,23 +3,29 @@ import { useRouterState } from "@tanstack/react-router";
 import { CookieConsentBanner } from "@/components/site/CookieConsentBanner";
 import {
   type AnalyticsConsent,
+  isCookieConsentBannerOpen,
   readAnalyticsConsent,
+  retainExplicitAnalyticsConsent,
   writeAnalyticsConsent,
 } from "@/lib/analytics/consent";
 import { GoogleAnalytics } from "@/lib/analytics/GoogleAnalytics";
 import {
   isAnalyticsExemptPath,
-  parseGaMeasurementId,
   readGaEnableDevFlag,
   shouldOfferAnalyticsConsent,
 } from "@/lib/analytics/ga-config";
+import {
+  activateGoogleAnalyticsAfterConsent,
+  applyGoogleConsentDefault,
+} from "@/lib/analytics/load-gtag";
+import { readPublicGaMeasurementId } from "@/lib/analytics/public-ga-id";
 
 function readAnalyticsOfferState(): {
   offerConsent: boolean;
   measurementId: string | null;
   enableDev: boolean;
 } {
-  const measurementId = parseGaMeasurementId(import.meta.env.VITE_GA_MEASUREMENT_ID);
+  const measurementId = readPublicGaMeasurementId();
   const enableDev = readGaEnableDevFlag(import.meta.env.VITE_GA_ENABLE_DEV);
   const offerConsent = shouldOfferAnalyticsConsent({
     measurementId,
@@ -31,8 +37,8 @@ function readAnalyticsOfferState(): {
 
 /**
  * Consent-gated GA4 + banner. Mount once in the storefront root.
- * Banner can appear in enableDev preview without a measurement ID;
- * gtag still loads only with a valid ID + granted consent.
+ * The banner is client-only: SSR never paints it, so a dead server copy
+ * cannot stay on screen after Accept.
  */
 export function StorefrontAnalytics() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -49,30 +55,53 @@ export function StorefrontAnalytics() {
     }
     if (import.meta.env.DEV && enableDev && !measurementId) {
       console.warn(
-        "[analytics] Consent banner preview active (VITE_GA_ENABLE_DEV) but VITE_GA_MEASUREMENT_ID is unset — gtag will not load.",
+        "[analytics] Consent banner preview active (VITE_GA_ENABLE_DEV) but no measurement ID — gtag will not load.",
       );
     }
-    setConsent(readAnalyticsConsent());
+    if (measurementId) applyGoogleConsentDefault();
+    setConsent((prev) => retainExplicitAnalyticsConsent(prev, readAnalyticsConsent()));
     setReady(true);
   }, [offerConsent, exempt, enableDev, measurementId]);
 
   const onAccept = useCallback(() => {
-    writeAnalyticsConsent("granted");
     setConsent("granted");
-  }, []);
+    writeAnalyticsConsent("granted");
+    if (measurementId && !exempt) {
+      try {
+        activateGoogleAnalyticsAfterConsent({
+          measurementId,
+          pathname,
+          title: typeof document !== "undefined" ? document.title : undefined,
+        });
+      } catch {
+        /* gtag failure must not resurrect the banner */
+      }
+    }
+  }, [measurementId, exempt, pathname]);
 
   const onReject = useCallback(() => {
-    writeAnalyticsConsent("denied");
     setConsent("denied");
-  }, []);
+    writeAnalyticsConsent("denied");
+    if (measurementId) {
+      try {
+        applyGoogleConsentDefault();
+      } catch {
+        /* consent default failure must not resurrect the banner */
+      }
+    }
+  }, [measurementId]);
 
   if (!offerConsent) return null;
 
   return (
     <>
-      <GoogleAnalytics consent={consent} pathname={pathname} />
+      <GoogleAnalytics
+        consent={consent}
+        pathname={pathname}
+        measurementId={measurementId}
+      />
       <CookieConsentBanner
-        open={!exempt && ready && consent === null}
+        open={isCookieConsentBannerOpen({ exempt, ready, consent })}
         onAccept={onAccept}
         onReject={onReject}
       />

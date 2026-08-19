@@ -39,6 +39,17 @@ export function buildConversationSentFilter(
 }
 
 /**
+ * Date-window $filter for locating a form notification without `$search`.
+ * `receivedDateTime` leads so `$orderby=receivedDateTime` stays legal.
+ */
+export function buildReceivedDateWindowFilter(fromIso: string, toIso?: string): string {
+  if (toIso) {
+    return `receivedDateTime ge ${fromIso} and receivedDateTime le ${toIso}`;
+  }
+  return `receivedDateTime ge ${fromIso}`;
+}
+
+/**
  * Decide whether a recent mailbox message belongs to an open Aanvraag during
  * detail sync. Conversation id is preferred; otherwise require reply-shaped
  * subject + (WR number or original subject overlap) + sender is submitter or

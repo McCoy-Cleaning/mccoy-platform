@@ -201,6 +201,81 @@ describe("getWebsiteRequestFormInboxAttachment", () => {
     expect(findGraphFormNotificationByRequestNumber).not.toHaveBeenCalled();
   });
 
+  it("uses a provider=graph mail row graph_message_id for legacy downloads", async () => {
+    const requestId = "55555555-5555-4555-8555-555555555555";
+    const inboxId = encodeRequestMessageId(requestId, "website-requests");
+    const filename = "cv.pdf";
+    const contentBase64 = Buffer.from("%PDF-legacy").toString("base64");
+
+    getWebsiteRequest.mockResolvedValue({
+      id: requestId,
+      number: "WR-2026-00011",
+      kind: "job_application",
+      status: "open",
+      submitterName: "Ada",
+      submitterEmail: "a@example.com",
+      submitterPhone: null,
+      submitterCompany: null,
+      subject: "Sollicitatie",
+      fields: {},
+      attachments: [{ filename, contentType: "application/pdf", sizeBytes: 48_000 }],
+      replies: [],
+      notificationState: "sent",
+      notificationError: null,
+      companyId: null,
+      formId: null,
+      sourcePageId: null,
+      scopeKey: null,
+      scopeLabel: null,
+      createdAt: "2026-04-01T10:00:00.000Z",
+      updatedAt: "2026-04-01T10:00:00.000Z",
+      lastRepliedAt: null,
+    });
+
+    listWebsiteRequestMailMessages.mockResolvedValue([
+      {
+        id: "mail-graph",
+        request_id: requestId,
+        direction: "inbound",
+        provider: "graph",
+        mailbox: "info@mccoy.nl",
+        graph_message_id: "legacy-graph-msg",
+        internet_message_id: null,
+        conversation_id: null,
+        conversation_index: null,
+        in_reply_to: null,
+        references_header: null,
+        sender_address: "info@mccoy.nl",
+        recipient_addresses: ["info@mccoy.nl"],
+        subject: "Sollicitatie (WR-2026-00011)",
+        body_text: null,
+        occurred_at: "2026-04-01T10:00:00.000Z",
+        is_read: true,
+        created_at: "2026-04-01T10:00:00.000Z",
+      },
+    ]);
+
+    getGraphFormInboxAttachment.mockResolvedValue({
+      filename,
+      contentType: "application/pdf",
+      size: 48_000,
+      contentBase64,
+      omitted: false,
+      part: "att-legacy",
+    });
+
+    const result = await getWebsiteRequestFormInboxAttachment(inboxId, filename);
+
+    expect(getGraphFormInboxAttachment).toHaveBeenCalledWith(
+      "legacy-graph-msg",
+      filename,
+      "info@mccoy.nl",
+      { sizeBytes: 48_000, maxBytes: 25 * 1024 * 1024 },
+    );
+    expect(result?.contentBase64).toBe(contentBase64);
+    expect(findGraphFormNotificationByRequestNumber).not.toHaveBeenCalled();
+  });
+
   it("returns null when request-backed download has no Graph content", async () => {
     const requestId = "22222222-2222-4222-8222-222222222222";
     const inboxId = encodeRequestMessageId(requestId, "website-requests");
@@ -236,6 +311,9 @@ describe("getWebsiteRequestFormInboxAttachment", () => {
       requestNumber: "WR-2026-00099",
       mailbox: "info@mccoy.nl",
       createdAt: "2026-08-01T10:00:00.000Z",
+      filename: "cv.pdf",
+      submitterName: "Ada",
+      submitterEmail: "a@example.com",
     });
   });
 
@@ -290,6 +368,9 @@ describe("getWebsiteRequestFormInboxAttachment", () => {
       requestNumber: "WR-2026-00007",
       mailbox: "info@mccoy.nl",
       createdAt: "2026-01-01T10:00:00.000Z",
+      filename,
+      submitterName: "Jorien",
+      submitterEmail: "j@example.com",
     });
     expect(getGraphFormInboxAttachment).toHaveBeenCalledWith(
       "graph-old-form",
@@ -352,7 +433,111 @@ describe("getWebsiteRequestFormInboxAttachment", () => {
       requestNumber: "WR-2026-00007",
       mailbox: "info@mccoy.nl",
       createdAt: "2026-01-01T10:00:00.000Z",
+      filename,
+      submitterName: "Jorien",
+      submitterEmail: "j@example.com",
     });
     expect(result?.contentBase64).toBe(contentBase64);
+  });
+
+  it("propagates Graph FormInboxError instead of returning null", async () => {
+    const requestId = "66666666-6666-4666-8666-666666666666";
+    const inboxId = encodeRequestMessageId(requestId, "website-requests");
+    const { FormInboxError } = await import("./form-inbox-contracts");
+
+    getWebsiteRequest.mockResolvedValue({
+      id: requestId,
+      number: "WR-2026-00088",
+      kind: "job_application",
+      status: "open",
+      submitterName: "Jorien",
+      submitterEmail: "j@example.com",
+      submitterPhone: null,
+      submitterCompany: null,
+      subject: "Sollicitatie",
+      fields: {},
+      attachments: [{ filename: "cv.doc", contentType: "application/msword", sizeBytes: 33_000 }],
+      replies: [],
+      notificationState: "sent",
+      notificationError: null,
+      companyId: null,
+      formId: null,
+      sourcePageId: null,
+      scopeKey: null,
+      scopeLabel: null,
+      createdAt: "2026-01-01T10:00:00.000Z",
+      updatedAt: "2026-01-01T10:00:00.000Z",
+      lastRepliedAt: null,
+    });
+    listWebsiteRequestMailMessages.mockResolvedValue([]);
+    findGraphFormNotificationByRequestNumber.mockResolvedValue({
+      id: "graph-auth-fail",
+      mailbox: "info@mccoy.nl",
+    });
+    getGraphFormInboxAttachment.mockRejectedValue(
+      new FormInboxError("Microsoft Graph token geweigerd (invalid_client)."),
+    );
+
+    await expect(getWebsiteRequestFormInboxAttachment(inboxId, "cv.doc")).rejects.toThrow(
+      /token geweigerd/,
+    );
+  });
+
+  it("downloads a klant-reply PDF from that Graph message and does not store it as a form file", async () => {
+    const requestId = "77777777-7777-4777-8777-777777777777";
+    const inboxId = `${encodeRequestMessageId(requestId, "website-requests")}:mail:mail-in`;
+    const filename = "offerte.pdf";
+    const contentBase64 = Buffer.from("%PDF-reply").toString("base64");
+
+    getWebsiteRequest.mockResolvedValue({
+      id: requestId,
+      number: "WR-2026-00200",
+      kind: "glass_washing",
+      status: "open",
+      submitterName: "Oana",
+      submitterEmail: "oana@example.com",
+      fields: {},
+      attachments: [{ filename: "situatie.webp", contentType: "image/webp", sizeBytes: 12 }],
+      replies: [],
+      createdAt: "2026-08-19T10:00:00.000Z",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+    });
+    listWebsiteRequestMailMessages.mockResolvedValue([
+      {
+        id: "mail-form",
+        direction: "inbound",
+        provider: "website_form",
+        mailbox: "info@mccoy.nl",
+        graph_message_id: "g-form",
+      },
+      {
+        id: "mail-in",
+        direction: "inbound",
+        provider: "microsoft_graph",
+        mailbox: "info@mccoy.nl",
+        graph_message_id: "g-in",
+      },
+    ]);
+    getGraphFormInboxAttachment.mockResolvedValue({
+      filename,
+      contentType: "application/pdf",
+      size: 9,
+      contentBase64,
+      omitted: false,
+      part: "att-reply",
+    });
+
+    const result = await getWebsiteRequestFormInboxAttachment(inboxId, filename);
+
+    expect(createStoredWebsiteRequestAttachmentAccess).not.toHaveBeenCalled();
+    expect(getGraphFormInboxAttachment).toHaveBeenCalledWith(
+      "g-in",
+      filename,
+      "info@mccoy.nl",
+      { sizeBytes: undefined, maxBytes: 25 * 1024 * 1024 },
+    );
+    expect(storeWebsiteRequestAttachments).not.toHaveBeenCalled();
+    expect(result?.contentBase64).toBe(contentBase64);
+    expect(result?.omitted).toBe(false);
   });
 });

@@ -10,12 +10,15 @@ import {
 
 export type ListState = "loading" | "ready" | "error";
 
-export function useInquiriesListQuery(params: {
+/**
+ * Loads the unfiltered Aanvragen snapshot once (kind=all, scope=all, no q).
+ * Kind / scope / search are applied client-side — they must not refetch.
+ */
+export function useInquiriesListQuery(_params: {
   kind: KindFilter;
   scopeKey: ScopeFilter;
   debouncedQ: string;
 }) {
-  const { kind, scopeKey, debouncedQ } = params;
   const [items, setItems] = React.useState<FormInboxMessageSummary[]>([]);
   const [scopeFacets, setScopeFacets] = React.useState<InboxScopeFacet[]>([]);
   const [listState, setListState] = React.useState<ListState>("loading");
@@ -30,8 +33,6 @@ export function useInquiriesListQuery(params: {
   const hasSuccessfulDataRef = React.useRef(false);
   const tombstonesRef = React.useRef<Map<string, DeleteTombstone>>(new Map());
   const [, bumpTombstones] = React.useState(0);
-  const loadParamsRef = React.useRef({ kind, scopeKey, debouncedQ });
-  loadParamsRef.current = { kind, scopeKey, debouncedQ };
 
   const registerTombstones = React.useCallback((entries: Map<string, DeleteTombstone>) => {
     for (const [id, meta] of entries) {
@@ -46,25 +47,26 @@ export function useInquiriesListQuery(params: {
   }, []);
 
   const loadList = React.useCallback(async (opts?: { fresh?: boolean }) => {
-    const { kind: k, scopeKey: s, debouncedQ: q } = loadParamsRef.current;
     const generation = ++requestGenerationRef.current;
     const hadData = hasSuccessfulDataRef.current;
+    const explicitRefresh = opts?.fresh === true;
 
-    if (hadData) {
+    if (explicitRefresh && hadData) {
       setRefreshing(true);
-    } else {
+    } else if (!hadData) {
       setInitialLoading(true);
       setListState("loading");
     }
-    setListError(null);
-    setListErrorCode(null);
+    if (explicitRefresh || !hadData) {
+      setListError(null);
+      setListErrorCode(null);
+    }
 
     try {
       const result = await listAdminFormInbox({
         data: {
-          kind: k,
-          scopeKey: s,
-          q: q || undefined,
+          kind: "all",
+          scopeKey: "all",
           fresh: opts?.fresh,
         },
       });
@@ -124,7 +126,7 @@ export function useInquiriesListQuery(params: {
 
   React.useEffect(() => {
     void loadList();
-  }, [kind, scopeKey, debouncedQ, loadList]);
+  }, [loadList]);
 
   return {
     items,

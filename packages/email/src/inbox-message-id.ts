@@ -91,6 +91,21 @@ export function decodeInboxMessageId(id: string): DecodedInboxMessageId {
   throw new FormInboxError("Ongeldig berichten-ID.");
 }
 
+/**
+ * Thread items for Graph replies are sometimes encoded as
+ * `req:mailbox:{requestId}:mail:{mailRowId}`. Decode that suffix so attachment
+ * download can still resolve the website request.
+ */
+export function splitWebsiteRequestInboxTarget(requestId: string): {
+  requestId: string;
+  mailRowId?: string;
+} {
+  const trimmed = requestId.trim();
+  const match = /^(.+):mail:(.+)$/.exec(trimmed);
+  if (!match) return { requestId: trimmed };
+  return { requestId: match[1]!, mailRowId: match[2] };
+}
+
 /** Zod-friendly pattern: imap / graph / req / e2e */
 export const INBOX_MESSAGE_ID_PATTERN =
   /^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/;

@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
   isAnalyticsConsent,
+  isCookieConsentBannerOpen,
+  parseAnalyticsConsentFromCookie,
   readAnalyticsConsent,
+  retainExplicitAnalyticsConsent,
   writeAnalyticsConsent,
 } from "./consent";
 import {
@@ -11,14 +14,17 @@ import {
   parseGaMeasurementId,
   readGaEnableDevFlag,
   resolveGoogleAnalyticsMeasurementId,
+  resolvePublicGaMeasurementId,
   shouldOfferAnalyticsConsent,
 } from "./ga-config";
 
 describe("analytics consent", () => {
   const store = new Map<string, string>();
+  let cookieJar = "";
 
   afterEach(() => {
     store.clear();
+    cookieJar = "";
     vi.unstubAllGlobals();
   });
 
@@ -40,24 +46,61 @@ describe("analytics consent", () => {
         store.delete(key);
       },
     };
-    vi.stubGlobal("window", { localStorage });
+    const document = {
+      get cookie() {
+        return cookieJar;
+      },
+      set cookie(value: string) {
+        const pair = value.split(";", 1)[0] ?? "";
+        const eq = pair.indexOf("=");
+        if (eq < 0) return;
+        const name = pair.slice(0, eq);
+        const val = pair.slice(eq + 1);
+        const parts = cookieJar
+          .split(";")
+          .map((part) => part.trim())
+          .filter((part) => part && !part.startsWith(`${name}=`));
+        parts.push(`${name}=${val}`);
+        cookieJar = parts.join("; ");
+      },
+    };
+    vi.stubGlobal("window", { localStorage, location: { protocol: "http:" } });
     vi.stubGlobal("localStorage", localStorage);
+    vi.stubGlobal("document", document);
   }
 
   it("narrows consent values", () => {
     expect(isAnalyticsConsent("granted")).toBe(true);
     expect(isAnalyticsConsent("denied")).toBe(true);
     expect(isAnalyticsConsent("maybe")).toBe(false);
+    expect(isAnalyticsConsent("null")).toBe(false);
     expect(isAnalyticsConsent(null)).toBe(false);
   });
 
-  it("reads and writes localStorage consent", () => {
+  it("reads and writes localStorage + first-party cookie consent", () => {
     stubBrowserStorage();
     expect(readAnalyticsConsent()).toBeNull();
     writeAnalyticsConsent("granted");
     expect(readAnalyticsConsent()).toBe("granted");
+    expect(store.get(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
+    expect(cookieJar).toContain(`${ANALYTICS_CONSENT_STORAGE_KEY}=granted`);
     writeAnalyticsConsent("denied");
     expect(readAnalyticsConsent()).toBe("denied");
+    expect(cookieJar).toContain(`${ANALYTICS_CONSENT_STORAGE_KEY}=denied`);
+  });
+
+  it("falls back to the consent cookie when localStorage is empty", () => {
+    stubBrowserStorage();
+    cookieJar = `${ANALYTICS_CONSENT_STORAGE_KEY}=granted`;
+    expect(readAnalyticsConsent()).toBe("granted");
+  });
+
+  it("parses consent from a Cookie header for SSR", () => {
+    expect(parseAnalyticsConsentFromCookie("foo=bar; mccoy-analytics-consent-v2=denied")).toBe(
+      "denied",
+    );
+    expect(parseAnalyticsConsentFromCookie("mccoy-analytics-consent-v2=maybe")).toBeNull();
+    expect(parseAnalyticsConsentFromCookie("")).toBeNull();
   });
 
   it("returns null when localStorage throws", () => {
@@ -72,6 +115,36 @@ describe("analytics consent", () => {
     expect(readAnalyticsConsent()).toBeNull();
     expect(() => writeAnalyticsConsent("granted")).not.toThrow();
   });
+
+  it("keeps an explicit accept even if the SSR isomorphic snapshot is still null", () => {
+    const isomorphicSnapshot = null; // readInitialAnalyticsConsent() after accept
+    const consent = retainExplicitAnalyticsConsent("granted", isomorphicSnapshot);
+    expect(consent).toBe("granted");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent }),
+    ).toBe(false);
+  });
+
+  it("keeps an explicit reject even if storage/SSR still reads null", () => {
+    const consent = retainExplicitAnalyticsConsent("denied", null);
+    expect(consent).toBe("denied");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent }),
+    ).toBe(false);
+  });
+
+  it("adopts storage only while still undecided", () => {
+    expect(retainExplicitAnalyticsConsent(null, "granted")).toBe("granted");
+    expect(retainExplicitAnalyticsConsent(null, "denied")).toBe("denied");
+    expect(retainExplicitAnalyticsConsent(null, null)).toBeNull();
+    expect(retainExplicitAnalyticsConsent("granted", "denied")).toBe("granted");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent: null }),
+    ).toBe(true);
+    expect(
+      isCookieConsentBannerOpen({ exempt: true, ready: true, consent: null }),
+    ).toBe(false);
+  });
 });
 
 describe("ga-config", () => {
@@ -81,6 +154,33 @@ describe("ga-config", () => {
     expect(parseGaMeasurementId("UA-123")).toBeNull();
     expect(parseGaMeasurementId("")).toBeNull();
     expect(parseGaMeasurementId(undefined)).toBeNull();
+  });
+
+  it("resolves measurement ID from VITE_ or server aliases", () => {
+    expect(
+      resolvePublicGaMeasurementId({
+        viteMeasurementId: undefined,
+        gaMeasurementId: "G-SERVER01",
+      }),
+    ).toBe("G-SERVER01");
+    expect(
+      resolvePublicGaMeasurementId({
+        viteMeasurementId: "G-VITE01",
+        gaMeasurementId: "G-SERVER01",
+        googleAnalyticsMeasurementId: "G-GOOGLE01",
+      }),
+    ).toBe("G-VITE01");
+    expect(
+      resolvePublicGaMeasurementId({
+        googleAnalyticsMeasurementId: "G-GOOGLE01",
+      }),
+    ).toBe("G-GOOGLE01");
+    expect(
+      resolvePublicGaMeasurementId({
+        injectedMeasurementId: "G-INJECT1",
+      }),
+    ).toBe("G-INJECT1");
+    expect(resolvePublicGaMeasurementId({})).toBeNull();
   });
 
   it("gates runtime to production unless enableDev", () => {
@@ -123,6 +223,13 @@ describe("ga-config", () => {
         measurementId: "G-ABC",
         isProd: false,
         enableDev: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAnalyticsConsent({
+        measurementId: null,
+        isProd: true,
+        enableDev: true,
       }),
     ).toBe(false);
   });

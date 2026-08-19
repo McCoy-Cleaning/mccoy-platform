@@ -1,6 +1,7 @@
 /**
  * Short-lived in-process cache for the unfiltered Aanvragen merge.
- * Category switches filter the same Graph+DB snapshot instead of refetching mailboxes.
+ * Default list is website_requests + hidden numbers (no Graph).
+ * Graph mailbox is loaded only when fresh=true (Vernieuwen).
  */
 
 export type InboxListSnapshotCacheOptions = {
@@ -30,9 +31,8 @@ export function clearInboxListSnapshotCache(): void {
 }
 
 /**
- * Structured website_requests are the list source of truth, so initial paint only
- * gives the legacy mailbox a small opportunistic window. Explicit Vernieuwen keeps
- * the longer budget needed to discover old Graph-only messages.
+ * Graph mailbox budget — only used on explicit Vernieuwen (fresh=true).
+ * The default list path does not call Graph at all.
  */
 export function graphListBudgetMs(fresh = false): number {
   return fresh ? FRESH_GRAPH_LIST_BUDGET_MS : COLD_GRAPH_LIST_BUDGET_MS;
