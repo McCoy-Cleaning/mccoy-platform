@@ -44,7 +44,7 @@ function defaultAdminFrameAncestors(): string[] {
   ];
 
   // Local defaults used by Playwright / npm run dev:admin
-  return unique([...fromEnv, "http://localhost:5174", "http://127.0.0.1:5174"]);
+  return unique([...fromEnv, "https://admin.mccoy.nl", "http://localhost:5174", "http://127.0.0.1:5174"]);
 }
 
 /**
