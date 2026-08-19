@@ -15,6 +15,10 @@ declare global {
 
 const initializedIds = new Set<string>();
 const lastPagePathById = new Map<string, string>();
+const pendingPageViewById = new Map<
+  string,
+  { measurementId: string; pathname: string; title?: string }
+>();
 let consentDefaultApplied = false;
 
 const DENIED_CONSENT = {
@@ -29,8 +33,12 @@ function ensureGtagStub(): boolean {
   if (typeof window === "undefined") return false;
   window.dataLayer = window.dataLayer || [];
   if (typeof window.gtag !== "function") {
-    window.gtag = function gtag(...args: unknown[]) {
-      window.dataLayer?.push(args);
+    // Google's snippet uses `arguments`. A rest-parameter Array is queued as
+    // one value; gtag.js then ignores consent/config/page_view and never
+    // sends collect.
+    window.gtag = function gtag() {
+      // eslint-disable-next-line prefer-rest-params
+      window.dataLayer?.push(arguments);
     };
   }
   return true;
@@ -53,6 +61,14 @@ export function updateGoogleAnalyticsConsentGranted(): boolean {
   return true;
 }
 
+function flushPendingPageView(measurementId: string): void {
+  const pending = pendingPageViewById.get(measurementId);
+  if (!pending) return;
+  pendingPageViewById.delete(measurementId);
+  lastPagePathById.delete(measurementId);
+  sendGoogleAnalyticsPageView(pending);
+}
+
 export function loadGoogleAnalyticsGtag(measurementId: string): boolean {
   if (typeof window === "undefined" || typeof document === "undefined") return false;
   applyGoogleConsentDefault();
@@ -72,6 +88,9 @@ export function loadGoogleAnalyticsGtag(measurementId: string): boolean {
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
     script.dataset.mccoyGa4 = measurementId;
+    script.onload = () => {
+      flushPendingPageView(measurementId);
+    };
     document.head.appendChild(script);
   }
   initializedIds.add(measurementId);
@@ -121,6 +140,11 @@ export function activateGoogleAnalyticsAfterConsent(input: {
   title?: string;
 }): boolean {
   updateGoogleAnalyticsConsentGranted();
+  pendingPageViewById.set(input.measurementId, {
+    measurementId: input.measurementId,
+    pathname: input.pathname,
+    title: input.title,
+  });
   loadGoogleAnalyticsGtag(input.measurementId);
   return sendGoogleAnalyticsPageView({
     measurementId: input.measurementId,
@@ -138,5 +162,6 @@ export function resetGoogleAnalyticsPageViewDedupe(measurementId: string): void 
 export function resetGtagLoadStateForTests(): void {
   initializedIds.clear();
   lastPagePathById.clear();
+  pendingPageViewById.clear();
   consentDefaultApplied = false;
 }
