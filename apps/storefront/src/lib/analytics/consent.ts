@@ -77,3 +77,24 @@ export function writeAnalyticsConsent(value: AnalyticsConsent): void {
     /* cookie blocked */
   }
 }
+
+/**
+ * Client remount/effect: keep an explicit Accept/Reject. Only adopt storage
+ * when still undecided. A stale SSR isomorphic snapshot (`null`) must not
+ * reopen the banner after the visitor chose.
+ */
+export function retainExplicitAnalyticsConsent(
+  prev: AnalyticsConsent | null,
+  stored: AnalyticsConsent | null,
+): AnalyticsConsent | null {
+  return prev ?? stored;
+}
+
+/** Banner is offered only until a choice exists (and the route is ready / not exempt). */
+export function isCookieConsentBannerOpen(input: {
+  exempt: boolean;
+  ready: boolean;
+  consent: AnalyticsConsent | null;
+}): boolean {
+  return !input.exempt && input.ready && input.consent === null;
+}

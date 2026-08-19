@@ -3,9 +3,11 @@ import { useRouterState } from "@tanstack/react-router";
 import { CookieConsentBanner } from "@/components/site/CookieConsentBanner";
 import {
   type AnalyticsConsent,
+  isCookieConsentBannerOpen,
+  readAnalyticsConsent,
+  retainExplicitAnalyticsConsent,
   writeAnalyticsConsent,
 } from "@/lib/analytics/consent";
-import { readInitialAnalyticsConsent } from "@/lib/analytics/consent-ssr";
 import { GoogleAnalytics } from "@/lib/analytics/GoogleAnalytics";
 import {
   isAnalyticsExemptPath,
@@ -35,18 +37,16 @@ function readAnalyticsOfferState(): {
 
 /**
  * Consent-gated GA4 + banner. Mount once in the storefront root.
- * Banner can appear in enableDev preview without a measurement ID (local only);
- * gtag still loads only with a valid ID + granted consent.
+ * The banner is client-only: SSR never paints it, so a dead server copy
+ * cannot stay on screen after Accept.
  */
 export function StorefrontAnalytics() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const exempt = isAnalyticsExemptPath(pathname);
   const { offerConsent, measurementId, enableDev } = readAnalyticsOfferState();
 
-  const [consent, setConsent] = useState<AnalyticsConsent | null>(() =>
-    offerConsent && !exempt ? readInitialAnalyticsConsent() : null,
-  );
-  const [ready, setReady] = useState(() => offerConsent && !exempt);
+  const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!offerConsent || exempt) {
@@ -59,26 +59,36 @@ export function StorefrontAnalytics() {
       );
     }
     if (measurementId) applyGoogleConsentDefault();
-    setConsent(readInitialAnalyticsConsent());
+    setConsent((prev) => retainExplicitAnalyticsConsent(prev, readAnalyticsConsent()));
     setReady(true);
   }, [offerConsent, exempt, enableDev, measurementId]);
 
   const onAccept = useCallback(() => {
-    writeAnalyticsConsent("granted");
     setConsent("granted");
+    writeAnalyticsConsent("granted");
     if (measurementId && !exempt) {
-      activateGoogleAnalyticsAfterConsent({
-        measurementId,
-        pathname,
-        title: typeof document !== "undefined" ? document.title : undefined,
-      });
+      try {
+        activateGoogleAnalyticsAfterConsent({
+          measurementId,
+          pathname,
+          title: typeof document !== "undefined" ? document.title : undefined,
+        });
+      } catch {
+        /* gtag failure must not resurrect the banner */
+      }
     }
   }, [measurementId, exempt, pathname]);
 
   const onReject = useCallback(() => {
-    writeAnalyticsConsent("denied");
     setConsent("denied");
-    if (measurementId) applyGoogleConsentDefault();
+    writeAnalyticsConsent("denied");
+    if (measurementId) {
+      try {
+        applyGoogleConsentDefault();
+      } catch {
+        /* consent default failure must not resurrect the banner */
+      }
+    }
   }, [measurementId]);
 
   if (!offerConsent) return null;
@@ -91,7 +101,7 @@ export function StorefrontAnalytics() {
         measurementId={measurementId}
       />
       <CookieConsentBanner
-        open={!exempt && ready && consent === null}
+        open={isCookieConsentBannerOpen({ exempt, ready, consent })}
         onAccept={onAccept}
         onReject={onReject}
       />

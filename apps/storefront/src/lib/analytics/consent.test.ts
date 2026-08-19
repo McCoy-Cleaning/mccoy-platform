@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
   isAnalyticsConsent,
+  isCookieConsentBannerOpen,
   parseAnalyticsConsentFromCookie,
   readAnalyticsConsent,
+  retainExplicitAnalyticsConsent,
   writeAnalyticsConsent,
 } from "./consent";
 import {
@@ -112,6 +114,36 @@ describe("analytics consent", () => {
     });
     expect(readAnalyticsConsent()).toBeNull();
     expect(() => writeAnalyticsConsent("granted")).not.toThrow();
+  });
+
+  it("keeps an explicit accept even if the SSR isomorphic snapshot is still null", () => {
+    const isomorphicSnapshot = null; // readInitialAnalyticsConsent() after accept
+    const consent = retainExplicitAnalyticsConsent("granted", isomorphicSnapshot);
+    expect(consent).toBe("granted");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent }),
+    ).toBe(false);
+  });
+
+  it("keeps an explicit reject even if storage/SSR still reads null", () => {
+    const consent = retainExplicitAnalyticsConsent("denied", null);
+    expect(consent).toBe("denied");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent }),
+    ).toBe(false);
+  });
+
+  it("adopts storage only while still undecided", () => {
+    expect(retainExplicitAnalyticsConsent(null, "granted")).toBe("granted");
+    expect(retainExplicitAnalyticsConsent(null, "denied")).toBe("denied");
+    expect(retainExplicitAnalyticsConsent(null, null)).toBeNull();
+    expect(retainExplicitAnalyticsConsent("granted", "denied")).toBe("granted");
+    expect(
+      isCookieConsentBannerOpen({ exempt: false, ready: true, consent: null }),
+    ).toBe(true);
+    expect(
+      isCookieConsentBannerOpen({ exempt: true, ready: true, consent: null }),
+    ).toBe(false);
   });
 });
 

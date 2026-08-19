@@ -62,14 +62,14 @@ export function CookieConsentBanner({ open, onAccept, onReject }: CookieConsentB
           <Button
             type="button"
             variant="outline"
-            onClick={onReject}
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReject(); }}
             className="h-11 w-full rounded-full border-white/15 bg-transparent px-4 text-sm text-foreground/85 hover:bg-white/5 hover:text-foreground lg:w-auto lg:px-5"
           >
             {copy.reject}
           </Button>
           <Button
             type="button"
-            onClick={onAccept}
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); onAccept(); }}
             className="h-11 w-full rounded-full px-5 text-sm font-semibold shadow-md shadow-primary/25 lg:w-auto lg:px-6"
           >
             {copy.accept}
