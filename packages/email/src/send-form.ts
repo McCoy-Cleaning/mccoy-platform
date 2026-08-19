@@ -1,9 +1,17 @@
-import type { FormAttachment, FormKind, UploadedFormAttachment, WebsiteFormPayload } from "@mccoy/domain";
+import { Buffer } from "node:buffer";
+import type {
+  AttachmentMeta,
+  FormAttachment,
+  FormKind,
+  UploadedFormAttachment,
+  WebsiteFormPayload,
+} from "@mccoy/domain";
 import { sanitizeScopeForSubject } from "@mccoy/domain";
 import {
   attachmentMetaFromBase64,
   createWebsiteRequest,
   finalizeWebsiteRequestUploadedAttachments,
+  getStoredWebsiteRequestAttachment,
   hasSupabaseServiceConfig,
   processNotificationOutbox,
   storeWebsiteRequestAttachments,
@@ -11,6 +19,7 @@ import {
 } from "@mccoy/database/server";
 import {
   assertRateLimit,
+  assertSafeWebsiteFormUpload,
   isHoneypotTriggered,
   RateLimitError,
   readServerEnv,
@@ -26,10 +35,12 @@ import { buildFormEmail } from "./templates";
 export { FormSubmitError } from "./form-submit-error";
 
 const DEFAULT_TO = "oana.dine1571@gmail.com";
-const MAX_ATTACHMENT_BYTES = 4.5 * 1024 * 1024;
+/** Whole-message mailbox cap (Exchange Online default ~25 MB). */
+export const MAILBOX_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MAX_MAIL_ATTACHMENTS = 8;
 const MAX_FIELD_LENGTH = 2000;
 const IMAGE_CONTENT_TYPE_RE = /^image\//i;
-const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|jpe?g|png|webp)$/i;
+const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i;
 
 function getFormEmailConfig() {
   return {
@@ -57,14 +68,20 @@ function sanitizeAttachmentFilename(name: string): string {
   return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "bijlage";
 }
 
+function approxBytesFromBase64(contentBase64: string): number {
+  if (!contentBase64) return 0;
+  const padding = contentBase64.endsWith("==") ? 2 : contentBase64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((contentBase64.length * 3) / 4) - padding);
+}
+
 function filterAttachments(attachments: FormAttachment[] | undefined): FormAttachment[] {
   if (!attachments?.length) return [];
   const accepted: FormAttachment[] = [];
   let total = 0;
-  for (const file of attachments.slice(0, 8)) {
-    const approxBytes = Math.floor((file.contentBase64.length * 3) / 4);
-    if (approxBytes <= 0 || approxBytes > MAX_ATTACHMENT_BYTES) continue;
-    if (total + approxBytes > MAX_ATTACHMENT_BYTES) continue;
+  for (const file of attachments.slice(0, MAX_MAIL_ATTACHMENTS)) {
+    const approxBytes = approxBytesFromBase64(file.contentBase64);
+    if (approxBytes <= 0 || approxBytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + approxBytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
     if (!file.filename || file.filename.length > 180) continue;
     accepted.push({
       filename: sanitizeAttachmentFilename(file.filename),
@@ -81,7 +98,7 @@ function filterUploadedAttachments(
 ): UploadedFormAttachment[] {
   if (!uploaded?.length) return [];
   const used = new Set<string>();
-  return uploaded.slice(0, 8).map((file) => {
+  return uploaded.slice(0, MAX_MAIL_ATTACHMENTS).map((file) => {
     let filename = sanitizeAttachmentFilename(file.filename);
     if (used.has(filename.toLowerCase())) {
       const dot = filename.lastIndexOf(".");
@@ -121,6 +138,31 @@ function enrichFieldsWithAttachmentNames(
   return next;
 }
 
+
+function scanFormAttachmentBytes(input: {
+  kind: FormKind;
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+}): { ok: true } | { ok: false; error: string } {
+  try {
+    const bytes = Buffer.from(input.contentBase64, "base64");
+    const result = assertSafeWebsiteFormUpload({
+      kind: input.kind,
+      filename: input.filename,
+      contentType: input.contentType,
+      bytes,
+    });
+    if (result.ok) return { ok: true };
+    return { ok: false, error: result.error };
+  } catch {
+    return {
+      ok: false,
+      error: `Bestand “${input.filename}” is onveilig en is geblokkeerd.`,
+    };
+  }
+}
+
 function htmlToPlainText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -132,6 +174,103 @@ function htmlToPlainText(html: string): string {
     .replace(/\s+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
+}
+
+/**
+ * Download staged storage files for the staff notification. Skip anything that
+ * would blow the mailbox cap; never fail the form when a download misses.
+ */
+async function collectNotificationMailAttachments(input: {
+  requestId: string;
+  kind: FormKind;
+  legacyAttachments: FormAttachment[];
+  uploaded: Array<AttachmentMeta | UploadedFormAttachment>;
+}): Promise<FormAttachment[]> {
+  const accepted: FormAttachment[] = [];
+  const usedNames = new Set<string>();
+  let total = 0;
+
+  for (const file of input.legacyAttachments) {
+    if (accepted.length >= MAX_MAIL_ATTACHMENTS) break;
+    const key = file.filename.trim().toLowerCase();
+    if (!key || usedNames.has(key)) continue;
+    const bytes = approxBytesFromBase64(file.contentBase64);
+    if (bytes <= 0 || bytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + bytes > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    const scan = scanFormAttachmentBytes({
+      kind: input.kind,
+      filename: file.filename,
+      contentType: file.contentType,
+      contentBase64: file.contentBase64,
+    });
+    if (!scan.ok) {
+      console.warn("[forms] skipped unsafe notification attachment", {
+        requestId: input.requestId,
+        filename: file.filename,
+      });
+      continue;
+    }
+    accepted.push(file);
+    usedNames.add(key);
+    total += bytes;
+  }
+
+  for (const file of input.uploaded) {
+    if (accepted.length >= MAX_MAIL_ATTACHMENTS) break;
+    const filename = sanitizeAttachmentFilename(file.filename);
+    const key = filename.toLowerCase();
+    if (!key || usedNames.has(key)) continue;
+    const declared = Number(file.sizeBytes) || 0;
+    if (declared <= 0 || declared > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+    if (total + declared > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+
+    try {
+      const stored = await getStoredWebsiteRequestAttachment(
+        input.requestId,
+        filename,
+        "storagePath" in file ? file.storagePath : undefined,
+      );
+      if (!stored?.contentBase64) {
+        console.warn("[forms] staged attachment bytes missing for email", {
+          requestId: input.requestId,
+          filename,
+        });
+        continue;
+      }
+      const actual =
+        stored.sizeBytes > 0 ? stored.sizeBytes : approxBytesFromBase64(stored.contentBase64);
+      if (actual <= 0 || actual > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+      if (total + actual > MAILBOX_MAX_ATTACHMENT_BYTES) continue;
+      const scan = scanFormAttachmentBytes({
+        kind: input.kind,
+        filename,
+        contentType: file.contentType || "application/octet-stream",
+        contentBase64: stored.contentBase64,
+      });
+      if (!scan.ok) {
+        console.warn("[forms] skipped unsafe notification attachment", {
+          requestId: input.requestId,
+          filename,
+        });
+        continue;
+      }
+      accepted.push({
+        filename,
+        contentBase64: stored.contentBase64,
+        contentType: file.contentType || "application/octet-stream",
+      });
+      usedNames.add(key);
+      total += actual;
+    } catch (error) {
+      console.warn("[forms] staged attachment download failed; sending email without it", {
+        requestId: input.requestId,
+        filename,
+        error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      });
+    }
+  }
+
+  return accepted;
 }
 
 /**
@@ -205,6 +344,26 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   const scope = payload.scope ?? null;
   const formId = `${payload.pageId}:${payload.sourceId}`;
 
+  for (const file of uploadedAttachments) {
+    const gate = assertSafeWebsiteFormUpload({
+      kind,
+      filename: file.filename,
+      contentType: file.contentType,
+    });
+    if (!gate.ok) throw new FormSubmitError(gate.error, "validation");
+  }
+  if (uploadedAttachments.length === 0) {
+    for (const file of legacyAttachments) {
+      const scan = scanFormAttachmentBytes({
+        kind,
+        filename: file.filename,
+        contentType: file.contentType,
+        contentBase64: file.contentBase64,
+      });
+      if (!scan.ok) throw new FormSubmitError(scan.error, "validation");
+    }
+  }
+
   const request = await createWebsiteRequest({
     kind,
     fields,
@@ -216,14 +375,17 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     scopeLabel: scope?.label ?? null,
   });
 
+  let finalizedUploaded: AttachmentMeta[] = [];
   if (uploadedAttachments.length > 0) {
     const finalized = await finalizeWebsiteRequestUploadedAttachments(
       request.id,
       uploadedAttachments,
+      kind,
     );
     if (!finalized.ok) {
       throw new FormSubmitError(finalized.error, "provider");
     }
+    finalizedUploaded = finalized.attachments;
   } else if (legacyAttachments.length > 0 && hasSupabaseServiceConfig()) {
     const stored = await storeWebsiteRequestAttachments(
       request.id,
@@ -301,8 +463,14 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     return { ok: true };
   }
 
-  // Prefer durable private storage for Admin; email may still carry small Base64 copies.
-  const mailAttachments = legacyAttachments;
+  // Durable private storage remains the source of truth for Admin / Aanvragen.
+  // Copy files onto the Graph/SMTP notification so Outlook has real attachments.
+  const mailAttachments = await collectNotificationMailAttachments({
+    requestId: request.id,
+    kind,
+    legacyAttachments,
+    uploaded: finalizedUploaded,
+  });
 
   try {
     if (canGraph) {

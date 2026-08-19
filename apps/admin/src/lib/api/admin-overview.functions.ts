@@ -23,6 +23,10 @@ export type AdminOverviewStats = {
   websiteVisitors: number | null;
   /** Prior 7-day visitor window for trend; 0 when current is known but previous failed. */
   websiteVisitorsPrevious7Days: number | null;
+  /** Safe status for the visitors tile (configured-but-failed vs missing env). */
+  websiteVisitorsStatus: "ok" | "not_configured" | "failed";
+  /** Missing env *names* only — never values. */
+  websiteVisitorsMissingEnv: string[];
 };
 
 function daysAgoIso(days: number, now = new Date()): string {
@@ -49,13 +53,16 @@ export const getAdminOverviewStats = createServerFn({ method: "POST" }).handler(
         fetchWebsiteVisitorStats(now).catch(() => null),
       ]);
 
+    const visitorResult = visitorStats;
     return {
       newRequestsLast7Days,
       newRequestsPrevious7Days,
       activeStaffCount: staffUsers.filter((u) => u.status === "active").length,
-      websiteVisitors: visitorStats?.visitors ?? null,
+      websiteVisitors: visitorResult?.visitors ?? null,
       websiteVisitorsPrevious7Days:
-        visitorStats === null ? null : visitorStats.previousVisitors,
+        visitorResult === null ? null : visitorResult.previousVisitors,
+      websiteVisitorsStatus: visitorResult?.status ?? "failed",
+      websiteVisitorsMissingEnv: visitorResult?.missingEnv ?? [],
     };
   },
 );

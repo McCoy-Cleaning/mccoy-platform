@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { filterInboxMessages, type FormInboxThreadItem } from "@mccoy/email/contracts";
 import { useInquiriesListQuery } from "../hooks/useInquiriesListQuery";
 import { useInquiriesRealtimeRefresh } from "../hooks/useInquiriesRealtimeRefresh";
+import { useInquiryMailboxWatch } from "../hooks/useInquiryMailboxWatch";
 import { useInquiryDetailQuery } from "../hooks/useInquiryDetailQuery";
 import { useInquiryListDeletes } from "../hooks/useInquiryListDeletes";
 import { useInquirySelection } from "../hooks/useInquirySelection";
@@ -47,6 +48,7 @@ export function InquiriesPage() {
     useInquiryDetailQuery({ setItems });
 
   useInquiriesRealtimeRefresh({ loadList, selectedId, softRefreshDetail });
+  useInquiryMailboxWatch({ selectedId, softRefreshDetail });
 
   const openInquiry = React.useCallback(
     (id: string) => {

@@ -16,6 +16,7 @@ import {
   getAdminOverviewStats,
   type AdminOverviewStats,
 } from "@/lib/api/admin-overview.functions";
+import { websiteVisitorsUnavailableCopy } from "@/lib/admin-overview-visitors";
 
 export const Route = createFileRoute("/_app/")({
   component: AdminOverview,
@@ -26,6 +27,7 @@ type StatCard = {
   value: string;
   delta: string;
   deltaTone: "up" | "down" | "neutral" | "pending";
+  hint?: string | null;
   icon: typeof Inbox;
   tone: string;
 };
@@ -116,12 +118,23 @@ function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
 
   const visitors = stats?.websiteVisitors ?? null;
   const visitorsPrevious = stats?.websiteVisitorsPrevious7Days ?? 0;
+  const visitorUnavailable =
+    stats === null || visitors !== null
+      ? null
+      : websiteVisitorsUnavailableCopy(
+          stats.websiteVisitorsStatus === "failed" ? "failed" : "not_configured",
+          stats.websiteVisitorsMissingEnv ?? [],
+        );
   const visitorTrend =
     stats === null
-      ? { delta: "…", deltaTone: "neutral" as const }
+      ? { delta: "…", deltaTone: "neutral" as const, hint: null as string | null }
       : visitors === null
-        ? { delta: "niet gekoppeld", deltaTone: "pending" as const }
-        : requestTrendDelta(visitors, visitorsPrevious);
+        ? (visitorUnavailable ?? {
+            delta: "niet gekoppeld",
+            deltaTone: "pending" as const,
+            hint: null,
+          })
+        : { ...requestTrendDelta(visitors, visitorsPrevious), hint: null };
 
   return [
     {
@@ -137,6 +150,7 @@ function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
       value: visitors === null ? "—" : formatNlNumber(visitors),
       delta: visitorTrend.delta,
       deltaTone: visitorTrend.deltaTone,
+      hint: visitorTrend.hint,
       icon: Globe2,
       tone: "from-[#7c3aed] to-[#ec4899]",
     },
@@ -205,6 +219,8 @@ function AdminOverview() {
             activeStaffCount: 0,
             websiteVisitors: null,
             websiteVisitorsPrevious7Days: null,
+            websiteVisitorsStatus: "failed",
+            websiteVisitorsMissingEnv: [],
           });
         }
       });
@@ -298,6 +314,9 @@ function AdminOverview() {
                 <div className="relative mt-4">
                   <div className="text-3xl font-bold tracking-tight tabular-nums">{s.value}</div>
                   <div className="mt-1 text-sm text-white/55">{s.label}</div>
+                  {s.hint ? (
+                    <div className="mt-1 text-[11px] leading-snug text-white/40">{s.hint}</div>
+                  ) : null}
                 </div>
               </div>
             );

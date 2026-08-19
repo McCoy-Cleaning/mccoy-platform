@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  activateGoogleAnalyticsAfterConsent,
+  applyGoogleConsentDefault,
   loadGoogleAnalyticsGtag,
   resetGoogleAnalyticsPageViewDedupe,
   resetGtagLoadStateForTests,
@@ -130,5 +132,102 @@ describe("GA4 gtag lifecycle", () => {
         entry[1] === "page_view",
     );
     expect(pageViews).toHaveLength(2);
+  });
+});
+
+
+describe("Consent Mode v2", () => {
+  it("applies default denied before any gtag config", () => {
+    const { dataLayer } = stubDom();
+    expect(applyGoogleConsentDefault()).toBe(true);
+    expect(applyGoogleConsentDefault()).toBe(false);
+    expect(dataLayer[0]).toEqual([
+      "consent",
+      "default",
+      {
+        analytics_storage: "denied",
+        ad_storage: "denied",
+        ad_user_data: "denied",
+        ad_personalization: "denied",
+        wait_for_update: 500,
+      },
+    ]);
+    loadGoogleAnalyticsGtag("G-ABC123");
+    expect(dataLayer.find((entry) => Array.isArray(entry) && entry[0] === "config")).toEqual([
+      "config",
+      "G-ABC123",
+      { anonymize_ip: true, send_page_view: false },
+    ]);
+    const defaultIndex = dataLayer.findIndex(
+      (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "default",
+    );
+    const configIndex = dataLayer.findIndex(
+      (entry) => Array.isArray(entry) && entry[0] === "config",
+    );
+    expect(defaultIndex).toBeGreaterThanOrEqual(0);
+    expect(defaultIndex).toBeLessThan(configIndex);
+  });
+
+  it("on accept: updates consent, loads gtag, and sends the first page_view", () => {
+    const { dataLayer, scripts } = stubDom();
+    applyGoogleConsentDefault();
+    expect(
+      activateGoogleAnalyticsAfterConsent({
+        measurementId: "G-ABC123",
+        pathname: "/",
+        title: "Home",
+      }),
+    ).toBe(true);
+    expect(scripts[0]?.src).toBe(
+      "https://www.googletagmanager.com/gtag/js?id=G-ABC123",
+    );
+    expect(dataLayer).toEqual(
+      expect.arrayContaining([
+        [
+          "consent",
+          "update",
+          { analytics_storage: "granted" },
+        ],
+        [
+          "config",
+          "G-ABC123",
+          { anonymize_ip: true, send_page_view: false },
+        ],
+        [
+          "event",
+          "page_view",
+          expect.objectContaining({
+            page_path: "/",
+            send_to: "G-ABC123",
+          }),
+        ],
+      ]),
+    );
+    const updateIndex = dataLayer.findIndex(
+      (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "update",
+    );
+    const pageViewIndex = dataLayer.findIndex(
+      (entry) => Array.isArray(entry) && entry[0] === "event" && entry[1] === "page_view",
+    );
+    expect(updateIndex).toBeLessThan(pageViewIndex);
+    expect(
+      sendGoogleAnalyticsPageView({
+        measurementId: "G-ABC123",
+        pathname: "/",
+        title: "Home",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not load gtag on reject — default stays denied", () => {
+    const { dataLayer, scripts } = stubDom();
+    applyGoogleConsentDefault();
+    expect(scripts).toHaveLength(0);
+    expect(dataLayer.filter((entry) => Array.isArray(entry) && entry[0] === "config")).toHaveLength(0);
+    expect(
+      dataLayer.some(
+        (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "update",
+      ),
+    ).toBe(false);
   });
 });

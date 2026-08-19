@@ -7,6 +7,7 @@ import {
   classifyFormInboxAttachmentDownload,
   decodeAttachmentFilename,
   formInboxAttachmentDownloadErrorMessage,
+  isRejectedReplyAttachment,
   mergeFormInboxAttachmentLists,
   pickFormInboxAttachmentForDownload,
   sanitizeAttachmentFilename,
@@ -182,5 +183,19 @@ describe("classifyFormInboxAttachmentDownload", () => {
       att({ size: 33_000, omitted: false, contentBase64: undefined }),
     );
     expect(result.status).toBe("unavailable");
+  });
+});
+
+describe("isRejectedReplyAttachment", () => {
+  it("rejects obvious executables and keeps office/pdf/images", () => {
+    expect(isRejectedReplyAttachment({ filename: "setup.exe" })).toBe(true);
+    expect(isRejectedReplyAttachment({ filename: "note.pdf" })).toBe(false);
+    expect(isRejectedReplyAttachment({ filename: "foto.jpg" })).toBe(false);
+    expect(
+      isRejectedReplyAttachment({
+        filename: "payload.bin",
+        contentType: "application/x-msdownload",
+      }),
+    ).toBe(true);
   });
 });

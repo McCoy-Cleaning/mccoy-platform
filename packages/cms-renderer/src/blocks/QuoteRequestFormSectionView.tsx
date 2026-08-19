@@ -17,6 +17,7 @@ import { SECTION_PAGE_RAIL } from "../sectionLayout";
 import { SectionShell } from "../SectionShell";
 import { cn } from "./blockViewShared";
 import { FormFileUploadField } from "./FormFileUploadField";
+import { WEBSITE_FORM_MEDIA_FILE_ACCEPT } from "../form-file-attachments";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
 
 type ConversionRenderMode = "storefront" | "preview";
@@ -147,7 +148,7 @@ function FieldControl({
           onFilesChange={onFilesChange}
           disabled={disabled}
           required={field.required}
-          accept="image/*,application/pdf"
+          accept={WEBSITE_FORM_MEDIA_FILE_ACCEPT}
           inputClassName={QUOTE_FILE_INPUT_CLASS}
         />
         {field.placeholder ? (

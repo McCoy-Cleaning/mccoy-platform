@@ -6,9 +6,11 @@ import {
   MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES,
   MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
   type AttachmentMeta,
+  type FormKind,
   type FormUploadFileIntent,
   type UploadedFormAttachment,
 } from "@mccoy/domain";
+import { assertSafeWebsiteFormUpload, canonicalWebsiteFormContentType } from "@mccoy/security";
 
 import { createSupabaseServiceClient, hasSupabaseServiceConfig } from "../supabase";
 
@@ -239,6 +241,7 @@ export async function storeWebsiteRequestAttachments(
 export async function finalizeWebsiteRequestUploadedAttachments(
   requestId: string,
   uploaded: UploadedFormAttachment[],
+  kind: FormKind,
 ): Promise<
   | { ok: true; attachments: AttachmentMeta[] }
   | { ok: false; error: string }
@@ -263,6 +266,12 @@ export async function finalizeWebsiteRequestUploadedAttachments(
     if (file.sizeBytes <= 0 || file.sizeBytes > MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES) {
       return { ok: false, error: `Bestand “${file.filename}” heeft een ongeldige grootte.` };
     }
+    const metaGate = assertSafeWebsiteFormUpload({
+      kind,
+      filename: file.filename,
+      contentType: file.contentType,
+    });
+    if (!metaGate.ok) return { ok: false, error: metaGate.error };
     totalBytes += file.sizeBytes;
     if (totalBytes > MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES) {
       return { ok: false, error: "De geselecteerde bestanden zijn samen te groot." };
@@ -289,30 +298,60 @@ export async function finalizeWebsiteRequestUploadedAttachments(
   const supabase = createSupabaseServiceClient();
   const bucket = supabase.storage.from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET);
   const moved: string[] = [];
+  const stagedToRemove: string[] = [];
+  const finalized: AttachmentMeta[] = [];
+
+  const cleanupRejected = async (extra: string[]) => {
+    const paths = [...new Set([...moved, ...stagedToRemove, ...extra])];
+    if (paths.length > 0) {
+      await bucket.remove(paths).catch(() => undefined);
+    }
+  };
 
   for (const file of prepared) {
+    stagedToRemove.push(file.storagePath);
+    const stored = await getStoredWebsiteRequestAttachmentByPath(file.storagePath);
+    if (!stored) {
+      await cleanupRejected([]);
+      return {
+        ok: false,
+        error: `Bestand “${file.filename}” kon niet worden gecontroleerd.`,
+      };
+    }
+    const gate = assertSafeWebsiteFormUpload({
+      kind,
+      filename: file.filename,
+      contentType: file.contentType,
+      bytes: stored.bytes,
+    });
+    if (!gate.ok) {
+      await cleanupRejected([]);
+      return { ok: false, error: gate.error };
+    }
+
     const { error } = await bucket.move(file.storagePath, file.destPath);
     if (error) {
-      if (moved.length > 0) {
-        await bucket.remove(moved).catch(() => undefined);
-      }
+      await cleanupRejected([]);
       return {
         ok: false,
         error: `Bijlage “${file.filename}” kon niet worden opgeslagen: ${safeStorageError(error.message)}`,
       };
     }
     moved.push(file.destPath);
+    const stagedIdx = stagedToRemove.indexOf(file.storagePath);
+    if (stagedIdx >= 0) stagedToRemove.splice(stagedIdx, 1);
+    const contentType = gate.detectedType
+      ? canonicalWebsiteFormContentType(gate.detectedType)
+      : file.contentType || "application/octet-stream";
+    finalized.push({
+      filename: file.filename,
+      contentType,
+      sizeBytes: stored.sizeBytes,
+      storagePath: file.destPath,
+    });
   }
 
-  return {
-    ok: true,
-    attachments: prepared.map((file) => ({
-      filename: file.filename,
-      contentType: file.contentType || "application/octet-stream",
-      sizeBytes: file.sizeBytes,
-      storagePath: file.destPath,
-    })),
-  };
+  return { ok: true, attachments: finalized };
 }
 
 export async function getStoredWebsiteRequestAttachmentByPath(

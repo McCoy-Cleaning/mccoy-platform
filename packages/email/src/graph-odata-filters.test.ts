@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildConversationReceivedFilter,
   buildConversationSentFilter,
+  buildReceivedDateWindowFilter,
   escapeODataString,
   messageBelongsToWebsiteRequest,
 } from "./graph-odata-filters";
@@ -22,6 +23,20 @@ describe("graph OData conversation filters", () => {
     );
     expect(filter).toBe(
       "sentDateTime ge 2026-08-06T12:00:00.000Z and conversationId eq 'conv-1'",
+    );
+  });
+
+  it("builds a receivedDateTime window without contains() or $search", () => {
+    expect(
+      buildReceivedDateWindowFilter(
+        "2026-01-01T10:00:00.000Z",
+        "2026-01-05T10:00:00.000Z",
+      ),
+    ).toBe(
+      "receivedDateTime ge 2026-01-01T10:00:00.000Z and receivedDateTime le 2026-01-05T10:00:00.000Z",
+    );
+    expect(buildReceivedDateWindowFilter("2026-01-01T10:00:00.000Z")).toBe(
+      "receivedDateTime ge 2026-01-01T10:00:00.000Z",
     );
   });
 

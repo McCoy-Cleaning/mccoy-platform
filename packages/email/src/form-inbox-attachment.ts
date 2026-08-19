@@ -165,6 +165,21 @@ export function classifyFormInboxAttachmentDownload(
   return { status: "unavailable", attachment };
 }
 
+/** Drop obvious executables from conversation-reply attachment lists. MZ magic is left for a dedicated scanner. */
+export function isRejectedReplyAttachment(attachment: {
+  filename: string;
+  contentType?: string | null;
+}): boolean {
+  const name = (attachment.filename || '').trim().toLowerCase();
+  if (/\.(exe|dll|bat|cmd|com|msi|scr|ps1)$/i.test(name)) return true;
+  const type = (attachment.contentType || '').trim().toLowerCase();
+  return (
+    type.includes('x-msdownload') ||
+    type.includes('x-dosexec') ||
+    type.includes('portable-executable')
+  );
+}
+
 export function formInboxAttachmentDownloadErrorMessage(
   classification: FormInboxAttachmentDownloadClass,
 ): string {

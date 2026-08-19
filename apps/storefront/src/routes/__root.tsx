@@ -12,6 +12,7 @@ import {
 import { Analytics } from "@vercel/analytics/react";
 import { CmsUiLocaleProvider } from "@mccoy/cms-renderer";
 import { StorefrontAnalytics } from "@/components/site/StorefrontAnalytics";
+import { readPublicGaMeasurementId } from "@/lib/analytics/public-ga-id";
 
 // Side-effect import so Start can discover CSS for Early Hints.
 // Do not use `?url` + head link when relying on Start-managed stylesheet assets.
@@ -176,6 +177,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
   // from this attribute via resolveClientHydrationUiLang (see i18n.tsx).
   // suppressHydrationWarning: browser extensions may alter <html> attributes.
   const htmlLang = resolveInitialUiLang();
+  const gaMeasurementId = readPublicGaMeasurementId();
   return (
     <html lang={htmlLang} translate="no" className="notranslate" suppressHydrationWarning>
       <head>
@@ -184,6 +186,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
           Text child avoids dangerouslySetInnerHTML while preserving LCP shell styles.
         */}
         <style>{STOREFRONT_CRITICAL_CSS}</style>
+        {gaMeasurementId ? (
+          <script>{`window.__MCCOY_GA_MEASUREMENT_ID__=${JSON.stringify(gaMeasurementId)};`}</script>
+        ) : null}
         <HeadContent />
       </head>
       <body
@@ -237,7 +242,8 @@ function RootComponent() {
       </PublishedCmsProvider>
       {/*
         GA4 (gtag): consent-gated via StorefrontAnalytics — loads only after
-        analytics cookies are accepted (see VITE_GA_MEASUREMENT_ID).
+        analytics cookies are accepted (VITE_GA_MEASUREMENT_ID or server
+        GA_MEASUREMENT_ID / GOOGLE_ANALYTICS_MEASUREMENT_ID).
         Vercel Web Analytics: cookieless / hashed visitor identity — left as-is.
         Skip CMS bridge routes so admin preview traffic does not inflate counts.
       */}

@@ -8,6 +8,7 @@ import {
   type QuoteRequestFormBlockData,
 } from "@mccoy/cms-schema";
 import { QuoteRequestFormSectionView } from "./QuoteRequestFormSectionView";
+import { WEBSITE_FORM_MEDIA_FILE_ACCEPT } from "../form-file-attachments";
 
 describe("QuoteRequestFormSectionView file previews", () => {
   it("uses the multi-file preview input for both quote form tabs", () => {
@@ -29,7 +30,9 @@ describe("QuoteRequestFormSectionView file previews", () => {
       );
       expect(html).toContain('type="file"');
       expect(html).toContain("multiple");
-      expect(html).toContain('accept="image/*,application/pdf"');
+      expect(html).toContain(`accept="${WEBSITE_FORM_MEDIA_FILE_ACCEPT}"`);
+      expect(html).not.toContain("image/*");
+      expect(WEBSITE_FORM_MEDIA_FILE_ACCEPT).not.toContain("svg");
       expect(html).toContain("form-file-upload");
     }
   });

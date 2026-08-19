@@ -15,6 +15,24 @@ export function parseGaMeasurementId(raw: unknown): string | null {
 }
 
 /**
+ * Resolve a public GA4 measurement ID from any supported alias.
+ * Prefer VITE_ (build-time), then server-side names, then an SSR-injected value.
+ */
+export function resolvePublicGaMeasurementId(input: {
+  viteMeasurementId?: unknown;
+  gaMeasurementId?: unknown;
+  googleAnalyticsMeasurementId?: unknown;
+  injectedMeasurementId?: unknown;
+}): string | null {
+  return (
+    parseGaMeasurementId(input.viteMeasurementId) ??
+    parseGaMeasurementId(input.gaMeasurementId) ??
+    parseGaMeasurementId(input.googleAnalyticsMeasurementId) ??
+    parseGaMeasurementId(input.injectedMeasurementId)
+  );
+}
+
+/**
  * Production-only by default. Set VITE_GA_ENABLE_DEV=1 to allow localhost / preview builds.
  */
 export function isGoogleAnalyticsRuntimeAllowed(input: {
@@ -33,18 +51,18 @@ export function readGaEnableDevFlag(raw: unknown): boolean {
 /**
  * Whether to mount the consent banner (and consent state).
  *
- * - Production (or enableDev): offer when a valid measurement ID is set.
- * - enableDev without an ID: still offer the UI for local/design preview;
- *   gtag must not load until an ID exists (see GoogleAnalytics / load-gtag).
+ * - Offer when a valid measurement ID exists and runtime is allowed.
+ * - enableDev without an ID: local/design preview only (never a fake production banner).
  */
 export function shouldOfferAnalyticsConsent(input: {
   measurementId: string | null;
   isProd: boolean;
   enableDev: boolean;
 }): boolean {
-  if (!isGoogleAnalyticsRuntimeAllowed(input)) return false;
-  if (input.measurementId) return true;
-  return input.enableDev;
+  if (input.measurementId) {
+    return isGoogleAnalyticsRuntimeAllowed(input);
+  }
+  return !input.isProd && input.enableDev;
 }
 
 /** CMS admin bridge routes — do not prompt or load analytics. */

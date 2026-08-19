@@ -10,6 +10,12 @@ export const MAX_FORM_ATTACHMENT_COUNT = MAX_WEBSITE_FORM_ATTACHMENT_COUNT;
 export const MAX_FORM_ATTACHMENT_FILE_BYTES = MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES;
 export const MAX_FORM_ATTACHMENT_TOTAL_BYTES = MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES;
 
+/** Offerte / inquiry photos + plattegrond. No SVG wildcard. */
+export const WEBSITE_FORM_MEDIA_FILE_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif,application/pdf,.pdf";
+
+export const WEBSITE_FORM_CV_FILE_ACCEPT = ".pdf,.doc,.docx";
+
 function megabytes(bytes: number): number {
   return Math.round(bytes / (1024 * 1024));
 }

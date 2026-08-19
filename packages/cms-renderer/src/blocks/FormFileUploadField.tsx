@@ -1,4 +1,5 @@
 import * as React from "react";
+import { WEBSITE_FORM_MEDIA_FILE_ACCEPT } from "../form-file-attachments";
 
 function fileIdentity(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}:${file.type}`;
@@ -35,7 +36,7 @@ export function FormFileUploadField({
   onFilesChange,
   disabled = false,
   required = false,
-  accept = "image/*,application/pdf,.doc,.docx",
+  accept = WEBSITE_FORM_MEDIA_FILE_ACCEPT,
   inputClassName,
 }: {
   id: string;
