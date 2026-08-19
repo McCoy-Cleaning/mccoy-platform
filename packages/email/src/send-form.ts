@@ -30,7 +30,7 @@ import { shouldAttemptGraphMail } from "./form-inbox-provider";
 import { isGraphMailConfigured } from "./graph-config";
 import { sendGraphAdminReply } from "./graph-mail";
 import { defaultTransactionalFrom, isSmtpConfigured, sendSmtpMail } from "./smtp";
-import { buildFormEmail } from "./templates";
+import { buildFormEmail, buildSubmitterConfirmationEmail } from "./templates";
 
 export { FormSubmitError } from "./form-submit-error";
 
@@ -273,6 +273,74 @@ async function collectNotificationMailAttachments(input: {
   return accepted;
 }
 
+/** Customer confirmation: Graph then SMTP. Failures are logged and never fail the form. */
+async function sendSubmitterConfirmationMail(input: {
+  to: string;
+  kind: FormKind;
+  fields: Record<string, string>;
+  requestNumber: string;
+  requestId: string;
+  replyTo: string;
+  from: string;
+  canGraph: boolean;
+  canSmtp: boolean;
+}): Promise<void> {
+  const email = buildSubmitterConfirmationEmail(input.kind, input.fields, input.requestNumber);
+  const text = htmlToPlainText(email.html);
+  const headers: Record<string, string> = {
+    "X-McCoy-Form-Kind": input.kind,
+    "X-McCoy-Form-Submission-Id": input.requestNumber,
+    "X-McCoy-Confirmation": "1",
+  };
+
+  try {
+    if (input.canGraph) {
+      const sent = await sendGraphAdminReply({
+        to: input.to,
+        subject: email.subject,
+        html: email.html,
+        text,
+        replyTo: input.replyTo,
+        headers,
+        saveToSentItems: false,
+      });
+      if (sent.ok) return;
+      console.error("[forms] confirmation Graph send failed", {
+        detail: sent.error.slice(0, 300),
+        kind: input.kind,
+        to: input.to,
+        requestId: input.requestId,
+      });
+      if (!input.canSmtp) return;
+      console.error("[forms] confirmation falling back to SMTP after Graph failure");
+    }
+
+    if (!input.canSmtp) return;
+
+    const sent = await sendSmtpMail({
+      from: input.from,
+      to: input.to,
+      subject: email.subject,
+      html: email.html,
+      replyTo: input.replyTo,
+      headers,
+    });
+    if (!sent.ok) {
+      console.error("[forms] confirmation SMTP send failed", {
+        detail: sent.error.slice(0, 300),
+        kind: input.kind,
+        to: input.to,
+        requestId: input.requestId,
+      });
+    }
+  } catch (error) {
+    console.error("[forms] confirmation send failed", {
+      requestId: input.requestId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
+}
+
 /**
  * Persist a structured admin request, then queue/send the staff notification.
  * Prefer Microsoft Graph Mail.Send (as GRAPH_MAILBOX) over SMTP — avoids M365
@@ -472,6 +540,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
     uploaded: finalizedUploaded,
   });
 
+  let staffDelivered = false;
   try {
     if (canGraph) {
       const sent = await sendGraphAdminReply({
@@ -493,51 +562,52 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
 
       if (sent.ok) {
         await updateRequestNotification(request.id, "sent");
-        return { ok: true };
-      }
+        staffDelivered = true;
+      } else {
+        console.error("[forms] Graph send failed", {
+          detail: sent.error.slice(0, 300),
+          kind,
+          to: config.to,
+          requestId: request.id,
+        });
 
-      console.error("[forms] Graph send failed", {
-        detail: sent.error.slice(0, 300),
-        kind,
+        if (!canSmtp) {
+          await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
+          staffDelivered = true;
+        } else {
+          console.error("[forms] falling back to SMTP after Graph failure");
+        }
+      }
+    }
+
+    if (!staffDelivered && canSmtp) {
+      const sent = await sendSmtpMail({
+        from: config.from,
         to: config.to,
-        requestId: request.id,
+        subject,
+        html: email.html,
+        replyTo: fields.email,
+        headers,
+        attachments: mailAttachments.map((a) => ({
+          filename: a.filename,
+          content: a.contentBase64,
+          contentType: a.contentType,
+          encoding: "base64" as const,
+        })),
       });
 
-      if (!canSmtp) {
+      if (!sent.ok) {
+        console.error("[forms] SMTP error", {
+          detail: sent.error.slice(0, 300),
+          kind,
+          to: config.to,
+          requestId: request.id,
+        });
         await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
-        return { ok: true };
+      } else {
+        await updateRequestNotification(request.id, "sent");
       }
-      console.error("[forms] falling back to SMTP after Graph failure");
     }
-
-    const sent = await sendSmtpMail({
-      from: config.from,
-      to: config.to,
-      subject,
-      html: email.html,
-      replyTo: fields.email,
-      headers,
-      attachments: mailAttachments.map((a) => ({
-        filename: a.filename,
-        content: a.contentBase64,
-        contentType: a.contentType,
-        encoding: "base64" as const,
-      })),
-    });
-
-    if (!sent.ok) {
-      console.error("[forms] SMTP error", {
-        detail: sent.error.slice(0, 300),
-        kind,
-        to: config.to,
-        requestId: request.id,
-      });
-      await updateRequestNotification(request.id, "failed", sent.error.slice(0, 200));
-      return { ok: true };
-    }
-
-    await updateRequestNotification(request.id, "sent");
-    return { ok: true };
   } catch (error) {
     console.error("[forms] notification send failed", error);
     await updateRequestNotification(
@@ -545,6 +615,25 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
       "failed",
       error instanceof Error ? error.message : "unknown",
     );
-    return { ok: true };
   }
+
+  const confirmationReplyTo =
+    readServerEnv("FORM_TO_EMAIL") ||
+    readServerEnv("GRAPH_MAILBOX") ||
+    config.to ||
+    config.from;
+
+  await sendSubmitterConfirmationMail({
+    to: fields.email,
+    kind,
+    fields,
+    requestNumber: request.number,
+    requestId: request.id,
+    replyTo: confirmationReplyTo,
+    from: config.from,
+    canGraph,
+    canSmtp,
+  });
+
+  return { ok: true };
 }

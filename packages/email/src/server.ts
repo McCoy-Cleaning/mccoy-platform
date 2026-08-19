@@ -139,7 +139,7 @@ export type {
 } from "./form-inbox";
 export type { InboxLoadMetrics } from "./graph-mail";
 /** Re-export pure helpers so server consumers can import one entry when needed. */
-export { buildFormEmail, escapeHtml } from "./templates";
+export { buildFormEmail, buildSubmitterConfirmationEmail, escapeHtml } from "./templates";
 export {
   classifyFormEmailSubject,
   extractRequestNumber,

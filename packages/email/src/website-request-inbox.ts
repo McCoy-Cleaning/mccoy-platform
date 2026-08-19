@@ -40,6 +40,10 @@ import {
   normaliseThreadMessageBody,
   outboundMailDuplicatesStaffReply,
 } from "./inquiry-thread-dedupe";
+import {
+  inboxAttachmentsToStored,
+  storedMailAttachmentsToInbox,
+} from "./mail-message-attachments";
 
 export { mergeMailboxAndWebsiteRequestSummaries };
 
@@ -106,6 +110,7 @@ function websiteRequestToMessage(
     id: string;
     direction: "inbound" | "outbound";
     provider?: string;
+    mailbox?: string | null;
     sender_address: string | null;
     recipient_addresses: string[] | null;
     subject: string | null;
@@ -113,6 +118,7 @@ function websiteRequestToMessage(
     occurred_at: string;
     internet_message_id: string | null;
     graph_message_id: string | null;
+    attachments?: unknown;
   }> = [],
 ): FormInboxMessage {
   const summary = websiteRequestSummaryToInboxSummary(request);
@@ -160,8 +166,14 @@ function websiteRequestToMessage(
     if (isOutbound && outboundMailDuplicatesStaffReply(row, request.replies)) {
       return;
     }
+    const mailbox = (row.mailbox || "").trim();
+    const graphId = row.graph_message_id?.trim() || "";
+    const threadId =
+      graphId && mailbox
+        ? encodeGraphMessageId(graphId, mailbox)
+        : `${summary.id}:mail:${row.id}`;
     fromMail.push({
-      id: `${summary.id}:mail:${row.id}`,
+      id: threadId,
       uid: summary.uid + 1000 + index,
       direction: isOutbound ? "admin" : "customer",
       from: row.sender_address || (isOutbound ? "McCoy" : summary.from),
@@ -173,7 +185,7 @@ function websiteRequestToMessage(
         isOutbound ? "outbound" : "inbound",
       ),
       messageId: row.internet_message_id,
-      attachments: [],
+      attachments: storedMailAttachmentsToInbox(row.attachments),
     });
   });
 
@@ -249,12 +261,43 @@ type WebsiteRequestMailRow = {
   occurred_at: string;
   internet_message_id: string | null;
   graph_message_id: string | null;
+  attachments?: unknown;
 };
 
 function sameRfcMessageId(a: string | null | undefined, b: string | null | undefined): boolean {
   const left = (a || "").replace(/[<>\s]/g, "").toLowerCase();
   const right = (b || "").replace(/[<>\s]/g, "").toLowerCase();
   return Boolean(left && right && left === right);
+}
+
+function findMailThreadItemIndex(
+  thread: FormInboxThreadItem[],
+  row: WebsiteRequestMailRow,
+  graphInboxId: string,
+): number {
+  const mailSuffix = `:mail:${row.id}`;
+  let index = thread.findIndex((item) => item.id === graphInboxId);
+  if (index < 0) {
+    index = thread.findIndex((item) => item.id.endsWith(mailSuffix));
+  }
+  if (index < 0 && row.internet_message_id) {
+    index = thread.findIndex((item) => sameRfcMessageId(item.messageId, row.internet_message_id));
+  }
+  if (index < 0 && row.direction === "outbound") {
+    index = thread.findIndex(
+      (item) =>
+        item.direction === "admin" &&
+        outboundMailDuplicatesStaffReply(row, [
+          {
+            resendId: item.messageId ?? undefined,
+            body: item.textBody,
+            sentAt: item.date,
+            toEmail: item.to,
+          },
+        ]),
+    );
+  }
+  return index;
 }
 
 /**
@@ -277,6 +320,23 @@ export async function hydrateWebsiteRequestThreadAttachments(
     const graphId = row.graph_message_id?.trim();
     if (!graphId) continue;
     const mailbox = (row.mailbox || fallbackMailbox).trim() || fallbackMailbox;
+    const graphInboxId = encodeGraphMessageId(graphId, mailbox);
+    const index = findMailThreadItemIndex(next, row, graphInboxId);
+    if (index < 0) continue;
+
+    const existing = next[index]!;
+    if (existing.direction === "form") continue;
+
+    const stored = storedMailAttachmentsToInbox(row.attachments);
+    const already = existing.attachments.length > 0 ? existing.attachments : stored;
+    if (already.length > 0) {
+      next[index] = {
+        ...existing,
+        id: graphInboxId,
+        attachments: already,
+      };
+      continue;
+    }
 
     let attachments: FormInboxAttachment[] = [];
     try {
@@ -288,38 +348,26 @@ export async function hydrateWebsiteRequestThreadAttachments(
     }
     if (attachments.length === 0) continue;
 
-    const graphInboxId = encodeGraphMessageId(graphId, mailbox);
-    const mailSuffix = `:mail:${row.id}`;
-    let index = next.findIndex((item) => item.id.endsWith(mailSuffix));
-    if (index < 0 && row.internet_message_id) {
-      index = next.findIndex((item) => sameRfcMessageId(item.messageId, row.internet_message_id));
-    }
-    if (index < 0 && row.direction === "outbound") {
-      index = next.findIndex(
-        (item) =>
-          item.direction === "admin" &&
-          outboundMailDuplicatesStaffReply(row, [
-            {
-              resendId: item.messageId ?? undefined,
-              body: item.textBody,
-              sentAt: item.date,
-              toEmail: item.to,
-            },
-          ]),
-      );
-    }
-    if (index < 0) continue;
-
-    const existing = next[index]!;
-    if (existing.direction === "form") continue;
     next[index] = {
       ...existing,
       id: graphInboxId,
       attachments,
     };
+
+    try {
+      const { updateWebsiteRequestMailMessageAttachments } = await import(
+        "@mccoy/database/server"
+      );
+      await updateWebsiteRequestMailMessageAttachments(
+        row.id,
+        inboxAttachmentsToStored(attachments),
+      );
+    } catch {
+      /* first paint already has files */
+    }
   }
 
-  return next;
+  return dedupeInquiryThreadItems(next);
 }
 
 export async function getWebsiteRequestFormInboxMessage(
@@ -331,20 +379,9 @@ export async function getWebsiteRequestFormInboxMessage(
   const request = await getWebsiteRequest(requestId);
   if (!request || !isActiveRequestStatus(request.status)) return null;
 
-  // DB-only open path — Graph sync runs in getWebsiteRequestFormInboxThread so
-  // the root message paints without waiting on Microsoft Graph.
-  let mailMessages: Array<{
-    id: string;
-    direction: "inbound" | "outbound";
-    provider: string;
-    sender_address: string | null;
-    recipient_addresses: string[] | null;
-    subject: string | null;
-    body_text: string | null;
-    occurred_at: string;
-    internet_message_id: string | null;
-    graph_message_id: string | null;
-  }> = [];
+  // First paint includes stored + Graph-listed reply files. Conversation sync
+  // still runs in getWebsiteRequestFormInboxThread for newly arrived mail.
+  let mailMessages: WebsiteRequestMailRow[] = [];
   try {
     const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
     mailMessages = await listWebsiteRequestMailMessages(requestId);
@@ -353,6 +390,21 @@ export async function getWebsiteRequestFormInboxMessage(
   }
 
   const message = websiteRequestToMessage(request, mailMessages);
+  try {
+    const { getGraphMailConfig } = await import("./graph-config");
+    const mailbox = (getGraphMailConfig()?.mailbox || "info@mccoy.nl").trim();
+    message.thread = await hydrateWebsiteRequestThreadAttachments(
+      message.thread,
+      mailMessages,
+      mailbox,
+    );
+  } catch (error) {
+    console.error("[website-request-inbox] open-path attachment hydrate failed", {
+      requestId,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
   const { withActivePublishedScopeCleared } = await import("./apply-active-form-scopes");
   return withActivePublishedScopeCleared(message);
 }

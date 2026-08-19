@@ -10,6 +10,7 @@
 export {
   FormSubmitError,
   buildFormEmail,
+  buildSubmitterConfirmationEmail,
   escapeHtml,
   classifyFormEmailSubject,
   extractRequestNumber,

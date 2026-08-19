@@ -128,7 +128,7 @@ describe("sendWebsiteFormEmail delivery channel", () => {
       fields: { name: "Test", email: "visitor@example.com", message: "Hallo" },
     });
 
-    expect(sendGraphAdminReply).toHaveBeenCalledTimes(1);
+    expect(sendGraphAdminReply).toHaveBeenCalledTimes(2);
     expect(sendSmtpMail).not.toHaveBeenCalled();
     expect(updateRequestNotification).toHaveBeenCalledWith("req-1", "sent");
     const graphArgs = sendGraphAdminReply.mock.calls[0]?.[0] as {
@@ -142,6 +142,20 @@ describe("sendWebsiteFormEmail delivery channel", () => {
     expect(graphArgs.headers["X-McCoy-Form-Kind"]).toBe("inquiry");
     expect(graphArgs.headers["X-McCoy-Submitter-Email"]).toBe("visitor@example.com");
     expect(graphArgs.saveToSentItems).toBe(false);
+
+    const confirmArgs = sendGraphAdminReply.mock.calls[1]?.[0] as {
+      to: string;
+      replyTo: string;
+      subject: string;
+      attachments?: unknown[];
+      saveToSentItems: boolean;
+    };
+    expect(confirmArgs.to).toBe("visitor@example.com");
+    expect(confirmArgs.replyTo).toBe("info@mccoy.nl");
+    expect(confirmArgs.subject).toContain("WR-TEST-1");
+    expect(confirmArgs.subject).toMatch(/ontvangen/i);
+    expect(confirmArgs.saveToSentItems).toBe(false);
+    expect(confirmArgs.attachments ?? []).toEqual([]);
   });
 
   it("falls back to SMTP when Graph send fails", async () => {
@@ -156,9 +170,11 @@ describe("sendWebsiteFormEmail delivery channel", () => {
       fields: { name: "Test", email: "visitor@example.com", message: "Hallo" },
     });
 
-    expect(sendGraphAdminReply).toHaveBeenCalledTimes(1);
-    expect(sendSmtpMail).toHaveBeenCalledTimes(1);
+    expect(sendGraphAdminReply).toHaveBeenCalledTimes(2);
+    expect(sendSmtpMail).toHaveBeenCalledTimes(2);
     expect(updateRequestNotification).toHaveBeenCalledWith("req-1", "sent");
+    expect((sendSmtpMail.mock.calls[0]?.[0] as { to: string }).to).toBe("info@mccoy.nl");
+    expect((sendSmtpMail.mock.calls[1]?.[0] as { to: string }).to).toBe("visitor@example.com");
   });
 
   it("attaches staged images and PDFs/CVs after finalize, without failing a missing download", async () => {
@@ -344,5 +360,104 @@ describe("sendWebsiteFormEmail delivery channel", () => {
     expect(graphArgs.html).toContain("huge.jpg");
     expect(graphArgs.html).toContain("extra.pdf");
     expect(updateRequestNotification).toHaveBeenCalledWith("req-1", "sent");
+  });
+});
+describe("sendWebsiteFormEmail submitter confirmation and skip rules", () => {
+  it("sends confirmation to the submitter without attachments; staff still goes to FORM_TO_EMAIL", async () => {
+    enableGraph();
+    const jpeg = JPEG_BYTES.toString("base64");
+
+    const { sendWebsiteFormEmail } = await import("./send-form");
+    await sendWebsiteFormEmail({
+      kind: "glass_washing",
+      pageId: "page_offerte",
+      sourceId: "fixed:quote:form",
+      fields: { name: "Jorien", email: "jorien@example.com", message: "Niet in bevestiging" },
+      attachments: [{ filename: "situatie.jpg", contentType: "image/jpeg", contentBase64: jpeg }],
+    });
+
+    expect(sendGraphAdminReply).toHaveBeenCalledTimes(2);
+    const staff = sendGraphAdminReply.mock.calls[0]?.[0] as {
+      to: string;
+      attachments: Array<{ filename: string }>;
+    };
+    const confirm = sendGraphAdminReply.mock.calls[1]?.[0] as {
+      to: string;
+      subject: string;
+      html: string;
+      attachments?: Array<{ filename: string }>;
+      saveToSentItems: boolean;
+      replyTo: string;
+    };
+    expect(staff.to).toBe("info@mccoy.nl");
+    expect(staff.attachments.map((a) => a.filename)).toEqual(["situatie.jpg"]);
+    expect(confirm.to).toBe("jorien@example.com");
+    expect(confirm.replyTo).toBe("info@mccoy.nl");
+    expect(confirm.saveToSentItems).toBe(false);
+    expect(confirm.attachments ?? []).toEqual([]);
+    expect(confirm.subject).toBe(
+      "We hebben uw aanvraag ontvangen / We received your request (WR-TEST-1)",
+    );
+    expect(confirm.html).toContain("Beste Jorien,");
+    expect(confirm.html).toContain("Dear Jorien,");
+    expect(confirm.html).not.toContain("Niet in bevestiging");
+  });
+
+  it("does not fail the form when confirmation send fails", async () => {
+    enableGraph();
+    sendGraphAdminReply
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error("graph confirmation boom"));
+
+    const { sendWebsiteFormEmail } = await import("./send-form");
+    const result = await sendWebsiteFormEmail({
+      kind: "inquiry",
+      pageId: "page_contact",
+      sourceId: "fixed:contact:form",
+      fields: { name: "Test", email: "visitor@example.com", message: "Hallo" },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(createWebsiteRequest).toHaveBeenCalled();
+    expect(updateRequestNotification).toHaveBeenCalledWith("req-1", "sent");
+  });
+
+  it("skips persist and both mails on honeypot", async () => {
+    enableGraph();
+    const { sendWebsiteFormEmail } = await import("./send-form");
+    const result = await sendWebsiteFormEmail({
+      kind: "inquiry",
+      pageId: "page_contact",
+      sourceId: "fixed:contact:form",
+      fields: { name: "Bot", email: "bot@example.com", message: "spam" },
+      website: "https://spam.example",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(createWebsiteRequest).not.toHaveBeenCalled();
+    expect(sendGraphAdminReply).not.toHaveBeenCalled();
+    expect(sendSmtpMail).not.toHaveBeenCalled();
+  });
+
+  it("skips staff and confirmation mail when MCCOY_E2E=1", async () => {
+    enableGraph();
+    process.env.MCCOY_E2E = "1";
+    const { sendWebsiteFormEmail } = await import("./send-form");
+    const result = await sendWebsiteFormEmail({
+      kind: "newsletter",
+      pageId: "page_home",
+      sourceId: "fixed:newsletter:form",
+      fields: { email: "news@example.com", consentAccepted: "true" },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(createWebsiteRequest).toHaveBeenCalled();
+    expect(sendGraphAdminReply).not.toHaveBeenCalled();
+    expect(sendSmtpMail).not.toHaveBeenCalled();
+    expect(updateRequestNotification).toHaveBeenCalledWith(
+      "req-1",
+      "skipped",
+      expect.stringMatching(/E2E/i),
+    );
   });
 });

@@ -6,6 +6,7 @@ export type GraphInboxSyncCandidate = {
   bodyPreview?: string | null;
   receivedDateTime?: string | null;
   isRead?: boolean;
+  hasAttachments?: boolean;
   internetMessageId?: string | null;
   conversationId?: string | null;
   fromAddress?: string | null;

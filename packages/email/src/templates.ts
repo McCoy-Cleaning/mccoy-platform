@@ -180,4 +180,108 @@ export function buildFormEmail(
   }
 }
 
+type ConfirmationCopy = {
+  nlNoun: string;
+  enNoun: string;
+  nlSubject: string;
+  enSubject: string;
+  kindLabel: string;
+};
+
+const CONFIRMATION_COPY: Record<FormKind, ConfirmationCopy> = {
+  inquiry: {
+    nlNoun: "aanvraag",
+    enNoun: "inquiry",
+    nlSubject: "We hebben uw aanvraag ontvangen",
+    enSubject: "We received your request",
+    kindLabel: "Algemene aanvraag",
+  },
+  glass_washing: {
+    nlNoun: "aanvraag",
+    enNoun: "inquiry",
+    nlSubject: "We hebben uw aanvraag ontvangen",
+    enSubject: "We received your request",
+    kindLabel: "Glasbewassing",
+  },
+  furniture_cleaning: {
+    nlNoun: "aanvraag",
+    enNoun: "inquiry",
+    nlSubject: "We hebben uw aanvraag ontvangen",
+    enSubject: "We received your request",
+    kindLabel: "Meubelreiniging",
+  },
+  job_application: {
+    nlNoun: "sollicitatie",
+    enNoun: "application",
+    nlSubject: "We hebben uw sollicitatie ontvangen",
+    enSubject: "We received your application",
+    kindLabel: "Sollicitatie",
+  },
+  newsletter: {
+    nlNoun: "aanmelding",
+    enNoun: "signup",
+    nlSubject: "We hebben uw aanmelding ontvangen",
+    enSubject: "We received your signup",
+    kindLabel: "Nieuwsbrief",
+  },
+};
+
+/**
+ * Bilingual confirmation for the person who submitted a website form.
+ * Dutch first, English underneath (muted). No form-field dump.
+ */
+export function buildSubmitterConfirmationEmail(
+  kind: FormKind,
+  fields: Record<string, string>,
+  requestNumber: string,
+) {
+  const copy = CONFIRMATION_COPY[kind];
+  const name = fields.name?.trim() ?? "";
+  const number = requestNumber.trim();
+  const subject = `${copy.nlSubject} / ${copy.enSubject} (${number})`;
+  const nlGreeting = name ? `Beste ${name},` : "Beste,";
+  const enGreeting = name ? `Dear ${name},` : "Dear,";
+
+  const html = `<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f5f7;font-family:Segoe UI,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+            <tr>
+              <td style="background:#0b1220;padding:24px 28px;">
+                <div style="color:#93c5fd;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">McCoy Cleaning</div>
+                <div style="color:#ffffff;font-size:22px;font-weight:700;margin-top:8px;">${escapeHtml(copy.nlSubject)}</div>
+                <div style="color:#cbd5e1;font-size:13px;margin-top:6px;">${escapeHtml(copy.kindLabel)} · ${escapeHtml(number)}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 28px 8px;color:#111827;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 12px;">${escapeHtml(nlGreeting)}</p>
+                <p style="margin:0 0 12px;">Bedankt. We hebben uw ${escapeHtml(copy.nlNoun)} ontvangen en zijn deze aan het verwerken.</p>
+                <p style="margin:0 0 12px;">We nemen zo snel mogelijk contact op.</p>
+                <p style="margin:0 0 4px;">Met vriendelijke groet,</p>
+                <p style="margin:0;">McCoy Cleaning</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 24px;color:#9ca3af;font-size:12px;line-height:1.55;">
+                <p style="margin:0 0 10px;">${escapeHtml(enGreeting)}</p>
+                <p style="margin:0 0 10px;">Thank you. We have received your ${escapeHtml(copy.enNoun)} and it is being processed.</p>
+                <p style="margin:0 0 10px;">We will get back to you as soon as possible.</p>
+                <p style="margin:0 0 4px;">Kind regards,</p>
+                <p style="margin:0;">McCoy Cleaning</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { subject, html };
+}
+
 export { escapeHtml };

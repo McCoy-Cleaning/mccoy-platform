@@ -11,6 +11,9 @@ import { readServerEnv } from "@mccoy/security";
  * Optional:
  * - VERCEL_TEAM_ID — team id when the project is under a team
  * - VERCEL_ORG_ID — Vercel deployments already set this; used as teamId fallback
+ *
+ * On 404/403: status "failed" + a safe errorCode for the overview tile.
+ * Never silently fall back to another Vercel project (the admin app).
  */
 
 export type WebsiteVisitorWindow = {
@@ -25,10 +28,24 @@ export type WebsiteVisitorStatsResult = {
   previousVisitors: number | null;
   status: WebsiteVisitorStatsStatus;
   missingEnv: string[];
+  /** Safe HTTP/API code only — never tokens, URLs, or project ids. */
+  errorCode?: string;
 };
 
 const VISITS_COUNT_URL = "https://api.vercel.com/v1/query/web-analytics/visits/count";
 const PRODUCTION_FILTER = "environment eq 'production'";
+
+type VisitsCountOutcome = {
+  visitors: number | null;
+  errorCode?: string;
+};
+
+type VisitsCountRequestOptions = {
+  /** Same storefront id/name, but without teamId (hobby / wrong team). */
+  omitTeamId?: boolean;
+  /** Caller already logged — keep one warn per overview load. */
+  silent?: boolean;
+};
 
 function coerceNonNegativeInt(value: unknown, depth = 0): number | null {
   if (depth > 2) return null;
@@ -110,10 +127,33 @@ function extractSafeErrorCode(payload: unknown): string | undefined {
   return undefined;
 }
 
-async function requestVisitsCount(since: string, until: string): Promise<number | null> {
+/** Map HTTP status to a stable, secret-free code for the overview tile. */
+export function mapVisitsCountHttpError(status: number, payload?: unknown): string {
+  if (status === 404) return "not_found";
+  if (status === 403) return "forbidden";
+  return extractSafeErrorCode(payload) ?? `http_${status}`;
+}
+
+function isProjectAccessError(errorCode: string | undefined): boolean {
+  return errorCode === "not_found" || errorCode === "forbidden";
+}
+
+function logVisitsCountHttpError(status: number, errorCode: string, hasTeamId: boolean): void {
+  console.warn("[vercel-web-analytics] visits/count HTTP error", {
+    status,
+    errorCode,
+    hasTeamId,
+  });
+}
+
+async function requestVisitsCount(
+  since: string,
+  until: string,
+  options: VisitsCountRequestOptions = {},
+): Promise<VisitsCountOutcome> {
   const token = readServerEnv("VERCEL_TOKEN");
   const projectId = resolveStorefrontAnalyticsProjectId();
-  if (!token || !projectId) return null;
+  if (!token || !projectId) return { visitors: null };
 
   const url = new URL(VISITS_COUNT_URL);
   url.searchParams.set("projectId", projectId);
@@ -121,7 +161,7 @@ async function requestVisitsCount(since: string, until: string): Promise<number 
   url.searchParams.set("until", until);
   url.searchParams.set("filter", PRODUCTION_FILTER);
 
-  const teamId = resolveVercelAnalyticsTeamId();
+  const teamId = options.omitTeamId ? "" : resolveVercelAnalyticsTeamId();
   if (teamId) url.searchParams.set("teamId", teamId);
 
   try {
@@ -135,36 +175,59 @@ async function requestVisitsCount(since: string, until: string): Promise<number 
     });
     const json: unknown = await res.json().catch(() => null);
     if (!res.ok) {
-      console.warn("[vercel-web-analytics] visits/count HTTP error", {
-        status: res.status,
-        errorCode: extractSafeErrorCode(json),
-        hasTeamId: Boolean(teamId),
-      });
-      return null;
+      const errorCode = mapVisitsCountHttpError(res.status, json);
+      if (!options.silent) {
+        logVisitsCountHttpError(res.status, errorCode, Boolean(teamId));
+      }
+      return { visitors: null, errorCode };
     }
     const visitors = parseVisitorCount(json);
     if (visitors === null) {
       console.warn("[vercel-web-analytics] visits/count unexpected payload shape");
     }
-    return visitors;
+    return { visitors };
   } catch (error) {
-    console.warn("[vercel-web-analytics] visits/count request failed", {
-      name: error instanceof Error ? error.name : "unknown",
-      hasTeamId: Boolean(teamId),
-    });
-    return null;
+    if (!options.silent) {
+      console.warn("[vercel-web-analytics] visits/count request failed", {
+        name: error instanceof Error ? error.name : "unknown",
+        hasTeamId: Boolean(teamId),
+      });
+    }
+    return { visitors: null };
   }
 }
 
-async function fetchVisitsCount(since: Date, until: Date): Promise<number | null> {
-  const iso = await requestVisitsCount(since.toISOString(), until.toISOString());
-  if (iso !== null) return iso;
-  return requestVisitsCount(String(since.getTime()), String(until.getTime()));
+async function fetchVisitsCount(
+  since: Date,
+  until: Date,
+  options: VisitsCountRequestOptions = {},
+): Promise<VisitsCountOutcome> {
+  const iso = await requestVisitsCount(since.toISOString(), until.toISOString(), options);
+  if (iso.visitors !== null) return iso;
+  // 404/403 is the configured project/token — do not retry date format or switch project.
+  if (isProjectAccessError(iso.errorCode)) return iso;
+  const epoch = await requestVisitsCount(String(since.getTime()), String(until.getTime()), options);
+  if (epoch.visitors !== null) return epoch;
+  return { visitors: null, errorCode: epoch.errorCode ?? iso.errorCode };
+}
+
+function failedVisitorStats(errorCode?: string): WebsiteVisitorStatsResult {
+  return {
+    visitors: null,
+    previousVisitors: null,
+    status: "failed",
+    missingEnv: [],
+    errorCode,
+  };
 }
 
 /**
  * Unique visitors for the last 7 days and the prior 7-day window (trend).
  * Hobby reporting window is ~1 month, so both windows are within plan limits.
+ *
+ * Current window first. 404/403 stops immediately (no previous window, no ISO+ms
+ * retry). One optional retry: same storefront id/name without teamId. Never the
+ * admin project.
  */
 export async function fetchWebsiteVisitorStats(
   now = new Date(),
@@ -184,23 +247,30 @@ export async function fetchWebsiteVisitorStats(
   const prev7 = new Date(now.getTime());
   prev7.setUTCDate(prev7.getUTCDate() - 14);
 
-  const [visitors, previousVisitors] = await Promise.all([
-    fetchVisitsCount(last7, now),
-    fetchVisitsCount(prev7, last7),
-  ]);
+  const current = await fetchVisitsCount(last7, now);
 
-  if (visitors === null) {
-    return {
-      visitors: null,
-      previousVisitors: null,
-      status: "failed",
-      missingEnv: [],
-    };
+  if (current.visitors === null && current.errorCode === "not_found" && resolveVercelAnalyticsTeamId()) {
+    const withoutTeam = await fetchVisitsCount(last7, now, { omitTeamId: true, silent: true });
+    if (withoutTeam.visitors !== null) {
+      const previous = await fetchVisitsCount(prev7, last7, { omitTeamId: true });
+      return {
+        visitors: withoutTeam.visitors,
+        previousVisitors: previous.visitors ?? 0,
+        status: "ok",
+        missingEnv: [],
+      };
+    }
+    return failedVisitorStats(withoutTeam.errorCode ?? current.errorCode);
   }
 
+  if (current.visitors === null) {
+    return failedVisitorStats(current.errorCode);
+  }
+
+  const previous = await fetchVisitsCount(prev7, last7);
   return {
-    visitors,
-    previousVisitors: previousVisitors ?? 0,
+    visitors: current.visitors,
+    previousVisitors: previous.visitors ?? 0,
     status: "ok",
     missingEnv: [],
   };

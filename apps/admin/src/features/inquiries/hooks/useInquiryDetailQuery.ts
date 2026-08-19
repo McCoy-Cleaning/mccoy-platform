@@ -37,6 +37,8 @@ export function useInquiryDetailQuery(options: {
   const [detailError, setDetailError] = React.useState<string | null>(null);
 
   const applyThreadInBackground = React.useCallback((id: string) => {
+    // Root getAdminFormInboxMessage already hydrates reply files; this only
+    // syncs newly arrived Graph conversation messages without replacing chips.
     void getAdminFormInboxThread({ data: { id } })
       .then((threadResult) => {
         if (!threadResult.ok) return;

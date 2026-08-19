@@ -106,6 +106,16 @@ async function persistSyncMessage(options: {
   });
 
   if (upsert?.status === "appended") {
+    if (options.msg.hasAttachments) {
+      const { persistMailMessageGraphAttachments } = await import(
+        "./persist-mail-graph-attachments"
+      );
+      await persistMailMessageGraphAttachments({
+        mailMessageId: upsert.id,
+        graphMessageId: options.msg.id,
+        mailbox: options.mailbox,
+      });
+    }
     if (direction === "inbound") {
       const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
       await notifyApplicantReplyAppended({

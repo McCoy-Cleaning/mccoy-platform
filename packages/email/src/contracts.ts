@@ -4,7 +4,7 @@
  */
 
 export { FormSubmitError } from "./form-submit-error";
-export { buildFormEmail, escapeHtml } from "./templates";
+export { buildFormEmail, buildSubmitterConfirmationEmail, escapeHtml } from "./templates";
 export {
   classifyFormEmailSubject,
   extractFormScopeKeyFromSubject,

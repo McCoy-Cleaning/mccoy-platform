@@ -28,6 +28,7 @@ export {
   upsertWebsiteRequestMailMessage,
   listWebsiteRequestMailMessages,
   listKnownMailIdentitiesForMailbox,
+  updateWebsiteRequestMailMessageAttachments,
   listHiddenWebsiteRequestNumbers,
   findWebsiteRequestIdByGraphMessageId,
   findWebsiteRequestIdByNumber,
@@ -35,6 +36,7 @@ export {
   type WebsiteRequestReplyRow,
   type WebsiteRequestMailMessageInput,
   type WebsiteRequestMailMessageRow,
+  type WebsiteRequestMailAttachmentMeta,
   type UpsertMailMessageResult,
   type ReconcileOrphanScopesResult,
 } from "./website-requests";

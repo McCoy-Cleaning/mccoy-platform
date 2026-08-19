@@ -97,6 +97,7 @@ export async function syncGraphInboxAfterList(options: {
           bodyPreview: msg.bodyPreview,
           receivedDateTime: msg.receivedDateTime,
           isRead: msg.isRead,
+          hasAttachments: msg.hasAttachments,
           internetMessageId: msg.internetMessageId,
           conversationId: msg.conversationId,
           from: msg.fromAddress

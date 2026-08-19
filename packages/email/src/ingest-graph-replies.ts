@@ -19,6 +19,7 @@ type LightweightGraphMessage = {
   bodyPreview?: string | null;
   receivedDateTime?: string | null;
   isRead?: boolean;
+  hasAttachments?: boolean;
   internetMessageId?: string | null;
   conversationId?: string | null;
   from?: { emailAddress?: { address?: string | null } | null } | null;
@@ -115,6 +116,16 @@ export async function ingestGraphReplyCandidates(options: {
 
     if (upsert?.status === "appended") {
       appended += 1;
+      if (msg.hasAttachments !== false) {
+        const { persistMailMessageGraphAttachments } = await import(
+          "./persist-mail-graph-attachments"
+        );
+        await persistMailMessageGraphAttachments({
+          mailMessageId: upsert.id,
+          graphMessageId: msg.id,
+          mailbox,
+        });
+      }
       const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
       await notifyApplicantReplyAppended({
         requestId: result.inquiryId,

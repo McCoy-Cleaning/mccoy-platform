@@ -124,6 +124,7 @@ function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
       : websiteVisitorsUnavailableCopy(
           stats.websiteVisitorsStatus === "failed" ? "failed" : "not_configured",
           stats.websiteVisitorsMissingEnv ?? [],
+          stats.websiteVisitorsErrorCode,
         );
   const visitorTrend =
     stats === null
@@ -221,6 +222,7 @@ function AdminOverview() {
             websiteVisitorsPrevious7Days: null,
             websiteVisitorsStatus: "failed",
             websiteVisitorsMissingEnv: [],
+            websiteVisitorsErrorCode: undefined,
           });
         }
       });

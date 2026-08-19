@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { websiteVisitorsUnavailableCopy } from "./admin-overview-visitors";
 import {
   __testExtractSafeErrorCode,
   __testParseVisitorCount,
   fetchWebsiteVisitorStats,
   getVercelWebAnalyticsMissingEnv,
   isVercelWebAnalyticsConfigured,
+  mapVisitsCountHttpError,
   resolveStorefrontAnalyticsProjectId,
   resolveVercelAnalyticsTeamId,
 } from "./vercel-web-analytics.server";
@@ -146,6 +148,12 @@ describe("safe error codes", () => {
     expect(__testExtractSafeErrorCode({ code: "bad_request" })).toBe("bad_request");
     expect(__testParseVisitorCount({ error: { code: "forbidden" } })).toBeNull();
   });
+
+  it("maps HTTP 404/403 to stable codes for the overview tile", () => {
+    expect(mapVisitsCountHttpError(404, { error: { code: "not_found" } })).toBe("not_found");
+    expect(mapVisitsCountHttpError(403, { error: { code: "forbidden" } })).toBe("forbidden");
+    expect(mapVisitsCountHttpError(500)).toBe("http_500");
+  });
 });
 
 describe("fetchWebsiteVisitorStats", () => {
@@ -204,16 +212,113 @@ describe("fetchWebsiteVisitorStats", () => {
       VERCEL_WEB_ANALYTICS_PROJECT_ID: "prj_sf",
       VERCEL_ORG_ID: "team_org",
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ error: { code: "forbidden" } }), { status: 403 })),
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ error: { code: "forbidden" } }), { status: 403 }),
     );
+    vi.stubGlobal("fetch", fetchMock);
     const result = await fetchWebsiteVisitorStats(new Date("2026-08-19T12:00:00.000Z"));
     expect(result).toEqual({
       visitors: null,
       previousVisitors: null,
       status: "failed",
       missingEnv: [],
+      errorCode: "forbidden",
     });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      warn.mock.calls.filter((args) => String(args[0]).includes("[vercel-web-analytics]")),
+    ).toHaveLength(1);
+  });
+
+  it("maps visits/count 404 to failed + the Dutch storefront-project hint", async () => {
+    setEnv({
+      VERCEL_TOKEN: "tok",
+      VERCEL_WEB_ANALYTICS_PROJECT_ID: "prj_sf",
+      VERCEL_TEAM_ID: "team_from_env",
+      VERCEL_ORG_ID: undefined,
+    });
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get("projectId")).toBe("prj_sf");
+      return new Response(JSON.stringify({ error: { code: "not_found" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchWebsiteVisitorStats(new Date("2026-08-19T12:00:00.000Z"));
+    expect(result.status).toBe("failed");
+    expect(result.visitors).toBeNull();
+    expect(result.errorCode).toBe("not_found");
+    expect(websiteVisitorsUnavailableCopy(result.status, result.missingEnv, result.errorCode)).toEqual({
+      delta: "niet beschikbaar",
+      deltaTone: "pending",
+      hint: "Vercel-token ziet het storefront-project niet. Gebruik een team-token en het prj_ van www.mccoy.nl.",
+    });
+
+    const now = new Date("2026-08-19T12:00:00.000Z");
+    const last7 = new Date(now.getTime());
+    last7.setUTCDate(last7.getUTCDate() - 7);
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(2);
+    for (const call of fetchMock.mock.calls) {
+      const url = new URL(String(call[0]));
+      expect(url.searchParams.get("projectId")).toBe("prj_sf");
+      expect(url.searchParams.get("since")).toBe(last7.toISOString());
+      expect(url.searchParams.get("until")).toBe(now.toISOString());
+      expect(url.href).not.toContain("mccoy-platform-admin");
+    }
+  });
+
+  it("404 current window does not fetch the previous window or ISO+ms retry and logs once", async () => {
+    setEnv({
+      VERCEL_TOKEN: "tok",
+      VERCEL_WEB_ANALYTICS_PROJECT_ID: "prj_sf",
+      VERCEL_TEAM_ID: "team_from_env",
+      VERCEL_ORG_ID: undefined,
+    });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const now = new Date("2026-08-19T12:00:00.000Z");
+    const last7 = new Date(now.getTime());
+    last7.setUTCDate(last7.getUTCDate() - 7);
+
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: { code: "not_found" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchWebsiteVisitorStats(now);
+    expect(result.status).toBe("failed");
+    expect(result.visitors).toBeNull();
+    expect(result.previousVisitors).toBeNull();
+    expect(result.errorCode).toBe("not_found");
+
+    const urls = fetchMock.mock.calls.map((call) => new URL(String(call[0])));
+    expect(urls.length).toBeGreaterThanOrEqual(1);
+    expect(urls.length).toBeLessThanOrEqual(2);
+    expect(urls[0].searchParams.get("teamId")).toBe("team_from_env");
+    if (urls.length === 2) {
+      expect(urls[1].searchParams.has("teamId")).toBe(false);
+    }
+    for (const url of urls) {
+      expect(url.searchParams.get("projectId")).toBe("prj_sf");
+      expect(url.searchParams.get("since")).toBe(last7.toISOString());
+      expect(url.searchParams.get("until")).toBe(now.toISOString());
+      expect(url.href).not.toContain("mccoy-platform-admin");
+    }
+
+    expect(
+      warn.mock.calls.filter((args) => String(args[0]).includes("[vercel-web-analytics]")),
+    ).toHaveLength(1);
+    expect(websiteVisitorsUnavailableCopy(result.status, result.missingEnv, result.errorCode).hint).toBe(
+      "Vercel-token ziet het storefront-project niet. Gebruik een team-token en het prj_ van www.mccoy.nl.",
+    );
   });
 });
