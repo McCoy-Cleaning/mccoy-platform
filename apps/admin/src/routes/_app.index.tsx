@@ -17,6 +17,7 @@ import {
   type AdminOverviewStats,
 } from "@/lib/api/admin-overview.functions";
 import { websiteVisitorsUnavailableCopy } from "@/lib/admin-overview-visitors";
+import { relativeWhen } from "@/features/inquiries/lib/format";
 
 export const Route = createFileRoute("/_app/")({
   component: AdminOverview,
@@ -66,13 +67,6 @@ const SECTIONS = [
     cta: "Producten openen",
   },
 ] as const;
-
-const ACTIVITY = [
-  { t: "2 min", text: "Nieuwe aanvraag — Glasbewassing", tag: "Aanvraag" },
-  { t: "1 uur", text: "Sollicitatie ontvangen — Objectleider", tag: "Vacature" },
-  { t: "3 uur", text: "Product bijgewerkt — Aromatic Amber", tag: "Product" },
-  { t: "Gisteren", text: "Nieuw teamlid uitgenodigd — maria@rekp.ai", tag: "Gebruiker" },
-];
 
 function todayLabel(): string {
   try {
@@ -223,6 +217,7 @@ function AdminOverview() {
             websiteVisitorsStatus: "failed",
             websiteVisitorsMissingEnv: [],
             websiteVisitorsErrorCode: undefined,
+            recentRequests: [],
           });
         }
       });
@@ -336,20 +331,46 @@ function AdminOverview() {
             Recent gebeurd
           </h2>
         </div>
-        <ul className="divide-y divide-white/5">
-          {ACTIVITY.map((a, i) => (
-            <li key={i} className="flex items-center justify-between gap-4 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#2f9ff0] shadow-[0_0_10px_rgba(30,136,229,0.8)]" />
-                <span className="truncate text-[15px] text-white/85">{a.text}</span>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/60 sm:inline">{a.tag}</span>
-                <span className="text-sm text-white/45">{a.t}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {stats == null ? (
+          <ul className="divide-y divide-white/5" aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i} className="flex items-center justify-between gap-4 py-4">
+                <div className="h-4 w-2/3 animate-pulse rounded bg-white/10" />
+                <div className="h-4 w-16 animate-pulse rounded bg-white/10" />
+              </li>
+            ))}
+          </ul>
+        ) : stats.recentRequests.length === 0 ? (
+          <p className="py-6 text-[15px] text-white/55">
+            Nog geen aanvragen.{" "}
+            <Link to="/inquiries" className="font-semibold text-[#2f9ff0] hover:underline">
+              Aanvragen openen
+            </Link>
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {stats.recentRequests.map((item) => (
+              <li key={item.id}>
+                <Link
+                  to="/inquiries"
+                  search={{ kind: "all", scope: "all", q: "", id: item.id }}
+                  className="flex items-center justify-between gap-4 py-4 transition hover:bg-white/[0.03]"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#2f9ff0] shadow-[0_0_10px_rgba(30,136,229,0.8)]" />
+                    <span className="truncate text-[15px] text-white/85">{item.text}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/60 sm:inline">
+                      {item.tag}
+                    </span>
+                    <span className="text-sm text-white/45">{relativeWhen(item.createdAt)}</span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );
