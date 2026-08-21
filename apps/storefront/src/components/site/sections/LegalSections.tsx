@@ -8,6 +8,7 @@ import {
 } from "@mccoy/cms-renderer";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { cn } from "@/lib/utils";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 
 function LegalArticlesView({
   pageId,
@@ -19,6 +20,7 @@ function LegalArticlesView({
   icon: typeof Shield;
 }) {
   const content = useTypedSectionContent(pageId, sectionKey) as LegalMainContent | null;
+  const heading = useOverlayHeading(content?.heading ?? "");
   if (!content) return null;
 
   return (
@@ -30,7 +32,7 @@ function LegalArticlesView({
         {content.eyebrow ? (
           <SectionEyebrow className="mt-6 tracking-[0.25em]">{content.eyebrow}</SectionEyebrow>
         ) : null}
-        <h1 className="font-display mt-3 text-5xl text-foreground md:text-6xl">{content.heading}</h1>
+        <h1 className="font-display mt-3 text-5xl text-foreground md:text-6xl">{heading}</h1>
         {content.updatedLabel ? (
           <p className="mt-4 text-sm text-muted-foreground">{content.updatedLabel}</p>
         ) : null}

@@ -200,13 +200,17 @@ export const adminListPublishedCustomPageIds = createServerFn({ method: "POST" }
       await requireAdminSession();
       const store = await ensureSeeded();
       const pages = await store.listPages();
+      const revisions = await store.listActivePublishedRevisions();
       const customIds: string[] = [];
       for (const page of pages) {
         if (page.kind !== "custom") continue;
         customIds.push(page.stableKey || page.id);
-        // App-facing ids are often stable_key; published payloads use CmsPage.id.
-        const rev = await store.getActivePublishedRevision(page.id);
-        if (rev?.payload?.id) customIds.push(rev.payload.id);
+      }
+      for (const rev of revisions) {
+        const payload = rev.payload;
+        if (payload?.isCustom && payload.id) {
+          customIds.push(payload.id);
+        }
       }
       return jsonClone({ ok: true as const, customPageIds: [...new Set(customIds)] });
     } catch (error) {
@@ -225,20 +229,14 @@ export const adminGetPublishedCmsPages = createServerFn({ method: "POST" }).hand
   try {
     await requireAdminSession();
     const store = await ensureSeeded();
-    const site = await store.getSite();
-    const pageRows = await store.listPages();
-    const pages: CmsPage[] = [];
-    for (const row of pageRows) {
-      const rev = await store.getActivePublishedRevision(row.id);
-      if (rev?.payload) {
-        pages.push(ensurePageLocaleFields(rev.payload));
-      }
-    }
+    const { getCachedPublishedCmsBundle } = await import("@mccoy/database/server");
+    const bundle = await getCachedPublishedCmsBundle(store);
+    const pages = bundle.pages.map((page) => ensurePageLocaleFields(page));
     return jsonClone({
       ok: true as const,
       pagesJson: JSON.stringify(pages),
-      navigationJson: site.navigation ? JSON.stringify(site.navigation) : null,
-      footerJson: site.footer ? JSON.stringify(site.footer) : null,
+      navigationJson: bundle.navigation ? JSON.stringify(bundle.navigation) : null,
+      footerJson: bundle.footer ? JSON.stringify(bundle.footer) : null,
     });
   } catch (error) {
     return mapAuthError(error);

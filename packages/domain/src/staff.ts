@@ -43,6 +43,15 @@ export const STAFF_AUDIT_ACTIONS = [
   "cms.media.restored",
   "cms.media.deleted",
   "cms.media.legacy_migrated",
+  "customer.invited",
+  "customer.blocked",
+  "customer.unblocked",
+  "customer.profile_updated",
+  "customer.company_updated",
+  "guest.conversion_invited",
+  "guest.linked_existing",
+  "order.imported",
+  "commerce.fixtures_seeded",
 ] as const;
 export type StaffAuditAction = (typeof STAFF_AUDIT_ACTIONS)[number];
 

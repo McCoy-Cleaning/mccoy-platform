@@ -153,6 +153,9 @@ export async function buildPublishedSitemapEntries(input?: {
     byPage.set(row.pageId, list);
   }
 
+  const revisions = await store.listActivePublishedRevisions(siteId);
+  const revByPageId = new Map(revisions.map((r) => [r.pageId, r]));
+
   const entries: Array<{
     loc: string;
     lastmod?: string;
@@ -160,7 +163,7 @@ export async function buildPublishedSitemapEntries(input?: {
   }> = [];
 
   for (const [pageId] of byPage) {
-    const rev = await store.getActivePublishedRevision(pageId, siteId);
+    const rev = revByPageId.get(pageId);
     if (!rev) continue;
     const page = rev.payload;
     const paths = page.paths ?? { nl: page.slug };

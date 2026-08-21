@@ -15,6 +15,7 @@ import { useHomeHeroContent } from "@/lib/cms/use-section-content";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { cn } from "@/lib/utils";
 import { localizedHeroCopy } from "@/lib/cms-i18n";
+import { useEdgePagePatch, useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 import { isCmsButtonInteractive, resolvePublicImageAlt } from "@mccoy/cms-schema";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer/section-layout";
 
@@ -92,6 +93,9 @@ export function Hero() {
   const isEn = lang === "en";
   const content = useHomeHeroContent();
   const copy = localizedHeroCopy(content, t);
+  const overlayPatch = useEdgePagePatch();
+  const heading = useOverlayHeading(copy.heading);
+  const headingAccent = overlayPatch?.h1 ? "" : copy.headingAccent;
   const { isEdit, sendMutation } = useLiveEditApi();
   // SSR + mobile: skip decorative CSS motion (ping / scroll cue).
   const softMotion = useMobileLiteMotion();
@@ -164,17 +168,17 @@ export function Hero() {
             <HeroEditableText
               as="span"
               editable={isEdit}
-              value={copy.heading}
+              value={heading}
               onCommit={(next) => patchHero({ heading: next })}
             />
-            {copy.headingAccent ? (
+            {headingAccent ? (
               <>
                 {" "}
                 <span className="relative inline-block bg-gradient-to-br from-primary via-primary to-white/90 bg-clip-text text-transparent">
                   <HeroEditableText
                     as="span"
                     editable={isEdit}
-                    value={copy.headingAccent}
+                    value={headingAccent}
                     onCommit={(next) => patchHero({ headingAccent: next })}
                   />
                   <span

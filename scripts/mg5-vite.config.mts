@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+﻿import { defineConfig } from "vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,7 @@ export default defineConfig({
         root,
         "packages/security/src/load-monorepo-env.server.ts",
       ),
+      "@mccoy/security": path.join(root, "packages/security/src/index.ts"),
       "@mccoy/domain": path.join(root, "packages/domain/src/index.ts"),
     },
   },

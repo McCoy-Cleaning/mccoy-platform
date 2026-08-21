@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,6 +40,7 @@ export const ADMIN_NAV: NavItem[] = [
   { to: "/", label: "Overzicht", icon: LayoutDashboard, hint: "Start — wat er speelt" },
   { to: "/website", label: "Website", icon: Globe2, hint: "Pagina's, teksten & foto's" },
   { to: "/inquiries", label: "Aanvragen", icon: Inbox, hint: "Berichten van klanten" },
+  { to: "/customers", label: "Klanten", icon: Building2, hint: "Geregistreerd en gastkopers" },
   { to: "/users", label: "Gebruikers", icon: Users, hint: "Wie mag er in het beheer" },
   { to: "/products", label: "Producten", icon: Package, hint: "Uw catalogus" },
 ];

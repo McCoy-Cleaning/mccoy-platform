@@ -340,3 +340,78 @@ export const staffInviteRegistrationFormSchema = z
     message: "Wachtwoorden komen niet overeen.",
     path: ["confirmPassword"],
   });
+
+const customerListSortSchema = z.enum([
+  "name",
+  "created",
+  "last_order",
+  "order_count",
+  "total_spend",
+]);
+
+export const adminCustomerListSchema = z.object({
+  population: z.enum(["registered", "guests"]).default("registered"),
+  q: z.string().max(200).optional(),
+  status: z.enum(["invited", "active", "blocked", "all"]).optional(),
+  sort: customerListSortSchema.optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+  page: z.number().int().min(1).max(10_000).optional(),
+  pageSize: z.number().int().min(1).max(100).optional(),
+});
+
+export const adminCustomerIdSchema = z.object({
+  customerId: z.string().uuid(),
+});
+
+export const adminGuestIdSchema = z.object({
+  guestId: z.string().uuid(),
+});
+
+export const adminUpdateCustomerSchema = z.object({
+  customerId: z.string().uuid(),
+  fullName: z.string().trim().max(200).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+});
+
+export const adminUpdateCompanySchema = z.object({
+  companyId: z.string().uuid(),
+  legalName: z.string().trim().min(1).max(200).optional(),
+  displayName: z.string().trim().max(200).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  email: z.string().trim().email().max(320).nullable().optional(),
+  status: z.enum(["pending", "active", "blocked"]).optional(),
+  invoiceAllowed: z.boolean().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
+
+export const adminSetCustomerBlockedSchema = z.object({
+  customerId: z.string().uuid(),
+  blocked: z.boolean(),
+});
+
+export const adminInviteCustomerSchema = z.object({
+  email: z.string().trim().email().max(320),
+  fullName: z.string().trim().max(200).optional(),
+  phone: z.string().trim().max(40).optional(),
+  companyLegalName: z.string().trim().min(1).max(200),
+});
+
+export const adminConvertGuestSchema = z.object({
+  guestId: z.string().uuid(),
+  companyLegalName: z.string().trim().max(200).optional(),
+});
+
+export const adminCustomerExportSchema = z.object({
+  population: z.enum(["registered", "guests"]),
+  q: z.string().max(200).optional(),
+  status: z.enum(["invited", "active", "blocked", "all"]).optional(),
+});
+
+export const adminCustomerImportSchema = z.object({
+  csvText: z.string().min(1).max(1_500_000),
+  commit: z.boolean().default(false),
+});
+
+export const adminSeedCommerceFixturesSchema = z.object({
+  confirm: z.literal(true),
+});

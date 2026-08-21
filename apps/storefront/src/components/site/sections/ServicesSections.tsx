@@ -20,6 +20,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { CompositePartSelectChrome } from "../PageLayoutRenderer";
 import { localizedServicesCopy } from "@/lib/cms-i18n";
@@ -133,7 +134,8 @@ function useLocalizedServiceCards() {
 /** Services intro chrome — cards live on `services.cards`. */
 export function ServicesMain() {
   const { localized } = useLocalizedServiceCards();
-  const { eyebrow, heading, intro } = localized;
+  const { eyebrow, heading: sectionHeading, intro } = localized;
+  const heading = useOverlayHeading(sectionHeading);
   return (
     <section id="services" className="relative isolate overflow-hidden py-20 sm:py-24">
       <SectionAmbient />

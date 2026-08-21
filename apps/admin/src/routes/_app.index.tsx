@@ -343,7 +343,11 @@ function AdminOverview() {
         ) : stats.recentRequests.length === 0 ? (
           <p className="py-6 text-[15px] text-white/55">
             Nog geen aanvragen.{" "}
-            <Link to="/inquiries" className="font-semibold text-[#2f9ff0] hover:underline">
+            <Link
+              to="/inquiries"
+              search={{ kind: "all", scope: "all", q: "" }}
+              className="font-semibold text-[#2f9ff0] hover:underline"
+            >
               Aanvragen openen
             </Link>
           </p>

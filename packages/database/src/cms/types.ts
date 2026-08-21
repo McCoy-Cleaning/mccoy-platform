@@ -170,6 +170,11 @@ export interface CmsStore {
     pageId: string,
     siteId?: string,
   ): Promise<CmsRevisionRecord | null>;
+  /**
+   * All active published revisions for a site in a bounded number of queries
+   * (avoid N+1 findPageRow + revision fetches).
+   */
+  listActivePublishedRevisions(siteId?: string): Promise<CmsRevisionRecord[]>;
   listRevisions(pageId: string, siteId?: string): Promise<CmsRevisionRecord[]>;
   publishPage(input: PublishPageInput): Promise<PublishPageResult>;
   rollbackPage(input: RollbackPageInput): Promise<PublishPageResult>;

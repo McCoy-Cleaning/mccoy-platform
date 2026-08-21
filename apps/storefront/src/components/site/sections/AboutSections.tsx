@@ -22,6 +22,7 @@ import { useI18n } from "@/lib/i18n";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { CompositePartSelectChrome } from "../PageLayoutRenderer";
 import { localizedAboutCopy } from "@/lib/cms-i18n";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
@@ -154,7 +155,7 @@ export function About() {
   const isEn = lang === "en";
   const copy = localizedAboutCopy(content, t);
   const eyebrow = copy.eyebrow;
-  const heading = copy.heading;
+  const heading = useOverlayHeading(copy.heading);
   const pillars = isEn
     ? [
         { icon: Award, label: "Premium quality" },

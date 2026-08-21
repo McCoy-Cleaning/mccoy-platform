@@ -40,6 +40,17 @@ export {
   staffCompleteInviteRegistrationSchema,
   staffCompletePasswordRecoverySchema,
   staffInviteRegistrationFormSchema,
+  adminCustomerListSchema,
+  adminCustomerIdSchema,
+  adminGuestIdSchema,
+  adminUpdateCustomerSchema,
+  adminUpdateCompanySchema,
+  adminSetCustomerBlockedSchema,
+  adminInviteCustomerSchema,
+  adminConvertGuestSchema,
+  adminCustomerExportSchema,
+  adminCustomerImportSchema,
+  adminSeedCommerceFixturesSchema,
 } from "./schemas";
 
 export {

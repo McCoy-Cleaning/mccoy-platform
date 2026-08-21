@@ -40,27 +40,21 @@ export const ensurePublishedCmsSeeded = createServerFn({ method: "POST" }).handl
 export const getPublishedCmsBundle = createServerFn({ method: "POST" }).handler(async () => {
   try {
     const store = await ensureSeeded();
-    const site = await store.getSite();
-    const pages = await store.listPages();
-    const publishedPages = [];
-    for (const page of pages) {
-      const rev = await store.getActivePublishedRevision(page.id);
-      if (rev) publishedPages.push(rev.payload);
-    }
-    const localeStates = await store.listPublishedLocaleStates();
+    const { getCachedPublishedCmsBundle } = await import("@mccoy/database/server");
+    const bundle = await getCachedPublishedCmsBundle(store);
     return {
       ok: true as const,
       site: {
-        id: site.id,
-        origin: site.origin,
-        configVersion: site.configVersion,
+        id: bundle.site.id,
+        origin: bundle.site.origin,
+        configVersion: bundle.site.configVersion,
       },
-      pagesJson: JSON.stringify(publishedPages),
+      pagesJson: JSON.stringify(bundle.pages),
       /** Null until Navigatie Opslaan writes durable chrome. */
-      navigationJson: site.navigation ? JSON.stringify(site.navigation) : null,
+      navigationJson: bundle.navigation ? JSON.stringify(bundle.navigation) : null,
       /** Null until Footer Opslaan writes durable chrome. */
-      footerJson: site.footer ? JSON.stringify(site.footer) : null,
-      publishedLocaleStatesJson: JSON.stringify(localeStates),
+      footerJson: bundle.footer ? JSON.stringify(bundle.footer) : null,
+      publishedLocaleStatesJson: JSON.stringify(bundle.localeStates),
     };
   } catch (error) {
     console.error("[cms] getPublishedCmsBundle failed", error);

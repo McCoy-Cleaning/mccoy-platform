@@ -34,6 +34,7 @@ import {
   SectionSurface,
 } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -112,6 +113,7 @@ export function ProductsIntroView({
   metrics: metricsProp,
 }: ProductsIntroViewProps) {
   const reduced = useReducedMotion();
+  const overlayH1 = useOverlayHeading(eyebrow);
   const introParagraphs = intro
     .replace(/\r\n/g, "\n")
     .split(/\n{2,}/)
@@ -143,9 +145,9 @@ export function ProductsIntroView({
             initial={false}
             className="lg:col-span-6"
           >
-            {eyebrow ? (
+            {overlayH1 ? (
               <h1 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {eyebrow}
+                {overlayH1}
               </h1>
             ) : null}
             <h2 className="font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl">

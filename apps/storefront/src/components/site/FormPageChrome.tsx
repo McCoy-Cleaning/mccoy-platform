@@ -6,6 +6,7 @@ import { CmsImageView, SectionInner } from "@mccoy/cms-renderer";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { useI18n } from "@/lib/i18n";
 import { localizedFormChromeCopy } from "@/lib/cms-i18n";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
 
 type FormChromeSectionKey = "contact.main" | "vacatures.main" | "offerte.main";
 
@@ -30,6 +31,7 @@ function FormPageChromeSection({
   const { t, lang } = useI18n();
   const content = useTypedSectionContent(pageId, sectionKey as FixedSectionKey) as FormPageChromeContent;
   const copy = localizedFormChromeCopy(sectionKey, content, t, lang);
+  const heading = useOverlayHeading(copy.heading);
 
   return (
     <section
@@ -65,7 +67,7 @@ function FormPageChromeSection({
               : "font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl"
           }
         >
-          {copy.heading}
+          {heading}
         </motion.h1>
         {copy.body ? <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">{copy.body}</p> : null}
         {content.image ? (
@@ -76,7 +78,7 @@ function FormPageChromeSection({
             className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10"
           >
             <CmsImageView
-              image={withResolvedPublicImageAlt(content.image, copy.heading || "McCoy Cleaning")}
+              image={withResolvedPublicImageAlt(content.image, heading || "McCoy Cleaning")}
               className="max-h-64 w-full bg-black/35 object-contain object-center"
             />
           </motion.div>

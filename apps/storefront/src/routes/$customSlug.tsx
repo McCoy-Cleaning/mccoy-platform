@@ -1,5 +1,4 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
-import { getPublishedCmsBundle } from "@/lib/api/cms-published.functions";
 import { useCms, hydratePublishedCmsState } from "@/lib/cms/store";
 import { useCmsPageForView } from "@/lib/cms/live-edit-draft";
 import { useEdit } from "@/lib/cms/edit-context";
@@ -32,24 +31,27 @@ export const Route = createFileRoute("/$customSlug")({
       throw redirect({ href: canonical, statusCode: 301 });
     }
     try {
-      const bundle = await getPublishedCmsBundle();
-      if (!bundle.ok) {
+      // Path resolve only — never load the full published bundle (N× cms_pages).
+      const { loadPublishedPageSnapshot } = await import(
+        "@/lib/cms/load-published-page.server"
+      );
+      const result = await loadPublishedPageSnapshot(slug);
+      if (result.kind === "redirect") {
+        throw redirect({ href: result.toPath, statusCode: result.statusCode });
+      }
+      if (result.kind !== "snapshot") {
         throw notFound();
       }
-      const pages = JSON.parse(bundle.pagesJson) as CmsPage[];
-      // Hydrate before first render so refresh does not 404 on seed-only state.
-      hydratePublishedCmsState({ pages });
-      const page =
-        pages.find((p) => p.isCustom && !p.isDraftOnly && p.slug === slug) ?? null;
-      const customPages = pages.filter((p) => p.isCustom && !p.isDraftOnly);
-      if (!page) {
+      const page = result.snapshot.page;
+      if (!page.isCustom || page.isDraftOnly) {
         throw notFound();
       }
+      hydratePublishedCmsState({ pages: [page] });
       return {
         slug,
         page,
         hydrated: true,
-        customPageCount: customPages.length,
+        customPageCount: 1,
         matchedSlug: page.slug,
       };
     } catch (error) {
