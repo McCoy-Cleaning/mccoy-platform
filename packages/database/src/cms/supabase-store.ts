@@ -898,32 +898,60 @@ export function createSupabaseCmsStore(): CmsStore {
     },
 
     async seedBuiltinsIfEmpty(pages, siteId = DEFAULT_CMS_SITE_ID) {
-      for (const page of pages) {
-        // Prefer live lookup by stable_key — list map can miss when stable_key was null
-        // historically and public id was the UUID, causing a duplicate-key insert race.
-        const row = await this.getPage(page.id, siteId);
-        if (row?.activePublishedRevisionId) continue;
+      // Process-once: every public read used to call this and N× findPageRow
+      // (stable_key walks), which matched the production PostgREST storm.
+      if (builtinsSeedCompleted.has(siteId)) return;
+      if (builtinsSeedInflight.has(siteId)) {
+        await builtinsSeedInflight.get(siteId);
+        return;
+      }
 
-        await this.upsertPage({ siteId, page, stableKey: page.id });
-        const draft = (await this.getDraftPayload(page.id)) ?? page;
-        const withStates = ensurePageLocaleFields({
-          ...draft,
-          localeStates: {
-            nl: { publicationState: "published", freshness: "current" },
-            // First seed is NL-only; EN stays missing until explicit Publiceer EN.
-            en: { publicationState: "missing", freshness: "unknown" },
-          },
-        });
-        await this.publishPage({
-          siteId,
-          pageId: page.id,
-          payload: withStates,
-          publishedLocales: ["nl"],
-        });
+      const run = (async () => {
+        const existing = await this.listPages(siteId);
+        const byKey = new Map<string, CmsPageRecord>();
+        for (const row of existing) {
+          const key = row.stableKey || row.id;
+          byKey.set(key, row);
+          byKey.set(row.id, row);
+        }
+
+        for (const page of pages) {
+          const row = byKey.get(page.id);
+          if (row?.activePublishedRevisionId) continue;
+
+          await this.upsertPage({ siteId, page, stableKey: page.id });
+          const draft = (await this.getDraftPayload(page.id)) ?? page;
+          const withStates = ensurePageLocaleFields({
+            ...draft,
+            localeStates: {
+              nl: { publicationState: "published", freshness: "current" },
+              // First seed is NL-only; EN stays missing until explicit Publiceer EN.
+              en: { publicationState: "missing", freshness: "unknown" },
+            },
+          });
+          await this.publishPage({
+            siteId,
+            pageId: page.id,
+            payload: withStates,
+            publishedLocales: ["nl"],
+          });
+        }
+        builtinsSeedCompleted.add(siteId);
+      })();
+
+      builtinsSeedInflight.set(siteId, run);
+      try {
+        await run;
+      } finally {
+        builtinsSeedInflight.delete(siteId);
       }
     },
   };
 }
+
+/** Sites that already completed builtin seed in this process. */
+const builtinsSeedCompleted = new Set<string>();
+const builtinsSeedInflight = new Map<string, Promise<void>>();
 
 /** Soft-fail window after DNS/network errors so local file CMS can serve without hammering a dead host. */
 let supabaseCmsUnreachableUntil = 0;

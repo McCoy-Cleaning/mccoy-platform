@@ -9,7 +9,24 @@ import {
 /**
  * Database imports stay inside handlers so the client stub for these
  * server functions does not evaluate node:fs file-store modules.
+ *
+ * Public reads must NOT call seedBuiltinsIfEmpty on every request — that was
+ * an N× cms_pages findPageRow walk and the dominant production CPU amplifier.
  */
+async function getStoreForRead() {
+  const db = await import("@mccoy/database/server");
+  try {
+    return db.getCmsStore();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[cms] getStoreForRead: primary store failed", message);
+    if (db.isSupabaseConnectivityError(error)) {
+      db.markSupabaseCmsUnreachable(message);
+    }
+    return db.getFileCmsStore();
+  }
+}
+
 async function ensureSeeded() {
   const db = await import("@mccoy/database/server");
   try {
@@ -39,7 +56,7 @@ export const ensurePublishedCmsSeeded = createServerFn({ method: "POST" }).handl
  */
 export const getPublishedCmsBundle = createServerFn({ method: "POST" }).handler(async () => {
   try {
-    const store = await ensureSeeded();
+    const store = await getStoreForRead();
     const { getCachedPublishedCmsBundle } = await import("@mccoy/database/server");
     const bundle = await getCachedPublishedCmsBundle(store);
     return {
@@ -76,12 +93,13 @@ export const resolvePublishedCmsPath = createServerFn({ method: "POST" })
   .validator(resolveSchema)
   .handler(async ({ data }) => {
     const { resolvePublicCmsRequest, DEFAULT_CMS_SITE_ID } = await import("@mccoy/database/server");
-    await ensureSeeded();
+    const store = await getStoreForRead();
     const result = await resolvePublicCmsRequest({
       pathname: data.pathname,
       authenticatedPreview: data.authenticatedPreview ?? false,
       previewLocale: data.previewLocale ?? null,
       siteId: DEFAULT_CMS_SITE_ID,
+      store,
     });
     return {
       ok: true as const,
@@ -91,8 +109,8 @@ export const resolvePublishedCmsPath = createServerFn({ method: "POST" })
 
 export const getPublishedSitemapXml = createServerFn({ method: "POST" }).handler(async () => {
   const { buildPublishedSitemapEntries } = await import("@mccoy/database/server");
-  await ensureSeeded();
-  const entries = await buildPublishedSitemapEntries();
+  const store = await getStoreForRead();
+  const entries = await buildPublishedSitemapEntries({ store });
   const urls = entries
     .map((entry) => {
       const alts = entry.alternates

@@ -228,7 +228,7 @@ export const adminListPublishedCustomPageIds = createServerFn({ method: "POST" }
 export const adminGetPublishedCmsPages = createServerFn({ method: "POST" }).handler(async () => {
   try {
     await requireAdminSession();
-    const store = await ensureSeeded();
+    const store = getCmsStore();
     const { getCachedPublishedCmsBundle } = await import("@mccoy/database/server");
     const bundle = await getCachedPublishedCmsBundle(store);
     const pages = bundle.pages.map((page) => ensurePageLocaleFields(page));
