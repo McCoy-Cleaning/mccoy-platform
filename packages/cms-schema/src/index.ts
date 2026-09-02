@@ -4,6 +4,7 @@ export * from "./slugs";
 export * from "./locale";
 export * from "./ui-locale";
 export * from "./seo";
+export * from "./canonical-origin";
 export * from "./resolve-seo";
 export * from "./business-nap";
 export * from "./image-alt";

@@ -253,7 +253,7 @@ describe("fetchWebsiteVisitorStats", () => {
     expect(result.status).toBe("failed");
     expect(result.visitors).toBeNull();
     expect(result.errorCode).toBe("not_found");
-    expect(websiteVisitorsUnavailableCopy(result.status, result.missingEnv, result.errorCode)).toEqual({
+    expect(websiteVisitorsUnavailableCopy("failed", result.missingEnv, result.errorCode)).toEqual({
       delta: "niet beschikbaar",
       deltaTone: "pending",
       hint: "Vercel-token ziet het storefront-project niet. Gebruik een team-token en het prj_ van www.mccoy.nl.",
@@ -286,7 +286,7 @@ describe("fetchWebsiteVisitorStats", () => {
     const last7 = new Date(now.getTime());
     last7.setUTCDate(last7.getUTCDate() - 7);
 
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
       return new Response(JSON.stringify({ error: { code: "not_found" } }), {
         status: 404,
         headers: { "content-type": "application/json" },
@@ -317,7 +317,7 @@ describe("fetchWebsiteVisitorStats", () => {
     expect(
       warn.mock.calls.filter((args) => String(args[0]).includes("[vercel-web-analytics]")),
     ).toHaveLength(1);
-    expect(websiteVisitorsUnavailableCopy(result.status, result.missingEnv, result.errorCode).hint).toBe(
+    expect(websiteVisitorsUnavailableCopy("failed", result.missingEnv, result.errorCode).hint).toBe(
       "Vercel-token ziet het storefront-project niet. Gebruik een team-token en het prj_ van www.mccoy.nl.",
     );
   });

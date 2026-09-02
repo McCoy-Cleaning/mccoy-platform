@@ -4,13 +4,24 @@
  * Phase 6 may overlay deployed factual titles/descriptions via frozen SEO.
  * Canonical origin is always https://www.mccoy.nl for public head output.
  * Does not invent unsupported marketing claims or emit ranking keywords meta.
+ *
+ * Leaf-ish module: no import from `./resolve` (breaks guardian circular graphs).
  */
 
+import type { Locale } from "./locale";
 import type { CmsSeo } from "./seo";
 import type { SiteUrlConfig } from "./paths";
-import type { ResolvedPublishedCmsPage } from "./resolve";
+import {
+  absoluteCanonicalUrl,
+  CANONICAL_SITE_ORIGIN,
+  resolveCanonicalOrigin,
+} from "./canonical-origin";
 
-export const CANONICAL_SITE_ORIGIN = "https://www.mccoy.nl";
+export {
+  absoluteCanonicalUrl,
+  CANONICAL_SITE_ORIGIN,
+  resolveCanonicalOrigin,
+} from "./canonical-origin";
 
 export type CmsHeadSnapshot = {
   title: string;
@@ -19,34 +30,17 @@ export type CmsHeadSnapshot = {
   jsonLd: Record<string, unknown>;
 };
 
-const PREVIEW_HOST_RE =
-  /(^|\.)localhost$|(^|\.)local$|\.vercel\.app$|\.now\.sh$|^127\.0\.0\.1$|^0\.0\.0\.0$|^::1$/i;
-
 /**
- * Fail-closed: preview/dev/admin hosts never become the public canonical origin.
+ * Minimal snapshot shape for head resolution — structurally compatible with
+ * {@link ResolvedPublishedCmsPage} without importing `./resolve`.
  */
-export function resolveCanonicalOrigin(candidate?: string | null): string {
-  if (!candidate) return CANONICAL_SITE_ORIGIN;
-  try {
-    const url = new URL(candidate.includes("://") ? candidate : `https://${candidate}`);
-    const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" && url.protocol !== "http:") return CANONICAL_SITE_ORIGIN;
-    if (PREVIEW_HOST_RE.test(host)) return CANONICAL_SITE_ORIGIN;
-    if (host === "admin.mccoy.nl") return CANONICAL_SITE_ORIGIN;
-    if (host === "www.mccoy.nl" || host === "mccoy.nl") return CANONICAL_SITE_ORIGIN;
-    return CANONICAL_SITE_ORIGIN;
-  } catch {
-    return CANONICAL_SITE_ORIGIN;
-  }
-}
-
-/** Absolute public URL for a path on the canonical host. */
-export function absoluteCanonicalUrl(pathname: string, origin = CANONICAL_SITE_ORIGIN): string {
-  const base = resolveCanonicalOrigin(origin).replace(/\/+$/, "");
-  const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  if (path === "/") return base;
-  return `${base}${path.replace(/\/+$/, "")}`;
-}
+export type SeoHeadPageSnapshot = {
+  path: string;
+  locale: Locale;
+  publishedAt: string;
+  content: { seo: CmsSeo };
+  alternates: Array<{ locale: string; url: string }>;
+};
 
 export type ResolveSeoMetadataOptions = {
   /**
@@ -93,7 +87,7 @@ function breadcrumbList(absolute: string, path: string): Record<string, unknown>
  * Never rewrites titles/descriptions for keyword optimization.
  */
 export function resolveSeoMetadata(
-  snapshot: ResolvedPublishedCmsPage,
+  snapshot: SeoHeadPageSnapshot,
   site: SiteUrlConfig,
   options?: ResolveSeoMetadataOptions,
 ): CmsHeadSnapshot {

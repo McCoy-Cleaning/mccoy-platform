@@ -7,7 +7,7 @@
 
 import type { CmsPage } from "./types";
 import type { LocaleAlternate } from "./paths";
-import { absoluteCanonicalUrl, CANONICAL_SITE_ORIGIN } from "./resolve-seo";
+import { absoluteCanonicalUrl, CANONICAL_SITE_ORIGIN } from "./canonical-origin";
 
 /** True when robots meta/header would block indexing. */
 export function robotsIndicateNoindex(robots?: string | null): boolean {
