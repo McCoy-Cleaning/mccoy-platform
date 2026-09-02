@@ -6,7 +6,7 @@
  * without emitting a second Organization / LocalBusiness identity.
  */
 
-import { absoluteCanonicalUrl, CANONICAL_SITE_ORIGIN } from "./resolve-seo";
+import { absoluteCanonicalUrl, CANONICAL_SITE_ORIGIN } from "./canonical-origin";
 import type { EmploymentType, VacancyItem } from "./blocks/jobs";
 import { resolveVacancyPublicSlug } from "./blocks/jobs";
 
