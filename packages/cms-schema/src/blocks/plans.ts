@@ -18,6 +18,8 @@ export type PlanItem = {
 
 export type PlansBlockData = {
   title: string;
+  /** Header for the shared features column (default: Kenmerk). */
+  featuresColumnLabel?: string;
   features: PlanFeature[];
   plans: PlanItem[];
 };
@@ -40,6 +42,7 @@ const planItemSchema: z.ZodType<PlanItem> = z.object({
 export const plansBlockSchema: z.ZodType<PlansBlockData> = z
   .object({
     title: z.string(),
+    featuresColumnLabel: z.string().optional(),
     features: z.array(planFeatureSchema),
     plans: z.array(planItemSchema),
   })
@@ -100,6 +103,7 @@ export function createDefaultPlans(): PlansBlockData {
   const f3 = createPlanFeature("Priority support");
   return {
     title: "Onze pakketten",
+    featuresColumnLabel: "Kenmerk",
     features: [f1, f2, f3],
     plans: [
       createPlanItem({
@@ -162,8 +166,13 @@ export function normalizePlans(value: unknown): PlansBlockData {
       highlighted: row.highlighted === true,
     };
   });
+  const featuresColumnLabel =
+    typeof rec.featuresColumnLabel === "string" && rec.featuresColumnLabel.trim()
+      ? rec.featuresColumnLabel.trim()
+      : undefined;
   const parsed = plansBlockSchema.safeParse({
     title: typeof rec.title === "string" ? rec.title : "Pakketten",
+    ...(featuresColumnLabel ? { featuresColumnLabel } : {}),
     features,
     plans,
   });

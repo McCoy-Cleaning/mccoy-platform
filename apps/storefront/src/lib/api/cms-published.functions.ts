@@ -9,7 +9,24 @@ import {
 /**
  * Database imports stay inside handlers so the client stub for these
  * server functions does not evaluate node:fs file-store modules.
+ *
+ * Public reads must NOT call seedBuiltinsIfEmpty on every request — that was
+ * an N× cms_pages findPageRow walk and the dominant production CPU amplifier.
  */
+async function getStoreForRead() {
+  const db = await import("@mccoy/database/server");
+  try {
+    return db.getCmsStore();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[cms] getStoreForRead: primary store failed", message);
+    if (db.isSupabaseConnectivityError(error)) {
+      db.markSupabaseCmsUnreachable(message);
+    }
+    return db.getFileCmsStore();
+  }
+}
+
 async function ensureSeeded() {
   const db = await import("@mccoy/database/server");
   try {
@@ -39,28 +56,22 @@ export const ensurePublishedCmsSeeded = createServerFn({ method: "POST" }).handl
  */
 export const getPublishedCmsBundle = createServerFn({ method: "POST" }).handler(async () => {
   try {
-    const store = await ensureSeeded();
-    const site = await store.getSite();
-    const pages = await store.listPages();
-    const publishedPages = [];
-    for (const page of pages) {
-      const rev = await store.getActivePublishedRevision(page.id);
-      if (rev) publishedPages.push(rev.payload);
-    }
-    const localeStates = await store.listPublishedLocaleStates();
+    const store = await getStoreForRead();
+    const { getCachedPublishedCmsBundle } = await import("@mccoy/database/server");
+    const bundle = await getCachedPublishedCmsBundle(store);
     return {
       ok: true as const,
       site: {
-        id: site.id,
-        origin: site.origin,
-        configVersion: site.configVersion,
+        id: bundle.site.id,
+        origin: bundle.site.origin,
+        configVersion: bundle.site.configVersion,
       },
-      pagesJson: JSON.stringify(publishedPages),
+      pagesJson: JSON.stringify(bundle.pages),
       /** Null until Navigatie Opslaan writes durable chrome. */
-      navigationJson: site.navigation ? JSON.stringify(site.navigation) : null,
+      navigationJson: bundle.navigation ? JSON.stringify(bundle.navigation) : null,
       /** Null until Footer Opslaan writes durable chrome. */
-      footerJson: site.footer ? JSON.stringify(site.footer) : null,
-      publishedLocaleStatesJson: JSON.stringify(localeStates),
+      footerJson: bundle.footer ? JSON.stringify(bundle.footer) : null,
+      publishedLocaleStatesJson: JSON.stringify(bundle.localeStates),
     };
   } catch (error) {
     console.error("[cms] getPublishedCmsBundle failed", error);
@@ -82,12 +93,13 @@ export const resolvePublishedCmsPath = createServerFn({ method: "POST" })
   .validator(resolveSchema)
   .handler(async ({ data }) => {
     const { resolvePublicCmsRequest, DEFAULT_CMS_SITE_ID } = await import("@mccoy/database/server");
-    await ensureSeeded();
+    const store = await getStoreForRead();
     const result = await resolvePublicCmsRequest({
       pathname: data.pathname,
       authenticatedPreview: data.authenticatedPreview ?? false,
       previewLocale: data.previewLocale ?? null,
       siteId: DEFAULT_CMS_SITE_ID,
+      store,
     });
     return {
       ok: true as const,
@@ -96,30 +108,38 @@ export const resolvePublishedCmsPath = createServerFn({ method: "POST" })
   });
 
 export const getPublishedSitemapXml = createServerFn({ method: "POST" }).handler(async () => {
-  const { buildPublishedSitemapEntries } = await import("@mccoy/database/server");
-  await ensureSeeded();
-  const entries = await buildPublishedSitemapEntries();
-  const urls = entries
-    .map((entry) => {
-      const alts = entry.alternates
-        .map(
-          (a) =>
-            `    <xhtml:link rel="alternate" hreflang="${a.locale}" href="${a.url}" />`,
-        )
-        .join("\n");
-      return `  <url>
+  try {
+    const { buildPublishedSitemapEntries } = await import("@mccoy/database/server");
+    const store = await getStoreForRead();
+    const entries = await buildPublishedSitemapEntries({ store });
+    if (entries.length === 0) {
+      return { ok: false as const, error: "empty_sitemap" };
+    }
+    const urls = entries
+      .map((entry) => {
+        const alts = entry.alternates
+          .map(
+            (a) =>
+              `    <xhtml:link rel="alternate" hreflang="${a.locale}" href="${a.url}" />`,
+          )
+          .join("\n");
+        return `  <url>
     <loc>${entry.loc}</loc>
 ${entry.lastmod ? `    <lastmod>${entry.lastmod.slice(0, 10)}</lastmod>\n` : ""}${alts}
   </url>`;
-    })
-    .join("\n");
+      })
+      .join("\n");
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls}
 </urlset>`;
-  return { ok: true as const, xml };
+    return { ok: true as const, xml };
+  } catch (error) {
+    console.error("[sitemap] build failed", error);
+    return { ok: false as const, error: "sitemap_build_failed" };
+  }
 });
 
 export const processCmsPublishOutbox = createServerFn({ method: "POST" }).handler(async () => {

@@ -470,7 +470,19 @@ export async function translateMissingEnForPublish(
         skipped += 1;
         continue;
       }
-      if (currentEn.trim()) {
+      // Manual EN always wins — never overwrite from an Opslaan auto batch.
+      if (currentMeta?.status === "manually_translated" && currentEn.trim()) {
+        drafts[path] = currentEn;
+        sources[path] = current.enFieldDraftSources?.[path] ?? currentSource;
+        metadata[path] = currentMeta;
+        skipped += 1;
+        continue;
+      }
+      // Live store may still hold pre-Opslaan EN (source_echo / stale machine).
+      // Paths in `attempted` were explicitly queued by preparePageEnForOpslaan —
+      // do not re-promote that store EN as "manually_translated".
+      const queuedForAutoFill = Object.prototype.hasOwnProperty.call(attempted, path);
+      if (currentEn.trim() && !queuedForAutoFill) {
         drafts[path] = currentEn;
         sources[path] = current.enFieldDraftSources?.[path] ?? currentSource;
         metadata[path] = currentMeta ?? {
@@ -676,8 +688,8 @@ export function preparePageEnForOpslaan(
     nextPage.enFieldDraftMeta = remapped.enFieldDraftMeta;
   }
 
-  // Missing/blank/empty override_removed stay eligible. Every non-empty EN and
-  // intentional_blank is retained and excluded from the provider.
+  // Missing/blank/source_echo/empty override_removed stay eligible. Manual EN and
+  // intentional_blank are retained. Machine EN is refreshed when its NL source drifted.
   const baselineNlFields = collectPageNlFieldDraftMap(published);
   const nlFields = collectPageNlFieldDraftMap(nextPage);
   const plan = planEnFieldDraftSync({

@@ -396,6 +396,7 @@ export function isMissingOrUntranslatedEn(nl: string, en: string | undefined): b
  * Lightweight rules only (no ML): emptiness, whitespace, EN===NL (`source_echo`),
  * and meta. Distinct non-empty EN that differs from NL is treated as `valid_en`
  * even if the text is still Dutch — that limitation is intentional.
+ * Opslaan queues `source_echo` for NL→EN (see {@link enOverlayNeedsTranslation}).
  */
 export type EnOverlayValidity =
   | "missing"
@@ -431,18 +432,25 @@ export function classifyEnOverlayValidity(input: {
   return "valid_en";
 }
 
-/** True when Opslaan / translate-missing should queue an empty EN value for NL→EN. */
+/** True when Opslaan / translate-missing should queue an EN value for NL→EN. */
 export function enOverlayNeedsTranslation(validity: EnOverlayValidity): boolean {
-  return validity === "missing" || validity === "blank" || validity === "override_removed";
+  return (
+    validity === "missing" ||
+    validity === "blank" ||
+    validity === "override_removed" ||
+    // Dutch parked in the EN slot is not a real translation — Opslaan must refill.
+    validity === "source_echo"
+  );
 }
 
 /**
  * Plan EN draft updates from current NL fields.
  * - Deleted / empty NL → drop EN draft
- * - Any non-empty existing EN → keep without sending it to the provider
- * - intentional_blank → never auto-fill
- * - empty/echo `override_removed` → queue (repairs stuck clears; Opslaan refills)
- * - NL present with empty/missing EN → queue for NL→EN
+ * - `manually_translated` EN → keep (never auto-overwrite)
+ * - `intentional_blank` → never auto-fill
+ * - missing / blank / empty `override_removed` / EN===NL (`source_echo`) → queue NL→EN
+ * - `machine_translated` EN whose pinned NL source drifted → queue retranslation
+ * - Other distinct EN → keep without sending it to the provider
  */
 export function planEnFieldDraftSync(input: {
   nlFields: Record<string, string>;
@@ -450,7 +458,7 @@ export function planEnFieldDraftSync(input: {
   existingSources?: Record<string, string>;
   /** Per-path meta — intentional_blank / manually_translated skip; empty override_removed queues. */
   existingMeta?: Record<string, { status?: string } | undefined>;
-  /** @deprecated Kept for call-site compat. */
+  /** Published NL snapshot — used when a machine EN has no source pin. */
   baselineNlFields?: Record<string, string>;
   /** @deprecated Kept for call-site compat. */
   baselineEnDrafts?: Record<string, string>;
@@ -478,33 +486,42 @@ export function planEnFieldDraftSync(input: {
     const hasDraftKey = Object.prototype.hasOwnProperty.call(existingDrafts, path);
     const prevEn = existingDrafts[path];
     const enTrim = prevEn?.trim() ?? "";
-    // EN content is immutable to automatic translation, even when it happens to
-    // equal the Dutch source. Only empty/null/undefined/whitespace is eligible.
-    if (enTrim) {
-      retainedDrafts[path] = enTrim;
-      retainedSources[path] = existingSources[path] ?? nl;
-      continue;
-    }
-    const validity = classifyEnOverlayValidity({
-      nl,
-      en: hasDraftKey ? prevEn : undefined,
-      status,
-    });
 
-    if (validity === "intentional_blank") {
+    if (status === "intentional_blank") {
       continue;
     }
-    if (validity === "valid_en" || validity === "manually_translated") {
+
+    // Manual EN always wins — Opslaan must never overwrite editor-owned English.
+    if (status === "manually_translated") {
       if (enTrim) {
         retainedDrafts[path] = enTrim;
         retainedSources[path] = existingSources[path] ?? nl;
       }
       continue;
     }
-    // missing | blank | override_removed → Opslaan background auto-fill.
+
+    const validity = classifyEnOverlayValidity({
+      nl,
+      en: hasDraftKey ? prevEn : undefined,
+      status,
+    });
+
     if (enOverlayNeedsTranslation(validity)) {
       toTranslate[path] = nl;
+      continue;
     }
+
+    if (!enTrim) continue;
+
+    // Machine EN whose Dutch source drifted after the last translation → refresh.
+    const lastSource = existingSources[path]?.trim() ?? "";
+    if (status === "machine_translated" && lastSource && lastSource !== nl) {
+      toTranslate[path] = nl;
+      continue;
+    }
+
+    retainedDrafts[path] = enTrim;
+    retainedSources[path] = existingSources[path] ?? nl;
   }
 
   return { retainedDrafts, retainedSources, toTranslate, prunedPaths };

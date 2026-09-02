@@ -11,17 +11,22 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:qualification": "vitest run src/customer-portal/qualification",
+    "test:qualification:upgrade": "vitest run src/customer-portal/qualification/phase1-to-phase2-upgrade.test.ts"
   },
   "dependencies": {
     "@mccoy/cms-schema": "*",
     "@mccoy/domain": "*",
     "@mccoy/notifications": "*",
     "@mccoy/security": "*",
-    "@supabase/supabase-js": "^2.110.7"
+    "@supabase/supabase-js": "^2.110.7",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }

@@ -50,17 +50,32 @@ export function SectiesOpenButton({
       onClick={onClick}
       aria-expanded={false}
       aria-controls="cms-sections-panel"
-      aria-label="Secties"
+      aria-label="Geavanceerde sectie-instellingen"
       data-cms-toolbar="sections"
       className="absolute bottom-5 right-5 z-40 inline-flex items-center gap-3 rounded-full border border-white/12 bg-[#0d1017]/92 px-5 py-3 text-[15px] font-semibold text-white/90 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl transition hover:border-white/25 hover:bg-[#141824]"
     >
       <span className="grid h-8 w-8 place-items-center rounded-full bg-white/10">
         <Layers className="h-4 w-4" />
       </span>
-      Secties
+      Geavanceerd
       <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs tabular-nums text-white/70">
         {count}
       </span>
+    </button>
+  );
+}
+
+/** Floating + control — opens the section template picker (replaces Geavanceerd FAB). */
+export function AddSectionFab({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Sectie toevoegen"
+      data-cms-toolbar="add-section"
+      className="absolute bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full border border-sky-400/40 bg-sky-500 text-white shadow-[0_18px_50px_-20px_rgba(14,165,233,0.85)] transition hover:bg-sky-600 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
+    >
+      <Plus className="h-7 w-7" aria-hidden />
     </button>
   );
 }

@@ -1,6 +1,8 @@
 import * as React from "react";
 import {
   type ContactFormBlockData,
+  type ContactFormColumnsDesktop,
+  createTextListItem,
   DEFAULT_CONTACT_FORM_INTRO_NL,
   formFieldPayloadKey,
   normalizeContactFormColumnsDesktop,
@@ -11,6 +13,7 @@ import {
   type FormFieldItem,
   type NewsletterBlockData,
   type PopupBlockData,
+  type TextListItem,
   resolveCmsLinkHref,
   linkRel,
   linkTarget,
@@ -18,6 +21,12 @@ import {
 } from "@mccoy/cms-schema";
 import { SectionShell } from "../SectionShell";
 import { SectionEyebrow, SectionHeader, SectionSurface } from "../sectionChromeUi";
+import {
+  CmsListAddButton,
+  CmsListRemoveButton,
+  EditableText,
+  useCmsTypedListEditor,
+} from "../edit-surface";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
 import { FormFileUploadField } from "./FormFileUploadField";
 import { CmsButtonView } from "./CmsButtonView";
@@ -43,7 +52,7 @@ const CONTACT_FORM_SUCCESS_NL = "Bedankt voor uw bericht.";
 const FIELD_INPUT_CLASS =
   "w-full rounded-2xl border border-border bg-background/60 px-4 py-3.5 text-sm text-foreground outline-none transition hover:border-primary/40 focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60";
 
-const FIELD_FILE_INPUT_CLASS = `${FIELD_INPUT_CLASS} border-dashed file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground`;
+const FIELD_FILE_INPUT_CLASS = `${FIELD_INPUT_CLASS} border-dashed file:mr-3 file:appearance-none file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground`;
 
 const FIELD_LABEL_CLASS =
   "mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
@@ -116,7 +125,19 @@ export function NewsletterSectionView({
 
   return (
     <SectionShell blockType="newsletter">
-      <SectionHeader title={d.title} body={d.body || undefined} className="mb-6 sm:mb-8" />
+      <SectionHeader
+        title={
+          <EditableText path="title" value={String(d.title ?? "")} as="span">
+            {String(d.title ?? "")}
+          </EditableText>
+        }
+        body={
+          <EditableText path="body" value={String(d.body ?? "")} multiline>
+            {String(d.body ?? "")}
+          </EditableText>
+        }
+        className="mb-6 sm:mb-8"
+      />
       {status === "success" ? (
         <p className="text-sm text-emerald-300" role="status">
           Bedankt — je aanmelding is ontvangen.
@@ -159,7 +180,11 @@ export function NewsletterSectionView({
                 disabled={preview || status === "loading"}
                 onChange={(e) => setConsent(e.target.checked)}
               />
-              <span>{d.consent}</span>
+              <span>
+                <EditableText path="consent" value={String(d.consent ?? "")}>
+                  {d.consent}
+                </EditableText>
+              </span>
             </label>
           ) : null}
           {error ? (
@@ -172,7 +197,13 @@ export function NewsletterSectionView({
             disabled={preview || status === "loading"}
             className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
-            {status === "loading" ? "Bezig…" : d.buttonLabel || "Aanmelden"}
+            {status === "loading" ? (
+              "Bezig…"
+            ) : (
+              <EditableText path="buttonLabel" value={String(d.buttonLabel || "Aanmelden")}>
+                {d.buttonLabel || "Aanmelden"}
+              </EditableText>
+            )}
           </button>
           {preview ? (
             <p className="text-xs text-muted-foreground">Preview — verzenden is uitgeschakeld.</p>
@@ -246,7 +277,7 @@ function ContactFormFieldInput({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={FIELD_INPUT_CLASS}
+        className={`${FIELD_INPUT_CLASS} cursor-pointer appearance-none bg-[length:12px] bg-[right_1rem_center] bg-no-repeat pr-10 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22 stroke=%22%23ffffff99%22 stroke-width=%222%22%3E%3Cpath d=%22M3 4.5 6 7.5 9 4.5%22/%3E%3C/svg%3E')]`}
       >
         <option value="">{required ? "Maak een keuze…" : "—"}</option>
         {options.map((option) => (
@@ -292,10 +323,16 @@ function contactFieldLabel(
   labels: ContactFormBlockData["labels"],
 ): string {
   const key = formFieldPayloadKey(field);
-  if (key === "name" && labels?.name) return labels.name;
+  // Name/email are re-injected builtins — labels map is the editable source of truth.
+  if (key === "name" || key === "email") {
+    if (key === "name" && labels?.name) return labels.name;
+    if (key === "email" && labels?.email) return labels.email;
+    return field.label;
+  }
+  // Canvas field.label wins for company/phone/message/custom fields.
+  if (field.label.trim()) return field.label.trim();
   if (key === "company" && labels?.company) return labels.company;
   if (key === "phone" && labels?.phone) return labels.phone;
-  if (key === "email" && labels?.email) return labels.email;
   if (key === "message" && labels?.message) return labels.message;
   return field.label;
 }
@@ -314,6 +351,55 @@ function contactFieldPlaceholder(
   return undefined;
 }
 
+export type ContactFormToolbarRender = (args: {
+  blockId: string;
+  fields: FormFieldItem[];
+  formColumnsDesktop: ContactFormColumnsDesktop;
+}) => React.ReactNode;
+
+export type ContactFormFieldChromeRender = (args: {
+  field: FormFieldItem;
+  fields: FormFieldItem[];
+  blockId: string;
+  className?: string;
+  children: React.ReactNode;
+}) => React.ReactNode;
+
+const ContactFormToolbarCtx = React.createContext<ContactFormToolbarRender | null>(null);
+const ContactFormFieldChromeCtx = React.createContext<ContactFormFieldChromeRender | null>(null);
+
+export function ContactFormToolbarProvider({
+  value,
+  children,
+}: {
+  value: ContactFormToolbarRender | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <ContactFormToolbarCtx.Provider value={value}>{children}</ContactFormToolbarCtx.Provider>
+  );
+}
+
+export function ContactFormFieldChromeProvider({
+  value,
+  children,
+}: {
+  value: ContactFormFieldChromeRender | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <ContactFormFieldChromeCtx.Provider value={value}>{children}</ContactFormFieldChromeCtx.Provider>
+  );
+}
+
+function useContactFormToolbar() {
+  return React.useContext(ContactFormToolbarCtx);
+}
+
+function useContactFormFieldChrome() {
+  return React.useContext(ContactFormFieldChromeCtx);
+}
+
 export function ContactFormSectionView({
   data,
   blockId,
@@ -326,6 +412,9 @@ export function ContactFormSectionView({
   const d = data as ContactFormBlockData;
   const adapters = useCmsFormAdapters();
   const pageId = useCmsPageId();
+  const formToolbar = useContactFormToolbar();
+  const fieldChrome = useContactFormFieldChrome();
+  const highlightsList = useCmsTypedListEditor<TextListItem>("highlights");
   const fields = React.useMemo(() => resolveContactFormFields(d.fields), [d.fields]);
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [fileValues, setFileValues] = React.useState<Record<string, File[]>>({});
@@ -340,7 +429,9 @@ export function ContactFormSectionView({
   const sideBySide = textPlacement === "left" || textPlacement === "right";
   const copyFirst = textPlacement === "top" || textPlacement === "left";
   // Only CMS-authored bullets — never inject hard-coded trust lines.
+  const highlightItems = Array.isArray(d.highlights) ? d.highlights : [];
   const highlights = resolveContactFormHighlights({ highlights: d.highlights }, []);
+  const editingHighlights = highlightsList.editing;
   const submitLabel = d.submitLabel?.trim() || "Verstuur aanvraag";
   const successMessage =
     d.successMessage?.trim() || d.confirmation?.trim() || CONTACT_FORM_SUCCESS_NL;
@@ -412,14 +503,26 @@ export function ContactFormSectionView({
 
   const copyColumn = (
     <aside className={cn(sideBySide && "lg:col-span-5", textPlacement === "top" && "max-w-3xl")}>
-      <SectionEyebrow>{d.eyebrow?.trim() || "Contact"}</SectionEyebrow>
+      <SectionEyebrow>
+        <EditableText path="eyebrow" value={d.eyebrow?.trim() || "Contact"}>
+          {d.eyebrow?.trim() || "Contact"}
+        </EditableText>
+      </SectionEyebrow>
       <h2 className="font-display mt-4 text-3xl leading-tight text-foreground md:text-4xl lg:text-[2.75rem]">
-        {d.title}
+        <EditableText path="title" value={d.title}>
+          {d.title}
+        </EditableText>
       </h2>
       <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
-        {d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
+        <EditableText
+          path="body"
+          value={d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
+          multiline
+        >
+          {d.body?.trim() || DEFAULT_CONTACT_FORM_INTRO_NL}
+        </EditableText>
       </p>
-      {highlights.length > 0 ? (
+      {!editingHighlights && highlights.length > 0 ? (
         <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
           {highlights.map((text, index) => (
             <li key={`${index}-${text}`} className="flex items-start gap-3">
@@ -434,11 +537,41 @@ export function ContactFormSectionView({
           ))}
         </ul>
       ) : null}
+      {editingHighlights ? (
+        <>
+          <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
+            {highlightItems.map((item, index) => (
+              <li key={item.id} className="relative flex items-start gap-3 pr-16">
+                <CmsListRemoveButton
+                  label={`Highlight verwijderen: ${item.text || `punt ${index + 1}`}`}
+                  className="right-0 top-0"
+                  onRemove={() => highlightsList.removeById(highlightItems, item.id)}
+                />
+                <span
+                  className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary"
+                  aria-hidden
+                >
+                  ✓
+                </span>
+                <EditableText path={`highlights.${index}.text`} value={item.text}>
+                  {item.text}
+                </EditableText>
+              </li>
+            ))}
+          </ul>
+          <CmsListAddButton
+            compact
+            label="Highlight toevoegen"
+            onAdd={() => highlightsList.append(highlightItems, createTextListItem("Nieuw punt"))}
+          />
+        </>
+      ) : null}
     </aside>
   );
 
   const formColumn = (
     <SectionSurface variant="form" className={cn(sideBySide && "lg:col-span-7")}>
+      {formToolbar?.({ blockId, fields, formColumnsDesktop })}
       {status === "success" ? (
         <div
           className="flex flex-col items-center gap-4 py-14 text-center"
@@ -448,8 +581,16 @@ export function ContactFormSectionView({
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-2xl text-primary ring-1 ring-primary/30">
             ✓
           </div>
-          <p className="font-display text-2xl text-foreground md:text-3xl">{successMessage}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">{successDetail}</p>
+          <p className="font-display text-2xl text-foreground md:text-3xl">
+            <EditableText path="successMessage" value={successMessage}>
+              {successMessage}
+            </EditableText>
+          </p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            <EditableText path="successDetail" value={successDetail} multiline>
+              {successDetail}
+            </EditableText>
+          </p>
         </div>
       ) : (
         <form
@@ -476,8 +617,8 @@ export function ContactFormSectionView({
             const spanFull =
               twoCol &&
               (field.type === "textarea" || field.type === "select" || field.type === "file");
-            return (
-              <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
+            const cell = (
+              <div>
                 <label htmlFor={`cf-${blockId}-${field.id}`} className={FIELD_LABEL_CLASS}>
                   {contactFieldLabel(field, d.labels)}
                   {required ? <span className="ml-1 text-primary">*</span> : null}
@@ -495,6 +636,24 @@ export function ContactFormSectionView({
                   placeholder={contactFieldPlaceholder(field, d.placeholders)}
                 />
               </div>
+            );
+            if (!fieldChrome) {
+              return (
+                <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
+                  {cell}
+                </div>
+              );
+            }
+            return (
+              <React.Fragment key={field.id}>
+                {fieldChrome({
+                  field,
+                  fields,
+                  blockId,
+                  className: spanFull ? "sm:col-span-2" : undefined,
+                  children: cell,
+                })}
+              </React.Fragment>
             );
           })}
           {error ? (

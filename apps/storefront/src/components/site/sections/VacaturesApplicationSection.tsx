@@ -1,4 +1,4 @@
-import { useMemo, useState, forwardRef, useRef } from "react";
+import { useEffect, useMemo, useState, forwardRef, useRef } from "react";
 import { motion } from "motion/react";
 import {
   ArrowRight,
@@ -11,6 +11,7 @@ import {
 import {
   cmsTextOrFallback,
   formFieldPayloadKey,
+  localImage,
   normalizeJobs,
   normalizeVacaturesApplicationContent,
   optionPayloadValue,
@@ -21,8 +22,10 @@ import {
   warnLegacyVacancyFallback,
   slugifyVacancyTitle,
   resolvePublicImageAlt,
+  DEFAULT_VACATURES_FACEBOOK_VIDEO_URL,
   type FormFieldItem,
   type VacaturesApplicationContent,
+  type VacaturesApplicationMedia,
   type VacaturesMainContent,
 } from "@mccoy/cms-schema";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
@@ -34,6 +37,10 @@ import { useI18n } from "@/lib/i18n";
 import { submitSiteForm } from "@/lib/forms/submit-client";
 import { useClientReady } from "@/lib/use-client-ready";
 import { cn } from "@/lib/utils";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { WysiwygMediaFrame } from "../cms-editor/WysiwygMediaButton";
+import { WysiwygFormFieldChrome } from "../cms-editor/WysiwygFormField";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   if (!src) return true;
@@ -46,6 +53,7 @@ function isFieldRequired(field: FormFieldItem): boolean {
 
 export function VacaturesApplicationSection() {
   const { t } = useI18n();
+  const { sendMutation, showEditorChrome } = useLiveEditApi();
   const published = useRoutePublishedPage();
   const page = useCmsPageForView("page_vacatures") ?? published;
   const rawApplication = useTypedSectionContent(
@@ -71,25 +79,45 @@ export function VacaturesApplicationSection() {
   const [error, setError] = useState<string | null>(null);
   const [activeRoleIndex, setActiveRoleIndex] = useState(0);
   const [fileValues, setFileValues] = useState<Record<string, File | null>>({});
+  const [draftVideoUrl, setDraftVideoUrl] = useState(
+    content.media.kind === "video" ? content.media.videoUrl : "",
+  );
+
+  useEffect(() => {
+    if (content.media.kind === "video") {
+      setDraftVideoUrl(content.media.videoUrl);
+    }
+  }, [content.media]);
+
+  const jobsBlock = useMemo(() => {
+    if (page?.kind !== "builtin") return null;
+    return page.blocks.find((b) => b.type === "jobs") ?? null;
+  }, [page]);
+
+  const jobsData = useMemo(
+    () => (jobsBlock ? normalizeJobs(jobsBlock.data) : null),
+    [jobsBlock],
+  );
 
   const applicationRoles = useMemo(() => {
+    if (jobsData) {
+      return jobsData.vacancies
+        .map((v, vacancyIndex) => ({ v, vacancyIndex }))
+        .filter(({ v }) => v.visible)
+        .map(({ v, vacancyIndex }) => ({
+          id: v.id,
+          vacancyIndex,
+          slug: v.slug?.trim() || resolveVacancyPublicSlug(v),
+          title: v.title,
+          desc: v.shortDescription || v.department || v.location || "",
+        }));
+    }
     if (page?.kind === "builtin") {
-      const jobsBlock = page.blocks.find((b) => b.type === "jobs");
-      if (jobsBlock) {
-        const jobs = normalizeJobs(jobsBlock.data);
-        return jobs.vacancies
-          .filter((v) => v.visible)
-          .map((v) => ({
-            id: v.id,
-            slug: v.slug?.trim() || resolveVacancyPublicSlug(v),
-            title: v.title,
-            desc: v.shortDescription || v.department || v.location || "",
-          }));
-      }
       if (allowLegacyVacancyFallback() && t.jobs.roles.length > 0) {
         warnLegacyVacancyFallback("page_vacatures");
         return t.jobs.roles.map((r, i) => ({
           id: `legacy_${i}`,
+          vacancyIndex: i,
           slug: slugifyVacancyTitle(r.title),
           title: r.title,
           desc: r.desc,
@@ -100,19 +128,30 @@ export function VacaturesApplicationSection() {
     if (allowLegacyVacancyFallback()) {
       return t.jobs.roles.map((r, i) => ({
         id: `legacy_${i}`,
+        vacancyIndex: i,
         slug: slugifyVacancyTitle(r.title),
         title: r.title,
         desc: r.desc,
       }));
     }
     return [];
-  }, [page, t.jobs.roles]);
+  }, [jobsData, page, t.jobs.roles]);
 
   const safeRoleIndex = Math.min(activeRoleIndex, Math.max(0, applicationRoles.length - 1));
   const selectedRole = applicationRoles[safeRoleIndex];
   const activeVacancyId = selectedRole?.id ?? "";
   const activeVacancySlug = selectedRole?.slug ?? "";
   const activeRoleTitle = selectedRole?.title ?? "";
+  const activeVacancyIndex = selectedRole?.vacancyIndex;
+
+  const patchVacancyText = (vacancyIndex: number, field: "title" | "shortDescription", next: string) => {
+    if (!jobsBlock) return;
+    sendMutation({
+      kind: "block",
+      blockId: jobsBlock.id,
+      patch: { [`vacancies.${vacancyIndex}.${field}`]: next },
+    });
+  };
 
   const formEyebrow = cmsTextOrFallback(content.formEyebrow, t.jobs.formTitle);
   const formIntro = cmsTextOrFallback(content.formIntro, t.jobs.formSub);
@@ -120,10 +159,21 @@ export function VacaturesApplicationSection() {
   const mediaHeading = cmsTextOrFallback(content.mediaHeading, t.jobs.videoSub);
   const mediaBadge = content.mediaBadge?.trim() || "McCoy on Facebook";
   const mediaLinkLabel = content.mediaLinkLabel?.trim() || "Open op Facebook";
+  const submitLabel = cmsTextOrFallback(content.submitLabel, t.jobs.submit, "Verstuur sollicitatie");
+  const successMessage = cmsTextOrFallback(
+    content.successMessage,
+    t.jobs.success,
+    "Bedankt! We hebben je sollicitatie ontvangen.",
+  );
+  const roleLabel = cmsTextOrFallback(content.roleLabel, t.jobs.role, "Functie");
+  const filePickLabel = cmsTextOrFallback(content.filePickLabel, t.jobs.cvPick, "Bestand kiezen");
 
   const media = content.media;
   const videoEmbed =
     media.kind === "video" ? resolveSafeVideoEmbed(media.videoUrl) : null;
+
+  const patchApp = (patch: Partial<VacaturesApplicationContent>) =>
+    sendMutation({ kind: "section", sectionKey: "vacatures.application", patch });
 
   return (
     <section
@@ -141,17 +191,60 @@ export function VacaturesApplicationSection() {
         >
           <SectionSurface variant="form" className="p-7 md:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {formEyebrow}
+              <WysiwygInlineText
+                label="Eyebrow"
+                value={formEyebrow}
+                enFieldPath="section:vacatures.application:formEyebrow"
+                target={{
+                  kind: "custom",
+                  onCommit: (next) => patchApp({ formEyebrow: next }),
+                }}
+              />
             </p>
             <h2 className="font-display mt-3 text-3xl text-foreground md:text-4xl">
-              {activeRoleTitle}
+              {jobsBlock && typeof activeVacancyIndex === "number" ? (
+                <WysiwygInlineText
+                  as="span"
+                  label="Functietitel"
+                  value={activeRoleTitle}
+                  enFieldPath={`block:${jobsBlock.id}:vacancies.${activeVacancyIndex}.title`}
+                  target={{
+                    kind: "custom",
+                    onCommit: (next) => patchVacancyText(activeVacancyIndex, "title", next),
+                  }}
+                />
+              ) : (
+                activeRoleTitle
+              )}
             </h2>
-            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{formIntro}</p>
+            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+              <WysiwygInlineText
+                as="span"
+                multiline
+                label="Intro"
+                value={formIntro}
+                enFieldPath="section:vacatures.application:formIntro"
+                target={{
+                  kind: "custom",
+                  onCommit: (next) => patchApp({ formIntro: next }),
+                }}
+              />
+            </p>
 
             {sent ? (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <CheckCircle2 className="h-12 w-12 text-primary" />
-                <p className="font-display text-2xl text-white">{t.jobs.success}</p>
+                <p className="font-display text-2xl text-white">
+                  <WysiwygInlineText
+                    as="span"
+                    label="Succesbericht"
+                    value={successMessage}
+                    target={{
+                      kind: "custom",
+                      onCommit: (next) => patchApp({ successMessage: next }),
+                    }}
+                  />
+                </p>
               </div>
             ) : (
               <form
@@ -205,7 +298,15 @@ export function VacaturesApplicationSection() {
 
                 <div className="sm:col-span-2">
                   <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-white/60">
-                    {t.jobs.role}
+                    <WysiwygInlineText
+                      as="span"
+                      label="Functielabel"
+                      value={roleLabel}
+                      target={{
+                        kind: "custom",
+                        onCommit: (next) => patchApp({ roleLabel: next }),
+                      }}
+                    />
                   </label>
                   <div className="grid gap-2.5 sm:grid-cols-3">
                     {applicationRoles.map((r, i) => {
@@ -252,18 +353,24 @@ export function VacaturesApplicationSection() {
                 </div>
 
                 {fields.map((field) => (
-                  <JobApplicationField
+                  <WysiwygFormFieldChrome
                     key={field.id}
                     field={field}
-                    file={fileValues[formFieldPayloadKey(field)] ?? null}
-                    onPickFile={(next) =>
-                      setFileValues((prev) => ({
-                        ...prev,
-                        [formFieldPayloadKey(field)]: next,
-                      }))
-                    }
-                    pickLabel={t.jobs.cvPick}
-                  />
+                    fields={fields}
+                    target={{ kind: "section", sectionKey: "vacatures.application" }}
+                  >
+                    <JobApplicationField
+                      field={field}
+                      file={fileValues[formFieldPayloadKey(field)] ?? null}
+                      onPickFile={(next) =>
+                        setFileValues((prev) => ({
+                          ...prev,
+                          [formFieldPayloadKey(field)]: next,
+                        }))
+                      }
+                      pickLabel={filePickLabel}
+                    />
+                  </WysiwygFormFieldChrome>
                 ))}
 
                 {error ? (
@@ -280,7 +387,19 @@ export function VacaturesApplicationSection() {
                   aria-disabled={!clientReady || submitting}
                   className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
                 >
-                  {submitting ? "..." : t.jobs.submit}
+                  {submitting ? (
+                    "..."
+                  ) : (
+                    <WysiwygInlineText
+                      as="span"
+                      label="Knoptekst"
+                      value={submitLabel}
+                      target={{
+                        kind: "custom",
+                        onCommit: (next) => patchApp({ submitLabel: next }),
+                      }}
+                    />
+                  )}
                   <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                 </button>
               </form>
@@ -297,44 +416,179 @@ export function VacaturesApplicationSection() {
         >
           <div className="sticky top-28">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {mediaEyebrow}
+              <WysiwygInlineText
+                label="Media eyebrow"
+                value={mediaEyebrow}
+                enFieldPath="section:vacatures.application:mediaEyebrow"
+                target={{
+                  kind: "custom",
+                  onCommit: (next) => patchApp({ mediaEyebrow: next }),
+                }}
+              />
             </p>
             <h3 className="font-display mt-3 text-2xl text-white md:text-3xl">
-              {mediaHeading}
+              <WysiwygInlineText
+                as="span"
+                label="Media kop"
+                value={mediaHeading}
+                enFieldPath="section:vacatures.application:mediaHeading"
+                target={{
+                  kind: "custom",
+                  onCommit: (next) => patchApp({ mediaHeading: next }),
+                }}
+              />
             </h3>
-            <div className="relative mt-6 overflow-hidden rounded-[1.75rem] border border-white/10 bg-background/60">
-              {media.kind === "video" && videoEmbed?.ok ? (
-                <>
-                  {mediaBadge ? (
-                    <div className="pointer-events-none absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur">
-                      <PlayCircle className="h-3.5 w-3.5 text-primary" /> {mediaBadge}
+            <div className="relative mt-6">
+              {showEditorChrome ? (
+                <div
+                  data-cms-editor-chrome
+                  className="mb-3 flex flex-col gap-3 rounded-2xl border border-sky-400/25 bg-sky-500/5 p-3 sm:flex-row sm:items-end"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200/80">
+                      Media
+                    </p>
+                    <div className="mt-1.5 flex gap-2" role="radiogroup" aria-label="Vacature-media">
+                      {(
+                        [
+                          { id: "image" as const, label: "Afbeelding" },
+                          { id: "video" as const, label: "Video" },
+                        ] as const
+                      ).map((opt) => {
+                        const selected = media.kind === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            className={cn(
+                              "rounded-lg border px-3 py-1.5 text-xs font-semibold",
+                              selected
+                                ? "border-sky-400/60 bg-sky-500/20 text-white"
+                                : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25",
+                            )}
+                            onClick={() => {
+                              if (opt.id === "video") {
+                                const next: VacaturesApplicationMedia = {
+                                  kind: "video",
+                                  videoUrl:
+                                    media.kind === "video"
+                                      ? media.videoUrl
+                                      : draftVideoUrl.trim() || DEFAULT_VACATURES_FACEBOOK_VIDEO_URL,
+                                  shareUrl: media.kind === "video" ? media.shareUrl : undefined,
+                                };
+                                patchApp({ media: next });
+                                return;
+                              }
+                              const image =
+                                media.kind === "image"
+                                  ? media.image
+                                  : localImage("/images/hero-placeholder.jpg", "", true);
+                              patchApp({ media: { kind: "image", image } });
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
                     </div>
+                  </div>
+                  {media.kind === "video" ? (
+                    <label className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200/80">
+                      Video-URL
+                      <input
+                        data-cms-editor-chrome
+                        className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm font-normal normal-case tracking-normal text-white outline-none focus:border-sky-400/50"
+                        value={draftVideoUrl}
+                        placeholder="https://www.youtube.com/watch?v=…"
+                        onChange={(e) => setDraftVideoUrl(e.target.value)}
+                        onBlur={() => {
+                          if (media.kind === "video" && draftVideoUrl.trim() !== media.videoUrl) {
+                            patchApp({
+                              media: {
+                                kind: "video",
+                                videoUrl: draftVideoUrl.trim(),
+                                shareUrl: media.shareUrl,
+                              },
+                            });
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                    </label>
                   ) : null}
-                  <iframe
-                    src={videoEmbed.embedUrl}
-                    title={mediaEyebrow || "McCoy Cleaning video"}
-                    className="aspect-video w-full"
-                    style={{ border: "none", overflow: "hidden" }}
-                    scrolling="no"
-                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                  />
-                </>
-              ) : media.kind === "image" &&
-                media.image?.src &&
-                !isCmsPlaceholderSrc(media.image.src) ? (
-                <img
-                  src={media.image.src}
-                  alt={resolvePublicImageAlt(media.image, mediaEyebrow || "McCoy Cleaning")}
-                  className="aspect-video w-full bg-black/35 object-contain object-center"
-                />
-              ) : (
-                <div className="flex aspect-video items-center justify-center bg-background/80 text-sm text-white/40">
-                  Media niet beschikbaar
                 </div>
-              )}
+              ) : null}
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-background/60">
+                {media.kind === "video" ? (
+                  videoEmbed?.ok ? (
+                    <>
+                      {mediaBadge ? (
+                        <div className="pointer-events-none absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+                          <PlayCircle className="h-3.5 w-3.5 text-primary" />{" "}
+                          <span className="pointer-events-auto">
+                            <WysiwygInlineText
+                              as="span"
+                              label="Badge"
+                              value={mediaBadge}
+                              target={{
+                                kind: "custom",
+                                onCommit: (next) => patchApp({ mediaBadge: next }),
+                              }}
+                            />
+                          </span>
+                        </div>
+                      ) : null}
+                      <iframe
+                        src={videoEmbed.embedUrl}
+                        title={mediaEyebrow || "McCoy Cleaning video"}
+                        className="aspect-video w-full"
+                        style={{ border: "none", overflow: "hidden" }}
+                        scrolling="no"
+                        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                      />
+                    </>
+                  ) : (
+                    <div className="flex aspect-video items-center justify-center bg-background/80 px-4 text-center text-sm text-amber-100/90">
+                      {showEditorChrome
+                        ? videoEmbed && !videoEmbed.ok
+                          ? videoEmbed.reason
+                          : "Plak een YouTube-, Vimeo- of Facebook-URL hierboven."
+                        : "Media niet beschikbaar"}
+                    </div>
+                  )
+                ) : (
+                  <WysiwygMediaFrame
+                    image={
+                      media.kind === "image" && media.image && !isCmsPlaceholderSrc(media.image.src)
+                        ? media.image
+                        : null
+                    }
+                    emptyPlaceholder
+                    emptyAspectClass="aspect-video"
+                    target={{ kind: "section", sectionKey: "vacatures.application", field: "media" }}
+                  >
+                    {media.kind === "image" &&
+                    media.image?.src &&
+                    !isCmsPlaceholderSrc(media.image.src) ? (
+                      <img
+                        src={media.image.src}
+                        alt={resolvePublicImageAlt(media.image, mediaEyebrow || "McCoy Cleaning")}
+                        className="aspect-video w-full bg-black/35 object-contain object-center"
+                      />
+                    ) : null}
+                  </WysiwygMediaFrame>
+                )}
+              </div>
             </div>
             {media.kind === "video" && media.shareUrl?.trim() ? (
               <a
@@ -343,7 +597,16 @@ export function VacaturesApplicationSection() {
                 rel="noreferrer"
                 className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
               >
-                {mediaLinkLabel} <ArrowRight className="h-3 w-3" />
+                <WysiwygInlineText
+                  as="span"
+                  label="Linktekst"
+                  value={mediaLinkLabel}
+                  target={{
+                    kind: "custom",
+                    onCommit: (next) => patchApp({ mediaLinkLabel: next }),
+                  }}
+                />{" "}
+                <ArrowRight className="h-3 w-3" />
               </a>
             ) : null}
           </div>

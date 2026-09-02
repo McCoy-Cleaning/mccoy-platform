@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build -w @mccoy/admin",
-  "ignoreCommand": "node ../../scripts/vercel-ignore.mjs admin"
+  "ignoreCommand": "node ../../scripts/vercel-ignore.mjs admin",
+  "crons": [
+    {
+      "path": "/api/commerce-portal-jobs",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

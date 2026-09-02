@@ -7,8 +7,8 @@
  */
 
 import { absoluteCanonicalUrl, CANONICAL_SITE_ORIGIN } from "./canonical-origin";
-import type { EmploymentType, VacancyItem } from "./blocks/jobs";
-import { resolveVacancyPublicSlug } from "./blocks/jobs";
+import type { VacancyItem } from "./blocks/jobs";
+import { resolveVacancyPublicSlug, toSchemaOrgEmploymentType } from "./blocks/jobs";
 
 /** Stable graph id for the one McCoy Cleaning business entity. */
 export const MCCOY_ORGANIZATION_ID = `${CANONICAL_SITE_ORIGIN}/#organization`;
@@ -156,16 +156,6 @@ export function buildCityLandingJsonLd(city: string, path: string): Record<strin
   };
 }
 
-const SCHEMA_EMPLOYMENT: Record<EmploymentType, string> = {
-  "full-time": "FULL_TIME",
-  "part-time": "PART_TIME",
-  temporary: "TEMPORARY",
-  freelance: "CONTRACTOR",
-  internship: "INTERN",
-  "on-call": "OTHER",
-  other: "OTHER",
-};
-
 export type JobPostingJsonLdOptions = {
   /** ISO datePosted override; defaults to vacancy.startDate when present. */
   datePosted?: string;
@@ -210,7 +200,7 @@ export function buildJobPostingJsonLd(
     title,
     description,
     url: jobUrl,
-    employmentType: SCHEMA_EMPLOYMENT[vacancy.employmentType] ?? "OTHER",
+    employmentType: toSchemaOrgEmploymentType(vacancy.employmentType),
     hiringOrganization: {
       "@type": "Organization",
       "@id": MCCOY_ORGANIZATION_ID,

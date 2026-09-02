@@ -91,6 +91,7 @@ function ProductsPresentationBlock({ block }: { block: Block }) {
         ctaLabel={t.products.cta}
         isEn={isEn}
         metrics={metrics}
+        editBlockId={block.id}
       />
     );
   }
@@ -168,6 +169,7 @@ function AboutPresentationBlock({ block }: { block: Block }) {
         heading={String(d.title ?? "")}
         pillars={pillars}
         cta={(d.cta as CmsButton | undefined) ?? null}
+        editBlockId={block.id}
       />
     );
   }
@@ -188,6 +190,7 @@ function AboutPresentationBlock({ block }: { block: Block }) {
         scaleValues={
           d.scaleMode === "soft" ? ([1.05, 1, 1.05] as [number, number, number]) : undefined
         }
+        editBlockId={block.id}
       />
     );
   }

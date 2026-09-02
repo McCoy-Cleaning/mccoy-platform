@@ -90,8 +90,10 @@ export const informationLegalEditorRegistry = {
     LegalArticlesBlockEditor as ComponentType<BlockEditorProps<LegalArticlesBlockData>>,
     "dedicated",
     [
+      "eyebrow",
       "heading",
       "updatedLabel",
+      "tocLabel",
       "updatedAt",
       "articles",
       "articles.id",

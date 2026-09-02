@@ -704,6 +704,18 @@ export function createFileCmsStore(options: FileCmsStoreOptions = {}): CmsStore 
       return store.revisions.find((r) => r.id === page.activePublishedRevisionId) ?? null;
     },
 
+    async listActivePublishedRevisions(siteId) {
+      const store = await readStore(backend);
+      const id = siteId ?? store.site.id;
+      const out: typeof store.revisions = [];
+      for (const page of store.pages) {
+        if (page.siteId !== id || !page.activePublishedRevisionId) continue;
+        const rev = store.revisions.find((r) => r.id === page.activePublishedRevisionId);
+        if (rev) out.push(rev);
+      }
+      return out;
+    },
+
     async listRevisions(pageId, siteId) {
       const store = await readStore(backend);
       const id = siteId ?? store.site.id;

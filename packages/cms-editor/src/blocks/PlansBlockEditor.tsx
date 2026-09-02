@@ -39,6 +39,19 @@ export function PlansBlockEditor({
             onChange={(e) => onChange({ ...value, title: e.target.value })}
           />
         </NlEnField>
+        <NlEnField
+          label="Kenmerken-kolomlabel"
+          enPath={blockEnPath(blockId, "featuresColumnLabel")}
+        >
+          <input
+            className={inputClass}
+            value={value.featuresColumnLabel ?? ""}
+            onChange={(e) =>
+              onChange({ ...value, featuresColumnLabel: e.target.value || undefined })
+            }
+            placeholder="Kenmerk"
+          />
+        </NlEnField>
       </Section>
 
       <Section title="Kenmerken (gedeelde lijst)">
@@ -152,7 +165,7 @@ export function PlansBlockEditor({
                       <thead>
                         <tr>
                           <th scope="col" className="p-2 text-[10px] uppercase tracking-wider text-white/40">
-                            Kenmerk
+                            {value.featuresColumnLabel?.trim() || "Kenmerk"}
                           </th>
                           <th scope="col" className="p-2 text-[10px] uppercase tracking-wider text-white/40">
                             Status

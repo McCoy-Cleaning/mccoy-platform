@@ -27,6 +27,11 @@ export function assertRateLimit(
   bucket.count += 1;
 }
 
+/** Test-only: clear in-memory buckets between isolated qualification runs. */
+export function resetRateLimits(): void {
+  buckets.clear();
+}
+
 /** Honeypot: treat non-empty website field as bot spam. */
 export function isHoneypotTriggered(website: string | undefined | null): boolean {
   return Boolean(website && website.trim().length > 0);

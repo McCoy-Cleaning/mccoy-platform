@@ -47,7 +47,7 @@ describe("collectTranslatableStringPaths", () => {
 });
 
 describe("classifyEnOverlayValidity", () => {
-  it("translates empty values but protects a non-empty source echo", () => {
+  it("translates empty values and queues source_echo for Opslaan", () => {
     expect(classifyEnOverlayValidity({ nl: "Welkom" })).toBe("missing");
     expect(classifyEnOverlayValidity({ nl: "Welkom", en: "" })).toBe("blank");
     expect(
@@ -59,7 +59,7 @@ describe("classifyEnOverlayValidity", () => {
     ).toBe("override_removed");
     expect(classifyEnOverlayValidity({ nl: "Welkom", en: "Welkom" })).toBe("source_echo");
     expect(enOverlayNeedsTranslation("override_removed")).toBe(true);
-    expect(enOverlayNeedsTranslation("source_echo")).toBe(false);
+    expect(enOverlayNeedsTranslation("source_echo")).toBe(true);
   });
 
   it("retains valid distinct EN and never auto-fills intentional_blank / manual", () => {
@@ -257,7 +257,95 @@ describe("planEnFieldDraftSync", () => {
     expect(plan.toTranslate).toEqual({});
   });
 
-  it("protects every non-empty EN draft even when it is identical to Dutch", () => {
+  it("queues source_echo (Dutch parked in EN) for Opslaan NL→EN", () => {
+    const plan = planEnFieldDraftSync({
+      nlFields: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Beschrijf hier de functie en het werk.",
+        "block:jobs1:vacancies.job_1.title": "Nieuwe vacature",
+      },
+      existingDrafts: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Beschrijf hier de functie en het werk.",
+        "block:jobs1:vacancies.job_1.title": "Nieuwe vacature",
+      },
+    });
+    expect(plan.toTranslate).toEqual({
+      "block:jobs1:vacancies.job_1.shortDescription": "Beschrijf hier de functie en het werk.",
+      "block:jobs1:vacancies.job_1.title": "Nieuwe vacature",
+    });
+    expect(plan.retainedDrafts).toEqual({});
+  });
+
+  it("re-queues machine_translated EN when Dutch source drifted after edit", () => {
+    const plan = planEnFieldDraftSync({
+      nlFields: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Glazenwasser voor kantoren in Twente.",
+      },
+      existingDrafts: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Describe the role and the work here.",
+      },
+      existingSources: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Beschrijf hier de functie en het werk.",
+      },
+      existingMeta: {
+        "block:jobs1:vacancies.job_1.shortDescription": { status: "machine_translated" },
+      },
+    });
+    expect(plan.toTranslate).toEqual({
+      "block:jobs1:vacancies.job_1.shortDescription": "Glazenwasser voor kantoren in Twente.",
+    });
+    expect(plan.retainedDrafts).toEqual({});
+  });
+
+  it("keeps manually_translated EN when Dutch is edited", () => {
+    const plan = planEnFieldDraftSync({
+      nlFields: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Nieuwe NL tekst",
+      },
+      existingDrafts: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Custom English copy",
+      },
+      existingSources: {
+        "block:jobs1:vacancies.job_1.shortDescription": "Oude NL tekst",
+      },
+      existingMeta: {
+        "block:jobs1:vacancies.job_1.shortDescription": { status: "manually_translated" },
+      },
+    });
+    expect(plan.retainedDrafts).toEqual({
+      "block:jobs1:vacancies.job_1.shortDescription": "Custom English copy",
+    });
+    expect(plan.toTranslate).toEqual({});
+  });
+
+  it("collects vacancy section NL paths for jobs blocks", () => {
+    const paths = collectTranslatableStringPaths({
+      heading: "Openstaande vacatures",
+      vacancies: [
+        {
+          id: "job_1",
+          title: "Nieuwe vacature",
+          shortDescription: "Wij zoeken een collega.",
+          detailsHeading: "Details",
+          benefitsHeading: "Wat wij bieden",
+          requirementsHeading: "Wat wij zoeken",
+          benefits: ["Goede voorwaarden"],
+          requirements: ["Motivatie"],
+          buttonLabel: "Solliciteer",
+          employmentType: "Fulltime",
+          slug: "nieuwe-vacature",
+        },
+      ],
+    });
+    expect(paths["vacancies.job_1.shortDescription"]).toBe("Wij zoeken een collega.");
+    expect(paths["vacancies.job_1.detailsHeading"]).toBe("Details");
+    expect(paths["vacancies.job_1.benefitsHeading"]).toBe("Wat wij bieden");
+    expect(paths["vacancies.job_1.requirementsHeading"]).toBe("Wat wij zoeken");
+    expect(paths["vacancies.job_1.benefits.0"]).toBe("Goede voorwaarden");
+    expect(paths["vacancies.job_1.requirements.0"]).toBe("Motivatie");
+    expect(paths["vacancies.job_1.slug"]).toBeUndefined();
+  });
+
+  it("queues source_echo on Opslaan while retaining distinct EN drafts", () => {
     const plan = planEnFieldDraftSync({
       nlFields: {
         "section:hero:title": "Een blik op wat wij doen",
@@ -270,10 +358,11 @@ describe("planEnFieldDraftSync", () => {
         "block:b1:title": "Real English kept",
       },
     });
-    expect(plan.toTranslate).toEqual({});
-    expect(plan.retainedDrafts).toEqual({
+    expect(plan.toTranslate).toEqual({
       "section:hero:title": "Een blik op wat wij doen",
       "section:hero:body": "Alles voor een schone werkomgeving",
+    });
+    expect(plan.retainedDrafts).toEqual({
       "block:b1:title": "Real English kept",
     });
   });
@@ -416,8 +505,9 @@ describe("gallery / offers / steps path coverage", () => {
           badge: "Actie",
           title: "Pakket",
           description: "Inclusief",
-          originalPrice: 100,
-          discountPrice: 80,
+          originalPrice: "€ 100,00",
+          discountPrice: "€ 80,00",
+          discountBadge: "−20%",
           image: { src: "/o.jpg", alt: "Aanbieding" },
         },
       ],
@@ -439,6 +529,9 @@ describe("gallery / offers / steps path coverage", () => {
     expect(paths["offers.o1.badge"]).toBe("Actie");
     expect(paths["offers.o1.title"]).toBe("Pakket");
     expect(paths["offers.o1.description"]).toBe("Inclusief");
+    expect(paths["offers.o1.originalPrice"]).toBe("€ 100,00");
+    expect(paths["offers.o1.discountPrice"]).toBe("€ 80,00");
+    expect(paths["offers.o1.discountBadge"]).toBe("−20%");
     expect(paths["offers.o1.image.alt"]).toBe("Aanbieding");
     expect(paths["steps.s1.title"]).toBe("Stap 1");
     expect(paths["steps.s1.body"]).toBe("Uitleg");

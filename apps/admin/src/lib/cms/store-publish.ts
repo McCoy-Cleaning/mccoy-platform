@@ -263,9 +263,11 @@ export const cmsPublishApi = {
           const remoteFresh = typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
           const dirty = isDraftDirty(nextDraft[local.id]);
 
-          // Newer published server copy always wins (multi-admin last write).
+          // Newer published server copy wins only when there is no local unsaved work.
+          // Never discard a dirty draft on focus/reconcile — that wiped canvas media
+          // uploads when the OS file picker returned focus to the admin window.
           if (remoteFresh > localFresh) {
-            if (dirty) delete nextDraft[local.id];
+            if (dirty) return local;
             pagesTouched = true;
             return remote;
           }

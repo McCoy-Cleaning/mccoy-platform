@@ -17,6 +17,7 @@ import {
 } from "./layout-presentation";
 import { canAddBlockType, canRemoveBlockType, policyFixedEquivalentForBlock } from "./page-block-policies";
 import { getBlockDataDefinition } from "./blocks/registry";
+import { protectQuoteRequestFormData } from "./blocks/quote-form-contract";
 import type { ContactFormContent, HomeHeroContent, StatsContent } from "./content";
 import { seedHeroBlockFromHomeHeroContent } from "./migration/home-hero-blocks";
 import { FIXED_SECTION_DEFS, FIXED_SECTIONS_BY_PAGE, type BuiltinPageKey, type FixedSectionKey } from "./sections";
@@ -381,13 +382,96 @@ export function updateLayoutBlockData(
   if (idx < 0) return { ok: false, code: "MISSING_BLOCK" };
   const block = next.blocks[idx]!;
   const { dataVersion, ...dataPatch } = patch;
+  const mergedData: Record<string, unknown> = { ...block.data };
+  for (const [key, value] of Object.entries(dataPatch)) {
+    if (key.includes(".")) {
+      assignDottedPath(mergedData, key, value);
+    } else {
+      mergedData[key] = value;
+    }
+  }
+  let data: Record<string, unknown> = mergedData;
+  if (block.type === "quoteRequestForm") {
+    const guarded = protectQuoteRequestFormData(block.data, mergedData);
+    if (!guarded.ok) return { ok: false, code: "NO_OP" };
+    data = guarded.data as unknown as Record<string, unknown>;
+  }
   next.blocks = next.blocks.slice();
   next.blocks[idx] = {
     ...block,
-    data: { ...block.data, ...dataPatch },
+    data,
     ...(typeof dataVersion === "number" ? { dataVersion } : {}),
   };
   return { ok: true, page: next };
+}
+
+/** Set `a.b.c` without wiping siblings under `a` / `a.b`. Supports numeric array indices. */
+function assignDottedPath(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".").filter(Boolean);
+  if (parts.length === 0) return;
+
+  let parent: Record<string, unknown> | unknown[] = target;
+  let parentKey: string | number | null = null;
+
+  const setChild = (child: unknown) => {
+    if (parentKey === null) return;
+    if (Array.isArray(parent)) parent[parentKey as number] = child;
+    else parent[parentKey as string] = child;
+  };
+
+  let cursor: unknown = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i]!;
+    const nextKey = parts[i + 1]!;
+    const nextIsIndex = /^\d+$/.test(nextKey);
+
+    if (Array.isArray(cursor)) {
+      const index = Number(key);
+      if (!Number.isFinite(index) || index < 0) return;
+      const cloned = cursor.slice();
+      setChild(cloned);
+      parent = cloned;
+      parentKey = index;
+      while (cloned.length <= index) cloned.push(nextIsIndex ? [] : {});
+      const existing = cloned[index];
+      if (nextIsIndex) {
+        cloned[index] = Array.isArray(existing) ? existing.slice() : [];
+      } else if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+        cloned[index] = {};
+      } else {
+        cloned[index] = { ...(existing as Record<string, unknown>) };
+      }
+      cursor = cloned[index];
+      continue;
+    }
+
+    if (!cursor || typeof cursor !== "object") return;
+    const obj = cursor as Record<string, unknown>;
+    parent = obj;
+    parentKey = key;
+    const existing = obj[key];
+    if (nextIsIndex) {
+      obj[key] = Array.isArray(existing) ? existing.slice() : [];
+    } else if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      obj[key] = {};
+    } else {
+      obj[key] = { ...(existing as Record<string, unknown>) };
+    }
+    cursor = obj[key];
+  }
+
+  const last = parts[parts.length - 1]!;
+  if (Array.isArray(cursor)) {
+    const index = Number(last);
+    if (!Number.isFinite(index) || index < 0) return;
+    const cloned = cursor.slice();
+    setChild(cloned);
+    while (cloned.length <= index) cloned.push(undefined);
+    cloned[index] = value;
+    return;
+  }
+  if (!cursor || typeof cursor !== "object") return;
+  (cursor as Record<string, unknown>)[last] = value;
 }
 
 /** Custom-page helper: rebuild layout from ordered blocks after classic block reorder. */

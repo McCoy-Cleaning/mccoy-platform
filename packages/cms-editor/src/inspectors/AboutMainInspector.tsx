@@ -59,6 +59,24 @@ export function AboutMainInspector({
             enableAi={false}
             showEnDraft={false}
           />
+          {(content.pillars ?? []).map((pillar, index) => (
+            <InspectTextField
+              key={pillar.id}
+              label={`Pijler ${index + 1}`}
+              value={pillar.label}
+              onChange={(v) => {
+                const pillars = (content.pillars ?? []).map((p) =>
+                  p.id === pillar.id ? { ...p, label: v } : p,
+                );
+                onPatch({ pillars });
+              }}
+              fieldPath={`section:about.main:pillars.${index}.label`}
+              fieldHint="label"
+              maxChars={80}
+              enableAi={false}
+              showEnDraft={false}
+            />
+          ))}
         </>
       ) : null}
 

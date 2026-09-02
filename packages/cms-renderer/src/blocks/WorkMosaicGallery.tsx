@@ -28,6 +28,21 @@ export type WorkMosaicGalleryProps = {
   items: WorkMosaicGalleryItem[];
   /** Override image element (e.g. storefront DeliveryImage). */
   renderImage?: (item: WorkMosaicGalleryItem, className: string) => React.ReactNode;
+  /** Optional WYSIWYG / custom header slots (defaults to plain text). */
+  renderEyebrow?: React.ReactNode;
+  renderHeading?: React.ReactNode;
+  renderBody?: React.ReactNode;
+  /** Optional figcaption override (title + caption). */
+  renderFigcaption?: (item: WorkMosaicGalleryItem, index: number) => React.ReactNode;
+  /** Wrap each tile figure (edit chrome). Must preserve grid child / span classes. */
+  renderTile?: (args: {
+    item: WorkMosaicGalleryItem;
+    index: number;
+    spanClass: string;
+    figure: React.ReactElement;
+  }) => React.ReactNode;
+  /** Extra grid children after tiles (e.g. add-photo control in edit mode). */
+  renderAfterItems?: React.ReactNode;
   className?: string;
   id?: string;
 };
@@ -61,46 +76,56 @@ export function WorkMosaicGallery({
   body,
   items,
   renderImage,
+  renderEyebrow,
+  renderHeading,
+  renderBody,
+  renderFigcaption,
+  renderTile,
+  renderAfterItems,
   className,
   id = "work",
 }: WorkMosaicGalleryProps) {
+  const eyebrowNode = renderEyebrow ?? (eyebrow ? eyebrow : null);
+  const headingNode = renderHeading ?? heading;
+  const bodyNode = renderBody ?? (body ? body : null);
+
   return (
     <section id={id} className={className ?? "relative py-24 sm:py-28"}>
       <div className={SECTION_PAGE_RAIL}>
         <div className="max-w-2xl">
-          {eyebrow ? (
+          {eyebrowNode ? (
             <div className="flex items-center gap-3">
               <span
                 className="h-px w-8 shrink-0 bg-primary/80 sm:w-10"
                 aria-hidden
               />
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">
-                {eyebrow}
+                {eyebrowNode}
               </p>
             </div>
           ) : null}
           <h2
             className={cn(
               "font-display text-4xl font-semibold leading-[1.08] tracking-[-0.02em] text-white break-words sm:text-5xl lg:text-[3.25rem]",
-              eyebrow ? "mt-5 sm:mt-6" : undefined,
+              eyebrowNode ? "mt-5 sm:mt-6" : undefined,
             )}
           >
-            {heading}
+            {headingNode}
           </h2>
-          {eyebrow || heading ? (
+          {eyebrowNode || headingNode ? (
             <div
               className="mt-6 h-px w-20 bg-gradient-to-r from-primary via-primary/55 to-transparent sm:w-24"
               aria-hidden
             />
           ) : null}
-          {body ? (
+          {bodyNode ? (
             <p className="mt-6 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-white/65 sm:mt-7 sm:text-lg sm:leading-[1.7]">
-              {body}
+              {bodyNode}
             </p>
           ) : null}
         </div>
 
-        {items.length === 0 ? (
+        {items.length === 0 && !renderAfterItems ? (
           <p className="mt-14 text-sm text-white/55">Nog geen foto&apos;s in deze galerij.</p>
         ) : (
           <div className="mt-14 grid auto-rows-[220px] grid-cols-2 gap-3 sm:mt-16 sm:gap-4 md:grid-cols-4 md:gap-5">
@@ -110,17 +135,16 @@ export function WorkMosaicGallery({
                 : workMosaicLegacyIndexClass(index);
               const imgClass =
                 "absolute inset-0 h-full w-full object-cover object-center transition duration-700 group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100";
-              return (
+              const figure = (
                 <figure
-                  key={item.id}
                   className={cn(
-                    "group relative overflow-hidden rounded-[1.35rem] bg-white/[0.03]",
+                    "group relative h-full min-h-0 overflow-hidden rounded-[1.35rem] bg-white/[0.03]",
                     "ring-1 ring-inset ring-white/12",
                     "transition-[box-shadow,ring-color] duration-500",
                     "hover:ring-white/22 hover:shadow-[0_22px_48px_-30px_rgba(0,0,0,0.7)]",
                     "focus-within:ring-primary/45 focus-within:outline-none",
                     "motion-reduce:transition-none motion-reduce:hover:shadow-none",
-                    spanClass,
+                    !renderTile && spanClass,
                   )}
                 >
                   {renderImage ? (
@@ -133,18 +157,33 @@ export function WorkMosaicGallery({
                     aria-hidden
                   />
                   <figcaption className="absolute bottom-0 z-10 w-full p-4 sm:p-5">
-                    <p className="font-display text-lg font-semibold leading-snug tracking-[-0.02em] text-white sm:text-xl">
-                      {item.title}
-                    </p>
-                    {item.caption ? (
-                      <p className="mt-1.5 text-sm leading-snug text-white/68">
-                        {item.caption}
-                      </p>
-                    ) : null}
+                    {renderFigcaption ? (
+                      renderFigcaption(item, index)
+                    ) : (
+                      <>
+                        <p className="font-display text-lg font-semibold leading-snug tracking-[-0.02em] text-white sm:text-xl">
+                          {item.title}
+                        </p>
+                        {item.caption ? (
+                          <p className="mt-1.5 text-sm leading-snug text-white/68">
+                            {item.caption}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
                   </figcaption>
                 </figure>
               );
+              if (renderTile) {
+                return (
+                  <React.Fragment key={item.id}>
+                    {renderTile({ item, index, spanClass, figure })}
+                  </React.Fragment>
+                );
+              }
+              return <React.Fragment key={item.id}>{figure}</React.Fragment>;
             })}
+            {renderAfterItems}
           </div>
         )}
       </div>

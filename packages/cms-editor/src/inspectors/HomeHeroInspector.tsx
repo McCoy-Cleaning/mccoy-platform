@@ -7,7 +7,7 @@ import {
 } from "../ai-assist";
 import { PrototypeImageField, TypedLinkField } from "../PrototypeImageField";
 import type { ImagePickerProps } from "../inspector-types";
-import { addBtnClass, smallBtnClass } from "../inspector-chrome";
+import { addBtnClass, inputClass, smallBtnClass } from "../inspector-chrome";
 import { PLACEHOLDER_IMAGE } from "../placeholder-image";
 
 export function HomeHeroInspector({
@@ -195,8 +195,48 @@ export function HomeHeroInspector({
         <p className="text-[11px] text-white/40">Secundaire knop is verwijderd.</p>
       )}
 
-      <div className="border-t border-white/[0.07] pt-3">
-        {content.image ? (
+      <div className="space-y-3 border-t border-white/[0.07] pt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">Media</p>
+        <div className="flex gap-2" role="radiogroup" aria-label="Hero-media">
+          {(
+            [
+              { id: "image" as const, label: "Afbeelding" },
+              { id: "video" as const, label: "Video (URL)" },
+            ] as const
+          ).map((opt) => {
+            const selected = (content.mediaKind ?? "image") === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onPatch({ mediaKind: opt.id })}
+                className={
+                  selected
+                    ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-3 py-2 text-xs font-semibold text-white"
+                    : "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white/70 hover:border-white/25"
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {(content.mediaKind ?? "image") === "video" ? (
+          <label className="block space-y-1.5">
+            <span className="text-[11px] font-medium text-white/55">Video-URL</span>
+            <input
+              className={inputClass}
+              value={content.videoUrl ?? ""}
+              placeholder="https://www.youtube.com/watch?v=…"
+              onChange={(e) => onPatch({ videoUrl: e.target.value })}
+            />
+            <span className="block text-[10px] text-white/40">
+              YouTube, Vimeo of Facebook (https).
+            </span>
+          </label>
+        ) : content.image ? (
           <PrototypeImageField
             label="Hero-afbeelding"
             compact

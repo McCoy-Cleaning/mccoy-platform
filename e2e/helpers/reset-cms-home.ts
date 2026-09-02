@@ -16,44 +16,65 @@ const DATA_DIR = process.env.E2E_MCCOY_DATA_DIR ?? join(process.cwd(), ".data", 
  * Screenshot baselines assume exactly the four fixed home sections before adds.
  */
 export async function resetHomeToBuiltinSeed() {
-  process.env.MCCOY_DATA_DIR = DATA_DIR;
-  const home = builtinCmsSeedPages().find((page) => page.id === "page_home");
-  if (!home) throw new Error("builtin seed missing page_home");
+  await resetBuiltinPagesToSeed(["page_home"]);
+}
 
+/** Publish builtin seed for one or more pages (deterministic E10 fixtures). */
+export async function resetBuiltinPagesToSeed(pageIds: readonly string[]) {
+  process.env.MCCOY_DATA_DIR = DATA_DIR;
+  const seeds = builtinCmsSeedPages();
   const store = createFileCmsStore();
-  await store.upsertPage({
-    siteId: DEFAULT_CMS_SITE_ID,
-    page: home,
-    stableKey: home.id,
-  });
-  await store.publishPage({
-    siteId: DEFAULT_CMS_SITE_ID,
-    pageId: home.id,
-    payload: home,
-    publishedLocales: ["nl"],
-  });
+  for (const pageId of pageIds) {
+    const page = seeds.find((p) => p.id === pageId);
+    if (!page) throw new Error(`builtin seed missing ${pageId}`);
+    await store.upsertPage({
+      siteId: DEFAULT_CMS_SITE_ID,
+      page,
+      stableKey: page.id,
+    });
+    await store.publishPage({
+      siteId: DEFAULT_CMS_SITE_ID,
+      pageId: page.id,
+      payload: page,
+      publishedLocales: ["nl"],
+    });
+  }
 }
 
 /** Align admin localStorage draft for home with the durable seed payload. */
 export async function syncHomeLocalStorageFromStore(page: Page) {
+  await syncBuiltinPagesLocalStorageFromStore(page, ["page_home"]);
+}
+
+/** Align admin localStorage drafts with published seed payloads for the given pages. */
+export async function syncBuiltinPagesLocalStorageFromStore(
+  page: Page,
+  pageIds: readonly string[],
+) {
   process.env.MCCOY_DATA_DIR = DATA_DIR;
   const store = createFileCmsStore();
-  const revision = await store.getActivePublishedRevision("page_home");
-  if (!revision?.payload) {
-    throw new Error("reset: page_home missing published revision");
+  const payloads: unknown[] = [];
+  for (const pageId of pageIds) {
+    const revision = await store.getActivePublishedRevision(pageId);
+    if (!revision?.payload) {
+      throw new Error(`reset: ${pageId} missing published revision`);
+    }
+    payloads.push(revision.payload);
   }
-  await page.evaluate((homePage) => {
+  await page.evaluate((pages) => {
     const KEY = "mccoy_cms_v1";
     const raw = window.localStorage.getItem(KEY);
     const state = raw
       ? (JSON.parse(raw) as { pages?: Array<{ id: string }> })
       : { pages: [] };
     if (!Array.isArray(state.pages)) state.pages = [];
-    const idx = state.pages.findIndex((p) => p.id === homePage.id);
-    if (idx >= 0) state.pages[idx] = homePage as { id: string };
-    else state.pages.push(homePage as { id: string });
+    for (const homePage of pages as Array<{ id: string }>) {
+      const idx = state.pages.findIndex((p) => p.id === homePage.id);
+      if (idx >= 0) state.pages[idx] = homePage;
+      else state.pages.push(homePage);
+    }
     window.localStorage.setItem(KEY, JSON.stringify(state));
     window.dispatchEvent(new Event("mccoy-cms-change"));
     window.dispatchEvent(new Event("storage"));
-  }, revision.payload);
+  }, payloads);
 }

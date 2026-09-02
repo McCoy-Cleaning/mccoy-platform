@@ -3,6 +3,7 @@ import { parseBlockData, type Block, type BlockType } from "@mccoy/cms-schema";
 import type { LinkResolverPages } from "./CmsImageView";
 import { blockViewRegistry } from "./blockViewRegistry";
 import { registerPopupBlockView } from "./popupBlockRenderer";
+import { CmsBlockEditScope } from "../edit-surface";
 
 export type RegisteredBlockViewProps = {
   block: Block;
@@ -14,6 +15,10 @@ export type RegisteredBlockViewProps = {
 /**
  * Stage 5 orchestrator — validates block data, then dispatches to
  * {@link blockViewRegistry}. Publishable markup lives in dedicated section views.
+ *
+ * Public props stay `{ block, pages, adminMode }` only. Edit chrome is injected
+ * via {@link CmsBlockEditScope} + optional storefront `CmsEditSurfaceProvider`,
+ * never via editor-specific props on this component.
  */
 export function RegisteredBlockView({
   block,
@@ -53,14 +58,16 @@ export function RegisteredBlockView({
 
   const mode = adminMode ? "preview" : "storefront";
   return (
-    <View
-      data={parsed.data as Record<string, unknown>}
-      pages={pages}
-      blockId={block.id}
-      adminMode={adminMode}
-      mode={mode}
-      showHidden={adminMode}
-    />
+    <CmsBlockEditScope blockId={block.id} blockType={type}>
+      <View
+        data={parsed.data as Record<string, unknown>}
+        pages={pages}
+        blockId={block.id}
+        adminMode={adminMode}
+        mode={mode}
+        showHidden={adminMode}
+      />
+    </CmsBlockEditScope>
   );
 }
 

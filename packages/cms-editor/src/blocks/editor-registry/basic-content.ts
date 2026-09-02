@@ -77,6 +77,8 @@ export const basicContentEditorRegistry = {
       "align",
       ...CTA_SUPPORTED_PATHS,
       ...imageSupportedPaths("image"),
+      "mediaKind",
+      "videoUrl",
     ],
   ),
   cta: def(

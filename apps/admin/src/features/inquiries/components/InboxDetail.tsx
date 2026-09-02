@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowLeft, Pin, PinOff, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Pencil, Pin, PinOff, Send, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/admin/ConfirmationDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { InlineLoader } from "@/components/admin/InlineLoader";
@@ -10,6 +10,7 @@ import type { FormInboxMessage, FormInboxThreadItem } from "@mccoy/email/contrac
 import type { DetailState } from "../hooks/useInquiryDetailQuery";
 import { useInquiryDetailDelete } from "../hooks/useInquiryDetailDelete";
 import { useInquiryReply } from "../hooks/useInquiryReply";
+import { useInquirySubmitterEmailEdit } from "../hooks/useInquirySubmitterEmailEdit";
 import { isFullWidthFormField, isHeaderContactFormField } from "../lib/form-fields";
 import {
   FORM_PHOTOS_FIELD_KEY,
@@ -32,6 +33,7 @@ export function InboxDetail({
   onAppendReply,
   onRemoveReply,
   onRefreshDetail,
+  onSubmitterEmailUpdated,
   isPinned,
   onTogglePin,
 }: {
@@ -43,6 +45,7 @@ export function InboxDetail({
   onAppendReply: (item: FormInboxThreadItem) => void;
   onRemoveReply?: (id: string) => void;
   onRefreshDetail: () => void;
+  onSubmitterEmailUpdated: (email: string) => void;
   isPinned: boolean;
   onTogglePin?: () => void;
 }) {
@@ -56,6 +59,10 @@ export function InboxDetail({
     onRefreshDetail,
   });
   const deleteMutation = useInquiryDetailDelete({ detail, onDeleted });
+  const emailEdit = useInquirySubmitterEmailEdit({
+    detail,
+    onUpdated: onSubmitterEmailUpdated,
+  });
 
   React.useEffect(() => {
     setReply("");
@@ -211,12 +218,88 @@ export function InboxDetail({
                 )}
               >
                 <div className="bg-[#0c1220] px-6 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                    Antwoord naar
-                  </p>
-                  <p className="mt-1 break-all text-[15px] text-white/90">
-                    {detail.submitterEmail ?? "Niet gevonden"}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                      Antwoord naar
+                    </p>
+                    {emailEdit.canEdit && !emailEdit.editing ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 px-2 text-white/55 hover:bg-white/10 hover:text-white"
+                        onClick={emailEdit.startEdit}
+                        disabled={deleteMutation.deleteBusy || replyMutation.busy}
+                        aria-label="E-mailadres bewerken"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Bewerken
+                      </Button>
+                    ) : null}
+                  </div>
+                  {emailEdit.editing ? (
+                    <div className="mt-2 space-y-2">
+                      <label className="sr-only" htmlFor="inquiry-submitter-email">
+                        E-mailadres voor antwoorden
+                      </label>
+                      <input
+                        id="inquiry-submitter-email"
+                        type="email"
+                        autoComplete="email"
+                        value={emailEdit.draft}
+                        onChange={(e) => emailEdit.setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            emailEdit.cancelEdit();
+                          }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void emailEdit.save();
+                          }
+                        }}
+                        disabled={emailEdit.busy}
+                        className="w-full rounded-lg border border-white/20 bg-white/[0.04] px-3 py-2 text-[15px] text-white outline-none focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 disabled:opacity-60"
+                      />
+                      {emailEdit.error ? (
+                        <p className="text-sm text-red-300" role="alert">
+                          {emailEdit.error}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-white/45">
+                          Antwoorden gaan naar dit adres. Corrigeer het als de bezoeker een typefout
+                          maakte.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="min-h-9 rounded-lg"
+                          onClick={() => void emailEdit.save()}
+                          disabled={emailEdit.busy || emailEdit.draft.trim().length < 3}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {emailEdit.busy ? "Opslaan…" : "Opslaan"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-9 rounded-lg border-white/20 bg-white/5 text-white/85 hover:bg-white/10 hover:text-white"
+                          onClick={emailEdit.cancelEdit}
+                          disabled={emailEdit.busy}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Annuleren
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1 break-all text-[15px] text-white/90">
+                      {detail.submitterEmail ?? "Niet gevonden"}
+                    </p>
+                  )}
                 </div>
                 {submitterPhone ? (
                   <div className="bg-[#0c1220] px-6 py-4">

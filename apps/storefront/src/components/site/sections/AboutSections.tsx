@@ -22,7 +22,17 @@ import { useI18n } from "@/lib/i18n";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { CompositePartSelectChrome } from "../PageLayoutRenderer";
 import { localizedAboutCopy } from "@/lib/cms-i18n";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
+import {
+  defaultAboutPillars,
+  defaultSectionContent,
+  type AboutMainContent,
+  type AboutPillarItem,
+} from "@mccoy/cms-schema";
 import { SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { WysiwygMediaFrame } from "../cms-editor/WysiwygMediaButton";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -40,6 +50,9 @@ const fadeUp = {
 type PillarRowProps = {
   title: string;
   body: string;
+  titleField: "missionTitle" | "visionTitle" | "historyTitle";
+  bodyField: "missionBody" | "visionBody" | "historyBody";
+  imageField: "missionImage" | "visionImage" | "historyImage";
   Icon: typeof Target;
   img: string;
   tag: string;
@@ -52,6 +65,9 @@ type PillarRowProps = {
 function PillarRow({
   title,
   body,
+  titleField,
+  bodyField,
+  imageField,
   Icon,
   img,
   tag,
@@ -93,20 +109,25 @@ function PillarRow({
       >
         <div className="relative overflow-hidden rounded-[2rem] border border-white/10 shadow-[0_30px_80px_-30px_rgba(63,182,242,0.45)]">
           <div className={`relative ${aspectClassName} w-full overflow-hidden`}>
-            <motion.img
-              src={img}
-              alt={title}
-              width={1280}
-              height={896}
-              loading="lazy"
-              decoding="async"
-              style={
-                soft
-                  ? { objectPosition: objectPosition ?? "center" }
-                  : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
-              }
-              className={`absolute inset-0 h-full w-full object-cover${soft ? "" : " will-change-transform"}`}
-            />
+            <WysiwygMediaFrame
+              className="absolute inset-0"
+              target={{ kind: "section", sectionKey: "about.main", field: imageField }}
+            >
+              <motion.img
+                src={img}
+                alt={title}
+                width={1280}
+                height={896}
+                loading="lazy"
+                decoding="async"
+                style={
+                  soft
+                    ? { objectPosition: objectPosition ?? "center" }
+                    : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
+                }
+                className={`absolute inset-0 h-full w-full object-cover${soft ? "" : " will-change-transform"}`}
+              />
+            </WysiwygMediaFrame>
             <motion.div
               style={soft ? undefined : { opacity: overlayOpacity }}
               className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent"
@@ -136,11 +157,26 @@ function PillarRow({
             </div>
             <span className="font-display text-sm uppercase tracking-[0.3em] text-primary/80">{tag}</span>
           </div>
-          <h3 className="font-display mt-5 text-4xl text-white md:text-5xl lg:text-6xl">{title}</h3>
+          <h3 className="font-display mt-5 text-4xl text-white md:text-5xl lg:text-6xl">
+            <WysiwygInlineText
+              as="span"
+              label="Titel"
+              value={title}
+              enFieldPath={`section:about.main:${titleField}`}
+              target={{ kind: "section", sectionKey: "about.main", field: titleField }}
+            />
+          </h3>
           <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/75">
-            {body.split("\n\n").map((p, idx) => (
-              <p key={idx} className="whitespace-pre-line">{p}</p>
-            ))}
+            <p className="whitespace-pre-line">
+              <WysiwygInlineText
+                as="span"
+                multiline
+                label="Tekst"
+                value={body}
+                enFieldPath={`section:about.main:${bodyField}`}
+                target={{ kind: "section", sectionKey: "about.main", field: bodyField }}
+              />
+            </p>
           </div>
         </motion.div>
       </motion.div>
@@ -150,24 +186,30 @@ function PillarRow({
 
 export function About() {
   const { t, lang } = useI18n();
-  const content = useTypedSectionContent("page_about", "about.main");
+  const { sendMutation } = useLiveEditApi();
+  const content = useTypedSectionContent("page_about", "about.main") as AboutMainContent;
   const isEn = lang === "en";
   const copy = localizedAboutCopy(content, t);
   const eyebrow = copy.eyebrow;
-  const heading = copy.heading;
-  const pillars = isEn
-    ? [
-        { icon: Award, label: "Premium quality" },
-        { icon: ShieldCheck, label: "Reliable team" },
-        { icon: Users, label: "Personal contact" },
-        { icon: Leaf, label: "Sustainable products" },
-      ]
-    : [
-        { icon: Award, label: "Premium kwaliteit" },
-        { icon: ShieldCheck, label: "Betrouwbaar team" },
-        { icon: Users, label: "Persoonlijk contact" },
-        { icon: Leaf, label: "Duurzame middelen" },
-      ];
+  const heading = useOverlayHeading(copy.heading);
+  const def = defaultSectionContent("about.main") as AboutMainContent;
+  const pillars: AboutPillarItem[] =
+    content.pillars && content.pillars.length > 0
+      ? content.pillars
+      : isEn
+        ? [
+            { id: "pillar_quality", label: "Premium quality" },
+            { id: "pillar_team", label: "Reliable team" },
+            { id: "pillar_contact", label: "Personal contact" },
+            { id: "pillar_sustainable", label: "Sustainable products" },
+          ]
+        : (def.pillars ?? defaultAboutPillars());
+  const pillarIcons = [Award, ShieldCheck, Users, Leaf] as const;
+
+  const patchPillar = (id: string, label: string) => {
+    const next = pillars.map((p) => (p.id === id ? { ...p, label } : p));
+    sendMutation({ kind: "section", sectionKey: "about.main", patch: { pillars: next } });
+  };
   return (
     <section id="about" className="relative overflow-hidden py-24 sm:py-28">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
@@ -181,23 +223,51 @@ export function About() {
             initial={false}
             className="lg:col-span-7"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-            <h1 className="font-display mt-4 text-4xl text-white md:text-5xl lg:text-6xl">{heading}</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              <WysiwygInlineText
+                label="Eyebrow"
+                value={eyebrow ?? ""}
+                enFieldPath="section:about.main:eyebrow"
+                target={{ kind: "section", sectionKey: "about.main", field: "eyebrow" }}
+              />
+            </p>
+            <h1 className="font-display mt-4 text-4xl text-white md:text-5xl lg:text-6xl">
+              <WysiwygInlineText
+                as="span"
+                label="Kop"
+                value={heading}
+                enFieldPath="section:about.main:heading"
+                target={{ kind: "section", sectionKey: "about.main", field: "heading" }}
+              />
+            </h1>
           </motion.div>
 
           {/* Pillars */}
           <div className="grid grid-cols-2 gap-3 lg:col-span-5">
-            {pillars.map((p) => (
-              <div
-                key={p.label}
-                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-card/60 p-4 transition hover:border-primary/40"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                  <p.icon className="h-5 w-5" />
+            {pillars.map((p, i) => {
+              const Icon = pillarIcons[i % pillarIcons.length] ?? Award;
+              return (
+                <div
+                  key={p.id}
+                  className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-card/60 p-4 transition hover:border-primary/40"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white/85">
+                    <WysiwygInlineText
+                      as="span"
+                      label="Pijler"
+                      value={p.label}
+                      target={{
+                        kind: "custom",
+                        onCommit: (next) => patchPillar(p.id, next),
+                      }}
+                    />
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-white/85">{p.label}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         </CompositePartSelectChrome>
@@ -209,6 +279,9 @@ export function About() {
               part: "mission" as const,
               title: copy.missionTitle,
               body: copy.missionBody,
+              titleField: "missionTitle" as const,
+              bodyField: "missionBody" as const,
+              imageField: "missionImage" as const,
               Icon: Target,
               img:
                 content.missionImage && !isCmsPlaceholderSrc(content.missionImage.src)
@@ -224,6 +297,9 @@ export function About() {
               part: "vision" as const,
               title: copy.visionTitle,
               body: copy.visionBody,
+              titleField: "visionTitle" as const,
+              bodyField: "visionBody" as const,
+              imageField: "visionImage" as const,
               Icon: Eye,
               img:
                 content.visionImage && !isCmsPlaceholderSrc(content.visionImage.src)
@@ -235,6 +311,9 @@ export function About() {
               part: "history" as const,
               title: copy.historyTitle,
               body: copy.historyBody,
+              titleField: "historyTitle" as const,
+              bodyField: "historyBody" as const,
+              imageField: "historyImage" as const,
               Icon: History,
               img:
                 content.historyImage && !isCmsPlaceholderSrc(content.historyImage.src)
@@ -254,6 +333,9 @@ export function About() {
                 index={i}
                 title={b.title}
                 body={b.body}
+                titleField={b.titleField}
+                bodyField={b.bodyField}
+                imageField={b.imageField}
                 Icon={b.Icon}
                 img={b.img}
                 tag={b.tag}

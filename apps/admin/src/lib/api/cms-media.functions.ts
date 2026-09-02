@@ -21,6 +21,7 @@ import {
   findCmsMediaReferencesInPayloads,
   getCmsStore,
   sha256Hex,
+  SupabaseConfigError,
   type CmsMediaProfile,
   type CmsMediaReference,
 } from "@mccoy/database/server";
@@ -85,6 +86,16 @@ export const adminListCmsMedia = createServerFn({ method: "POST" })
       });
       return { ok: true as const, ...result };
     } catch (error) {
+      // E2E / local JSON CMS clears Supabase env; seeded pages use `/images/...`.
+      // Do not treat an empty Storage catalog as a render failure.
+      if (error instanceof SupabaseConfigError) {
+        return {
+          ok: true as const,
+          items: [],
+          nextCursor: null,
+          unconfigured: true as const,
+        };
+      }
       return mapAuthError(error);
     }
   });

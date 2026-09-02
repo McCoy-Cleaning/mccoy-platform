@@ -7,6 +7,10 @@ import { useInquirySelection } from "../hooks/useInquirySelection";
 import { useInquiryListDeletes } from "../hooks/useInquiryListDeletes";
 import { useInquiryReply } from "../hooks/useInquiryReply";
 import { useInquiryDetailDelete } from "../hooks/useInquiryDetailDelete";
+import {
+  canEditSubmitterEmail,
+  useInquirySubmitterEmailEdit,
+} from "../hooks/useInquirySubmitterEmailEdit";
 import type { FormInboxMessage, FormInboxMessageSummary } from "@mccoy/email/contracts";
 
 vi.mock("@/lib/api/admin-requests.functions", () => ({
@@ -15,6 +19,7 @@ vi.mock("@/lib/api/admin-requests.functions", () => ({
   deleteAdminFormInboxMessage: vi.fn(),
   bulkDeleteAdminFormInboxMessages: vi.fn(),
   replyAdminFormInboxMessage: vi.fn(),
+  updateAdminFormInboxSubmitterEmail: vi.fn(),
   getAdminFormInboxMessage: vi.fn(),
   getAdminFormInboxThread: vi.fn(),
   getAdminFormInboxAttachment: vi.fn(),
@@ -29,12 +34,14 @@ import {
   deleteAdminFormInboxMessage,
   bulkDeleteAdminFormInboxMessages,
   replyAdminFormInboxMessage,
+  updateAdminFormInboxSubmitterEmail,
 } from "@/lib/api/admin-requests.functions";
 
 const listAdminFormInboxMock = vi.mocked(listAdminFormInbox);
 const deleteAdminFormInboxMessageMock = vi.mocked(deleteAdminFormInboxMessage);
 const bulkDeleteAdminFormInboxMessagesMock = vi.mocked(bulkDeleteAdminFormInboxMessages);
 const replyAdminFormInboxMessageMock = vi.mocked(replyAdminFormInboxMessage);
+const updateAdminFormInboxSubmitterEmailMock = vi.mocked(updateAdminFormInboxSubmitterEmail);
 
 function summary(
   id: string,
@@ -699,5 +706,87 @@ describe("useInquiryDetailDelete", () => {
     expect(state.deleteError).toBe("Kan niet verwijderen");
     expect(state.deleteOpen).toBe(true);
     expect(onDeleted).not.toHaveBeenCalled();
+  });
+});
+
+describe("canEditSubmitterEmail", () => {
+  it("allows form-backed request and e2e ids", () => {
+    expect(canEditSubmitterEmail("req:website-requests:abc")).toBe(true);
+    expect(canEditSubmitterEmail("e2e:website-requests:abc")).toBe(true);
+  });
+
+  it("rejects graph and imap ids", () => {
+    expect(canEditSubmitterEmail("graph:info%40mccoy.nl:msgid")).toBe(false);
+    expect(canEditSubmitterEmail("imap:INBOX:12")).toBe(false);
+  });
+});
+
+describe("useInquirySubmitterEmailEdit", () => {
+  it("saves a corrected email and notifies the parent", async () => {
+    updateAdminFormInboxSubmitterEmailMock.mockResolvedValue({
+      ok: true,
+      submitterEmail: "fixed@example.com",
+      requestId: "abc",
+    } as never);
+
+    const onUpdated = vi.fn();
+    const { container, root, probe } = mountHook(() =>
+      useInquirySubmitterEmailEdit({
+        detail: detailMessage("req:website-requests:abc"),
+        onUpdated,
+      }),
+    );
+    mounted = { container, root };
+
+    expect((probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).canEdit).toBe(true);
+
+    act(() => {
+      (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).startEdit();
+      (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).setDraft(
+        "fixed@example.com",
+      );
+    });
+
+    await act(async () => {
+      await (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).save();
+    });
+
+    expect(updateAdminFormInboxSubmitterEmailMock).toHaveBeenCalledWith({
+      data: { id: "req:website-requests:abc", email: "fixed@example.com" },
+    });
+    expect(onUpdated).toHaveBeenCalledWith("fixed@example.com");
+    expect((probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).editing).toBe(false);
+  });
+
+  it("keeps editing open when the server rejects the update", async () => {
+    updateAdminFormInboxSubmitterEmailMock.mockResolvedValue({
+      ok: false,
+      error: "Aanvraag niet gevonden.",
+    } as never);
+
+    const onUpdated = vi.fn();
+    const { container, root, probe } = mountHook(() =>
+      useInquirySubmitterEmailEdit({
+        detail: detailMessage("req:website-requests:abc"),
+        onUpdated,
+      }),
+    );
+    mounted = { container, root };
+
+    act(() => {
+      (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).startEdit();
+      (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).setDraft(
+        "fixed@example.com",
+      );
+    });
+
+    await act(async () => {
+      await (probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>).save();
+    });
+
+    const state = probe.latest as ReturnType<typeof useInquirySubmitterEmailEdit>;
+    expect(state.error).toBe("Aanvraag niet gevonden.");
+    expect(state.editing).toBe(true);
+    expect(onUpdated).not.toHaveBeenCalled();
   });
 });

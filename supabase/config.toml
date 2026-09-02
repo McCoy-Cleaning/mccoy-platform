@@ -20,9 +20,32 @@ enabled = true
 [auth]
 enabled = true
 enable_signup = false
+# Customer portal / storefront qualification (E2E uses 5183; local Vite often 5173).
+site_url = "http://localhost:5183"
+additional_redirect_urls = [
+  "http://localhost:5183",
+  "http://localhost:5183/**",
+  "http://127.0.0.1:5183",
+  "http://127.0.0.1:5183/**",
+  "http://localhost:5173",
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5173/**",
+  "http://localhost:5184",
+  "http://localhost:5184/**",
+  "http://127.0.0.1:5184",
+  "http://127.0.0.1:5184/**",
+]
 
-# Local Auth invite template (hosted projects: apply via
-# `npm run apply:auth-invite-template` or Dashboard → Authentication → Email Templates).
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[local_smtp]
+enabled = true
+port = 54324
+smtp_port = 54325
+
 [auth.email.template.invite]
 subject = "Uitnodiging voor McCoy Admin"
 content_path = "./supabase/templates/invite.html"

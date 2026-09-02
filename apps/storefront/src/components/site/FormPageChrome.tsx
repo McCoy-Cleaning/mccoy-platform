@@ -6,6 +6,10 @@ import { CmsImageView, SectionInner } from "@mccoy/cms-renderer";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
 import { useI18n } from "@/lib/i18n";
 import { localizedFormChromeCopy } from "@/lib/cms-i18n";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
+import { WysiwygInlineText } from "./cms-editor/WysiwygInlineText";
+import { WysiwygMediaFrame } from "./cms-editor/WysiwygMediaButton";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 
 type FormChromeSectionKey = "contact.main" | "vacatures.main" | "offerte.main";
 
@@ -28,8 +32,12 @@ function FormPageChromeSection({
 }) {
   const pageId = PAGE_ID_BY_SECTION[sectionKey];
   const { t, lang } = useI18n();
+  const { showEditorChrome } = useLiveEditApi();
   const content = useTypedSectionContent(pageId, sectionKey as FixedSectionKey) as FormPageChromeContent;
   const copy = localizedFormChromeCopy(sectionKey, content, t, lang);
+  const heading = useOverlayHeading(copy.heading);
+  const en = (field: string) => `section:${sectionKey}:${field}`;
+  const showMedia = Boolean(content.image) || showEditorChrome;
 
   return (
     <section
@@ -44,7 +52,12 @@ function FormPageChromeSection({
             className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {copy.eyebrow}
+            <WysiwygInlineText
+              label="Eyebrow"
+              value={copy.eyebrow ?? ""}
+              enFieldPath={en("eyebrow")}
+              target={{ kind: "section", sectionKey, field: "eyebrow" }}
+            />
           </motion.div>
         ) : (
           <motion.p
@@ -52,7 +65,12 @@ function FormPageChromeSection({
             animate={{ opacity: 1, y: 0 }}
             className="text-xs font-semibold uppercase tracking-[0.2em] text-primary"
           >
-            {copy.eyebrow}
+            <WysiwygInlineText
+              label="Eyebrow"
+              value={copy.eyebrow ?? ""}
+              enFieldPath={en("eyebrow")}
+              target={{ kind: "section", sectionKey, field: "eyebrow" }}
+            />
           </motion.p>
         )}
         <motion.h1
@@ -65,20 +83,47 @@ function FormPageChromeSection({
               : "font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl"
           }
         >
-          {copy.heading}
+          <WysiwygInlineText
+            as="span"
+            label="Kop"
+            value={heading}
+            enFieldPath={en("heading")}
+            target={{ kind: "section", sectionKey, field: "heading" }}
+          />
         </motion.h1>
-        {copy.body ? <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">{copy.body}</p> : null}
-        {content.image ? (
+        <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">
+          <WysiwygInlineText
+            as="span"
+            multiline
+            label="Tekst"
+            value={copy.body ?? ""}
+            enFieldPath={en("body")}
+            target={{ kind: "section", sectionKey, field: "body" }}
+          />
+        </p>
+        {showMedia ? (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.6 }}
-            className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10"
+            className={
+              content.image
+                ? "mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10"
+                : "mt-8 max-w-3xl"
+            }
           >
-            <CmsImageView
-              image={withResolvedPublicImageAlt(content.image, copy.heading || "McCoy Cleaning")}
-              className="max-h-64 w-full bg-black/35 object-contain object-center"
-            />
+            <WysiwygMediaFrame
+              image={content.image}
+              emptyPlaceholder
+              target={{ kind: "section", sectionKey, field: "image" }}
+            >
+              {content.image ? (
+                <CmsImageView
+                  image={withResolvedPublicImageAlt(content.image, heading || "McCoy Cleaning")}
+                  className="max-h-64 w-full bg-black/35 object-contain object-center"
+                />
+              ) : null}
+            </WysiwygMediaFrame>
           </motion.div>
         ) : null}
       </SectionInner>

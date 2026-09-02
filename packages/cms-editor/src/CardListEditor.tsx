@@ -103,6 +103,27 @@ export function CardListEditor({
                 multiline
               />
             ) : null}
+            <Field label="Detailtekst (paneel)">
+              <textarea
+                className={cn(inputClass, "min-h-[96px]")}
+                value={card.detailBody ?? ""}
+                onChange={(e) =>
+                  onChange(
+                    updateCardAt(cards, card.id, {
+                      detailBody: e.target.value || undefined,
+                    }),
+                  )
+                }
+                placeholder="Lange tekst in het detailpaneel (lege regels = alinea’s)."
+              />
+            </Field>
+            {enPathPrefix ? (
+              <ManualEnDraftField
+                fieldPath={cardEn(card.id, "detailBody")!}
+                label="Detailtekst"
+                multiline
+              />
+            ) : null}
             <CmsButtonEditor
               label="Contactknop (naast Lees meer)"
               value={ctaValue}

@@ -6,6 +6,7 @@ import {
   collectShallowStringFields,
 } from "../ai-assist";
 import { PrototypeImageField } from "../PrototypeImageField";
+import { CmsButtonEditor } from "../blocks/shared-fields";
 import type { ImagePickerProps } from "../inspector-types";
 import { addBtnClass } from "../inspector-chrome";
 
@@ -75,6 +76,50 @@ export function ProductsMainInspector({
       <p className="text-[11px] leading-relaxed text-white/40">
         Extra sectietekst verschijnt als melding onder de knoppen (webshop-notitie).
       </p>
+      <CmsButtonEditor
+        label="Primaire knop"
+        value={content.cta}
+        onChange={(cta) => onPatch({ cta })}
+      />
+      <CmsButtonEditor
+        label="Secundaire knop"
+        value={content.secondaryCta}
+        onChange={(secondaryCta) => onPatch({ secondaryCta })}
+      />
+      {(content.metrics ?? []).map((metric, index) => (
+        <div key={metric.id} className="grid grid-cols-2 gap-2">
+          <InspectTextField
+            label={`Metric ${index + 1} waarde`}
+            value={metric.value}
+            onChange={(v) => {
+              const metrics = (content.metrics ?? []).map((m) =>
+                m.id === metric.id ? { ...m, value: v } : m,
+              );
+              onPatch({ metrics });
+            }}
+            fieldPath={`section:products.main:metrics.${index}.value`}
+            fieldHint="value"
+            maxChars={24}
+            enableAi={false}
+            showEnDraft={false}
+          />
+          <InspectTextField
+            label={`Metric ${index + 1} label`}
+            value={metric.label}
+            onChange={(v) => {
+              const metrics = (content.metrics ?? []).map((m) =>
+                m.id === metric.id ? { ...m, label: v } : m,
+              );
+              onPatch({ metrics });
+            }}
+            fieldPath={`section:products.main:metrics.${index}.label`}
+            fieldHint="label"
+            maxChars={40}
+            enableAi={false}
+            showEnDraft={false}
+          />
+        </div>
+      ))}
       {content.image ? (
         <PrototypeImageField
           label="Flyer"

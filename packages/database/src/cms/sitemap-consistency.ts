@@ -16,11 +16,14 @@ import {
 import { resolveLegacyUrlDecision } from "@mccoy/security";
 
 import {
+  STATIC_INDEXABLE_SITEMAP_PATHS,
   forbiddenSitemapPathnames,
   isSitemapExcludedPathname,
 } from "./sitemap-eligibility";
 import { buildPublishedSitemapEntries, resolvePublicCmsRequest } from "./resolve";
 import { DEFAULT_CMS_SITE_ID, type CmsStore } from "./types";
+
+const STATIC_INDEXABLE_PATH_SET = new Set<string>(STATIC_INDEXABLE_SITEMAP_PATHS);
 
 export type SitemapEntry = {
   loc: string;
@@ -121,6 +124,11 @@ export async function assertSitemapIndexabilityConsistency(input?: {
             ? "HTTP 410 path must not appear in sitemap"
             : "HTTP 301 legacy redirect must not appear in sitemap",
       });
+      continue;
+    }
+
+    // Static city landings are indexable routes outside the CMS store.
+    if (STATIC_INDEXABLE_PATH_SET.has(pathname.replace(/\/+$/, "") || "/")) {
       continue;
     }
 

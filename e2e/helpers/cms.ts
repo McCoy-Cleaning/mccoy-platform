@@ -10,6 +10,8 @@ export const STOREFRONT_ORIGIN = process.env.E2E_STOREFRONT_ORIGIN ?? "http://lo
 export const PAGES = {
   home: "page_home",
   about: "page_about",
+  contact: "page_contact",
+  offerte: "page_offerte",
   custom: "page_e2e_custom",
 } as const;
 
@@ -228,13 +230,19 @@ export async function enableMobileDeviceCanvas(page: Page, canvas: Locator) {
   await expect(mobileBtn).toBeVisible();
   await mobileBtn.click();
 
-  // DeviceFrame locks the edit iframe to 390px; section content is narrower (page padding).
+  // DeviceFrame content box is exactly 390px (ring chrome does not consume width).
   await expect
     .poll(async () => (await canvas.boundingBox())?.width ?? 0, {
       timeout: 15_000,
-      message: "Edit canvas did not enter mobile DeviceFrame width",
+      message: "Edit canvas did not enter mobile DeviceFrame width (~390)",
     })
-    .toBeLessThan(520);
+    .toBeGreaterThan(380);
+  await expect
+    .poll(async () => (await canvas.boundingBox())?.width ?? 0, {
+      timeout: 5_000,
+      message: "Edit canvas mobile width unexpectedly wide",
+    })
+    .toBeLessThan(400);
 
   await awaitStableBoundingBox(canvas);
 }

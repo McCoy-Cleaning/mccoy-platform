@@ -4,6 +4,7 @@
  */
 import * as React from "react";
 import {
+  createItemId,
   isCmsButtonInteractive,
   resolveCmsLinkHref,
   resolveSafeVideoEmbed,
@@ -20,6 +21,16 @@ import { CmsButtonView } from "./CmsButtonView";
 import { CmsImageView, type LinkResolverPages } from "./CmsImageView";
 import { WorkMosaicGallery } from "./WorkMosaicGallery";
 import { GalleryTextAndImageView } from "./GalleryTextAndImageView";
+import {
+  CmsListAddButton,
+  CmsListRemoveButton,
+  EditableCta,
+  EditableMedia,
+  EditableText,
+  useCmsBlockEditScope,
+  useCmsEditSurface,
+  useCmsTypedListEditor,
+} from "../edit-surface";
 import {
   SECTION_GRID,
   SECTION_PAGE_RAIL,
@@ -115,6 +126,155 @@ function heroAccentParts(raw: unknown): HeroHeadingAccent | undefined {
   return parts;
 }
 
+function HeroMediaKindChrome({
+  mediaKind,
+  videoUrl,
+}: {
+  mediaKind: "image" | "video";
+  videoUrl: string;
+}) {
+  const surface = useCmsEditSurface();
+  const scope = useCmsBlockEditScope();
+  const [draftUrl, setDraftUrl] = React.useState(videoUrl);
+
+  React.useEffect(() => {
+    setDraftUrl(videoUrl);
+  }, [videoUrl]);
+
+  if (!surface?.enabled || !scope || !surface.sendBlockPatch) {
+    return null;
+  }
+
+  return (
+    <div
+      data-cms-editor-chrome
+      className="mb-3 flex flex-col gap-3 rounded-2xl border border-sky-400/25 bg-sky-500/5 p-3 sm:flex-row sm:items-end"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-200/80">Hero-media</p>
+        <div className="mt-1.5 flex gap-2" role="radiogroup" aria-label="Hero-media">
+          {(
+            [
+              { id: "image" as const, label: "Afbeelding" },
+              { id: "video" as const, label: "Video" },
+            ] as const
+          ).map((opt) => {
+            const selected = mediaKind === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={cn(
+                  "rounded-lg border px-3 py-1.5 text-xs font-semibold",
+                  selected
+                    ? "border-sky-400/60 bg-sky-500/20 text-white"
+                    : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25",
+                )}
+                onClick={() => {
+                  surface.sendBlockPatch?.(scope.blockId, { mediaKind: opt.id });
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {mediaKind === "video" ? (
+        <label className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200/80">
+          Video-URL
+          <input
+            data-cms-editor-chrome
+            className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm font-normal normal-case tracking-normal text-white outline-none focus:border-sky-400/50"
+            value={draftUrl}
+            placeholder="https://www.youtube.com/watch?v=…"
+            onChange={(e) => setDraftUrl(e.target.value)}
+            onBlur={() => {
+              if (draftUrl.trim() !== videoUrl) {
+                surface.sendBlockPatch?.(scope.blockId, { videoUrl: draftUrl.trim() });
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+function HeroMediaFrame({
+  image,
+  mediaKind,
+  videoUrl,
+  title,
+}: {
+  image?: CmsImage;
+  mediaKind: "image" | "video";
+  videoUrl: string;
+  title: string;
+}) {
+  const surface = useCmsEditSurface();
+  const editing = Boolean(surface?.enabled);
+  const embed = mediaKind === "video" ? resolveSafeVideoEmbed(videoUrl) : null;
+
+  if (mediaKind === "video") {
+    return (
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
+        {embed?.ok ? (
+          <div className="aspect-[4/3] w-full bg-black/50">
+            <iframe
+              title={title || "Hero video"}
+              src={embed.embedUrl}
+              className="h-full w-full"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-presentation"
+              allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-black/35 px-4 text-center text-sm text-amber-100/90">
+            {editing
+              ? embed && !embed.ok
+                ? embed.reason
+                : "Plak een YouTube-, Vimeo- of Facebook-URL hierboven."
+              : "Video niet beschikbaar."}
+          </div>
+        )}
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent"
+          aria-hidden
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
+      <EditableMedia path="image" image={image} emptyPlaceholder className="block w-full">
+        <FitImage
+          image={image}
+          aspectClass="aspect-[4/3]"
+          className="w-full bg-black/35"
+          imgClassName="object-contain object-center"
+        />
+      </EditableMedia>
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent"
+        aria-hidden
+      />
+    </div>
+  );
+}
+
 export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
   const type = "hero" as BlockType;
   const image = d.image as CmsImage | undefined;
@@ -133,6 +293,11 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
   const title = String(d.title ?? "");
   const subtitle = typeof d.subtitle === "string" ? d.subtitle : "";
   const eyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+  const mediaKind = d.mediaKind === "video" ? "video" : "image";
+  const videoUrl = typeof d.videoUrl === "string" ? d.videoUrl : "";
+  const surface = useCmsEditSurface();
+  const editing = Boolean(surface?.enabled);
+  const showMediaColumn = mediaKind === "video" || Boolean(image) || editing;
 
   const showPrimary = cta && isCmsButtonInteractive(cta);
   const showSecondary = secondaryCta && isCmsButtonInteractive(secondaryCta);
@@ -148,18 +313,34 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
       >
         <SectionInner>
           {eyebrow ? (
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              <EditableText path="eyebrow" value={eyebrow}>
+                {eyebrow}
+              </EditableText>
+            </p>
           ) : null}
-          <h1 className="font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl">{title}</h1>
+          <h1 className="font-display mt-4 max-w-3xl text-5xl text-white md:text-7xl">
+            <EditableText path="title" value={title}>
+              {title}
+            </EditableText>
+          </h1>
           {subtitle ? (
-            <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">{subtitle}</p>
+            <p className="mt-5 max-w-2xl whitespace-pre-line font-bold text-white/65">
+              <EditableText path="subtitle" value={subtitle} multiline>
+                {subtitle}
+              </EditableText>
+            </p>
           ) : null}
-          {image ? (
+          {image || editing ? (
             <div className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/10">
-              <CmsImageView
-                image={image}
-                className="max-h-64 w-full bg-black/35 object-contain object-center"
-              />
+              <EditableMedia path="image" image={image} emptyPlaceholder>
+                {image ? (
+                  <CmsImageView
+                    image={image}
+                    className="max-h-64 w-full bg-black/35 object-contain object-center"
+                  />
+                ) : null}
+              </EditableMedia>
             </div>
           ) : null}
         </SectionInner>
@@ -213,7 +394,11 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
               <HeroSparklesIcon className="h-3.5 w-3.5" />
-              <span>{eyebrow}</span>
+              <span>
+                <EditableText path="eyebrow" value={eyebrow}>
+                  {eyebrow}
+                </EditableText>
+              </span>
             </div>
           ) : null}
 
@@ -221,13 +406,24 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
             data-testid="hero-heading"
             className="font-display mt-6 text-6xl leading-[0.98] tracking-tight text-white sm:text-7xl lg:text-[5.75rem] xl:text-[6.5rem]"
           >
-            {title}
-            {accent?.beforeAccent ? <> {accent.beforeAccent}</> : null}
+            <EditableText path="title" value={title}>
+              {title}
+            </EditableText>
+            {accent?.beforeAccent ? (
+              <>
+                {" "}
+                <EditableText path="headingAccent.beforeAccent" value={accent.beforeAccent}>
+                  {accent.beforeAccent}
+                </EditableText>
+              </>
+            ) : null}
             {accent?.accent ? (
               <>
                 {" "}
                 <span className="relative inline-block bg-gradient-to-br from-primary via-primary to-white/90 bg-clip-text text-transparent">
-                  {accent.accent}
+                  <EditableText path="headingAccent.accent" value={accent.accent}>
+                    {accent.accent}
+                  </EditableText>
                   <span
                     aria-hidden
                     className="absolute -bottom-2 left-0 h-1 w-full rounded-full bg-primary/70"
@@ -235,12 +431,21 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
                 </span>
               </>
             ) : null}
-            {accent?.afterAccent ? <> {accent.afterAccent}</> : null}
+            {accent?.afterAccent ? (
+              <>
+                {" "}
+                <EditableText path="headingAccent.afterAccent" value={accent.afterAccent}>
+                  {accent.afterAccent}
+                </EditableText>
+              </>
+            ) : null}
           </h1>
 
           {subtitle ? (
             <p className="mt-8 max-w-xl whitespace-pre-line text-lg text-white/75 md:text-xl">
-              {subtitle}
+              <EditableText path="subtitle" value={subtitle} multiline>
+                {subtitle}
+              </EditableText>
             </p>
           ) : null}
 
@@ -252,18 +457,22 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
               )}
             >
               {showPrimary ? (
-                <CmsButtonView
-                  button={cta}
-                  pages={pages}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                />
+                <EditableCta path="cta" button={cta}>
+                  <CmsButtonView
+                    button={cta}
+                    pages={pages}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  />
+                </EditableCta>
               ) : null}
               {showSecondary ? (
-                <CmsButtonView
-                  button={secondaryCta}
-                  pages={pages}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-7 py-4 text-sm font-semibold text-white backdrop-blur transition hover:border-primary/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                />
+                <EditableCta path="secondaryCta" button={secondaryCta}>
+                  <CmsButtonView
+                    button={secondaryCta}
+                    pages={pages}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-7 py-4 text-sm font-semibold text-white backdrop-blur transition hover:border-primary/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  />
+                </EditableCta>
               ) : null}
             </div>
           ) : null}
@@ -285,18 +494,16 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
           ) : null}
         </div>
 
-        {image && !alignCenter ? (
+        {showMediaColumn && !alignCenter ? (
           <div className="relative lg:col-span-5">
             <div className="relative mx-auto max-w-md">
-              <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
-                <FitImage
-                  image={image}
-                  aspectClass="aspect-[4/3]"
-                  className="w-full bg-black/35"
-                  imgClassName="object-contain object-center"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-              </div>
+              <HeroMediaKindChrome mediaKind={mediaKind} videoUrl={videoUrl} />
+              <HeroMediaFrame
+                image={image}
+                mediaKind={mediaKind}
+                videoUrl={videoUrl}
+                title={title}
+              />
               {highlightStat && (highlightStat.value || highlightStat.label) ? (
                 <div className="absolute -bottom-6 -left-6 hidden rounded-2xl border border-white/15 bg-card/95 px-5 py-4 shadow-2xl sm:block">
                   <div className="flex items-center gap-3">
@@ -305,10 +512,14 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
                     </div>
                     <div>
                       <div className="font-display text-2xl leading-none text-white">
-                        {highlightStat.value}
+                        <EditableText path="highlightStat.value" value={highlightStat.value}>
+                          {highlightStat.value}
+                        </EditableText>
                       </div>
                       <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
-                        {highlightStat.label}
+                        <EditableText path="highlightStat.label" value={highlightStat.label}>
+                          {highlightStat.label}
+                        </EditableText>
                       </div>
                     </div>
                   </div>
@@ -317,22 +528,24 @@ export function HeroSectionView({ data: d, pages = [] }: BlockSectionViewProps) 
               {certBadge ? (
                 <div className="absolute -top-4 -right-4 hidden rounded-2xl border border-primary/30 bg-primary/20 px-4 py-3 sm:block">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white">
-                    <HeroShieldIcon className="h-4 w-4 text-primary" /> {certBadge}
+                    <HeroShieldIcon className="h-4 w-4 text-primary" />{" "}
+                    <EditableText path="certBadge" value={certBadge}>
+                      {certBadge}
+                    </EditableText>
                   </div>
                 </div>
               ) : null}
             </div>
           </div>
-        ) : image && alignCenter ? (
+        ) : showMediaColumn && alignCenter ? (
           <div className="relative w-full max-w-md lg:col-span-12">
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_30px_80px_-20px_rgba(63,182,242,0.4)]">
-              <FitImage
-                image={image}
-                aspectClass="aspect-[4/3]"
-                className="w-full bg-black/35"
-                imgClassName="object-contain object-center"
-              />
-            </div>
+            <HeroMediaKindChrome mediaKind={mediaKind} videoUrl={videoUrl} />
+            <HeroMediaFrame
+              image={image}
+              mediaKind={mediaKind}
+              videoUrl={videoUrl}
+              title={title}
+            />
           </div>
         ) : null}
       </div>
@@ -352,37 +565,161 @@ export function TitleBodyCtaSectionView({
   blockType,
 }: BlockSectionViewProps & { blockType: "richText" | "centered" | "cta" }) {
   const type = blockType;
-const centered = type === "centered";
-      return (
-        <SectionShell
-          blockType={type}
-          tone={type === "cta" ? "cta" : "default"}
-          innerMaxWidth={centered ? "2xl" : type === "richText" ? "3xl" : "7xl"}
-          innerClassName={centered ? "text-center" : undefined}
-        >
-          <SectionHeader
-            title={String(d.title ?? "")}
-            body={typeof d.body === "string" ? d.body : undefined}
-            align={centered ? "center" : undefined}
-            className={type === "cta" ? "mb-8 sm:mb-10" : undefined}
-          />
-          <div className={cn(type === "cta" ? "mt-2" : "mt-2", centered && "flex justify-center")}>
+  const centered = type === "centered";
+  const editing = Boolean(useCmsEditSurface()?.enabled);
+  const title = String(d.title ?? "");
+  const body = typeof d.body === "string" ? d.body : "";
+  const cta = d.cta as CmsButton | undefined;
+  const showBody = Boolean(body) || editing;
+  return (
+    <SectionShell
+      blockType={type}
+      tone={type === "cta" ? "cta" : "default"}
+      innerMaxWidth={centered ? "2xl" : type === "richText" ? "3xl" : "7xl"}
+      innerClassName={centered ? "text-center" : undefined}
+    >
+      <SectionHeader
+        title={
+          <EditableText path="title" value={title}>
+            {title}
+          </EditableText>
+        }
+        body={
+          showBody ? (
+            <EditableText path="body" value={body} multiline>
+              {body}
+            </EditableText>
+          ) : undefined
+        }
+        align={centered ? "center" : undefined}
+        className={type === "cta" ? "mb-8 sm:mb-10" : undefined}
+      />
+      <div className={cn(type === "cta" ? "mt-2" : "mt-2", centered && "flex justify-center")}>
+        {cta ? (
+          <EditableCta path="cta" button={cta}>
             <OptionalCta
-              cta={d.cta as CmsButton | undefined}
+              cta={cta}
               pages={pages}
               className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             />
-          </div>
-        </SectionShell>
-      );
+          </EditableCta>
+        ) : (
+          <OptionalCta
+            cta={cta}
+            pages={pages}
+            className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          />
+        )}
+      </div>
+    </SectionShell>
+  );
 }
 
 export function RichTextSectionView(props: BlockSectionViewProps) {
   return <TitleBodyCtaSectionView {...props} blockType="richText" />;
 }
 
-export function CenteredSectionView(props: BlockSectionViewProps) {
-  return <TitleBodyCtaSectionView {...props} blockType="centered" />;
+export function CenteredSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
+  const type = "centered" as BlockType;
+  const list = useCmsTypedListEditor<{ id: string; icon?: string; label: string }>("pillars");
+  const editing = list.editing || Boolean(useCmsEditSurface()?.enabled);
+  const title = String(d.title ?? "");
+  const body = typeof d.body === "string" ? d.body : "";
+  const eyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+  const cta = d.cta as CmsButton | undefined;
+  const pillars =
+    (d.pillars as Array<{ id: string; icon?: string; label: string }> | undefined) ?? [];
+  const showBody = Boolean(body) || editing;
+  const showEyebrow = Boolean(eyebrow.trim()) || editing;
+  const showPillars = pillars.length > 0 || editing;
+
+  return (
+    <SectionShell
+      blockType={type}
+      innerMaxWidth="2xl"
+      innerClassName="text-center"
+    >
+      {showEyebrow ? (
+        <SectionEyebrow className="justify-center">
+          <EditableText path="eyebrow" value={eyebrow}>
+            {eyebrow}
+          </EditableText>
+        </SectionEyebrow>
+      ) : null}
+      <SectionHeader
+        title={
+          <EditableText path="title" value={title}>
+            {title}
+          </EditableText>
+        }
+        body={
+          showBody ? (
+            <EditableText path="body" value={body} multiline>
+              {body}
+            </EditableText>
+          ) : undefined
+        }
+        align="center"
+      />
+      {showPillars ? (
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          {pillars.map((p, index) => (
+            <SectionSurface
+              key={p.id}
+              variant="outlined"
+              className="relative flex items-center gap-3 p-4 text-left"
+            >
+              {list.editing ? (
+                <CmsListRemoveButton
+                  label={`Pijler verwijderen: ${p.label}`}
+                  onRemove={() => list.removeById(pillars, p.id)}
+                />
+              ) : null}
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-xs font-semibold uppercase text-primary"
+                aria-hidden
+              >
+                {(p.icon ?? "award").slice(0, 2)}
+              </span>
+              <EditableText path={`pillars.${index}.label`} value={p.label}>
+                {p.label}
+              </EditableText>
+            </SectionSurface>
+          ))}
+          {list.editing ? (
+            <CmsListAddButton
+              label="Pijler toevoegen"
+              onAdd={() =>
+                list.append(pillars, {
+                  id: createItemId("pillar"),
+                  icon: "award",
+                  label: "Nieuwe pijler",
+                })
+              }
+              className="min-h-[4.5rem]"
+            />
+          ) : null}
+        </div>
+      ) : null}
+      <div className="mt-8 flex justify-center">
+        {cta ? (
+          <EditableCta path="cta" button={cta}>
+            <OptionalCta
+              cta={cta}
+              pages={pages}
+              className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+            />
+          </EditableCta>
+        ) : (
+          <OptionalCta
+            cta={cta}
+            pages={pages}
+            className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          />
+        )}
+      </div>
+    </SectionShell>
+  );
 }
 
 export function CtaSectionView(props: BlockSectionViewProps) {
@@ -391,29 +728,108 @@ export function CtaSectionView(props: BlockSectionViewProps) {
 
 export function TextImageSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
   const type = "textImage" as BlockType;
-const image = d.image as CmsImage | undefined;
-      return (
-        <SectionShell blockType={type}>
-          <div
-            className={cn(
-              "grid items-center gap-10 sm:gap-12 md:grid-cols-2 md:gap-14",
-              d.reverse === true && "md:[direction:rtl] md:[&>*]:[direction:ltr]",
-            )}
-          >
-            <div className="min-w-0">
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-foreground break-words sm:text-4xl">
-                {String(d.title ?? "")}
-              </h2>
-              {typeof d.body === "string" && d.body ? (
-                <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground break-words">
-                  {d.body}
-                </p>
+  const list = useCmsTypedListEditor<{ id: string; value: string; label: string }>("metrics");
+  const editing = list.editing || Boolean(useCmsEditSurface()?.enabled);
+  const image = d.image as CmsImage | undefined;
+  const title = String(d.title ?? "");
+  const body = typeof d.body === "string" ? d.body : "";
+  const eyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+  const notice = typeof d.notice === "string" ? d.notice : "";
+  const tag = typeof d.tag === "string" ? d.tag : "";
+  const metrics =
+    (d.metrics as Array<{ id: string; value: string; label: string }> | undefined) ?? [];
+  const showBody = Boolean(body) || editing;
+  const showEyebrow = Boolean(eyebrow.trim()) || editing;
+  const showNotice = Boolean(notice.trim()) || editing;
+  const showTag = Boolean(tag.trim()) || editing;
+  const showMetrics = metrics.length > 0 || list.editing;
+
+  return (
+    <SectionShell blockType={type}>
+      <div
+        className={cn(
+          "grid items-center gap-10 sm:gap-12 md:grid-cols-2 md:gap-14",
+          d.reverse === true && "md:[direction:rtl] md:[&>*]:[direction:ltr]",
+        )}
+      >
+        <div className="min-w-0">
+          {showEyebrow ? (
+            <SectionEyebrow>
+              <EditableText path="eyebrow" value={eyebrow}>
+                {eyebrow}
+              </EditableText>
+            </SectionEyebrow>
+          ) : null}
+          {showTag ? (
+            <p className="mb-2 font-display text-sm uppercase tracking-[0.3em] text-primary/80">
+              <EditableText path="tag" value={tag}>
+                {tag}
+              </EditableText>
+            </p>
+          ) : null}
+          <h2 className="font-display text-3xl font-semibold tracking-tight text-foreground break-words sm:text-4xl">
+            <EditableText path="title" value={title}>
+              {title}
+            </EditableText>
+          </h2>
+          {showBody ? (
+            <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-muted-foreground break-words">
+              <EditableText path="body" value={body} multiline>
+                {body}
+              </EditableText>
+            </p>
+          ) : null}
+          {showNotice ? (
+            <p className="mt-4 rounded-2xl border border-border/60 bg-card/40 px-4 py-3 text-sm text-muted-foreground whitespace-pre-wrap">
+              <EditableText path="notice" value={notice} multiline>
+                {notice}
+              </EditableText>
+            </p>
+          ) : null}
+          {showMetrics ? (
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              {metrics.map((m, index) => (
+                <div key={m.id} className="relative min-w-0">
+                  {list.editing ? (
+                    <CmsListRemoveButton
+                      label={`Metric verwijderen: ${m.label || m.value}`}
+                      className="right-0 top-0"
+                      onRemove={() => list.removeById(metrics, m.id)}
+                    />
+                  ) : null}
+                  <p className="font-display text-2xl font-semibold text-foreground">
+                    <EditableText path={`metrics.${index}.value`} value={m.value}>
+                      {m.value}
+                    </EditableText>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <EditableText path={`metrics.${index}.label`} value={m.label}>
+                      {m.label}
+                    </EditableText>
+                  </p>
+                </div>
+              ))}
+              {list.editing ? (
+                <CmsListAddButton
+                  compact
+                  label="Metric toevoegen"
+                  onAdd={() =>
+                    list.append(metrics, {
+                      id: createItemId("metric"),
+                      value: "0",
+                      label: "Label",
+                    })
+                  }
+                  className="col-span-3"
+                />
               ) : null}
             </div>
+          ) : null}
+        </div>
+        <SectionSurface variant="media" className="w-full">
+          <EditableMedia path="image" image={image}>
             {image ? (
-              <SectionSurface variant="media" className="w-full">
-                <FitImage image={image} aspectClass="aspect-[4/3]" className="w-full" />
-              </SectionSurface>
+              <FitImage image={image} aspectClass="aspect-[4/3]" className="w-full" />
             ) : (
               <div
                 className="flex aspect-[4/3] items-center justify-center rounded-3xl border border-dashed border-border bg-card/30 text-sm text-muted-foreground"
@@ -422,13 +838,23 @@ const image = d.image as CmsImage | undefined;
                 Geen afbeelding
               </div>
             )}
-          </div>
-        </SectionShell>
-      );
+          </EditableMedia>
+        </SectionSurface>
+      </div>
+    </SectionShell>
+  );
 }
 
 export function FeatureGridSectionView({ data: d, pages = [] }: BlockSectionViewProps) {
   const type = "featureGrid" as BlockType;
+  const list = useCmsTypedListEditor<{
+    id: string;
+    icon?: string;
+    title: string;
+    body: string;
+    cta?: CmsButton;
+  }>("features");
+  const editing = list.editing;
   const features =
     (d.features as Array<{
       id: string;
@@ -437,29 +863,93 @@ export function FeatureGridSectionView({ data: d, pages = [] }: BlockSectionView
       body: string;
       cta?: CmsButton;
     }>) ?? [];
+  const title = String(d.title ?? "");
+  const eyebrow = typeof d.eyebrow === "string" ? d.eyebrow : "";
+  const intro = typeof d.intro === "string" ? d.intro : "";
+  const showEyebrow = Boolean(eyebrow.trim()) || editing;
+  const showIntro = Boolean(intro.trim()) || editing;
   return (
     <SectionShell blockType={type}>
-      <SectionTitle>{String(d.title ?? "")}</SectionTitle>
-      {features.length === 0 ? (
+      {showEyebrow ? (
+        <SectionEyebrow>
+          <EditableText path="eyebrow" value={eyebrow}>
+            {eyebrow}
+          </EditableText>
+        </SectionEyebrow>
+      ) : null}
+      <SectionTitle>
+        <EditableText path="title" value={title}>
+          {title}
+        </EditableText>
+      </SectionTitle>
+      {showIntro ? (
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          <EditableText path="intro" value={intro} multiline>
+            {intro}
+          </EditableText>
+        </p>
+      ) : null}
+      {features.length === 0 && !editing ? (
         <p className="text-sm text-white/55">Nog geen kenmerken.</p>
       ) : (
         <div className={cn(SECTION_GRID, "sm:grid-cols-2")}>
-          {features.map((f) => (
-            <SectionSurface key={f.id} variant="outlined" className="flex h-full flex-col p-5 sm:p-6">
+          {features.map((f, index) => (
+            <SectionSurface
+              key={f.id}
+              variant="outlined"
+              className="relative flex h-full flex-col p-5 sm:p-6"
+            >
+              {editing ? (
+                <CmsListRemoveButton
+                  label={`Kenmerk verwijderen: ${f.title}`}
+                  onRemove={() => list.removeById(features, f.id)}
+                />
+              ) : null}
               {f.icon ? (
                 <span className="mb-2 block text-xs uppercase tracking-wider text-primary/80" aria-hidden>
                   {f.icon}
                 </span>
               ) : null}
-              <h3 className="font-semibold text-foreground break-words">{f.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground break-words">{f.body}</p>
-              <OptionalCta
-                cta={f.cta}
-                pages={pages}
-                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
-              />
+              <h3 className="font-semibold text-foreground break-words">
+                <EditableText path={`features.${index}.title`} value={f.title}>
+                  {f.title}
+                </EditableText>
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground break-words">
+                <EditableText path={`features.${index}.body`} value={f.body} multiline>
+                  {f.body}
+                </EditableText>
+              </p>
+              {f.cta ? (
+                <EditableCta path={`features.${index}.cta`} button={f.cta}>
+                  <OptionalCta
+                    cta={f.cta}
+                    pages={pages}
+                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
+                  />
+                </EditableCta>
+              ) : (
+                <OptionalCta
+                  cta={f.cta}
+                  pages={pages}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
+                />
+              )}
             </SectionSurface>
           ))}
+          {editing ? (
+            <CmsListAddButton
+              label="Kenmerk toevoegen"
+              onAdd={() =>
+                list.append(features, {
+                  id: createItemId("feat"),
+                  icon: "sparkles",
+                  title: "Nieuw kenmerk",
+                  body: "Toelichting",
+                })
+              }
+            />
+          ) : null}
         </div>
       )}
     </SectionShell>

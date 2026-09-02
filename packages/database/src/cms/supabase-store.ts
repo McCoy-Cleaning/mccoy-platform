@@ -22,6 +22,7 @@ import {
   isCmsUuid,
   uuidOrNull,
 } from "./page-id";
+import { invalidatePublishedCmsReadCache } from "./published-read-cache";
 import {
   DEFAULT_CMS_SITE_ID,
   type CmsLocaleStateRecord,
@@ -180,6 +181,23 @@ async function findPageRow(
     .maybeSingle();
   if (byKey.error) throw new Error(`cms findPage: ${byKey.error.message}`);
   return byKey.data ? (byKey.data as PageRow) : null;
+}
+
+/** One cms_pages read → db UUID → app-facing page id (stable_key). */
+async function loadAppIdByDbId(
+  supabase: ServiceClient,
+  siteId: string,
+): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from("cms_pages")
+    .select("id, stable_key")
+    .eq("site_id", siteId);
+  if (error) throw new Error(`cms loadAppIdByDbId: ${error.message}`);
+  const map = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{ id: string; stable_key: string | null }>) {
+    map.set(row.id, cmsPageRecordId(row as PageRow));
+  }
+  return map;
 }
 
 /**
@@ -348,6 +366,7 @@ export function createSupabaseCmsStore(): CmsStore {
         .catch(() => undefined);
 
       const site = mapSite(data as SiteRow);
+      invalidatePublishedCmsReadCache();
       return {
         configVersion: site.configVersion,
         navigation: site.navigation ?? null,
@@ -456,13 +475,30 @@ export function createSupabaseCmsStore(): CmsStore {
           (err as Error & { code: string }).code = "conflict";
           throw err;
         }
+        if (error.code === "PGRST202" || /schema cache/i.test(error.message)) {
+          const filePage = await fallback.getPage(command.pageId, siteId);
+          return fallback.saveDraft({
+            ...command,
+            expectedRevisionNumber: filePage?.draftRevisionNumber ?? command.expectedRevisionNumber,
+          });
+        }
         throw new Error(`cms saveDraft: ${error.message}`);
       }
+
+      const draftRevisionNumber = data as number;
+      // Soft-conflict RPC returns current revision unchanged (no throw). Treat as conflict
+      // so callers refresh expected revision instead of retrying blindly.
+      if (draftRevisionNumber === command.expectedRevisionNumber) {
+        const err = new Error("cms draft: conflict");
+        (err as Error & { code: string }).code = "conflict";
+        throw err;
+      }
+
       await fallback.saveDraft({
         ...command,
         expectedRevisionNumber: command.expectedRevisionNumber,
       });
-      return { draftRevisionNumber: data as number };
+      return { draftRevisionNumber };
     },
 
     async getActivePublishedRevision(pageId, siteId = DEFAULT_CMS_SITE_ID) {
@@ -477,6 +513,40 @@ export function createSupabaseCmsStore(): CmsStore {
         .maybeSingle();
       if (error) throw new Error(`cms getActivePublishedRevision: ${error.message}`);
       return data ? mapRevision(data as RevisionRow, appPageId) : null;
+    },
+
+    async listActivePublishedRevisions(siteId = DEFAULT_CMS_SITE_ID) {
+      const supabase = createSupabaseServiceClient();
+      const { data: pages, error: pagesError } = await supabase
+        .from("cms_pages")
+        .select("*")
+        .eq("site_id", siteId)
+        .not("active_published_revision_id", "is", null);
+      if (pagesError) throw new Error(`cms listActivePublishedRevisions pages: ${pagesError.message}`);
+      const pageRows = (pages ?? []) as PageRow[];
+      const revIds = pageRows
+        .map((p) => p.active_published_revision_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      if (revIds.length === 0) return [];
+
+      const { data: revisions, error: revError } = await supabase
+        .from("cms_page_revisions")
+        .select("*")
+        .in("id", revIds);
+      if (revError) {
+        throw new Error(`cms listActivePublishedRevisions revisions: ${revError.message}`);
+      }
+
+      const appIdByDbId = new Map<string, string>();
+      for (const page of pageRows) {
+        appIdByDbId.set(page.id, cmsPageRecordId(page));
+      }
+      const out: CmsRevisionRecord[] = [];
+      for (const rev of (revisions ?? []) as RevisionRow[]) {
+        const appPageId = appIdByDbId.get(rev.page_id) ?? rev.page_id;
+        out.push(mapRevision(rev, appPageId));
+      }
+      return out;
     },
 
     async listRevisions(pageId, siteId = DEFAULT_CMS_SITE_ID) {
@@ -540,6 +610,8 @@ export function createSupabaseCmsStore(): CmsStore {
 
       await fallback.publishPage(input).catch(() => undefined);
 
+      invalidatePublishedCmsReadCache();
+
       const event: CmsPagePublishedEvent = {
         eventId: result.eventId,
         siteId: input.siteId,
@@ -578,6 +650,7 @@ export function createSupabaseCmsStore(): CmsStore {
         eventId: string;
         draftRevisionNumber: number;
       };
+      invalidatePublishedCmsReadCache();
       const event: CmsPagePublishedEvent = {
         eventId: result.eventId,
         siteId: input.siteId,
@@ -613,9 +686,17 @@ export function createSupabaseCmsStore(): CmsStore {
       const pageRow = await findPageRow(supabase, siteId, (localeRow as LocaleRow).page_id);
       if (!pageRow?.active_published_revision_id) return null;
       const appPageId = cmsPageRecordId(pageRow);
-      const rev = await this.getActivePublishedRevision(appPageId, siteId);
-      if (!rev) return null;
-      const site = await this.getSite(siteId);
+      const [{ data: revData, error: revError }, site] = await Promise.all([
+        supabase
+          .from("cms_page_revisions")
+          .select("*")
+          .eq("id", pageRow.active_published_revision_id)
+          .maybeSingle(),
+        this.getSite(siteId),
+      ]);
+      if (revError) throw new Error(`cms findPublishedByPublicPath revision: ${revError.message}`);
+      if (!revData) return null;
+      const rev = mapRevision(revData as RevisionRow, appPageId);
       return {
         page: rev.payload,
         revisionId: rev.id,
@@ -627,29 +708,25 @@ export function createSupabaseCmsStore(): CmsStore {
 
     async listPublishedLocaleStates(siteId = DEFAULT_CMS_SITE_ID) {
       const supabase = createSupabaseServiceClient();
-      const { data, error } = await supabase
-        .from("cms_page_locale_states")
-        .select("*")
-        .eq("site_id", siteId)
-        .eq("publication_state", "published");
+      const [{ data, error }, appIdByDbId] = await Promise.all([
+        supabase
+          .from("cms_page_locale_states")
+          .select("*")
+          .eq("site_id", siteId)
+          .eq("publication_state", "published"),
+        loadAppIdByDbId(supabase, siteId),
+      ]);
       if (error) throw new Error(`cms listPublishedLocaleStates: ${error.message}`);
       const rows = (data ?? []) as LocaleRow[];
-      const pageIds = [...new Set(rows.map((r) => r.page_id))];
-      const appIdByDbId = new Map<string, string>();
-      for (const dbId of pageIds) {
-        const pageRow = await findPageRow(supabase, siteId, dbId);
-        if (pageRow) appIdByDbId.set(dbId, cmsPageRecordId(pageRow));
-      }
       return rows.map((r) => mapLocale(r, appIdByDbId.get(r.page_id)));
     },
 
     async listActiveRedirects(siteId = DEFAULT_CMS_SITE_ID) {
       const supabase = createSupabaseServiceClient();
-      const { data, error } = await supabase
-        .from("cms_redirects")
-        .select("*")
-        .eq("site_id", siteId)
-        .is("retired_at", null);
+      const [{ data, error }, appIdByDbId] = await Promise.all([
+        supabase.from("cms_redirects").select("*").eq("site_id", siteId).is("retired_at", null),
+        loadAppIdByDbId(supabase, siteId),
+      ]);
       if (error) throw new Error(`cms listActiveRedirects: ${error.message}`);
       const rows = (data ?? []) as Array<{
         id: string;
@@ -662,12 +739,6 @@ export function createSupabaseCmsStore(): CmsStore {
         created_at: string;
         retired_at: string | null;
       }>;
-      const pageIds = [...new Set(rows.map((r) => r.page_id).filter(Boolean))] as string[];
-      const appIdByDbId = new Map<string, string>();
-      for (const dbId of pageIds) {
-        const pageRow = await findPageRow(supabase, siteId, dbId);
-        if (pageRow) appIdByDbId.set(dbId, cmsPageRecordId(pageRow));
-      }
       return rows.map((r) => ({
         id: r.id,
         siteId: r.site_id,
@@ -837,32 +908,60 @@ export function createSupabaseCmsStore(): CmsStore {
     },
 
     async seedBuiltinsIfEmpty(pages, siteId = DEFAULT_CMS_SITE_ID) {
-      for (const page of pages) {
-        // Prefer live lookup by stable_key — list map can miss when stable_key was null
-        // historically and public id was the UUID, causing a duplicate-key insert race.
-        const row = await this.getPage(page.id, siteId);
-        if (row?.activePublishedRevisionId) continue;
+      // Process-once: every public read used to call this and N× findPageRow
+      // (stable_key walks), which matched the production PostgREST storm.
+      if (builtinsSeedCompleted.has(siteId)) return;
+      if (builtinsSeedInflight.has(siteId)) {
+        await builtinsSeedInflight.get(siteId);
+        return;
+      }
 
-        await this.upsertPage({ siteId, page, stableKey: page.id });
-        const draft = (await this.getDraftPayload(page.id)) ?? page;
-        const withStates = ensurePageLocaleFields({
-          ...draft,
-          localeStates: {
-            nl: { publicationState: "published", freshness: "current" },
-            // First seed is NL-only; EN stays missing until explicit Publiceer EN.
-            en: { publicationState: "missing", freshness: "unknown" },
-          },
-        });
-        await this.publishPage({
-          siteId,
-          pageId: page.id,
-          payload: withStates,
-          publishedLocales: ["nl"],
-        });
+      const run = (async () => {
+        const existing = await this.listPages(siteId);
+        const byKey = new Map<string, CmsPageRecord>();
+        for (const row of existing) {
+          const key = row.stableKey || row.id;
+          byKey.set(key, row);
+          byKey.set(row.id, row);
+        }
+
+        for (const page of pages) {
+          const row = byKey.get(page.id);
+          if (row?.activePublishedRevisionId) continue;
+
+          await this.upsertPage({ siteId, page, stableKey: page.id });
+          const draft = (await this.getDraftPayload(page.id)) ?? page;
+          const withStates = ensurePageLocaleFields({
+            ...draft,
+            localeStates: {
+              nl: { publicationState: "published", freshness: "current" },
+              // First seed is NL-only; EN stays missing until explicit Publiceer EN.
+              en: { publicationState: "missing", freshness: "unknown" },
+            },
+          });
+          await this.publishPage({
+            siteId,
+            pageId: page.id,
+            payload: withStates,
+            publishedLocales: ["nl"],
+          });
+        }
+        builtinsSeedCompleted.add(siteId);
+      })();
+
+      builtinsSeedInflight.set(siteId, run);
+      try {
+        await run;
+      } finally {
+        builtinsSeedInflight.delete(siteId);
       }
     },
   };
 }
+
+/** Sites that already completed builtin seed in this process. */
+const builtinsSeedCompleted = new Set<string>();
+const builtinsSeedInflight = new Map<string, Promise<void>>();
 
 /** Soft-fail window after DNS/network errors so local file CMS can serve without hammering a dead host. */
 let supabaseCmsUnreachableUntil = 0;

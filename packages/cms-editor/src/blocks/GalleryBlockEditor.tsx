@@ -29,7 +29,7 @@ const CONTENT_MODE_OPTIONS: Array<{
   {
     id: "imagesOnly",
     label: "Alleen afbeeldingen",
-    hint: "Mozaïek of raster — optionele tekst blijft bewerkbaar (bijv. overlay)",
+    hint: "Zelfde mozaïek als Werkgalerij — oriëntatie per foto op het canvas",
   },
   {
     id: "textAndImage",
@@ -116,7 +116,8 @@ export function GalleryBlockEditor({
   const textAndImage = contentMode === "textAndImage";
   const textPlacement = normalizeGalleryTextPlacement(value.textPlacement);
   const columns = normalizeGalleryColumns(value.columns);
-  const featured = !textAndImage && (value.layout ?? "grid") === "featured";
+  /** imagesOnly is always Werkgalerij mosaic (featured). */
+  const featured = !textAndImage;
   const sideBySide = textPlacement === "left" || textPlacement === "right";
 
   React.useEffect(() => {
@@ -185,7 +186,7 @@ export function GalleryBlockEditor({
                               textPlacement: value.textPlacement ?? "below",
                               columns: value.columns ?? 2,
                             }
-                          : {}),
+                          : { layout: "featured" }),
                       });
                     }}
                     className={
@@ -225,25 +226,10 @@ export function GalleryBlockEditor({
               ) : null}
             </>
           ) : (
-            <Field label="Layout">
-              <select
-                className={selectClass}
-                value={value.layout ?? "grid"}
-                onChange={(e) => {
-                  const layout = e.target.value;
-                  patch({
-                    layout:
-                      layout === "masonry" || layout === "featured" || layout === "grid"
-                        ? layout
-                        : "grid",
-                  });
-                }}
-              >
-                <option value="featured">Werkgalerij (mozaïek)</option>
-                <option value="grid">Raster</option>
-                <option value="masonry">Masonry</option>
-              </select>
-            </Field>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-relaxed text-white/55">
+              Weergave is gelijk aan de homepage <span className="font-semibold text-white/75">Werkgalerij</span>:
+              mozaïek met oriëntatie (breed / vierkant / hoog) per foto op het canvas.
+            </p>
           )}
         </Section>
       ) : null}

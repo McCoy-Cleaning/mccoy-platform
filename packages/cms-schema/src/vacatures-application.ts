@@ -51,6 +51,14 @@ export type VacaturesApplicationContent = {
   mediaLinkLabel?: string;
   media: VacaturesApplicationMedia;
   applicationScope?: FormScopeSnapshot;
+  /** Submit button label. */
+  submitLabel?: string;
+  /** Success message after submit. */
+  successMessage?: string;
+  /** Label above the vacancy role picker. */
+  roleLabel?: string;
+  /** File-picker button label (CV / letter). */
+  filePickLabel?: string;
 };
 
 const cmsImageSchemaLocal: z.ZodType<CmsImage> = z.object({
@@ -93,6 +101,10 @@ export const vacaturesApplicationContentSchema: z.ZodType<VacaturesApplicationCo
   mediaLinkLabel: z.string().optional(),
   media: vacaturesApplicationMediaSchema,
   applicationScope: formScopeSnapshotSchema.optional(),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  roleLabel: z.string().optional(),
+  filePickLabel: z.string().optional(),
 });
 
 export function defaultVacaturesApplicationMedia(): VacaturesApplicationMedia {
@@ -118,6 +130,10 @@ export function defaultVacaturesApplicationContent(
     mediaLinkLabel: "Open op Facebook",
     media: defaultVacaturesApplicationMedia(),
     applicationScope: legacyScope,
+    submitLabel: "Verstuur sollicitatie",
+    successMessage: "Bedankt! We hebben je sollicitatie ontvangen.",
+    roleLabel: "Functie",
+    filePickLabel: "Bestand kiezen",
   };
 }
 
@@ -177,5 +193,12 @@ export function normalizeVacaturesApplicationContent(
       typeof rec.mediaLinkLabel === "string" ? rec.mediaLinkLabel : base.mediaLinkLabel,
     media: normalizeVacaturesMedia(rec.media),
     applicationScope: scope,
+    submitLabel:
+      typeof rec.submitLabel === "string" ? rec.submitLabel : base.submitLabel,
+    successMessage:
+      typeof rec.successMessage === "string" ? rec.successMessage : base.successMessage,
+    roleLabel: typeof rec.roleLabel === "string" ? rec.roleLabel : base.roleLabel,
+    filePickLabel:
+      typeof rec.filePickLabel === "string" ? rec.filePickLabel : base.filePickLabel,
   };
 }

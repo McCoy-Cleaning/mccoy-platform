@@ -218,6 +218,13 @@ describe("security headers", () => {
     );
   });
 
+
+  it("allows official admin.mccoy.nl to embed the storefront by default", () => {
+    const csp = buildContentSecurityPolicy("storefront");
+    expect(csp).toContain("https://admin.mccoy.nl");
+    expect(csp).toContain("http://localhost:5174");
+  });
+
   it("parses comma-separated admin frame ancestors from env", () => {
     const prev = process.env.MCCOY_ADMIN_FRAME_ANCESTORS;
     process.env.MCCOY_ADMIN_FRAME_ANCESTORS =

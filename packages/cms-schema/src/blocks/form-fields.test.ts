@@ -37,6 +37,17 @@ describe("formFieldPayloadKey", () => {
     expect(formFieldPayloadKey(createFormFieldItem("Organisatie", "company"))).toBe("company");
     expect(formFieldPayloadKey(createFormFieldItem("Label 1", "text"))).toBe("label_1");
   });
+
+  it("prefers frozen payloadKey over label slug (E12)", () => {
+    const field = createFormFieldItem("Aantal ramen (indicatie)", "text", {
+      id: "quote-glass-windows",
+      payloadKey: "aantal_ramen_indicatie",
+    });
+    expect(formFieldPayloadKey(field)).toBe("aantal_ramen_indicatie");
+    expect(
+      formFieldPayloadKey({ ...field, label: "Hoeveel ramen moeten worden gereinigd?" }),
+    ).toBe("aantal_ramen_indicatie");
+  });
 });
 
 describe("resolveContactFormFields", () => {

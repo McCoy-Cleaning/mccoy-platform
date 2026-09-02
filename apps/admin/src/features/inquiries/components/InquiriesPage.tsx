@@ -262,6 +262,33 @@ export function InquiriesPage() {
           onRefreshDetail={() => {
             if (selectedId) softRefreshDetail(selectedId);
           }}
+          onSubmitterEmailUpdated={(email) => {
+            setDetail((prev) => {
+              if (!prev || prev.id !== selectedId) return prev;
+              const name = prev.submitterName?.trim();
+              return {
+                ...prev,
+                submitterEmail: email,
+                from: name ? `${name} <${email}>` : email,
+                fields: prev.fields.map((field) =>
+                  field.key === "email" ? { ...field, value: email } : field,
+                ),
+              };
+            });
+            if (selectedId) {
+              setItems((prev) =>
+                prev.map((item) => {
+                  if (item.id !== selectedId) return item;
+                  const name = item.submitterName?.trim();
+                  return {
+                    ...item,
+                    submitterEmail: email,
+                    from: name ? `${name} <${email}>` : email,
+                  };
+                }),
+              );
+            }
+          }}
         />
       ) : (
         <>

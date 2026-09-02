@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "siteId": "d06f2e13-d001-45b8-90a7-dc2724330a5e",
+  "notice": "Opt-in Improve overlay. Approved title/meta/H1 apply without CMS publish. Frozen deployed SEO remains the baseline when no approved patch exists.",
+  "patches": [
+    {
+      "url": "https://mccoy.nl/contact",
+      "path": "/contact",
+      "h1": "Contact — McCoy Cleaning Twente | Oldenzaal"
+    },
+    {
+      "url": "https://mccoy.nl/en/contact",
+      "path": "/en/contact",
+      "h1": "Contact"
+    },
+    {
+      "url": "https://mccoy.nl/en/services",
+      "path": "/en/services",
+      "h1": "Services"
+    },
+    {
+      "url": "https://mccoy.nl/en/terms",
+      "path": "/en/terms",
+      "title": "Terms & conditions"
+    },
+    {
+      "url": "https://mccoy.nl/en/vacatures",
+      "path": "/en/vacatures",
+      "h1": "Vacancies"
+    },
+    {
+      "url": "https://mccoy.nl/services",
+      "path": "/services",
+      "h1": "Schoonmaakdiensten Twente — McCoy Cleaning"
+    },
+    {
+      "url": "https://mccoy.nl/vacatures",
+      "path": "/vacatures",
+      "h1": "Vacatures Schoonmaak Twente — Werken bij McCoy Cleaning"
+    }
+  ]
+}

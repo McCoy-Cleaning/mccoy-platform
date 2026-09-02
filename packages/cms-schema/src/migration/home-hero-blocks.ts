@@ -153,6 +153,8 @@ export function mapHomeHeroToHeroBlockData(
     cta: rec.primaryCta ?? rec.cta,
     secondaryCta: rec.secondaryCta ?? factory.secondaryCta,
     image: rec.image ?? factory.image,
+    mediaKind: rec.mediaKind === "video" ? "video" : rec.mediaKind === "image" ? "image" : undefined,
+    videoUrl: typeof rec.videoUrl === "string" ? rec.videoUrl : undefined,
     align: "left",
     trustItems: trust,
     highlightStat: first

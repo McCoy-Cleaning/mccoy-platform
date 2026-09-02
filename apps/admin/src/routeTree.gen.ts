@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppInquiriesRouteImport } from './routes/_app.inquiries'
 import { Route as AppInviteRouteImport } from './routes/_app.invite'
 import { Route as AppLoginRouteImport } from './routes/_app.login'
@@ -22,9 +23,13 @@ import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSplatRouteImport } from './routes/admin.$'
+import { Route as ApiCommercePortalJobsRouteImport } from './routes/api.commerce-portal-jobs'
 import { Route as AppWebsiteIndexRouteImport } from './routes/_app.website.index'
 import { Route as AppWebsitePageIdRouteImport } from './routes/_app.website.$pageId'
 import { Route as AppWebsiteMediaRouteImport } from './routes/_app.website.media'
+import { Route as AppCustomersCompanyCompanyIdRouteImport } from './routes/_app.customers.company.$companyId'
+import { Route as AppCustomersGuestGuestIdRouteImport } from './routes/_app.customers.guest.$guestId'
+import { Route as AppCustomersRegisteredCustomerIdRouteImport } from './routes/_app.customers.registered.$customerId'
 import { Route as AppWebsiteOtherFooterRouteImport } from './routes/_app.website.other.footer'
 import { Route as AppWebsiteOtherNavigationRouteImport } from './routes/_app.website.other.navigation'
 
@@ -40,6 +45,11 @@ const AdminRoute = AdminRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCustomersRoute = AppCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInquiriesRoute = AppInquiriesRouteImport.update({
@@ -92,6 +102,11 @@ const AdminSplatRoute = AdminSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiCommercePortalJobsRoute = ApiCommercePortalJobsRouteImport.update({
+  id: '/api/commerce-portal-jobs',
+  path: '/api/commerce-portal-jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppWebsiteIndexRoute = AppWebsiteIndexRouteImport.update({
   id: '/website/',
   path: '/website/',
@@ -107,6 +122,24 @@ const AppWebsiteMediaRoute = AppWebsiteMediaRouteImport.update({
   path: '/website/media',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCustomersCompanyCompanyIdRoute =
+  AppCustomersCompanyCompanyIdRouteImport.update({
+    id: '/company/$companyId',
+    path: '/company/$companyId',
+    getParentRoute: () => AppCustomersRoute,
+  } as any)
+const AppCustomersGuestGuestIdRoute =
+  AppCustomersGuestGuestIdRouteImport.update({
+    id: '/guest/$guestId',
+    path: '/guest/$guestId',
+    getParentRoute: () => AppCustomersRoute,
+  } as any)
+const AppCustomersRegisteredCustomerIdRoute =
+  AppCustomersRegisteredCustomerIdRouteImport.update({
+    id: '/registered/$customerId',
+    path: '/registered/$customerId',
+    getParentRoute: () => AppCustomersRoute,
+  } as any)
 const AppWebsiteOtherFooterRoute = AppWebsiteOtherFooterRouteImport.update({
   id: '/website/other/footer',
   path: '/website/other/footer',
@@ -122,6 +155,7 @@ const AppWebsiteOtherNavigationRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/customers': typeof AppCustomersRouteWithChildren
   '/inquiries': typeof AppInquiriesRoute
   '/invite': typeof AppInviteRoute
   '/login': typeof AppLoginRoute
@@ -131,14 +165,19 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
+  '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/admin/': typeof AdminIndexRoute
   '/website/$pageId': typeof AppWebsitePageIdRoute
   '/website/media': typeof AppWebsiteMediaRoute
   '/website/': typeof AppWebsiteIndexRoute
+  '/customers/company/$companyId': typeof AppCustomersCompanyCompanyIdRoute
+  '/customers/guest/$guestId': typeof AppCustomersGuestGuestIdRoute
+  '/customers/registered/$customerId': typeof AppCustomersRegisteredCustomerIdRoute
   '/website/other/footer': typeof AppWebsiteOtherFooterRoute
   '/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
 export interface FileRoutesByTo {
+  '/customers': typeof AppCustomersRouteWithChildren
   '/inquiries': typeof AppInquiriesRoute
   '/invite': typeof AppInviteRoute
   '/login': typeof AppLoginRoute
@@ -148,11 +187,15 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
+  '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/': typeof AppIndexRoute
   '/admin': typeof AdminIndexRoute
   '/website/$pageId': typeof AppWebsitePageIdRoute
   '/website/media': typeof AppWebsiteMediaRoute
   '/website': typeof AppWebsiteIndexRoute
+  '/customers/company/$companyId': typeof AppCustomersCompanyCompanyIdRoute
+  '/customers/guest/$guestId': typeof AppCustomersGuestGuestIdRoute
+  '/customers/registered/$customerId': typeof AppCustomersRegisteredCustomerIdRoute
   '/website/other/footer': typeof AppWebsiteOtherFooterRoute
   '/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
@@ -160,6 +203,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
+  '/_app/customers': typeof AppCustomersRouteWithChildren
   '/_app/inquiries': typeof AppInquiriesRoute
   '/_app/invite': typeof AppInviteRoute
   '/_app/login': typeof AppLoginRoute
@@ -169,11 +213,15 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/users': typeof AppUsersRoute
   '/admin/$': typeof AdminSplatRoute
+  '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/_app/': typeof AppIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/_app/website/$pageId': typeof AppWebsitePageIdRoute
   '/_app/website/media': typeof AppWebsiteMediaRoute
   '/_app/website/': typeof AppWebsiteIndexRoute
+  '/_app/customers/company/$companyId': typeof AppCustomersCompanyCompanyIdRoute
+  '/_app/customers/guest/$guestId': typeof AppCustomersGuestGuestIdRoute
+  '/_app/customers/registered/$customerId': typeof AppCustomersRegisteredCustomerIdRoute
   '/_app/website/other/footer': typeof AppWebsiteOtherFooterRoute
   '/_app/website/other/navigation': typeof AppWebsiteOtherNavigationRoute
 }
@@ -182,6 +230,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/customers'
     | '/inquiries'
     | '/invite'
     | '/login'
@@ -191,14 +240,19 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/admin/$'
+    | '/api/commerce-portal-jobs'
     | '/admin/'
     | '/website/$pageId'
     | '/website/media'
     | '/website/'
+    | '/customers/company/$companyId'
+    | '/customers/guest/$guestId'
+    | '/customers/registered/$customerId'
     | '/website/other/footer'
     | '/website/other/navigation'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/customers'
     | '/inquiries'
     | '/invite'
     | '/login'
@@ -208,17 +262,22 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/admin/$'
+    | '/api/commerce-portal-jobs'
     | '/'
     | '/admin'
     | '/website/$pageId'
     | '/website/media'
     | '/website'
+    | '/customers/company/$companyId'
+    | '/customers/guest/$guestId'
+    | '/customers/registered/$customerId'
     | '/website/other/footer'
     | '/website/other/navigation'
   id:
     | '__root__'
     | '/_app'
     | '/admin'
+    | '/_app/customers'
     | '/_app/inquiries'
     | '/_app/invite'
     | '/_app/login'
@@ -228,11 +287,15 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/users'
     | '/admin/$'
+    | '/api/commerce-portal-jobs'
     | '/_app/'
     | '/admin/'
     | '/_app/website/$pageId'
     | '/_app/website/media'
     | '/_app/website/'
+    | '/_app/customers/company/$companyId'
+    | '/_app/customers/guest/$guestId'
+    | '/_app/customers/registered/$customerId'
     | '/_app/website/other/footer'
     | '/_app/website/other/navigation'
   fileRoutesById: FileRoutesById
@@ -240,6 +303,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
+  ApiCommercePortalJobsRoute: typeof ApiCommercePortalJobsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -263,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/customers': {
+      id: '/_app/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/inquiries': {
@@ -335,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSplatRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/commerce-portal-jobs': {
+      id: '/api/commerce-portal-jobs'
+      path: '/api/commerce-portal-jobs'
+      fullPath: '/api/commerce-portal-jobs'
+      preLoaderRoute: typeof ApiCommercePortalJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/website/': {
       id: '/_app/website/'
       path: '/website'
@@ -356,6 +434,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWebsiteMediaRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/customers/company/$companyId': {
+      id: '/_app/customers/company/$companyId'
+      path: '/company/$companyId'
+      fullPath: '/customers/company/$companyId'
+      preLoaderRoute: typeof AppCustomersCompanyCompanyIdRouteImport
+      parentRoute: typeof AppCustomersRoute
+    }
+    '/_app/customers/guest/$guestId': {
+      id: '/_app/customers/guest/$guestId'
+      path: '/guest/$guestId'
+      fullPath: '/customers/guest/$guestId'
+      preLoaderRoute: typeof AppCustomersGuestGuestIdRouteImport
+      parentRoute: typeof AppCustomersRoute
+    }
+    '/_app/customers/registered/$customerId': {
+      id: '/_app/customers/registered/$customerId'
+      path: '/registered/$customerId'
+      fullPath: '/customers/registered/$customerId'
+      preLoaderRoute: typeof AppCustomersRegisteredCustomerIdRouteImport
+      parentRoute: typeof AppCustomersRoute
+    }
     '/_app/website/other/footer': {
       id: '/_app/website/other/footer'
       path: '/website/other/footer'
@@ -373,7 +472,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppCustomersRouteChildren {
+  AppCustomersCompanyCompanyIdRoute: typeof AppCustomersCompanyCompanyIdRoute
+  AppCustomersGuestGuestIdRoute: typeof AppCustomersGuestGuestIdRoute
+  AppCustomersRegisteredCustomerIdRoute: typeof AppCustomersRegisteredCustomerIdRoute
+}
+
+const AppCustomersRouteChildren: AppCustomersRouteChildren = {
+  AppCustomersCompanyCompanyIdRoute: AppCustomersCompanyCompanyIdRoute,
+  AppCustomersGuestGuestIdRoute: AppCustomersGuestGuestIdRoute,
+  AppCustomersRegisteredCustomerIdRoute: AppCustomersRegisteredCustomerIdRoute,
+}
+
+const AppCustomersRouteWithChildren = AppCustomersRoute._addFileChildren(
+  AppCustomersRouteChildren,
+)
+
 interface AppRouteChildren {
+  AppCustomersRoute: typeof AppCustomersRouteWithChildren
   AppInquiriesRoute: typeof AppInquiriesRoute
   AppInviteRoute: typeof AppInviteRoute
   AppLoginRoute: typeof AppLoginRoute
@@ -391,6 +507,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppCustomersRoute: AppCustomersRouteWithChildren,
   AppInquiriesRoute: AppInquiriesRoute,
   AppInviteRoute: AppInviteRoute,
   AppLoginRoute: AppLoginRoute,
@@ -424,6 +541,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
+  ApiCommercePortalJobsRoute: ApiCommercePortalJobsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

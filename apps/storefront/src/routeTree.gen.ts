@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CustomSlugRouteImport } from './routes/$customSlug'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as CmsPreviewRouteImport } from './routes/cms-preview'
 import { Route as CmsSyncRouteImport } from './routes/cms-sync'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -25,9 +26,16 @@ import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as VacaturesRouteImport } from './routes/vacatures'
+import { Route as AccountIndexRouteImport } from './routes/account.index'
+import { Route as AccountActivateRouteImport } from './routes/account.activate'
+import { Route as AccountCompanyRouteImport } from './routes/account.company'
+import { Route as AccountForgotPasswordRouteImport } from './routes/account.forgot-password'
+import { Route as AccountLoginRouteImport } from './routes/account.login'
+import { Route as AccountResetPasswordRouteImport } from './routes/account.reset-password'
 import { Route as EnIndexRouteImport } from './routes/en.index'
 import { Route as EnSplatRouteImport } from './routes/en.$'
 import { Route as VacaturesSlugRouteImport } from './routes/vacatures.$slug'
+import { Route as AccountCompanyUsersRouteImport } from './routes/account.company.users'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -42,6 +50,11 @@ const CustomSlugRoute = CustomSlugRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CmsPreviewRoute = CmsPreviewRouteImport.update({
@@ -111,6 +124,36 @@ const VacaturesRoute = VacaturesRouteImport.update({
   path: '/vacatures',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountIndexRoute = AccountIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountActivateRoute = AccountActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountCompanyRoute = AccountCompanyRouteImport.update({
+  id: '/company',
+  path: '/company',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountForgotPasswordRoute = AccountForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountLoginRoute = AccountLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountResetPasswordRoute = AccountResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => AccountRoute,
+} as any)
 const EnIndexRoute = EnIndexRouteImport.update({
   id: '/en/',
   path: '/en/',
@@ -126,11 +169,17 @@ const VacaturesSlugRoute = VacaturesSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => VacaturesRoute,
 } as any)
+const AccountCompanyUsersRoute = AccountCompanyUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AccountCompanyRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$customSlug': typeof CustomSlugRoute
   '/about': typeof AboutRoute
+  '/account': typeof AccountRouteWithChildren
   '/cms-preview': typeof CmsPreviewRoute
   '/cms-sync': typeof CmsSyncRoute
   '/contact': typeof ContactRoute
@@ -144,9 +193,16 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/vacatures': typeof VacaturesRouteWithChildren
+  '/account/activate': typeof AccountActivateRoute
+  '/account/company': typeof AccountCompanyRouteWithChildren
+  '/account/forgot-password': typeof AccountForgotPasswordRoute
+  '/account/login': typeof AccountLoginRoute
+  '/account/reset-password': typeof AccountResetPasswordRoute
   '/en/$': typeof EnSplatRoute
   '/vacatures/$slug': typeof VacaturesSlugRoute
+  '/account/': typeof AccountIndexRoute
   '/en/': typeof EnIndexRoute
+  '/account/company/users': typeof AccountCompanyUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -165,15 +221,23 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/vacatures': typeof VacaturesRouteWithChildren
+  '/account/activate': typeof AccountActivateRoute
+  '/account/company': typeof AccountCompanyRouteWithChildren
+  '/account/forgot-password': typeof AccountForgotPasswordRoute
+  '/account/login': typeof AccountLoginRoute
+  '/account/reset-password': typeof AccountResetPasswordRoute
   '/en/$': typeof EnSplatRoute
   '/vacatures/$slug': typeof VacaturesSlugRoute
+  '/account': typeof AccountIndexRoute
   '/en': typeof EnIndexRoute
+  '/account/company/users': typeof AccountCompanyUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$customSlug': typeof CustomSlugRoute
   '/about': typeof AboutRoute
+  '/account': typeof AccountRouteWithChildren
   '/cms-preview': typeof CmsPreviewRoute
   '/cms-sync': typeof CmsSyncRoute
   '/contact': typeof ContactRoute
@@ -187,9 +251,16 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/vacatures': typeof VacaturesRouteWithChildren
+  '/account/activate': typeof AccountActivateRoute
+  '/account/company': typeof AccountCompanyRouteWithChildren
+  '/account/forgot-password': typeof AccountForgotPasswordRoute
+  '/account/login': typeof AccountLoginRoute
+  '/account/reset-password': typeof AccountResetPasswordRoute
   '/en/$': typeof EnSplatRoute
   '/vacatures/$slug': typeof VacaturesSlugRoute
+  '/account/': typeof AccountIndexRoute
   '/en/': typeof EnIndexRoute
+  '/account/company/users': typeof AccountCompanyUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -197,6 +268,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$customSlug'
     | '/about'
+    | '/account'
     | '/cms-preview'
     | '/cms-sync'
     | '/contact'
@@ -210,9 +282,16 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/vacatures'
+    | '/account/activate'
+    | '/account/company'
+    | '/account/forgot-password'
+    | '/account/login'
+    | '/account/reset-password'
     | '/en/$'
     | '/vacatures/$slug'
+    | '/account/'
     | '/en/'
+    | '/account/company/users'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -231,14 +310,22 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/vacatures'
+    | '/account/activate'
+    | '/account/company'
+    | '/account/forgot-password'
+    | '/account/login'
+    | '/account/reset-password'
     | '/en/$'
     | '/vacatures/$slug'
+    | '/account'
     | '/en'
+    | '/account/company/users'
   id:
     | '__root__'
     | '/'
     | '/$customSlug'
     | '/about'
+    | '/account'
     | '/cms-preview'
     | '/cms-sync'
     | '/contact'
@@ -252,15 +339,23 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/vacatures'
+    | '/account/activate'
+    | '/account/company'
+    | '/account/forgot-password'
+    | '/account/login'
+    | '/account/reset-password'
     | '/en/$'
     | '/vacatures/$slug'
+    | '/account/'
     | '/en/'
+    | '/account/company/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CustomSlugRoute: typeof CustomSlugRoute
   AboutRoute: typeof AboutRoute
+  AccountRoute: typeof AccountRouteWithChildren
   CmsPreviewRoute: typeof CmsPreviewRoute
   CmsSyncRoute: typeof CmsSyncRoute
   ContactRoute: typeof ContactRoute
@@ -299,6 +394,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cms-preview': {
@@ -392,6 +494,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VacaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/': {
+      id: '/account/'
+      path: '/'
+      fullPath: '/account/'
+      preLoaderRoute: typeof AccountIndexRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/activate': {
+      id: '/account/activate'
+      path: '/activate'
+      fullPath: '/account/activate'
+      preLoaderRoute: typeof AccountActivateRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/company': {
+      id: '/account/company'
+      path: '/company'
+      fullPath: '/account/company'
+      preLoaderRoute: typeof AccountCompanyRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/forgot-password': {
+      id: '/account/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/account/forgot-password'
+      preLoaderRoute: typeof AccountForgotPasswordRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/login': {
+      id: '/account/login'
+      path: '/login'
+      fullPath: '/account/login'
+      preLoaderRoute: typeof AccountLoginRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/reset-password': {
+      id: '/account/reset-password'
+      path: '/reset-password'
+      fullPath: '/account/reset-password'
+      preLoaderRoute: typeof AccountResetPasswordRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/en/': {
       id: '/en/'
       path: '/en'
@@ -413,8 +557,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VacaturesSlugRouteImport
       parentRoute: typeof VacaturesRoute
     }
+    '/account/company/users': {
+      id: '/account/company/users'
+      path: '/users'
+      fullPath: '/account/company/users'
+      preLoaderRoute: typeof AccountCompanyUsersRouteImport
+      parentRoute: typeof AccountCompanyRoute
+    }
   }
 }
+
+interface AccountCompanyRouteChildren {
+  AccountCompanyUsersRoute: typeof AccountCompanyUsersRoute
+}
+
+const AccountCompanyRouteChildren: AccountCompanyRouteChildren = {
+  AccountCompanyUsersRoute: AccountCompanyUsersRoute,
+}
+
+const AccountCompanyRouteWithChildren = AccountCompanyRoute._addFileChildren(
+  AccountCompanyRouteChildren,
+)
+
+interface AccountRouteChildren {
+  AccountActivateRoute: typeof AccountActivateRoute
+  AccountCompanyRoute: typeof AccountCompanyRouteWithChildren
+  AccountForgotPasswordRoute: typeof AccountForgotPasswordRoute
+  AccountLoginRoute: typeof AccountLoginRoute
+  AccountResetPasswordRoute: typeof AccountResetPasswordRoute
+  AccountIndexRoute: typeof AccountIndexRoute
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountActivateRoute: AccountActivateRoute,
+  AccountCompanyRoute: AccountCompanyRouteWithChildren,
+  AccountForgotPasswordRoute: AccountForgotPasswordRoute,
+  AccountLoginRoute: AccountLoginRoute,
+  AccountResetPasswordRoute: AccountResetPasswordRoute,
+  AccountIndexRoute: AccountIndexRoute,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
 
 interface VacaturesRouteChildren {
   VacaturesSlugRoute: typeof VacaturesSlugRoute
@@ -432,6 +616,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CustomSlugRoute: CustomSlugRoute,
   AboutRoute: AboutRoute,
+  AccountRoute: AccountRouteWithChildren,
   CmsPreviewRoute: CmsPreviewRoute,
   CmsSyncRoute: CmsSyncRoute,
   ContactRoute: ContactRoute,

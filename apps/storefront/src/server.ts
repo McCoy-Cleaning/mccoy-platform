@@ -162,9 +162,20 @@ export default {
   },
 };
 
-// Warm home snapshot after boot so the first visitor skips cold CMS resolve.
+// Warm high-traffic published snapshots after boot so crawlers skip cold CMS resolve.
 void import("./lib/cms/load-published-page.server")
-  .then((m) => Promise.all([m.loadPublishedPageSnapshot("/"), m.loadPublishedPageSnapshot("/en")]))
+  .then((m) =>
+    Promise.all([
+      m.loadPublishedPageSnapshot("/"),
+      m.loadPublishedPageSnapshot("/en"),
+      m.loadPublishedPageSnapshot("/services"),
+      m.loadPublishedPageSnapshot("/products"),
+      m.loadPublishedPageSnapshot("/about"),
+      m.loadPublishedPageSnapshot("/contact"),
+      m.loadPublishedPageSnapshot("/vacatures"),
+      m.loadPublishedPageSnapshot("/offerte"),
+    ]),
+  )
   .catch(() => {
     /* ignore warm failures — request path still loads */
   });

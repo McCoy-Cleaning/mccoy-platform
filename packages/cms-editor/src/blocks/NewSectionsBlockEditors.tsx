@@ -466,13 +466,14 @@ export function LegalArticlesBlockEditor({
           pathPrefix={pathPrefix}
           fields={collectShallowStringFields(
             value as unknown as Record<string, unknown>,
-            ["eyebrow", "heading", "updatedLabel"],
+            ["eyebrow", "heading", "updatedLabel", "tocLabel"],
             { includeEmpty: true },
           )}
           fieldLabels={{
             eyebrow: "Eyebrow",
             heading: "Paginakop",
             updatedLabel: "Bijgewerkt-label",
+            tocLabel: "Inhoudsopgave-label",
           }}
           onApplyDutch={(nl) => {
             const patch: Partial<LegalArticlesBlockData> = {};
@@ -481,6 +482,7 @@ export function LegalArticlesBlockEditor({
             if (typeof nl.updatedLabel === "string") {
               patch.updatedLabel = nl.updatedLabel || undefined;
             }
+            if (typeof nl.tocLabel === "string") patch.tocLabel = nl.tocLabel || undefined;
             onChange({ ...value, ...patch });
           }}
         />
@@ -505,6 +507,13 @@ export function LegalArticlesBlockEditor({
             className={inputClass}
             value={value.updatedLabel ?? ""}
             onChange={(e) => onChange({ ...value, updatedLabel: e.target.value || undefined })}
+          />
+        </NlEnField>
+        <NlEnField label="Inhoudsopgave-label" enPath={blockEnPath(blockId, "tocLabel")}>
+          <input
+            className={inputClass}
+            value={value.tocLabel ?? ""}
+            onChange={(e) => onChange({ ...value, tocLabel: e.target.value || undefined })}
           />
         </NlEnField>
         <Field label="Updated at (YYYY-MM-DD)">

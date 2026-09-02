@@ -4,6 +4,8 @@ import {
   createFormFieldItem,
   createFormFieldOption,
   FORM_FIELD_TYPE_LABELS_NL,
+  formFieldPayloadKey,
+  sanitizePayloadKey,
   type FormFieldItem,
   type FormFieldOption,
   type FormFieldType,
@@ -164,6 +166,23 @@ export function ContactFormFieldsEditor({
                   />
                 </Field>
               )}
+              <Field
+                label="Veldnaam"
+                hint="Technische naam in inzendingen; letters/cijfers/underscore."
+              >
+                <input
+                  className={inputClass}
+                  value={item.payloadKey?.trim() || formFieldPayloadKey(item)}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) =>
+                    actions.update({
+                      ...item,
+                      payloadKey: sanitizePayloadKey(e.target.value.trim() || item.label),
+                    })
+                  }
+                />
+              </Field>
               <Field
                 label="Veldtype"
                 hint="Bepaalt opslag en invoercontrole — niet hetzelfde als het zichtbare label."

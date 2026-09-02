@@ -52,6 +52,16 @@ describe("gallery block normalize", () => {
     expect(data.columns).toBe(2);
   });
 
+  it("forces featured layout for imagesOnly even when legacy grid is stored", () => {
+    const normalized = def.normalize({
+      title: "Galerij",
+      contentMode: "imagesOnly",
+      layout: "grid",
+      images: [],
+    }) as GalleryBlockData;
+    expect(normalized.layout).toBe("featured");
+  });
+
   it("upgrades legacy product gallery copy in textAndImage mode", () => {
     const normalized = def.normalize({
       title: "Een blik op wat wij doen",

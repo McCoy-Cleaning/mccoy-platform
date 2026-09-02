@@ -145,21 +145,38 @@ function collectMediaPublishErrors(block: Block): PublishValidationError[] {
         }),
       );
     }
-    const embed = resolveSafeVideoEmbed(data.videoUrl ?? "");
-    if (!embed.ok) {
-      errors.push(
-        err(PUBLISH_VALIDATION_CODES.VIDEO_URL_INVALID, [...base, "videoUrl"], {
-          blockType: block.type,
-          message: embed.reason,
-        }),
-      );
-    }
-    if (imageNeedsAlt(data.poster)) {
-      errors.push(
-        err(PUBLISH_VALIDATION_CODES.VIDEO_POSTER_ALT_REQUIRED, [...base, "poster", "alt"], {
-          blockType: block.type,
-        }),
-      );
+    const mediaKind = data.mediaKind === "image" ? "image" : "video";
+    if (mediaKind === "image") {
+      if (!data.image) {
+        errors.push(
+          err(PUBLISH_VALIDATION_CODES.VIDEO_IMAGE_REQUIRED, [...base, "image"], {
+            blockType: block.type,
+          }),
+        );
+      } else if (imageNeedsAlt(data.image)) {
+        errors.push(
+          err(PUBLISH_VALIDATION_CODES.VIDEO_IMAGE_ALT_REQUIRED, [...base, "image", "alt"], {
+            blockType: block.type,
+          }),
+        );
+      }
+    } else {
+      const embed = resolveSafeVideoEmbed(data.videoUrl ?? "");
+      if (!embed.ok) {
+        errors.push(
+          err(PUBLISH_VALIDATION_CODES.VIDEO_URL_INVALID, [...base, "videoUrl"], {
+            blockType: block.type,
+            message: embed.reason,
+          }),
+        );
+      }
+      if (imageNeedsAlt(data.poster)) {
+        errors.push(
+          err(PUBLISH_VALIDATION_CODES.VIDEO_POSTER_ALT_REQUIRED, [...base, "poster", "alt"], {
+            blockType: block.type,
+          }),
+        );
+      }
     }
   }
 

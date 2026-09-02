@@ -171,7 +171,7 @@ function fallbackSnapshotOrNotFound(pathname: string): LoadPublishedPageResult {
  * Warm instances reuse memory hits without another Supabase/file round-trip —
  * important for document TTFB / Speed Index on Vercel after cold start.
  */
-const SNAPSHOT_CACHE_TTL_MS = 30_000;
+const SNAPSHOT_CACHE_TTL_MS = 60_000;
 /** Avoid getSite() on every request when the snapshot cache is warm. */
 const SITE_META_TTL_MS = 10_000;
 const snapshotCache = new Map<

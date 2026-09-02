@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { adminInboxBulkDeleteSchema, adminInboxMessageIdSchema } from "./schemas";
+import {
+  adminInboxBulkDeleteSchema,
+  adminInboxMessageIdSchema,
+  adminInboxUpdateSubmitterEmailSchema,
+} from "./schemas";
 
 const VALID_IMAP_ID = "imap:inbox:42";
 const VALID_GRAPH_ID = "graph:mailbox@example.com:AAMkAGI2TG93AAA=";
@@ -17,6 +21,23 @@ describe("adminInboxMessageIdSchema", () => {
 
   it("rejects malformed ids", () => {
     expect(() => adminInboxMessageIdSchema.parse({ id: "smtp:bad" })).toThrow();
+  });
+});
+
+describe("adminInboxUpdateSubmitterEmailSchema", () => {
+  it("accepts a valid request id and email", () => {
+    const parsed = adminInboxUpdateSubmitterEmailSchema.parse({
+      id: VALID_REQ_ID,
+      email: "  fixed@example.com  ",
+    });
+    expect(parsed.id).toBe(VALID_REQ_ID);
+    expect(parsed.email).toBe("fixed@example.com");
+  });
+
+  it("rejects invalid emails", () => {
+    expect(() =>
+      adminInboxUpdateSubmitterEmailSchema.parse({ id: VALID_REQ_ID, email: "not-an-email" }),
+    ).toThrow();
   });
 });
 

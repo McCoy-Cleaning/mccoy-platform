@@ -43,13 +43,15 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function assetToCmsImage(asset: CmsMediaAssetDto, alt?: string): CmsImage {
+  const width = asset.width > 0 ? asset.width : undefined;
+  const height = asset.height > 0 ? asset.height : undefined;
   return {
     assetId: `storage:${asset.id}`,
     src: asset.publicUrl,
     alt: alt ?? asset.altDefault ?? "",
     decorative: false,
-    width: asset.width,
-    height: asset.height,
+    ...(width != null ? { width } : {}),
+    ...(height != null ? { height } : {}),
   };
 }
 

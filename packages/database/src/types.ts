@@ -47,6 +47,14 @@ export type WebsiteRequestsStore = {
     reply: Omit<RequestReply, "id">,
     nextStatus?: RequestStatus,
   ): Promise<WebsiteRequest | null>;
+  /**
+   * Staff correction when a visitor submitted the wrong email.
+   * Updates `submitter_email` and `fields.email` (when fields exist).
+   */
+  updateWebsiteRequestSubmitterEmail(
+    id: string,
+    email: string,
+  ): Promise<WebsiteRequest | null>;
   countWebsiteRequests(): Promise<number>;
   /** Count rows with created_at in [fromIso, toIso). `toIso` defaults to now. */
   countWebsiteRequestsCreatedBetween(

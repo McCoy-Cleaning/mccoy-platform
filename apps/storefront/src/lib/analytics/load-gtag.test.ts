@@ -12,7 +12,17 @@ type FakeScript = {
   async?: boolean;
   src?: string;
   dataset: Record<string, string>;
+  onload?: () => void;
 };
+
+/** gtag.js reads Arguments objects; normalize for assertions. */
+function cmd(entry: unknown): unknown[] {
+  if (Array.isArray(entry)) return entry;
+  if (entry && typeof entry === "object" && "length" in entry) {
+    return Array.from(entry as ArrayLike<unknown>);
+  }
+  return [];
+}
 
 function stubDom() {
   const scripts: FakeScript[] = [];
@@ -27,6 +37,7 @@ function stubDom() {
     head: {
       appendChild: vi.fn((script: FakeScript) => {
         scripts.push(script);
+        script.onload?.();
         return script;
       }),
     },
@@ -58,8 +69,8 @@ describe("GA4 gtag lifecycle", () => {
     );
     expect(document.head.appendChild).toHaveBeenCalledTimes(1);
     const configs = dataLayer.filter(
-      (entry) => Array.isArray(entry) && entry[0] === "config",
-    );
+      (entry) => cmd(entry)[0] === "config",
+    ).map(cmd);
     expect(configs).toEqual([
       [
         "config",
@@ -96,11 +107,8 @@ describe("GA4 gtag lifecycle", () => {
     ).toBe(true);
 
     const pageViews = dataLayer.filter(
-      (entry) =>
-        Array.isArray(entry) &&
-        entry[0] === "event" &&
-        entry[1] === "page_view",
-    ) as Array<[string, string, Record<string, unknown>]>;
+      (entry) => cmd(entry)[0] === "event" && cmd(entry)[1] === "page_view",
+    ).map(cmd) as Array<[string, string, Record<string, unknown>]>;
     expect(pageViews).toHaveLength(2);
     expect(pageViews[1]?.[2]).toMatchObject({
       page_path: "/en/contact",
@@ -126,10 +134,7 @@ describe("GA4 gtag lifecycle", () => {
       }),
     ).toBe(true);
     const pageViews = dataLayer.filter(
-      (entry) =>
-        Array.isArray(entry) &&
-        entry[0] === "event" &&
-        entry[1] === "page_view",
+      (entry) => cmd(entry)[0] === "event" && cmd(entry)[1] === "page_view",
     );
     expect(pageViews).toHaveLength(2);
   });
@@ -141,7 +146,7 @@ describe("Consent Mode v2", () => {
     const { dataLayer } = stubDom();
     expect(applyGoogleConsentDefault()).toBe(true);
     expect(applyGoogleConsentDefault()).toBe(false);
-    expect(dataLayer[0]).toEqual([
+    expect(cmd(dataLayer[0])).toEqual([
       "consent",
       "default",
       {
@@ -152,17 +157,18 @@ describe("Consent Mode v2", () => {
         wait_for_update: 500,
       },
     ]);
+    expect(Array.isArray(dataLayer[0])).toBe(false);
     loadGoogleAnalyticsGtag("G-ABC123");
-    expect(dataLayer.find((entry) => Array.isArray(entry) && entry[0] === "config")).toEqual([
+    expect(cmd(dataLayer.find((entry) => cmd(entry)[0] === "config"))).toEqual([
       "config",
       "G-ABC123",
       { anonymize_ip: true, send_page_view: false },
     ]);
     const defaultIndex = dataLayer.findIndex(
-      (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "default",
+      (entry) => cmd(entry)[0] === "consent" && cmd(entry)[1] === "default",
     );
     const configIndex = dataLayer.findIndex(
-      (entry) => Array.isArray(entry) && entry[0] === "config",
+      (entry) => cmd(entry)[0] === "config",
     );
     expect(defaultIndex).toBeGreaterThanOrEqual(0);
     expect(defaultIndex).toBeLessThan(configIndex);
@@ -181,7 +187,8 @@ describe("Consent Mode v2", () => {
     expect(scripts[0]?.src).toBe(
       "https://www.googletagmanager.com/gtag/js?id=G-ABC123",
     );
-    expect(dataLayer).toEqual(
+    const cmds = dataLayer.map(cmd);
+    expect(cmds).toEqual(
       expect.arrayContaining([
         [
           "consent",
@@ -204,10 +211,10 @@ describe("Consent Mode v2", () => {
       ]),
     );
     const updateIndex = dataLayer.findIndex(
-      (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "update",
+      (entry) => cmd(entry)[0] === "consent" && cmd(entry)[1] === "update",
     );
     const pageViewIndex = dataLayer.findIndex(
-      (entry) => Array.isArray(entry) && entry[0] === "event" && entry[1] === "page_view",
+      (entry) => cmd(entry)[0] === "event" && cmd(entry)[1] === "page_view",
     );
     expect(updateIndex).toBeLessThan(pageViewIndex);
     expect(
@@ -223,10 +230,10 @@ describe("Consent Mode v2", () => {
     const { dataLayer, scripts } = stubDom();
     applyGoogleConsentDefault();
     expect(scripts).toHaveLength(0);
-    expect(dataLayer.filter((entry) => Array.isArray(entry) && entry[0] === "config")).toHaveLength(0);
+    expect(dataLayer.filter((entry) => cmd(entry)[0] === "config")).toHaveLength(0);
     expect(
       dataLayer.some(
-        (entry) => Array.isArray(entry) && entry[0] === "consent" && entry[1] === "update",
+        (entry) => cmd(entry)[0] === "consent" && cmd(entry)[1] === "update",
       ),
     ).toBe(false);
   });

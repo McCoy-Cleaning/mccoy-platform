@@ -5,7 +5,9 @@ import { normalizeCmsPage, type CmsPage } from "@mccoy/cms-schema";
 
 import { builtinCmsSeedPages } from "./seeds";
 import { getFileCmsStore } from "./file-store";
+import { loadPublishedPagesBatched } from "./published-read-cache";
 import { getCmsStore } from "./supabase-store";
+import type { CmsStore } from "./types";
 
 export async function publishedPagesFromStore(store: {
   seedBuiltinsIfEmpty: (pages: CmsPage[]) => Promise<void>;
@@ -13,11 +15,27 @@ export async function publishedPagesFromStore(store: {
   getActivePublishedRevision: (
     pageId: string,
   ) => Promise<{ payload?: unknown } | null>;
+  listActivePublishedRevisions?: () => Promise<Array<{ payload?: unknown }>>;
 }): Promise<CmsPage[]> {
   try {
     await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
   } catch {
     /* seed best-effort */
+  }
+
+  if (typeof store.listActivePublishedRevisions === "function") {
+    const revisions = await store.listActivePublishedRevisions();
+    const pages: CmsPage[] = [];
+    for (const rev of revisions) {
+      try {
+        if (rev?.payload && typeof rev.payload === "object") {
+          pages.push(normalizeCmsPage(rev.payload as CmsPage));
+        }
+      } catch {
+        /* skip broken page */
+      }
+    }
+    return pages;
   }
 
   const pages: CmsPage[] = [];
@@ -38,7 +56,7 @@ export async function publishedPagesFromStore(store: {
 export async function loadPublishedCmsPagesForFormScopes(): Promise<CmsPage[]> {
   try {
     const primary = getCmsStore();
-    const fromPrimary = await publishedPagesFromStore(primary);
+    const fromPrimary = await loadPublishedPagesBatched(primary as CmsStore);
     if (fromPrimary.length > 0) return fromPrimary;
   } catch {
     /* try file store */

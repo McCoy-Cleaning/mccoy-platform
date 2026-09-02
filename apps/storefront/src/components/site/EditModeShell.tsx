@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import * as React from "react";
 import { useLocation } from "@tanstack/react-router";
 import { useEdit } from "@/lib/cms/edit-mode-context";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { EditInteractionGuard } from "@/components/site/EditInteractionGuard";
 import { useI18n } from "@/lib/i18n";
 import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
@@ -12,9 +13,13 @@ import { useActiveCmsLocale } from "@/lib/cms/use-active-cms-locale";
  *
  * Also mirrors Admin `?_cmsLocale=` into client i18n so static catalogs (forms,
  * chrome) match CMS EN overlays — LanguageToggle clicks are blocked in edit mode.
+ *
+ * WYSIWYG Preview (interactionMode=preview) uses guard "preview": forms stay
+ * blocked from real submit; navigation is allowed for parity checking.
  */
 export function EditModeShell({ children }: { children: ReactNode }) {
   const { mode } = useEdit();
+  const { interactionMode } = useLiveEditApi();
   const location = useLocation();
   const isPreviewRoute = location.pathname === "/cms-preview";
   const { lang, setLang } = useI18n();
@@ -25,7 +30,14 @@ export function EditModeShell({ children }: { children: ReactNode }) {
     if (previewLocale !== lang) setLang(previewLocale);
   }, [mode, isPreviewRoute, previewLocale, lang, setLang]);
 
-  const guardMode: "edit" | "preview" | "off" = mode === "edit" ? "edit" : isPreviewRoute ? "preview" : "off";
+  const guardMode: "edit" | "preview" | "off" =
+    mode === "edit"
+      ? interactionMode === "preview"
+        ? "preview"
+        : "edit"
+      : isPreviewRoute
+        ? "preview"
+        : "off";
 
   if (guardMode === "off") return <>{children}</>;
 

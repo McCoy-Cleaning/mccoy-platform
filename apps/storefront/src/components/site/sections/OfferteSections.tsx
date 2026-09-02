@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowRight,
@@ -8,9 +8,17 @@ import {
   Camera,
   X,
 } from "lucide-react";
-import type { ContactFormContent } from "@mccoy/cms-schema";
+import {
+  formFieldPayloadKey,
+  normalizeQuoteRequestForm,
+  resolveContactFormFields,
+  createDefaultQuoteRequestForm,
+  type ContactFormContent,
+  type FormFieldItem,
+  type QuoteRequestFormBlockData,
+  type QuoteRequestFormTab,
+} from "@mccoy/cms-schema";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
-import { useI18n } from "@/lib/i18n";
 import { submitSiteForm } from "@/lib/forms/submit-client";
 import { useClientReady } from "@/lib/use-client-ready";
 import { FIXED_FORM_SOURCE_IDS } from "@mccoy/domain";
@@ -21,57 +29,105 @@ import {
   WEBSITE_FORM_MEDIA_FILE_ACCEPT,
 } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { WysiwygQuoteFormFieldChrome } from "../cms-editor/WysiwygQuoteFormField";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
+
+function iconForTab(tab: QuoteRequestFormTab) {
+  if (tab.icon === "sofa" || tab.kind === "furniture_cleaning") return Sofa;
+  return GlassWater;
+}
+
+function quoteFieldSpansFull(field: FormFieldItem): boolean {
+  return field.type === "textarea" || field.type === "file";
+}
 
 export function OfferteFormSection() {
   const content = useTypedSectionContent("page_offerte", "offerte.form") as ContactFormContent;
-  const { t } = useI18n();
-  const [tab, setTab] = useState<"window" | "furniture">("window");
+  const { sendMutation } = useLiveEditApi();
+  const quote = useMemo(
+    () =>
+      normalizeQuoteRequestForm(content.quote ?? createDefaultQuoteRequestForm()),
+    [content.quote],
+  );
+
+  const initialTabId =
+    quote.defaultTabId && quote.tabs.some((t) => t.id === quote.defaultTabId)
+      ? quote.defaultTabId
+      : quote.tabs[0]?.id ?? "";
+  const [tabId, setTabId] = useState(initialTabId);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const apply = () => {
       const h = window.location.hash.replace("#", "").toLowerCase();
-      if (h === "furniture") setTab("furniture");
-      else setTab("window");
+      if (h === "furniture" || h === "tab_furniture") {
+        const furniture = quote.tabs.find((t) => t.kind === "furniture_cleaning");
+        if (furniture) setTabId(furniture.id);
+        return;
+      }
+      if (h === "window" || h === "glass" || h === "tab_glass") {
+        const glass = quote.tabs.find((t) => t.kind === "glass_washing");
+        if (glass) setTabId(glass.id);
+      }
     };
     apply();
     window.addEventListener("hashchange", apply);
     return () => window.removeEventListener("hashchange", apply);
-  }, []);
+  }, [quote.tabs]);
 
-  const tabs = [
-    {
-      id: "window" as const,
-      icon: GlassWater,
-      tag: t.contact.sections.window.tag,
-      title: t.contact.sections.window.title,
-    },
-    {
-      id: "furniture" as const,
-      icon: Sofa,
-      tag: t.contact.sections.furniture.tag,
-      title: t.contact.sections.furniture.title,
-    },
-  ];
+  const active = quote.tabs.find((t) => t.id === tabId) ?? quote.tabs[0];
+  const heading = content.heading?.trim() || quote.heading?.trim() || "";
+
+  const patchQuote = (next: QuoteRequestFormBlockData, extra?: Partial<ContactFormContent>) => {
+    sendMutation({
+      kind: "section",
+      sectionKey: "offerte.form",
+      patch: { quote: next, heading: next.heading, ...extra },
+    });
+  };
+
+  const updateTab = (index: number, patch: Partial<QuoteRequestFormTab>) => {
+    const tabs = quote.tabs.map((t, i) => (i === index ? { ...t, ...patch } : t));
+    patchQuote({ ...quote, tabs });
+  };
+
+  if (!active) {
+    return (
+      <div data-cms-section="offerte.form">
+        <p className={cn(SECTION_PAGE_RAIL, "text-sm text-muted-foreground")}>
+          Geen tabs geconfigureerd.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div data-cms-section="offerte.form">
-      {content.heading ? (
-        <h2 className={cn(SECTION_PAGE_RAIL, "mt-16 font-display text-3xl text-foreground md:text-4xl")}>
-          {content.heading}
-        </h2>
-      ) : null}
+      <h2 className={cn(SECTION_PAGE_RAIL, "mt-16 font-display text-3xl text-foreground md:text-4xl")}>
+        <WysiwygInlineText
+          as="span"
+          label="Kop"
+          value={heading}
+          enFieldPath="section:offerte.form:heading"
+          target={{
+            kind: "custom",
+            onCommit: (next) =>
+              patchQuote({ ...quote, heading: next || undefined }, { heading: next || undefined }),
+          }}
+        />
+      </h2>
 
       <section className={cn(SECTION_PAGE_RAIL, "mt-20")}>
         <div className="grid gap-4 md:grid-cols-2">
-          {tabs.map((tb, i) => {
-            const Icon = tb.icon;
-            const active = tab === tb.id;
+          {quote.tabs.map((tb, i) => {
+            const Icon = iconForTab(tb);
+            const selected = tb.id === active.id;
             return (
               <motion.button
                 key={tb.id}
                 type="button"
-                onClick={() => setTab(tb.id)}
+                onClick={() => setTabId(tb.id)}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -79,7 +135,7 @@ export function OfferteFormSection() {
                 whileHover={{ y: -3 }}
                 className={cn(
                   "group relative overflow-hidden rounded-3xl border p-5 text-left transition",
-                  active
+                  selected
                     ? "border-primary/60 bg-primary/10"
                     : "border-border bg-card/60 hover:border-primary/40",
                 )}
@@ -87,7 +143,7 @@ export function OfferteFormSection() {
                 <div className="relative flex items-start gap-4">
                   <div
                     className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition ${
-                      active ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"
+                      selected ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -106,13 +162,24 @@ export function OfferteFormSection() {
       <section className={cn(SECTION_PAGE_RAIL, "pb-28 pt-10")}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={tab}
+            key={active.id}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
-            {tab === "window" ? <WindowForm /> : <FurnitureForm />}
+            <TabForm
+              tab={active}
+              tabIndex={Math.max(
+                0,
+                quote.tabs.findIndex((t) => t.id === active.id),
+              )}
+              quote={quote}
+              submitLabel={active.submitLabel?.trim() || quote.submitLabel}
+              successMessage={active.successMessage?.trim() || quote.successMessage}
+              onUpdateTab={updateTab}
+              onPatchQuote={patchQuote}
+            />
           </motion.div>
         </AnimatePresence>
       </section>
@@ -120,247 +187,271 @@ export function OfferteFormSection() {
   );
 }
 
-function FormShell({
-  id,
-  tag,
-  title,
-  desc,
-  icon: Icon,
-  children,
+function TabForm({
+  tab,
+  tabIndex,
+  quote,
+  submitLabel,
+  successMessage,
+  onUpdateTab,
+  onPatchQuote,
 }: {
-  id: string;
-  tag: string;
-  title: string;
-  desc: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
+  tab: QuoteRequestFormTab;
+  tabIndex: number;
+  quote: QuoteRequestFormBlockData;
+  submitLabel: string;
+  successMessage: string;
+  onUpdateTab: (index: number, patch: Partial<QuoteRequestFormTab>) => void;
+  onPatchQuote: (next: QuoteRequestFormBlockData, extra?: Partial<ContactFormContent>) => void;
 }) {
+  const Icon = iconForTab(tab);
+  const fields = useMemo(() => resolveContactFormFields(tab.fields), [tab.fields]);
+  const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fileValues, setFileValues] = useState<Record<string, File[]>>({});
+
+  const extraFiles = useMemo(
+    () => Object.values(fileValues).flat(),
+    [fileValues],
+  );
+
   return (
-    <div id={id} className="grid items-start gap-10 lg:grid-cols-12">
+    <div id={tab.id} className="grid items-start gap-10 lg:grid-cols-12">
       <aside className="lg:col-span-5">
         <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
           <Icon className="h-5 w-5" />
         </div>
-        <SectionEyebrow className="mt-6 tracking-[0.25em]">{tag}</SectionEyebrow>
-        <h2 className="font-display mt-3 text-4xl text-foreground md:text-5xl">{title}</h2>
-        <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">{desc}</p>
+        <SectionEyebrow className="mt-6 tracking-[0.25em]">
+          <WysiwygInlineText
+            as="span"
+            label="Tab-tag"
+            value={tab.tag}
+            enFieldPath={`section:offerte.form:quote.tabs.${tabIndex}.tag`}
+            target={{
+              kind: "custom",
+              onCommit: (next) => onUpdateTab(tabIndex, { tag: next || tab.tag }),
+            }}
+          />
+        </SectionEyebrow>
+        <h2 className="font-display mt-3 text-4xl text-foreground md:text-5xl">
+          <WysiwygInlineText
+            as="span"
+            label="Tab-titel"
+            value={tab.title}
+            enFieldPath={`section:offerte.form:quote.tabs.${tabIndex}.title`}
+            target={{
+              kind: "custom",
+              onCommit: (next) => onUpdateTab(tabIndex, { title: next || tab.title }),
+            }}
+          />
+        </h2>
+        <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">
+          <WysiwygInlineText
+            as="span"
+            multiline
+            label="Tab-beschrijving"
+            value={tab.description}
+            enFieldPath={`section:offerte.form:quote.tabs.${tabIndex}.description`}
+            target={{
+              kind: "custom",
+              onCommit: (next) => onUpdateTab(tabIndex, { description: next }),
+            }}
+          />
+        </p>
       </aside>
 
       <SectionSurface variant="form" className="lg:col-span-7">
-        {children}
+        {sent ? (
+          <Success
+            label={successMessage}
+            onCommit={(next) =>
+              onPatchQuote(
+                { ...quote, successMessage: next || quote.successMessage },
+                { successMessage: next || undefined },
+              )
+            }
+          />
+        ) : (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (submitting) return;
+              setSubmitting(true);
+              setError(null);
+              const result = await submitSiteForm({
+                kind: tab.kind,
+                pageId: "page_offerte",
+                sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
+                form: e.currentTarget,
+                extraFiles,
+              });
+              setSubmitting(false);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setSent(true);
+            }}
+            className="relative grid gap-4 sm:grid-cols-2"
+          >
+            <Honeypot />
+            {fields.map((field) => {
+              const key = formFieldPayloadKey(field);
+              const isTabField = tab.fields.some((f) => f.id === field.id);
+              const spanClass = quoteFieldSpansFull(field) ? "sm:col-span-2" : undefined;
+              const control = (
+                <FieldControl
+                  field={field}
+                  idPrefix={`offerte-${tab.id}`}
+                  files={fileValues[key] ?? []}
+                  onFilesChange={(next) =>
+                    setFileValues((prev) => ({ ...prev, [key]: next }))
+                  }
+                />
+              );
+              return (
+                <div
+                  key={field.id}
+                  className={cn("relative", spanClass)}
+                  data-cms-form-field-chrome=""
+                >
+                  {isTabField ? (
+                    <WysiwygQuoteFormFieldChrome
+                      field={field}
+                      tab={tab}
+                      tabIndex={tabIndex}
+                      sectionKey="offerte.form"
+                      quote={quote}
+                    >
+                      {control}
+                    </WysiwygQuoteFormFieldChrome>
+                  ) : (
+                    control
+                  )}
+                </div>
+              );
+            })}
+            {error ? <FormError message={error} /> : null}
+            <Submit
+              label={submitLabel}
+              submitting={submitting}
+              onCommit={(next) =>
+                onPatchQuote(
+                  { ...quote, submitLabel: next || quote.submitLabel },
+                  { submitLabel: next || undefined },
+                )
+              }
+            />
+          </form>
+        )}
       </SectionSurface>
     </div>
   );
 }
 
-function WindowForm() {
-  const { t } = useI18n();
-  const s = t.contact.sections.window;
-  const [sent, setSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-
-  return (
-    <FormShell id="window" tag={s.tag} title={s.title} desc={s.desc} icon={GlassWater}>
-      {sent ? (
-        <Success label={t.contact.success} />
-      ) : (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (submitting) return;
-            setSubmitting(true);
-            setError(null);
-            const result = await submitSiteForm({
-              kind: "glass_washing",
-              pageId: "page_offerte",
-              sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
-              form: e.currentTarget,
-              extraFiles: photoFiles,
-            });
-            setSubmitting(false);
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            setSent(true);
-          }}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          <Honeypot />
-          <Field label={t.contact.name} name="name" required />
-          <Field label={t.contact.email} name="email" type="email" required />
-          <Field label={t.contact.phone} name="phone" type="tel" />
-          <Field label={t.contact.company} name="company" />
-          <Field label={s.floors} name="floors" type="number" />
-          <Field label={s.windows} name="windows" type="number" />
-          <Field label={s.height} name="height" type="number" />
-          <Select label={s.access} name="access" options={s.accessOptions} />
-          <Select label={s.sides} name="sides" options={s.sidesOptions} />
-          <Select label={s.frequency} name="frequency" options={s.frequencyOptions} />
-          <PhotoUpload
-            label={t.contact.photosLabel}
-            help={t.contact.photosHelp}
-            files={photoFiles}
-            onFilesChange={setPhotoFiles}
-          />
-          <TextArea label={t.contact.message} name="message" />
-          {error ? <FormError message={error} /> : null}
-          <Submit label={t.contact.submit} submitting={submitting} />
-        </form>
-      )}
-    </FormShell>
-  );
-}
-
-function FurnitureForm() {
-  const { t } = useI18n();
-  const s = t.contact.sections.furniture;
-  const [sent, setSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-
-  return (
-    <FormShell id="furniture" tag={s.tag} title={s.title} desc={s.desc} icon={Sofa}>
-      {sent ? (
-        <Success label={t.contact.success} />
-      ) : (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (submitting) return;
-            setSubmitting(true);
-            setError(null);
-            const result = await submitSiteForm({
-              kind: "furniture_cleaning",
-              pageId: "page_offerte",
-              sourceId: FIXED_FORM_SOURCE_IDS.offerteForm,
-              form: e.currentTarget,
-              extraFiles: photoFiles,
-            });
-            setSubmitting(false);
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            setSent(true);
-          }}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          <Honeypot />
-          <Field label={t.contact.name} name="name" required />
-          <Field label={t.contact.email} name="email" type="email" required />
-          <Field label={t.contact.phone} name="phone" type="tel" />
-          <Field label={t.contact.company} name="company" />
-          <Select label={s.itemType} name="item" options={s.itemOptions} />
-          <Field label={s.pieces} name="pieces" type="number" />
-          <Field label={s.material} name="material" />
-          <Field label={s.area} name="area" type="number" />
-          <PhotoUpload
-            label={t.contact.photosLabel}
-            help={t.contact.photosHelp}
-            files={photoFiles}
-            onFilesChange={setPhotoFiles}
-          />
-          <TextArea label={s.stains} name="stains" />
-          {error ? <FormError message={error} /> : null}
-          <Submit label={t.contact.submit} submitting={submitting} />
-        </form>
-      )}
-    </FormShell>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  required,
+function FieldControl({
+  field,
+  idPrefix,
+  files,
+  onFilesChange,
 }: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
+  field: FormFieldItem;
+  idPrefix: string;
+  files: File[];
+  onFilesChange: (files: File[]) => void;
 }) {
-  const id = `offerte-${name}`;
+  const id = `${idPrefix}-${formFieldPayloadKey(field)}`;
+  const key = formFieldPayloadKey(field);
+  const label = (
+    <label
+      htmlFor={id}
+      className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60"
+    >
+      {field.label}
+      {field.required ? <span className="ml-1 text-primary">*</span> : null}
+    </label>
+  );
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        {label}
+        <textarea
+          id={id}
+          name={key}
+          rows={4}
+          maxLength={1000}
+          required={field.required}
+          placeholder={field.placeholder}
+          className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-primary"
+        />
+      </div>
+    );
+  }
+
+  if (field.type === "select") {
+    const options = field.options ?? [];
+    return (
+      <div>
+        {label}
+        <select
+          id={id}
+          name={key}
+          required={field.required}
+          className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white outline-none transition focus:border-primary"
+        >
+          {options.map((o) => (
+            <option key={o.id} value={o.value ?? o.label} className="bg-background">
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  if (field.type === "file") {
+    return (
+      <PhotoUpload
+        id={id}
+        label={field.label}
+        help={field.placeholder}
+        required={field.required}
+        files={files}
+        onFilesChange={onFilesChange}
+      />
+    );
+  }
+
+  const inputType =
+    field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text";
+
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60"
-      >
-        {label}
-        {required ? <span className="ml-1 text-primary">*</span> : null}
-      </label>
+      {label}
       <input
         id={id}
-        type={type}
-        name={name}
-        required={required}
+        type={inputType}
+        name={key}
+        required={field.required ?? (field.type === "name" || field.type === "email")}
         maxLength={255}
+        placeholder={field.placeholder}
         className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-primary"
       />
     </div>
   );
 }
 
-function Select({
+function Submit({
   label,
-  name,
-  options,
+  submitting,
+  onCommit,
 }: {
   label: string;
-  name: string;
-  options: readonly string[];
+  submitting?: boolean;
+  onCommit: (next: string) => void;
 }) {
-  const id = `offerte-${name}`;
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60"
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        name={name}
-        className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white outline-none transition focus:border-primary"
-      >
-        {options.map((o) => (
-          <option key={o} value={o} className="bg-background">
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function TextArea({ label, name }: { label: string; name: string }) {
-  const id = `offerte-${name}`;
-  return (
-    <div className="sm:col-span-2">
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60"
-      >
-        {label}
-      </label>
-      <textarea
-        id={id}
-        name={name}
-        rows={4}
-        maxLength={1000}
-        className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-primary"
-      />
-    </div>
-  );
-}
-
-function Submit({ label, submitting }: { label: string; submitting?: boolean }) {
   const clientReady = useClientReady();
   return (
     <button
@@ -370,8 +461,23 @@ function Submit({ label, submitting }: { label: string; submitting?: boolean }) 
       data-testid={clientReady ? "site-form-ready" : "site-form-pending"}
       className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
     >
-      {submitting ? "..." : label}
-      <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+      {submitting ? (
+        "..."
+      ) : (
+        <>
+          <WysiwygInlineText
+            as="span"
+            label="Knoptekst"
+            value={label}
+            enFieldPath="section:offerte.form:submitLabel"
+            target={{
+              kind: "custom",
+              onCommit,
+            }}
+          />
+          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        </>
+      )}
     </button>
   );
 }
@@ -400,7 +506,13 @@ function Honeypot() {
   );
 }
 
-function Success({ label }: { label: string }) {
+function Success({
+  label,
+  onCommit,
+}: {
+  label: string;
+  onCommit: (next: string) => void;
+}) {
   return (
     <div
       className="flex flex-col items-center gap-3 py-12 text-center"
@@ -408,19 +520,34 @@ function Success({ label }: { label: string }) {
       data-testid="site-form-success"
     >
       <CheckCircle2 className="h-12 w-12 text-primary" />
-      <p className="font-display text-2xl text-white">{label}</p>
+      <p className="font-display text-2xl text-white">
+        <WysiwygInlineText
+          as="span"
+          label="Succesbericht"
+          value={label}
+          enFieldPath="section:offerte.form:successMessage"
+          target={{
+            kind: "custom",
+            onCommit,
+          }}
+        />
+      </p>
     </div>
   );
 }
 
 function PhotoUpload({
+  id,
   label,
   help,
+  required,
   files,
   onFilesChange,
 }: {
+  id: string;
   label: string;
-  help: string;
+  help?: string;
+  required?: boolean;
   files: File[];
   onFilesChange: (files: File[]) => void;
 }) {
@@ -440,18 +567,23 @@ function PhotoUpload({
   }
 
   return (
-    <div className="sm:col-span-2">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60">
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/60"
+      >
         {label}
+        {required ? <span className="ml-1 text-primary">*</span> : null}
       </label>
       <label className="group flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-white/15 bg-background/40 px-4 py-6 text-center transition hover:border-primary/60 hover:bg-primary/5">
         <Camera className="h-6 w-6 text-primary" />
         <span className="text-sm text-white/75">
           {files.length > 0 ? `${files.length} bestand(en) geselecteerd` : "Klik om foto's toe te voegen"}
         </span>
-        <span className="text-[11px] text-white/45">{help}</span>
+        {help ? <span className="text-[11px] text-white/45">{help}</span> : null}
         <input
           ref={inputRef}
+          id={id}
           type="file"
           accept={WEBSITE_FORM_MEDIA_FILE_ACCEPT}
           multiple

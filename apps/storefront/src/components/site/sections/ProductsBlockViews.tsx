@@ -4,7 +4,6 @@
  */
 
 import { motion, useReducedMotion } from "motion/react";
-import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
   Sparkles,
@@ -24,7 +23,6 @@ import {
   withResolvedPublicImageAlt,
   type CmsButton,
   type CmsImage,
-  type CmsLink,
 } from "@mccoy/cms-schema";
 import { CmsLinkAnchor } from "../CmsLinkAnchor";
 import { DeliveryImage } from "../DeliveryImage";
@@ -34,6 +32,11 @@ import {
   SectionSurface,
 } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
+import { useOverlayHeading } from "@/lib/cms/aether-edge-overlay-context";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { WysiwygButtonEditor, WysiwygMediaFrame } from "../cms-editor/WysiwygMediaButton";
+import type { FixedSectionKey } from "@mccoy/cms-schema";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -62,10 +65,17 @@ export type ProductsIntroViewProps = {
   /** Webshop aside notice. */
   notice: string;
   image?: CmsImage | null;
-  ctaLabel: string;
+  /** @deprecated Prefer `cta` — kept for non-CMS presentation callers. */
+  ctaLabel?: string;
+  cta?: CmsButton | null;
+  secondaryCta?: CmsButton | null;
   isEn: boolean;
   /** Optional CMS metrics strip; falls back to current NL/EN defaults. */
   metrics?: ProductsIntroMetric[] | null;
+  /** When set, wrap chrome fields for on-canvas editing (fixed products.main). */
+  editSectionKey?: Extract<FixedSectionKey, "products.main">;
+  /** When set, wrap chrome fields for on-canvas editing (textImage productsIntro block). */
+  editBlockId?: string;
 };
 
 function defaultProductsIntroMetrics(isEn: boolean): ProductsIntroMetric[] {
@@ -108,10 +118,44 @@ export function ProductsIntroView({
   notice,
   image,
   ctaLabel,
+  cta: ctaProp,
+  secondaryCta: secondaryCtaProp,
   isEn,
   metrics: metricsProp,
+  editSectionKey,
+  editBlockId,
 }: ProductsIntroViewProps) {
   const reduced = useReducedMotion();
+  const { sendMutation } = useLiveEditApi();
+  const overlayH1 = useOverlayHeading(eyebrow);
+  const primaryCta: CmsButton = ctaProp ?? {
+    label: ctaLabel ?? (isEn ? "Contact us" : "Contact opnemen"),
+    link: { type: "internal_route", route: "contact" },
+  };
+  const phoneCta: CmsButton = secondaryCtaProp ?? {
+    label: MCCOY_NAP.telephoneDisplayNational,
+    link: { type: "external", url: napTelHref() },
+  };
+  const canEdit = Boolean(editSectionKey || editBlockId);
+  const patchProducts = (patch: Record<string, unknown>) => {
+    if (editSectionKey) {
+      sendMutation({ kind: "section", sectionKey: editSectionKey, patch });
+      return;
+    }
+    if (editBlockId) {
+      sendMutation({ kind: "block", blockId: editBlockId, patch });
+    }
+  };
+  /** Section uses heading/intro/body(notice); textImage block uses title/body/notice. */
+  const fieldName = (logical: string): string => {
+    if (editBlockId) {
+      if (logical === "heading") return "title";
+      if (logical === "intro") return "body";
+      return logical;
+    }
+    if (editSectionKey && logical === "notice") return "body";
+    return logical;
+  };
   const introParagraphs = intro
     .replace(/\r\n/g, "\n")
     .split(/\n{2,}/)
@@ -130,6 +174,39 @@ export function ProductsIntroView({
 
   const metrics = localizedProductsIntroMetrics(metricsProp, isEn);
 
+  const text = (
+    field: string,
+    value: string,
+    opts?: { multiline?: boolean; as?: "span"; label?: string },
+  ) => {
+    const resolved = fieldName(field);
+    if (editSectionKey) {
+      return (
+        <WysiwygInlineText
+          as={opts?.as ?? "span"}
+          multiline={opts?.multiline}
+          label={opts?.label}
+          value={value}
+          enFieldPath={`section:${editSectionKey}:${resolved}`}
+          target={{ kind: "section", sectionKey: editSectionKey, field: resolved }}
+        />
+      );
+    }
+    if (editBlockId) {
+      return (
+        <WysiwygInlineText
+          as={opts?.as ?? "span"}
+          multiline={opts?.multiline}
+          label={opts?.label}
+          value={value}
+          enFieldPath={`block:${editBlockId}:${resolved}`}
+          target={{ kind: "block", blockId: editBlockId, field: resolved }}
+        />
+      );
+    }
+    return value;
+  };
+
   return (
     <section id="products" className="relative overflow-hidden py-24 sm:py-28">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
@@ -139,59 +216,100 @@ export function ProductsIntroView({
         <div className="grid items-start gap-12 lg:grid-cols-12 lg:gap-16">
           <motion.div
             variants={fadeUp}
-            // Immediate paint on SPA enter — avoid opacity:0 until whileInView.
             initial={false}
             className="lg:col-span-6"
           >
-            {eyebrow ? (
+            {overlayH1 ? (
               <h1 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {eyebrow}
+                {text("eyebrow", overlayH1, { label: "Eyebrow" })}
               </h1>
             ) : null}
             <h2 className="font-display mt-4 max-w-xl text-4xl leading-[1.08] text-white md:text-5xl lg:text-6xl">
-              {heading}
+              {text("heading", heading, { label: "Kop" })}
             </h2>
             <div className="mt-5 h-0.5 w-14 rounded-full bg-primary" aria-hidden />
 
-            {introParagraphs.map((paragraph, index) => {
-              const gap = index === 0 ? 0 : (introGaps[index - 1] ?? 1);
-              const marginTop =
-                index === 0 ? "1.5rem" : gap >= 2 ? `${1 + gap * 0.75}rem` : "1rem";
-              return (
-                <p
-                  key={`products-intro-${index}`}
-                  className="max-w-xl whitespace-pre-line text-base leading-relaxed text-white/70 md:text-[17px]"
-                  style={{ marginTop }}
-                >
-                  {paragraph}
-                </p>
-              );
-            })}
+            {canEdit ? (
+              <p className="mt-6 max-w-xl whitespace-pre-line text-base leading-relaxed text-white/70 md:text-[17px]">
+                {text("intro", intro, { multiline: true, label: "Intro" })}
+              </p>
+            ) : (
+              introParagraphs.map((paragraph, index) => {
+                const gap = index === 0 ? 0 : (introGaps[index - 1] ?? 1);
+                const marginTop =
+                  index === 0 ? "1.5rem" : gap >= 2 ? `${1 + gap * 0.75}rem` : "1rem";
+                return (
+                  <p
+                    key={`products-intro-${index}`}
+                    className="max-w-xl whitespace-pre-line text-base leading-relaxed text-white/70 md:text-[17px]"
+                    style={{ marginTop }}
+                  >
+                    {paragraph}
+                  </p>
+                );
+              })
+            )}
 
             <div className="mt-10 flex flex-wrap items-center gap-3 sm:gap-4">
-              <Link
-                to="/contact"
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <ShoppingBag className="h-4 w-4" aria-hidden />
-                {ctaLabel}
-              </Link>
-              <a
-                href={napTelHref()}
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-primary/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <Phone className="h-4 w-4 text-primary" aria-hidden />
-                {MCCOY_NAP.telephoneDisplayNational}
-              </a>
+              {editSectionKey ? (
+                <WysiwygButtonEditor
+                  button={primaryCta}
+                  onChange={(next) => patchProducts({ cta: next })}
+                >
+                  <CmsLinkAnchor
+                    link={primaryCta.link}
+                    fallbackHref="/contact"
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <ShoppingBag className="h-4 w-4" aria-hidden />
+                    {primaryCta.label}
+                  </CmsLinkAnchor>
+                </WysiwygButtonEditor>
+              ) : (
+                <CmsLinkAnchor
+                  link={primaryCta.link}
+                  fallbackHref="/contact"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <ShoppingBag className="h-4 w-4" aria-hidden />
+                  {primaryCta.label}
+                </CmsLinkAnchor>
+              )}
+              {editSectionKey ? (
+                <WysiwygButtonEditor
+                  button={phoneCta}
+                  onChange={(next) => patchProducts({ secondaryCta: next })}
+                >
+                  <CmsLinkAnchor
+                    link={phoneCta.link}
+                    fallbackHref={napTelHref()}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-primary/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <Phone className="h-4 w-4 text-primary" aria-hidden />
+                    {phoneCta.label}
+                  </CmsLinkAnchor>
+                </WysiwygButtonEditor>
+              ) : (
+                <CmsLinkAnchor
+                  link={phoneCta.link}
+                  fallbackHref={napTelHref()}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-semibold text-white/85 transition hover:border-primary/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <Phone className="h-4 w-4 text-primary" aria-hidden />
+                  {phoneCta.label}
+                </CmsLinkAnchor>
+              )}
             </div>
 
-            {notice ? (
+            {notice || canEdit ? (
               <aside
                 className="mt-10 flex gap-3 border-l-2 border-primary/60 pl-5"
                 aria-label={isEn ? "Webshop notice" : "Webshop melding"}
               >
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                <p className="whitespace-pre-line text-sm leading-relaxed text-white/80">{notice}</p>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-white/80">
+                  {text("notice", notice, { multiline: true, label: "Melding" })}
+                </p>
               </aside>
             ) : null}
           </motion.div>
@@ -201,7 +319,7 @@ export function ProductsIntroView({
             initial={false}
             className="lg:col-span-6"
           >
-            {image && !isCmsPlaceholderSrc(image.src) ? (
+            {(image && !isCmsPlaceholderSrc(image.src)) || canEdit ? (
               <figure className="relative">
                 <div
                   className="pointer-events-none absolute -inset-8 -z-10 rounded-full bg-primary/15 blur-3xl"
@@ -209,11 +327,10 @@ export function ProductsIntroView({
                 />
                 <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/40">
                   {(() => {
-                    const resolved = withResolvedPublicImageAlt(
-                      image,
-                      heading || "McCoy Cleaning Products",
-                    );
-                    return (
+                    const resolved = image
+                      ? withResolvedPublicImageAlt(image, heading || "McCoy Cleaning Products")
+                      : null;
+                    const img = resolved ? (
                       <DeliveryImage
                         src={resolved.src}
                         alt={resolved.alt}
@@ -224,22 +341,83 @@ export function ProductsIntroView({
                         fetchPriority="high"
                         className="h-auto w-full object-contain"
                       />
-                    );
+                    ) : null;
+                    if (editSectionKey) {
+                      return (
+                        <WysiwygMediaFrame
+                          image={image && !isCmsPlaceholderSrc(image.src) ? image : null}
+                          emptyPlaceholder
+                          target={{ kind: "section", sectionKey: editSectionKey, field: "image" }}
+                        >
+                          {img}
+                        </WysiwygMediaFrame>
+                      );
+                    }
+                    if (editBlockId) {
+                      return (
+                        <WysiwygMediaFrame
+                          image={image && !isCmsPlaceholderSrc(image.src) ? image : null}
+                          emptyPlaceholder
+                          target={{ kind: "block", blockId: editBlockId, field: "image" }}
+                        >
+                          {img}
+                        </WysiwygMediaFrame>
+                      );
+                    }
+                    return img;
                   })()}
                 </div>
-                <figcaption className="sr-only">
-                  {resolvePublicImageAlt(image, heading || "McCoy Cleaning Products")}
-                </figcaption>
+                {image ? (
+                  <figcaption className="sr-only">
+                    {resolvePublicImageAlt(image, heading || "McCoy Cleaning Products")}
+                  </figcaption>
+                ) : null}
               </figure>
             ) : null}
 
             {metrics.length > 0 ? (
               <dl className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10">
-                {metrics.map((m) => (
+                {metrics.map((m, index) => (
                   <div key={m.id} className="bg-card/80 px-3 py-4 text-center sm:px-4 sm:py-5">
-                    <dd className="font-display text-xl text-white sm:text-2xl">{m.value}</dd>
+                    <dd className="font-display text-xl text-white sm:text-2xl">
+                      {canEdit ? (
+                        <WysiwygInlineText
+                          as="span"
+                          label="Waarde"
+                          value={m.value}
+                          target={{
+                            kind: "custom",
+                            onCommit: (next) => {
+                              const nextMetrics = metrics.map((row, i) =>
+                                i === index ? { ...row, value: next } : row,
+                              );
+                              patchProducts({ metrics: nextMetrics });
+                            },
+                          }}
+                        />
+                      ) : (
+                        m.value
+                      )}
+                    </dd>
                     <dt className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/55 sm:text-xs">
-                      {m.label}
+                      {canEdit ? (
+                        <WysiwygInlineText
+                          as="span"
+                          label="Label"
+                          value={m.label}
+                          target={{
+                            kind: "custom",
+                            onCommit: (next) => {
+                              const nextMetrics = metrics.map((row, i) =>
+                                i === index ? { ...row, label: next } : row,
+                              );
+                              patchProducts({ metrics: nextMetrics });
+                            },
+                          }}
+                        />
+                      ) : (
+                        m.label
+                      )}
                     </dt>
                   </div>
                 ))}
@@ -265,6 +443,8 @@ export type ProductsAssortmentViewProps = {
   heading: string;
   intro: string;
   cards: ProductsAssortmentCard[];
+  editSectionKey?: Extract<FixedSectionKey, "products.info">;
+  onPatchCard?: (id: string, patch: { title?: string; description?: string; cta?: CmsButton }) => void;
 };
 
 /** Exact Producten assortment card grid. */
@@ -273,9 +453,25 @@ export function ProductsAssortmentView({
   heading,
   intro,
   cards,
+  editSectionKey,
+  onPatchCard,
 }: ProductsAssortmentViewProps) {
   const reduced = useReducedMotion();
   const cardIcons = [Package, Droplets, SprayCan, Wrench] as const;
+
+  const sectionText = (field: string, value: string, opts?: { multiline?: boolean; label?: string }) =>
+    editSectionKey ? (
+      <WysiwygInlineText
+        as="span"
+        multiline={opts?.multiline}
+        label={opts?.label}
+        value={value}
+        enFieldPath={`section:${editSectionKey}:${field}`}
+        target={{ kind: "section", sectionKey: editSectionKey, field }}
+      />
+    ) : (
+      value
+    );
 
   return (
     <section id="products-info" className="relative overflow-hidden py-20 sm:py-24">
@@ -287,14 +483,20 @@ export function ProductsAssortmentView({
           viewport={{ once: true }}
         >
           <div className="max-w-2xl">
-            {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+            {eyebrow || editSectionKey ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                {sectionText("eyebrow", eyebrow, { label: "Eyebrow" })}
+              </p>
             ) : null}
-            {heading ? (
-              <h2 className="font-display mt-4 text-3xl text-white md:text-4xl">{heading}</h2>
+            {heading || editSectionKey ? (
+              <h2 className="font-display mt-4 text-3xl text-white md:text-4xl">
+                {sectionText("heading", heading, { label: "Kop" })}
+              </h2>
             ) : null}
-            {intro ? (
-              <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-white/65">{intro}</p>
+            {intro || editSectionKey ? (
+              <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-white/65">
+                {sectionText("intro", intro, { multiline: true, label: "Intro" })}
+              </p>
             ) : null}
           </div>
 
@@ -319,22 +521,65 @@ export function ProductsAssortmentView({
                           <Icon className="h-5 w-5" aria-hidden />
                         </div>
                         <div className="min-w-0 pt-1">
-                          <h3 className="text-sm font-semibold leading-snug text-foreground">{card.title}</h3>
+                          <h3 className="text-sm font-semibold leading-snug text-foreground">
+                            {onPatchCard ? (
+                              <WysiwygInlineText
+                                as="span"
+                                label="Titel"
+                                value={card.title}
+                                target={{
+                                  kind: "custom",
+                                  onCommit: (next) => onPatchCard(card.id, { title: next }),
+                                }}
+                              />
+                            ) : (
+                              card.title
+                            )}
+                          </h3>
                           {card.description ? (
                             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                              {card.description}
+                              {onPatchCard ? (
+                                <WysiwygInlineText
+                                  as="span"
+                                  multiline
+                                  label="Beschrijving"
+                                  value={card.description}
+                                  target={{
+                                    kind: "custom",
+                                    onCommit: (next) =>
+                                      onPatchCard(card.id, { description: next }),
+                                  }}
+                                />
+                              ) : (
+                                card.description
+                              )}
                             </p>
                           ) : null}
                         </div>
                       </div>
                       {card.cta ? (
-                        <CmsButtonView
-                          button={card.cta}
-                          className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
-                        >
-                          {card.cta.label}
-                          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                        </CmsButtonView>
+                        onPatchCard ? (
+                          <WysiwygButtonEditor
+                            button={card.cta}
+                            onChange={(next) => onPatchCard(card.id, { cta: next })}
+                          >
+                            <CmsButtonView
+                              button={card.cta}
+                              className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
+                            >
+                              {card.cta.label}
+                              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                            </CmsButtonView>
+                          </WysiwygButtonEditor>
+                        ) : (
+                          <CmsButtonView
+                            button={card.cta}
+                            className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
+                          >
+                            {card.cta.label}
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                          </CmsButtonView>
+                        )
                       ) : null}
                     </SectionSurface>
                   </motion.div>

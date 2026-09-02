@@ -9,6 +9,7 @@ export {
   sendSmtpMail,
   defaultTransactionalFrom,
   getSmtpConfig,
+  resetSmtpTransportCache,
 } from "./smtp";
 export { FormSubmitError, sendWebsiteFormEmail } from "./send-form";
 export { sendAdminReplyEmail, type SendAdminReplyEmailResult } from "./send-reply";
@@ -20,6 +21,11 @@ export {
   type InboundMailCandidate,
   type KnownInquiryMailIdentity,
 } from "./inquiry-thread-correlation";
+export {
+  buildCustomerInviteEmail,
+  sendCustomerInviteEmail,
+  type CustomerInviteEmailInput,
+} from "./customer-invite";
 export {
   buildStaffInviteEmail,
   buildStaffInviteSupabaseAuthTemplate,

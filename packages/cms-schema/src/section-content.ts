@@ -24,6 +24,7 @@ import {
   type VacaturesMainContent,
   type WorkGalleryContent,
   normalizeContactFormContent,
+  normalizeOfferteFormContent,
 } from "./content";
 import { newFixedLayoutItem, type LayoutItem } from "./layout";
 import { FIXED_SECTIONS_BY_PAGE, type FixedSectionKey } from "./sections";
@@ -329,6 +330,9 @@ export function ensureBuiltinSectionContent(
       if (key === "contact.form") {
         next = normalizeContactFormContent(parsed) as typeof parsed;
       }
+      if (key === "offerte.form") {
+        next = normalizeOfferteFormContent(parsed) as typeof parsed;
+      }
       // Do not rehydrate removed CTAs, cards, or items — editors may clear them deliberately.
       // Exception: empty partners list is treated as "never seeded" and gets default logos.
       (out as Record<string, unknown>)[key] = next;
@@ -359,6 +363,9 @@ export function ensureBuiltinSectionContent(
     }
     if (key === "contact.form") {
       def = normalizeContactFormContent(def) as ContactFormContent;
+    }
+    if (key === "offerte.form") {
+      def = normalizeOfferteFormContent(def) as ContactFormContent;
     }
     (out as Record<string, unknown>)[key] = def;
   }

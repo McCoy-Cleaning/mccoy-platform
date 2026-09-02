@@ -26,6 +26,7 @@ export function VideoBlockEditor({
   blockId?: string;
 } & CmsImagePickerProps) {
   void presentation;
+  const mediaKind = value.mediaKind === "image" ? "image" : "video";
   const embed = resolveSafeVideoEmbed(value.videoUrl ?? "");
   const imageProps: CmsImagePickerProps = {
     projectImages,
@@ -36,7 +37,20 @@ export function VideoBlockEditor({
   };
   return (
     <div className="space-y-6">
-      <Section title="Video">
+      <Section title="Media">
+        <Field label="Type" hint="Eén media-slot: kies afbeelding of ingesloten video.">
+          <select
+            className={inputClass}
+            value={mediaKind}
+            onChange={(e) => {
+              const kind = e.target.value === "image" ? "image" : "video";
+              onChange({ ...value, mediaKind: kind });
+            }}
+          >
+            <option value="image">Afbeelding</option>
+            <option value="video">Video (YouTube, Vimeo of Facebook)</option>
+          </select>
+        </Field>
         <NlEnField
           label="Titel"
           enPath={blockEnPath(blockId, "title")}
@@ -55,32 +69,47 @@ export function VideoBlockEditor({
             onChange={(e) => onChange({ ...value, description: e.target.value })}
           />
         </NlEnField>
-        <Field
-          label="Video-URL"
-          hint={
-            embed.ok
-              ? `Embed: ${embed.provider}`
-              : embed.reason || "Alleen YouTube, Vimeo, Facebook of McCoy-host"
-          }
-        >
-          <input
-            className={inputClass}
-            value={value.videoUrl}
-            onChange={(e) => onChange({ ...value, videoUrl: e.target.value })}
-            placeholder="https://www.youtube.com/watch?v=…"
+        {mediaKind === "video" ? (
+          <Field
+            label="Video-URL"
+            hint={
+              embed.ok
+                ? `Embed: ${embed.provider}`
+                : embed.reason || "Alleen YouTube, Vimeo, Facebook of McCoy-host"
+            }
+          >
+            <input
+              className={inputClass}
+              value={value.videoUrl}
+              onChange={(e) => onChange({ ...value, videoUrl: e.target.value })}
+              placeholder="https://www.youtube.com/watch?v=…"
+            />
+          </Field>
+        ) : null}
+      </Section>
+      {mediaKind === "image" ? (
+        <Section title="Afbeelding">
+          <BlockImageField
+            label="Afbeelding"
+            value={value.image}
+            preferTags={["cms", "video", "media"]}
+            enAltPath={blockEnPath(blockId, "image.alt")}
+            {...imageProps}
+            onChange={(image) => onChange({ ...value, image })}
           />
-        </Field>
-      </Section>
-      <Section title="Poster (optioneel)">
-        <BlockImageField
-          label="Posterafbeelding"
-          value={value.poster}
-          preferTags={["cms", "video"]}
-          enAltPath={blockEnPath(blockId, "poster.alt")}
-          {...imageProps}
-          onChange={(poster) => onChange({ ...value, poster })}
-        />
-      </Section>
+        </Section>
+      ) : (
+        <Section title="Poster (optioneel)">
+          <BlockImageField
+            label="Posterafbeelding"
+            value={value.poster}
+            preferTags={["cms", "video"]}
+            enAltPath={blockEnPath(blockId, "poster.alt")}
+            {...imageProps}
+            onChange={(poster) => onChange({ ...value, poster })}
+          />
+        </Section>
+      )}
     </div>
   );
 }

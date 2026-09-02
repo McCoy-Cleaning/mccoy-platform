@@ -1,6 +1,10 @@
 import * as React from "react";
 import type { BuiltinPageKey, BuiltinCmsPage, CmsPage, FixedSectionKey, LayoutItem } from "@mccoy/cms-schema";
 import {
+  FIXED_SECTION_DEFS,
+  canAddBlockType,
+  canRemoveBlockType,
+  getBlockDataDefinition,
   resolveLayoutItemContentAlign,
   suppressedAboutFixedKeys,
   suppressedHomeHeroFixedKeys,
@@ -12,6 +16,11 @@ import { ContentAlignProvider } from "@mccoy/cms-renderer/content-align";
 import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import { clientDevError } from "@/lib/client-log";
 import { cn } from "@/lib/utils";
+import {
+  EmptyPageAddSection,
+  SectionInsertGap,
+  WysiwygSectionChrome,
+} from "@/components/site/cms-editor/WysiwygSectionChrome";
 
 /** Custom layout blocks (and Motion) stay off fixed-section routes like `/`. */
 const BlocksView = React.lazy(() =>
@@ -102,16 +111,11 @@ function useSelectOnPointerDown(
 } {
   const ref = React.useRef<HTMLDivElement>(null);
 
-  // Use React's onPointerDown (not a post-mount useEffect listener) so the chrome
-  // is interactive as soon as it appears in the DOM — E2E clicks must not race
-  // an effect that attaches too late.
   const onPointerDown = React.useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!enabled) return;
       const t = e.target as HTMLElement | null;
-      // Always select the section so the admin inspector opens — including when the
-      // click lands on inline-editable copy (contentEditable). Skipping onSelect here
-      // left canvas clicks silent for the parent bridge.
+      if (t?.closest("[data-cms-editor-chrome]")) return;
       if (!(opts?.ignoreSelector && t?.closest(opts.ignoreSelector))) {
         onSelect();
       }
@@ -128,16 +132,23 @@ function useSelectOnPointerDown(
 
 function FixedSelectChrome({
   sectionKey,
+  layoutItemId,
   mode,
   children,
+  canMoveUp,
+  canMoveDown,
+  hidden,
 }: {
   sectionKey: FixedSectionKey;
+  layoutItemId: string;
   mode: SectionRenderMode;
   children: React.ReactNode;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  hidden: boolean;
 }) {
-  const { isEdit, selection, setSelection } = useLiveEditApi();
-  const enabled = isEdit && mode === "admin";
-  // Whole-section highlight only when no composite part is selected.
+  const { showEditorChrome, selection, setSelection, sendUiCommand } = useLiveEditApi();
+  const enabled = showEditorChrome && mode === "admin";
   const selected =
     selection?.kind === "fixed" &&
     selection.sectionKey === sectionKey &&
@@ -145,40 +156,33 @@ function FixedSelectChrome({
   const onSelect = React.useCallback(() => {
     setSelection({ kind: "fixed", sectionKey });
   }, [setSelection, sectionKey]);
-  const { ref, onPointerDown } = useSelectOnPointerDown(enabled, onSelect, {
-    ignoreSelector: "[data-cms-select-part]",
-  });
+  const def = FIXED_SECTION_DEFS[sectionKey];
 
   if (!enabled) return <>{children}</>;
 
   return (
-    <div
-      ref={ref}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      data-cms-select={sectionKey}
-      onPointerDown={onPointerDown}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={cn(
-        "relative outline-none transition",
-        "focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        selected &&
-          "z-[1] ring-2 ring-sky-400 ring-offset-2 ring-offset-background shadow-[0_0_0_4px_rgba(56,189,248,0.18)]",
-      )}
+    <WysiwygSectionChrome
+      label={def?.label ?? sectionKey}
+      layoutItemId={layoutItemId}
+      selected={selected}
+      onSelect={onSelect}
+      ignoreSelector="[data-cms-select-part]"
+      canMoveUp={canMoveUp && (def?.movable ?? true)}
+      canMoveDown={canMoveDown && (def?.movable ?? true)}
+      canDuplicate={false}
+      canHide={def?.hideable ?? true}
+      canDelete={!(def?.required ?? false)}
+      hidden={hidden}
+      selectAttr={{ "data-cms-select": sectionKey }}
+      onOpenAdvanced={() =>
+        sendUiCommand({
+          kind: "openAdvanced",
+          selection: { kind: "fixed", sectionKey },
+        })
+      }
     >
       {children}
-      {selected ? (
-        <span className="pointer-events-none absolute left-2 top-2 z-20 rounded bg-sky-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-          Geselecteerd
-        </span>
-      ) : null}
-    </div>
+    </WysiwygSectionChrome>
   );
 }
 
@@ -194,8 +198,8 @@ export function CompositePartSelectChrome({
   children: React.ReactNode;
   label?: string;
 }) {
-  const { isEdit, selection, setSelection } = useLiveEditApi();
-  const enabled = isEdit;
+  const { showEditorChrome, selection, setSelection } = useLiveEditApi();
+  const enabled = showEditorChrome;
   const selected =
     selection?.kind === "fixed" &&
     selection.sectionKey === sectionKey &&
@@ -223,10 +227,10 @@ export function CompositePartSelectChrome({
         }
       }}
       className={cn(
-        "relative outline-none transition",
-        "focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "relative outline-none",
+        // Inset-only selection — avoid ring-offset which can shift nested geometry.
         selected &&
-          "z-[1] ring-2 ring-sky-400 ring-offset-2 ring-offset-background shadow-[0_0_0_4px_rgba(56,189,248,0.18)]",
+          "z-[1] shadow-[inset_0_0_0_2px_rgba(14,165,233,1),0_0_0_4px_rgba(56,189,248,0.18)]",
       )}
     >
       {children}
@@ -244,50 +248,56 @@ function BlockSelectChrome({
   layoutItemId,
   mode,
   children,
+  label,
+  canMoveUp,
+  canMoveDown,
+  canDuplicate,
+  canDelete,
+  hidden,
 }: {
   blockId: string;
   layoutItemId: string;
   mode: SectionRenderMode;
   children: React.ReactNode;
+  label: string;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canDuplicate: boolean;
+  canDelete: boolean;
+  hidden: boolean;
 }) {
-  const { isEdit, selection, setSelection } = useLiveEditApi();
-  const enabled = isEdit && mode === "admin";
+  const { showEditorChrome, selection, setSelection, sendUiCommand } = useLiveEditApi();
+  const enabled = showEditorChrome && mode === "admin";
   const selected = selection?.kind === "block" && selection.blockId === blockId;
   const onSelect = React.useCallback(() => {
     setSelection({ kind: "block", blockId, layoutItemId });
   }, [setSelection, blockId, layoutItemId]);
-  const { ref, onPointerDown } = useSelectOnPointerDown(enabled, onSelect);
 
   if (!enabled) return <>{children}</>;
 
   return (
-    <div
-      ref={ref}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      data-cms-select-block={blockId}
-      onPointerDown={onPointerDown}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={cn(
-        "relative outline-none transition",
-        "focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        selected &&
-          "z-[1] ring-2 ring-sky-400 ring-offset-2 ring-offset-background shadow-[0_0_0_4px_rgba(56,189,248,0.18)]",
-      )}
+    <WysiwygSectionChrome
+      label={label}
+      layoutItemId={layoutItemId}
+      selected={selected}
+      onSelect={onSelect}
+      canMoveUp={canMoveUp}
+      canMoveDown={canMoveDown}
+      canDuplicate={canDuplicate}
+      canHide
+      canDelete={canDelete}
+      hidden={hidden}
+      blockId={blockId}
+      selectAttr={{ "data-cms-select-block": blockId }}
+      onOpenAdvanced={() =>
+        sendUiCommand({
+          kind: "openAdvanced",
+          selection: { kind: "block", blockId, layoutItemId },
+        })
+      }
     >
       {children}
-      {selected ? (
-        <span className="pointer-events-none absolute left-2 top-2 z-20 rounded bg-sky-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-          Paginasectie
-        </span>
-      ) : null}
-    </div>
+    </WysiwygSectionChrome>
   );
 }
 
@@ -321,27 +331,51 @@ export function PageLayoutRenderer({
     return next;
   }, [page]);
 
+  const visibleLayout = React.useMemo(() => {
+    return page.layout.filter((item) => {
+      if (item.kind === "fixed" && suppressFixed.has(item.key)) return false;
+      if (respectHidden && item.hidden) return false;
+      return true;
+    });
+  }, [page.layout, respectHidden, suppressFixed]);
+
+  if (visibleLayout.length === 0 && mode === "admin") {
+    return <EmptyPageAddSection />;
+  }
+
   return (
     <>
-      {page.layout.map((item) => (
-        <LayoutItemView
-          key={item.id}
-          item={item}
-          pageId={page.id}
-          registry={registry}
-          blockById={blockById}
-          blocksRenderer={blocksRenderer}
-          mode={mode}
-          respectHidden={respectHidden}
-          suppressFixed={suppressFixed}
-        />
-      ))}
+      {visibleLayout.map((item, index) => {
+        const layoutIndex = page.layout.findIndex((l) => l.id === item.id);
+        return (
+          <React.Fragment key={item.id}>
+            {index === 0 ? <SectionInsertGap atIndex={Math.max(0, layoutIndex)} /> : null}
+            <LayoutItemView
+              item={item}
+              page={page}
+              pageId={page.id}
+              registry={registry}
+              blockById={blockById}
+              blocksRenderer={blocksRenderer}
+              mode={mode}
+              respectHidden={respectHidden}
+              suppressFixed={suppressFixed}
+              canMoveUp={index > 0}
+              canMoveDown={index < visibleLayout.length - 1}
+            />
+            <SectionInsertGap
+              atIndex={layoutIndex >= 0 ? layoutIndex + 1 : page.layout.length}
+            />
+          </React.Fragment>
+        );
+      })}
     </>
   );
 }
 
 function LayoutItemView({
   item,
+  page,
   pageId,
   registry,
   blockById,
@@ -349,8 +383,11 @@ function LayoutItemView({
   mode,
   respectHidden,
   suppressFixed,
+  canMoveUp,
+  canMoveDown,
 }: {
   item: LayoutItem;
+  page: CmsPage;
   pageId: string;
   registry: Partial<Record<FixedSectionKey, FixedRenderer>>;
   blockById: Map<string, CmsPage["blocks"][number]>;
@@ -358,6 +395,8 @@ function LayoutItemView({
   mode: SectionRenderMode;
   respectHidden: boolean;
   suppressFixed: Set<FixedSectionKey>;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }) {
   const contentAlign = resolveLayoutItemContentAlign(item);
 
@@ -394,7 +433,14 @@ function LayoutItemView({
     return (
       <ContentAlignProvider align={contentAlign}>
         <SafeSectionBoundary sectionKey={item.key} mode={mode}>
-          <FixedSelectChrome sectionKey={item.key} mode={mode}>
+          <FixedSelectChrome
+            sectionKey={item.key}
+            layoutItemId={item.id}
+            mode={mode}
+            canMoveUp={canMoveUp}
+            canMoveDown={canMoveDown}
+            hidden={!!item.hidden}
+          >
             {body}
           </FixedSelectChrome>
         </SafeSectionBoundary>
@@ -419,6 +465,18 @@ function LayoutItemView({
 
   if (respectHidden && item.hidden) return null;
 
+  let blockLabel = "Paginasectie";
+  let canDuplicate = false;
+  let canDelete = true;
+  try {
+    const def = getBlockDataDefinition(block.type);
+    blockLabel = def.label;
+    canDuplicate = def.capabilities.duplicable && canAddBlockType(page, block.type);
+    canDelete = canRemoveBlockType(page, block.type);
+  } catch {
+    /* ignore */
+  }
+
   const BlocksComponent = blocksRenderer ?? BlocksView;
   const renderedBlocks = <BlocksComponent blocks={[block]} pageId={pageId} />;
   // Eager renderers (Home LCP) must not sit behind the lazy 12rem hole — that
@@ -434,7 +492,17 @@ function LayoutItemView({
   return (
     <ContentAlignProvider align={contentAlign}>
       <SafeSectionBoundary sectionKey={`block:${item.blockId}`} mode={mode}>
-        <BlockSelectChrome blockId={item.blockId} layoutItemId={item.id} mode={mode}>
+        <BlockSelectChrome
+          blockId={item.blockId}
+          layoutItemId={item.id}
+          mode={mode}
+          label={blockLabel}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          canDuplicate={canDuplicate}
+          canDelete={canDelete}
+          hidden={!!item.hidden}
+        >
           {item.hidden && !respectHidden ? (
             <div className="relative opacity-40 ring-1 ring-inset ring-amber-400/30" data-cms-hidden="true">
               <div className="pointer-events-none absolute left-3 top-3 z-10 rounded bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black">

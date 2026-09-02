@@ -182,19 +182,61 @@ export function HeroBlockEditor({
             mediaLibraryItems={mediaLibraryItems}
             resolveProjectImage={resolveProjectImage}
           />
-          <Section title="Afbeelding">
-            <BlockImageField
-              label="Hero-afbeelding"
-              value={value.image}
-              preferTags={["hero", "home"]}
-              enAltPath={blockEnPath(blockId, "image.alt")}
-              projectImages={projectImages}
-              assetBaseUrl={assetBaseUrl}
-              uploadToMediaLibrary={uploadToMediaLibrary}
-              mediaLibraryItems={mediaLibraryItems}
-              resolveProjectImage={resolveProjectImage}
-              onChange={(image) => onChange({ ...value, image })}
-            />
+          <Section title="Media">
+            <Field label="Type">
+              <div className="flex gap-2" role="radiogroup" aria-label="Hero-media">
+                {(
+                  [
+                    { id: "image" as const, label: "Afbeelding" },
+                    { id: "video" as const, label: "Video (URL)" },
+                  ] as const
+                ).map((opt) => {
+                  const selected = (value.mediaKind ?? "image") === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onChange({ ...value, mediaKind: opt.id })}
+                      className={
+                        selected
+                          ? "rounded-xl border border-sky-400/50 bg-sky-400/15 px-3 py-2 text-sm font-semibold text-white"
+                          : "rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-semibold text-white/70 hover:border-white/25"
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            {(value.mediaKind ?? "image") === "video" ? (
+              <Field
+                label="Video-URL"
+                hint="YouTube, Vimeo of Facebook (https). Wordt veilig als embed getoond."
+              >
+                <input
+                  className={inputClass}
+                  value={value.videoUrl ?? ""}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  onChange={(e) => onChange({ ...value, videoUrl: e.target.value })}
+                />
+              </Field>
+            ) : (
+              <BlockImageField
+                label="Hero-afbeelding"
+                value={value.image}
+                preferTags={["hero", "home"]}
+                enAltPath={blockEnPath(blockId, "image.alt")}
+                projectImages={projectImages}
+                assetBaseUrl={assetBaseUrl}
+                uploadToMediaLibrary={uploadToMediaLibrary}
+                mediaLibraryItems={mediaLibraryItems}
+                resolveProjectImage={resolveProjectImage}
+                onChange={(image) => onChange({ ...value, image })}
+              />
+            )}
             <NlEnField
               label="Highlight waarde"
               enPath={blockEnPath(blockId, "highlightStat.value")}
