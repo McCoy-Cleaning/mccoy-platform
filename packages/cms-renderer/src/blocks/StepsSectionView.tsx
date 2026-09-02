@@ -1,7 +1,14 @@
 import * as React from "react";
-import type { CmsImage, StepItem, StepsBlockData } from "@mccoy/cms-schema";
+import { createItemId, type CmsImage, type StepItem, type StepsBlockData } from "@mccoy/cms-schema";
 import { SectionShell } from "../SectionShell";
 import { SectionHeader, SectionIndex } from "../sectionChromeUi";
+import {
+  CmsListAddButton,
+  CmsListRemoveButton,
+  EditableMedia,
+  EditableText,
+  useCmsTypedListEditor,
+} from "../edit-surface";
 import { CmsImageView } from "./CmsImageView";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -29,64 +36,106 @@ function StepCard({
   index,
   active,
   reducedMotion,
+  editing,
   onSelect,
+  onRemove,
 }: {
   step: StepItem;
   index: number;
   active: boolean;
   reducedMotion: boolean;
+  editing: boolean;
   onSelect: () => void;
+  onRemove?: () => void;
 }) {
   const image = step.image as CmsImage | undefined;
+  const body = typeof step.body === "string" ? step.body : "";
+  const cardClass = cn(
+    "relative flex shrink-0 flex-col overflow-hidden rounded-[1.35rem] border bg-gradient-to-b from-white/[0.07] to-white/[0.02]",
+    "origin-center",
+    reducedMotion
+      ? "transition-opacity duration-200"
+      : "transition-[transform,opacity,border-color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+    active
+      ? "z-[2] scale-100 border-primary/45 opacity-100 shadow-[0_24px_60px_-28px_rgba(63,182,242,0.55)]"
+      : reducedMotion
+        ? "z-[1] scale-100 border-white/10 opacity-[0.55]"
+        : "z-[1] scale-[0.86] border-white/10 opacity-[0.42]",
+  );
+
+  const media = image ? (
+    <div className="relative isolate aspect-[16/10] w-full overflow-hidden bg-black/40">
+      <CmsImageView
+        image={image}
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"
+        aria-hidden
+      />
+    </div>
+  ) : editing ? (
+    <div className="relative isolate aspect-[16/10] w-full overflow-hidden bg-black/40" />
+  ) : null;
+
+  const content = (
+    <>
+      <EditableMedia
+        path="steps"
+        image={image}
+        listItemId={step.id}
+        listImageKey="image"
+        emptyPlaceholder={editing}
+        className="relative isolate aspect-[16/10] w-full overflow-hidden"
+      >
+        {media}
+      </EditableMedia>
+      <div className="flex gap-3.5 p-5 sm:p-6">
+        <SectionIndex value={index + 1} className={cn(!active && "opacity-70")} />
+        <div className="min-w-0 space-y-1.5">
+          <h3 className="font-display text-lg font-semibold tracking-tight text-foreground break-words sm:text-xl">
+            <EditableText path={`steps.${index}.title`} value={step.title}>
+              {step.title}
+            </EditableText>
+          </h3>
+          {body || editing ? (
+            <p className="text-sm leading-relaxed text-muted-foreground break-words">
+              <EditableText path={`steps.${index}.body`} value={body} multiline>
+                {body}
+              </EditableText>
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <article
       data-step-card={active ? "active" : "inactive"}
       data-step-index={index}
-      className={cn(
-        "flex shrink-0 flex-col overflow-hidden rounded-[1.35rem] border bg-gradient-to-b from-white/[0.07] to-white/[0.02]",
-        "origin-center",
-        reducedMotion
-          ? "transition-opacity duration-200"
-          : "transition-[transform,opacity,border-color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-        active
-          ? "z-[2] scale-100 border-primary/45 opacity-100 shadow-[0_24px_60px_-28px_rgba(63,182,242,0.55)]"
-          : reducedMotion
-            ? "z-[1] scale-100 border-white/10 opacity-[0.55]"
-            : "z-[1] scale-[0.86] border-white/10 opacity-[0.42]",
-      )}
+      className={cardClass}
       style={{ width: "var(--step-card)", flex: "0 0 var(--step-card)" }}
       aria-current={active ? "step" : undefined}
     >
-      <button
-        type="button"
-        className="flex w-full flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        onClick={onSelect}
-        aria-label={`Stap ${index + 1}: ${step.title}`}
-      >
-        {image ? (
-          <div className="relative isolate aspect-[16/10] w-full overflow-hidden bg-black/40">
-            <CmsImageView
-              image={image}
-              className="absolute inset-0 h-full w-full object-cover object-center"
-            />
-            <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"
-              aria-hidden
-            />
-          </div>
-        ) : null}
-        <div className="flex gap-3.5 p-5 sm:p-6">
-          <SectionIndex value={index + 1} className={cn(!active && "opacity-70")} />
-          <div className="min-w-0 space-y-1.5">
-            <h3 className="font-display text-lg font-semibold tracking-tight text-foreground break-words sm:text-xl">
-              {step.title}
-            </h3>
-            {step.body ? (
-              <p className="text-sm leading-relaxed text-muted-foreground break-words">{step.body}</p>
-            ) : null}
-          </div>
-        </div>
-      </button>
+      {editing && onRemove ? (
+        <CmsListRemoveButton
+          label={`Stap verwijderen: ${step.title || `stap ${index + 1}`}`}
+          onRemove={onRemove}
+        />
+      ) : null}
+      {editing ? (
+        <div className="flex w-full flex-col text-left">{content}</div>
+      ) : (
+        <button
+          type="button"
+          className="flex w-full flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          onClick={onSelect}
+          aria-label={`Stap ${index + 1}: ${step.title}`}
+        >
+          {content}
+        </button>
+      )}
     </article>
   );
 }
@@ -94,7 +143,10 @@ function StepCard({
 export function StepsSectionView({ data }: StepsSectionViewProps) {
   const steps = data.steps ?? [];
   const reducedMotion = usePrefersReducedMotion();
+  const list = useCmsTypedListEditor<StepItem>("steps");
+  const editing = list.editing;
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const title = typeof data.title === "string" ? data.title : "";
 
   React.useEffect(() => {
     setActiveIndex((i) => {
@@ -102,6 +154,15 @@ export function StepsSectionView({ data }: StepsSectionViewProps) {
       return Math.min(i, steps.length - 1);
     });
   }, [steps.length]);
+
+  const addStep = () => {
+    list.append(steps, {
+      id: createItemId("step"),
+      title: "Nieuwe stap",
+      body: "Beschrijving",
+    });
+    setActiveIndex(steps.length);
+  };
 
   const goTo = (next: number) => {
     if (steps.length === 0) return;
@@ -132,16 +193,24 @@ export function StepsSectionView({ data }: StepsSectionViewProps) {
 
   return (
     <SectionShell blockType="steps">
-      <SectionHeader title={data.title} align="left" className="mb-8 sm:mb-12" />
+      <SectionHeader
+        title={
+          <EditableText path="title" value={title}>
+            {title}
+          </EditableText>
+        }
+        align="left"
+        className="mb-8 sm:mb-12"
+      />
 
-      {steps.length === 0 ? (
+      {steps.length === 0 && !editing ? (
         <p className="text-sm text-muted-foreground">Nog geen stappen in deze sectie.</p>
       ) : (
         <div
           className="relative outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           role="region"
           aria-roledescription="carousel"
-          aria-label={data.title?.trim() || "Stappen"}
+          aria-label={title.trim() || "Stappen"}
           tabIndex={0}
           onKeyDown={onKeyDown}
           data-steps-slider=""
@@ -182,64 +251,82 @@ export function StepsSectionView({ data }: StepsSectionViewProps) {
                   index={i}
                   active={i === activeIndex}
                   reducedMotion={reducedMotion}
+                  editing={editing}
                   onSelect={() => goTo(i)}
+                  onRemove={editing ? () => list.removeById(steps, step.id) : undefined}
                 />
               ))}
-            </div>
-          </div>
-
-          <div className="mt-2 flex items-center justify-center gap-3 sm:gap-4">
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-foreground transition hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
-              onClick={goPrev}
-              aria-label="Vorige stap"
-              disabled={steps.length < 2}
-            >
-              <span aria-hidden className="text-lg leading-none">
-                ‹
-              </span>
-            </button>
-
-            <div className="flex items-center gap-2" role="tablist" aria-label="Stapnavigatie">
-              {steps.map((step, i) => {
-                const selected = i === activeIndex;
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-label={`Ga naar stap ${i + 1}`}
-                    className={cn(
-                      "h-2.5 rounded-full transition-[width,background-color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                      reducedMotion ? "duration-150" : "duration-300",
-                      selected
-                        ? "w-7 bg-primary opacity-100"
-                        : "w-2.5 bg-white/25 opacity-70 hover:opacity-100",
-                    )}
-                    onClick={() => goTo(i)}
+              {editing ? (
+                <div
+                  style={{ width: "var(--step-card)", flex: "0 0 var(--step-card)" }}
+                  className="shrink-0"
+                >
+                  <CmsListAddButton
+                    label="Stap toevoegen"
+                    onAdd={addStep}
+                    className="h-full min-h-[16rem]"
                   />
-                );
-              })}
+                </div>
+              ) : null}
             </div>
-
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-foreground transition hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
-              onClick={goNext}
-              aria-label="Volgende stap"
-              disabled={steps.length < 2}
-            >
-              <span aria-hidden className="text-lg leading-none">
-                ›
-              </span>
-            </button>
           </div>
 
-          <p className="sr-only" aria-live="polite">
-            Stap {activeIndex + 1} van {steps.length}: {steps[activeIndex]?.title ?? ""}
-          </p>
+          {steps.length > 0 ? (
+            <div className="mt-2 flex items-center justify-center gap-3 sm:gap-4">
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-foreground transition hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
+                onClick={goPrev}
+                aria-label="Vorige stap"
+                disabled={steps.length < 2}
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  ‹
+                </span>
+              </button>
+
+              <div className="flex items-center gap-2" role="tablist" aria-label="Stapnavigatie">
+                {steps.map((step, i) => {
+                  const selected = i === activeIndex;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      aria-label={`Ga naar stap ${i + 1}`}
+                      className={cn(
+                        "h-2.5 rounded-full transition-[width,background-color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                        reducedMotion ? "duration-150" : "duration-300",
+                        selected
+                          ? "w-7 bg-primary opacity-100"
+                          : "w-2.5 bg-white/25 opacity-70 hover:opacity-100",
+                      )}
+                      onClick={() => goTo(i)}
+                    />
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-foreground transition hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
+                onClick={goNext}
+                aria-label="Volgende stap"
+                disabled={steps.length < 2}
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  ›
+                </span>
+              </button>
+            </div>
+          ) : null}
+
+          {steps.length > 0 ? (
+            <p className="sr-only" aria-live="polite">
+              Stap {activeIndex + 1} van {steps.length}: {steps[activeIndex]?.title ?? ""}
+            </p>
+          ) : null}
         </div>
       )}
     </SectionShell>

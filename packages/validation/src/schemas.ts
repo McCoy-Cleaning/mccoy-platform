@@ -187,6 +187,12 @@ export const adminInboxReplySchema = z.object({
   body: z.string().trim().min(1).max(8000),
 });
 
+/** Staff correction when a visitor submitted the wrong reply-to email. */
+export const adminInboxUpdateSubmitterEmailSchema = z.object({
+  id: inboxMessageId,
+  email: z.string().trim().email("Voer een geldig e-mailadres in.").max(320),
+});
+
 export const adminInboxAttachmentSchema = z.object({
   id: inboxMessageId,
   filename: z.string().min(1).max(180),
@@ -377,8 +383,24 @@ export const adminUpdateCompanySchema = z.object({
   companyId: z.string().uuid(),
   legalName: z.string().trim().min(1).max(200).optional(),
   displayName: z.string().trim().max(200).nullable().optional(),
+  partyType: z.enum(["company", "private_person"]).optional(),
   phone: z.string().trim().max(40).nullable().optional(),
-  email: z.string().trim().email().max(320).nullable().optional(),
+  email: z
+    .union([z.string().trim().email().max(320), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
+  kvkNumber: z
+    .union([z.string().trim().regex(/^[0-9]{8}$/), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
+  vatNumber: z.string().trim().max(32).nullable().optional(),
+  contactPersonName: z.string().trim().max(200).nullable().optional(),
+  addressStreet: z.string().trim().max(200).nullable().optional(),
+  addressHouseNumber: z.string().trim().max(20).nullable().optional(),
+  addressHouseSuffix: z.string().trim().max(20).nullable().optional(),
+  addressPostalCode: z.string().trim().max(20).nullable().optional(),
+  addressCity: z.string().trim().max(120).nullable().optional(),
+  addressCountry: z.string().trim().max(80).nullable().optional(),
   status: z.enum(["pending", "active", "blocked"]).optional(),
   invoiceAllowed: z.boolean().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
@@ -410,6 +432,39 @@ export const adminCustomerExportSchema = z.object({
 export const adminCustomerImportSchema = z.object({
   csvText: z.string().min(1).max(1_500_000),
   commit: z.boolean().default(false),
+});
+
+/** Existing service-client CSV/XLSX import (mirror → sync). Reparses on commit. */
+export const adminExistingCustomerFileImportSchema = z.object({
+  fileName: z.string().min(1).max(260),
+  /** Base64-encoded file bytes (max ~2MB decoded). */
+  fileBase64: z.string().min(1).max(3_000_000),
+  commit: z.boolean().default(false),
+  sheetName: z.string().max(120).optional().nullable(),
+  columnMap: z
+    .object({
+      externalCustomerId: z.string().max(120).optional(),
+      legalName: z.string().max(120).optional(),
+      displayName: z.string().max(120).optional(),
+      email: z.string().max(120).optional(),
+      phone: z.string().max(120).optional(),
+      vatNumber: z.string().max(120).optional(),
+      kvkNumber: z.string().max(120).optional(),
+      invoiceAllowed: z.string().max(120).optional(),
+      companyStatus: z.string().max(120).optional(),
+      contactPersonName: z.string().max(120).optional(),
+      addressStreet: z.string().max(120).optional(),
+      addressHouseNumber: z.string().max(120).optional(),
+      addressHouseSuffix: z.string().max(120).optional(),
+      addressPostalCode: z.string().max(120).optional(),
+      addressCity: z.string().max(120).optional(),
+      addressCountry: z.string().max(120).optional(),
+    })
+    .optional(),
+});
+
+export const adminDeletePortalCompaniesSchema = z.object({
+  companyIds: z.array(z.string().uuid()).min(1).max(50),
 });
 
 export const adminSeedCommerceFixturesSchema = z.object({

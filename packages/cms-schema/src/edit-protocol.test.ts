@@ -118,7 +118,7 @@ describe("edit-protocol — parseCmsEditMessage hardening", () => {
     expect(msg?.type).toBe("cms-draft-patch");
   });
 
-  it("accepts a layout op mutation (no side patch payload expected)", () => {
+  it("accepts a typed layout move mutation", () => {
     const msg = parseCmsEditMessage({
       channel: CMS_EDIT_CHANNEL,
       type: "cms-draft-patch",
@@ -126,9 +126,23 @@ describe("edit-protocol — parseCmsEditMessage hardening", () => {
       pageId,
       baseRevision: 2,
       mutationId: createMutationId(),
-      patch: { kind: "layout", op: "move" },
+      patch: { kind: "layout", op: "move", layoutItemId: "li_1", direction: "down" },
     });
     expect(msg?.type).toBe("cms-draft-patch");
+  });
+
+  it("rejects an incomplete layout move mutation", () => {
+    expect(
+      parseCmsEditMessage({
+        channel: CMS_EDIT_CHANNEL,
+        type: "cms-draft-patch",
+        sessionId,
+        pageId,
+        baseRevision: 2,
+        mutationId: createMutationId(),
+        patch: { kind: "layout", op: "move" },
+      }),
+    ).toBeNull();
   });
 
   it("rejects a layout op outside the known enum", () => {
@@ -232,6 +246,92 @@ describe("edit-protocol — parseCmsEditMessage hardening", () => {
         patch: hugePatch,
       }),
     ).toBeNull();
+  });
+
+  it("parses typed layout move mutations", () => {
+    const msg = parseCmsEditMessage({
+      channel: CMS_EDIT_CHANNEL,
+      type: "cms-draft-patch",
+      sessionId,
+      pageId,
+      baseRevision: 1,
+      mutationId: createMutationId(),
+      patch: {
+        kind: "layout",
+        op: "move",
+        layoutItemId: "li_1",
+        direction: "up",
+      },
+    });
+    expect(msg?.type).toBe("cms-draft-patch");
+    if (msg?.type === "cms-draft-patch") {
+      expect(msg.patch).toEqual({
+        kind: "layout",
+        op: "move",
+        layoutItemId: "li_1",
+        direction: "up",
+      });
+    }
+  });
+
+  it("parses cms-ui-command openAddPicker", () => {
+    const msg = parseCmsEditMessage({
+      channel: CMS_EDIT_CHANNEL,
+      type: "cms-ui-command",
+      sessionId,
+      pageId,
+      command: { kind: "openAddPicker", atIndex: 2 },
+    });
+    expect(msg).toEqual({
+      channel: CMS_EDIT_CHANNEL,
+      type: "cms-ui-command",
+      sessionId,
+      pageId,
+      command: { kind: "openAddPicker", atIndex: 2 },
+    });
+  });
+
+  it("preserves openMediaPicker listAppend (add-image flow)", () => {
+    const msg = parseCmsEditMessage({
+      channel: CMS_EDIT_CHANNEL,
+      type: "cms-ui-command",
+      sessionId,
+      pageId,
+      command: {
+        kind: "openMediaPicker",
+        target: {
+          kind: "section",
+          sectionKey: "home.partners",
+          field: "items",
+          listAppend: true,
+          listImageKey: "image",
+        },
+      },
+    });
+    expect(msg?.type).toBe("cms-ui-command");
+    if (msg?.type === "cms-ui-command" && msg.command.kind === "openMediaPicker") {
+      expect(msg.command.target).toEqual({
+        kind: "section",
+        sectionKey: "home.partners",
+        field: "items",
+        listAppend: true,
+        listImageKey: "image",
+      });
+    }
+  });
+
+  it("parses cms-editor-mode preview", () => {
+    const msg = parseCmsEditMessage({
+      channel: CMS_EDIT_CHANNEL,
+      type: "cms-editor-mode",
+      sessionId,
+      pageId,
+      interactionMode: "preview",
+    });
+    expect(msg?.type).toBe("cms-editor-mode");
+    if (msg?.type === "cms-editor-mode") {
+      expect(msg.interactionMode).toBe("preview");
+    }
   });
 });
 

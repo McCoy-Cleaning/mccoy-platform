@@ -60,6 +60,7 @@ export {
   assertRateLimit,
   isHoneypotTriggered,
   RateLimitError,
+  resetRateLimits,
 } from "./rate-limit";
 
 export {
@@ -107,6 +108,17 @@ export {
 } from "./mfa-flow";
 
 export { assertAdminSameOriginMutation } from "./admin-origin";
+export {
+  CustomerAuthError,
+  issueCustomerAuthCookies,
+  clearCustomerAuthCookies,
+  readCustomerAccessToken,
+  readCustomerRefreshToken,
+  CUSTOMER_LOGIN_RATE,
+  CUSTOMER_FORGOT_PASSWORD_RATE,
+  CUSTOMER_ACTIVATION_RATE,
+  CUSTOMER_INVITE_RATE,
+} from "./customer-session";
 export {
   assertSafeWebsiteFormUpload,
   canonicalWebsiteFormContentType,

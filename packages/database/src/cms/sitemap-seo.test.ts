@@ -85,6 +85,15 @@ describe("dynamic sitemap SEO gates", () => {
       expect(urls).not.toContain(absoluteCanonicalUrl(path));
     }
   });
+
+  it("includes static indexable city landings", async () => {
+    const store = createFileCmsStore({ memoryOnly: true });
+    await store.seedBuiltinsIfEmpty(builtinCmsSeedPages());
+    const entries = await buildPublishedSitemapEntries({ store });
+    const urls = collectSitemapEmittedUrls(entries);
+    expect(urls).toContain(`${CANONICAL_SITE_ORIGIN}/schoonmaakbedrijf-enschede`);
+    expect(urls).toContain(`${CANONICAL_SITE_ORIGIN}/schoonmaakbedrijf-hengelo`);
+  });
 });
 
 describe("sitemap ↔ indexability consistency invariant", () => {
@@ -98,6 +107,13 @@ describe("sitemap ↔ indexability consistency invariant", () => {
 
     for (const url of report.sitemapUrls) {
       const pathname = new URL(url).pathname;
+      const normalized = pathname.replace(/\/+$/, "") || "/";
+      if (
+        normalized === "/schoonmaakbedrijf-enschede" ||
+        normalized === "/schoonmaakbedrijf-hengelo"
+      ) {
+        continue;
+      }
       const resolved = await resolvePublicCmsRequest({ pathname, store });
       expect(resolved.kind).toBe("snapshot");
       if (resolved.kind !== "snapshot") continue;

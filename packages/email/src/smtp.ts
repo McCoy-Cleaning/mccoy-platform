@@ -58,6 +58,7 @@ function smtpPassword(): string {
  * Password: SMTP_PASS → SMTP_PASSWORD → FORM_INBOX_PASS
  */
 export function getSmtpConfig(): SmtpConfig | null {
+  const qual = readServerEnv("E2E_CUSTOMER_PORTAL_QUAL") === "1";
   const user =
     readServerEnv("SMTP_USER") ||
     readServerEnv("SMTP_FROM_EMAIL") ||
@@ -72,13 +73,24 @@ export function getSmtpConfig(): SmtpConfig | null {
       ? "smtp.gmail.com"
       : inboxHost.replace(/^imap\./, "smtp.") || "smtp.gmail.com";
 
-  const host = readServerEnv("SMTP_HOST") || defaultHost;
-  const port = parsePort(readServerEnv("SMTP_PORT"), 587);
+  const host =
+    (qual ? readServerEnv("QUALIFICATION_SMTP_HOST") : "") ||
+    readServerEnv("SMTP_HOST") ||
+    defaultHost;
+  const port = parsePort(
+    (qual ? readServerEnv("QUALIFICATION_SMTP_PORT") : "") || readServerEnv("SMTP_PORT"),
+    qual ? 54325 : 587,
+  );
   const secureEnv = readServerEnv("SMTP_SECURE").toLowerCase();
-  const secure =
-    secureEnv === "true" || secureEnv === "1" || port === 465;
+  const secure = secureEnv === "true" || secureEnv === "1" || port === 465;
 
   return { host, port, secure, user, pass };
+}
+
+/** Drop cached Nodemailer transport (qualification env switches). */
+export function resetSmtpTransportCache(): void {
+  cachedTransport = null;
+  cachedKey = "";
 }
 
 export function isSmtpConfigured(): boolean {

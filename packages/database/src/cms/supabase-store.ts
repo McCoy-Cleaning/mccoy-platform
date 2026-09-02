@@ -484,11 +484,21 @@ export function createSupabaseCmsStore(): CmsStore {
         }
         throw new Error(`cms saveDraft: ${error.message}`);
       }
+
+      const draftRevisionNumber = data as number;
+      // Soft-conflict RPC returns current revision unchanged (no throw). Treat as conflict
+      // so callers refresh expected revision instead of retrying blindly.
+      if (draftRevisionNumber === command.expectedRevisionNumber) {
+        const err = new Error("cms draft: conflict");
+        (err as Error & { code: string }).code = "conflict";
+        throw err;
+      }
+
       await fallback.saveDraft({
         ...command,
         expectedRevisionNumber: command.expectedRevisionNumber,
       });
-      return { draftRevisionNumber: data as number };
+      return { draftRevisionNumber };
     },
 
     async getActivePublishedRevision(pageId, siteId = DEFAULT_CMS_SITE_ID) {

@@ -15,7 +15,7 @@ import {
   type SiteUrlConfig,
 } from "@mccoy/cms-schema";
 
-import { isSitemapExcludedPathname } from "./sitemap-eligibility";
+import { isSitemapExcludedPathname, staticIndexableSitemapEntries } from "./sitemap-eligibility";
 import { DEFAULT_CMS_SITE_ID, type CmsStore } from "./types";
 import { getCmsStore } from "./supabase-store";
 
@@ -211,6 +211,14 @@ export async function buildPublishedSitemapEntries(input?: {
         alternates: alternateLinks,
       });
     }
+  }
+
+  // City landings are static routes (not CMS pages) — always include when indexable.
+  const seen = new Set(entries.map((e) => e.loc));
+  for (const staticEntry of staticIndexableSitemapEntries(site.origin)) {
+    if (seen.has(staticEntry.loc)) continue;
+    if (isSitemapExcludedPathname(new URL(staticEntry.loc).pathname)) continue;
+    entries.push(staticEntry);
   }
 
   return entries;

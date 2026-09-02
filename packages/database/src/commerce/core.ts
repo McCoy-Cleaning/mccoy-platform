@@ -8,6 +8,7 @@ import {
   type AddressSnapshot,
   type Company,
   type CompanyMemberRole,
+  type CompanyPartyType,
   type CompanyStatus,
   type CompanyType,
   type FulfilmentStatus,
@@ -32,12 +33,21 @@ type CompanyRow = {
   kvk_number: string | null;
   vat_number: string | null;
   company_type: CompanyType;
+  party_type: CompanyPartyType;
   status: CompanyStatus;
   invoice_allowed: boolean;
   email: string | null;
   phone: string | null;
+  contact_person_name: string | null;
+  address_street: string | null;
+  address_house_number: string | null;
+  address_house_suffix: string | null;
+  address_postal_code: string | null;
+  address_city: string | null;
+  address_country: string | null;
   blocked_at: string | null;
   notes: string | null;
+  external_customer_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -122,12 +132,21 @@ export function mapCompany(row: CompanyRow): Company {
     kvkNumber: row.kvk_number,
     vatNumber: row.vat_number,
     companyType: row.company_type,
+    partyType: row.party_type ?? "company",
     status: row.status,
     invoiceAllowed: row.invoice_allowed,
     email: row.email,
     phone: row.phone,
+    contactPersonName: row.contact_person_name ?? null,
+    addressStreet: row.address_street ?? null,
+    addressHouseNumber: row.address_house_number ?? null,
+    addressHouseSuffix: row.address_house_suffix ?? null,
+    addressPostalCode: row.address_postal_code ?? null,
+    addressCity: row.address_city ?? null,
+    addressCountry: row.address_country ?? null,
     blockedAt: row.blocked_at,
     notes: row.notes,
+    externalCustomerId: row.external_customer_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -275,11 +294,20 @@ export async function createCompany(input: {
   kvkNumber?: string | null;
   vatNumber?: string | null;
   companyType?: CompanyType;
+  partyType?: CompanyPartyType;
   status?: CompanyStatus;
   invoiceAllowed?: boolean;
   email?: string | null;
   phone?: string | null;
+  contactPersonName?: string | null;
+  addressStreet?: string | null;
+  addressHouseNumber?: string | null;
+  addressHouseSuffix?: string | null;
+  addressPostalCode?: string | null;
+  addressCity?: string | null;
+  addressCountry?: string | null;
   notes?: string | null;
+  externalCustomerId?: string | null;
 }): Promise<Company> {
   const supabase = createSupabaseServiceClient();
   const status = input.status ?? "pending";
@@ -291,11 +319,20 @@ export async function createCompany(input: {
       kvk_number: input.kvkNumber?.trim() || null,
       vat_number: input.vatNumber?.trim() || null,
       company_type: input.companyType ?? "product_customer",
+      party_type: input.partyType ?? "company",
       status,
       invoice_allowed: input.invoiceAllowed ?? false,
       email: input.email ? normalizeEmail(input.email) : null,
       phone: input.phone?.trim() || null,
+      contact_person_name: input.contactPersonName?.trim() || null,
+      address_street: input.addressStreet?.trim() || null,
+      address_house_number: input.addressHouseNumber?.trim() || null,
+      address_house_suffix: input.addressHouseSuffix?.trim() || null,
+      address_postal_code: input.addressPostalCode?.trim() || null,
+      address_city: input.addressCity?.trim() || null,
+      address_country: input.addressCountry?.trim() || null,
       notes: input.notes?.trim() || null,
+      external_customer_id: input.externalCustomerId?.trim() || null,
       blocked_at: status === "blocked" ? new Date().toISOString() : null,
     })
     .select("*")
@@ -319,10 +356,18 @@ export async function updateCompany(
     kvkNumber: string | null;
     vatNumber: string | null;
     companyType: CompanyType;
+    partyType: CompanyPartyType;
     status: CompanyStatus;
     invoiceAllowed: boolean;
     email: string | null;
     phone: string | null;
+    contactPersonName: string | null;
+    addressStreet: string | null;
+    addressHouseNumber: string | null;
+    addressHouseSuffix: string | null;
+    addressPostalCode: string | null;
+    addressCity: string | null;
+    addressCountry: string | null;
     notes: string | null;
   }>,
 ): Promise<Company> {
@@ -333,9 +378,25 @@ export async function updateCompany(
   if (patch.kvkNumber !== undefined) row.kvk_number = patch.kvkNumber?.trim() || null;
   if (patch.vatNumber !== undefined) row.vat_number = patch.vatNumber?.trim() || null;
   if (patch.companyType !== undefined) row.company_type = patch.companyType;
+  if (patch.partyType !== undefined) row.party_type = patch.partyType;
   if (patch.invoiceAllowed !== undefined) row.invoice_allowed = patch.invoiceAllowed;
   if (patch.email !== undefined) row.email = patch.email ? normalizeEmail(patch.email) : null;
   if (patch.phone !== undefined) row.phone = patch.phone?.trim() || null;
+  if (patch.contactPersonName !== undefined) {
+    row.contact_person_name = patch.contactPersonName?.trim() || null;
+  }
+  if (patch.addressStreet !== undefined) row.address_street = patch.addressStreet?.trim() || null;
+  if (patch.addressHouseNumber !== undefined) {
+    row.address_house_number = patch.addressHouseNumber?.trim() || null;
+  }
+  if (patch.addressHouseSuffix !== undefined) {
+    row.address_house_suffix = patch.addressHouseSuffix?.trim() || null;
+  }
+  if (patch.addressPostalCode !== undefined) {
+    row.address_postal_code = patch.addressPostalCode?.trim() || null;
+  }
+  if (patch.addressCity !== undefined) row.address_city = patch.addressCity?.trim() || null;
+  if (patch.addressCountry !== undefined) row.address_country = patch.addressCountry?.trim() || null;
   if (patch.notes !== undefined) row.notes = patch.notes?.trim() || null;
   if (patch.status !== undefined) {
     row.status = patch.status;
@@ -356,7 +417,8 @@ export async function addCompanyMember(input: {
     {
       company_id: input.companyId,
       user_id: input.userId,
-      role: input.role ?? "owner",
+      role: input.role ?? "account_admin",
+      status: "active",
     },
     { onConflict: "company_id,user_id", ignoreDuplicates: true },
   );

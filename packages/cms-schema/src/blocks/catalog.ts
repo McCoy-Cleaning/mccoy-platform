@@ -4,7 +4,8 @@ import type { CmsImage } from "../cms-image";
 import { createItemId } from "../ids";
 import { formScopeSnapshotSchema, normalizeFormScopeSnapshot, type FormScopeSnapshot } from "../form-scope";
 import { cmsLinkSchema, linkFromLegacyHref, parseCmsLink } from "../links";
-import type { BlockType, CmsLink } from "../types";
+import type { BlockType } from "../block-types";
+import type { CmsLink } from "../cms-link-model";
 import type { CmsBlockDataDefinition } from "./definition";
 import { normalizeCmsImage } from "./image-normalize";
 import {
@@ -48,6 +49,10 @@ export {
   warnLegacyVacancyFallback,
   EMPLOYMENT_TYPES,
   EMPLOYMENT_TYPE_LABELS_NL,
+  EMPLOYMENT_TYPE_PRESETS_NL,
+  resolveEmploymentTypeLabel,
+  toSchemaOrgEmploymentType,
+  VACANCY_CARD_LABELS_NL,
 } from "./jobs";
 
 function legacyCta(rec: Record<string, unknown>): CmsButton | undefined {
@@ -144,6 +149,12 @@ export type HeroBlockData = {
   cta?: CmsButton;
   secondaryCta?: CmsButton;
   image?: CmsImage;
+  /**
+   * Hero media: image (default) or embeddable video URL.
+   * When `video`, `videoUrl` is primary; `image` may still act as poster/fallback.
+   */
+  mediaKind?: "image" | "video";
+  videoUrl?: string;
   align?: "left" | "center";
   /** Trust strip under CTAs (Home hero parity). */
   trustItems?: HeroTrustItem[];
@@ -179,6 +190,8 @@ const heroSchema: z.ZodType<HeroBlockData> = z.object({
   cta: cmsButtonSchema.optional(),
   secondaryCta: cmsButtonSchema.optional(),
   image: z.custom<CmsImage | undefined>((v) => v === undefined || normalizeCmsImage(v) != null).optional(),
+  mediaKind: z.enum(["image", "video"]).optional(),
+  videoUrl: z.string().optional(),
   align: z.enum(["left", "center"]).optional(),
   trustItems: z.array(heroTrustItemSchema).optional(),
   highlightStat: heroHighlightStatSchema.optional(),
@@ -277,6 +290,9 @@ function normalizeHero(value: unknown): HeroBlockData {
   const subtitle = str(rec, "subtitle") || str(rec, "body") || undefined;
   const presentation: HeroPresentation | undefined =
     rec.presentation === "formChrome" ? "formChrome" : undefined;
+  const mediaKind: "image" | "video" | undefined =
+    rec.mediaKind === "video" ? "video" : rec.mediaKind === "image" ? "image" : undefined;
+  const videoUrl = str(rec, "videoUrl") || undefined;
   const data: HeroBlockData = {
     eyebrow: str(rec, "eyebrow") || undefined,
     title,
@@ -285,6 +301,8 @@ function normalizeHero(value: unknown): HeroBlockData {
     cta: primary,
     secondaryCta: secondary,
     image: normalizeCmsImage(rec.image),
+    ...(mediaKind ? { mediaKind } : {}),
+    ...(videoUrl ? { videoUrl } : {}),
     align: rec.align === "center" ? "center" : "left",
     trustItems: normalizeHeroTrustItems(rec.trustItems),
     highlightStat: normalizeHeroHighlightStat(rec.highlightStat),
@@ -572,11 +590,19 @@ export function normalizeGalleryColumns(raw: unknown): GalleryColumns {
 }
 
 // —— Video ——
+export type VideoMediaKind = "image" | "video";
+
 export type VideoBlockData = {
   title?: string;
   description?: string;
+  /**
+   * Single-slot media mode. Legacy blocks without this field behave as `video`.
+   * When `image`, `image` is the primary media; when `video`, `videoUrl` (+ optional poster).
+   */
+  mediaKind?: VideoMediaKind;
   videoUrl: string;
   poster?: CmsImage;
+  image?: CmsImage;
 };
 
 // —— Before/after ——
@@ -784,7 +810,7 @@ export const catalogDefinitions = {
     label: "Hero",
     category: "Hero & intro",
     description: "Full-bleed intro met media, CTAs en trust strip (Home-pariteit)",
-    dataVersion: 3,
+    dataVersion: 4,
     schema: heroSchema,
     createDefault: createDefaultHero,
     normalize: normalizeHero,
@@ -1052,11 +1078,13 @@ export const catalogDefinitions = {
         }
       }
       const layoutRaw = rec.layout;
-      const layout =
-        layoutRaw === "masonry" || layoutRaw === "featured" || layoutRaw === "grid"
-          ? layoutRaw
-          : "grid";
       const contentMode = normalizeGalleryContentMode(rec.contentMode);
+      const layout =
+        contentMode === "imagesOnly"
+          ? "featured"
+          : layoutRaw === "masonry" || layoutRaw === "featured" || layoutRaw === "grid"
+            ? layoutRaw
+            : "grid";
       const upgraded = upgradeTextAndImageGalleryCopy({
         title: str(rec, "title", "Galerij"),
         body: str(rec, "body") || undefined,
@@ -1080,24 +1108,30 @@ export const catalogDefinitions = {
     type: "video",
     label: "Video",
     category: "Media",
-    dataVersion: 1,
+    dataVersion: 2,
     schema: z.object({
       title: z.string().optional(),
       description: z.string().optional(),
-      videoUrl: z.string().min(1),
+      mediaKind: z.enum(["image", "video"]).optional(),
+      videoUrl: z.string(),
       poster: z.custom<CmsImage | undefined>().optional(),
+      image: z.custom<CmsImage | undefined>().optional(),
     }),
     createDefault: (): VideoBlockData => ({
       title: "Video",
+      mediaKind: "video",
       videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     }),
     normalize: (value) => {
       const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const mediaKind: VideoMediaKind = rec.mediaKind === "image" ? "image" : "video";
       return {
         title: str(rec, "title") || undefined,
         description: str(rec, "description") || undefined,
+        mediaKind,
         videoUrl: str(rec, "videoUrl", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
         poster: normalizeCmsImage(rec.poster),
+        image: normalizeCmsImage(rec.image),
       };
     },
     capabilities: { duplicable: true, removable: true, publishable: true },

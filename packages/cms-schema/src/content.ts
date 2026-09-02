@@ -48,6 +48,12 @@ import {
   type ContactFormTextPlacement,
   type FormFieldItem,
 } from "./blocks/form-fields";
+import {
+  createDefaultQuoteRequestForm,
+  normalizeQuoteRequestForm,
+  quoteRequestFormSchema,
+  type QuoteRequestFormBlockData,
+} from "./blocks/new-sections";
 
 export type { VacaturesApplicationContent } from "./vacatures-application";
 export type { CmsImage } from "./cms-image";
@@ -128,10 +134,16 @@ export type ServiceCard = IdItem & {
   link?: CmsLink;
   /**
    * Contact / secondary CTA (label + geen link / pagina / extern / popup).
-   * Does not replace the fixed “Lees meer” detail-modal opener.
+   * Does not replace the “Lees meer” detail-modal opener (`readMoreLabel`).
    */
   cta?: CmsButton;
+  /**
+   * Long-form detail panel body. Paragraphs separated by blank lines (`\n\n`).
+   * When omitted, storefront falls back to `description`.
+   */
+  detailBody?: string;
 };
+
 export type ProductCard = IdItem & {
   title: string;
   description: string;
@@ -150,6 +162,9 @@ export type HomeHeroContent = {
   body: string;
   /** Optional — cleared via null patch in Secties. */
   image?: CmsImage;
+  /** Image (default) or pasteable embed URL. */
+  mediaKind?: "image" | "video";
+  videoUrl?: string;
   primaryCta?: CmsButton;
   secondaryCta?: CmsButton;
 };
@@ -174,6 +189,11 @@ export type WorkGalleryContent = {
   items: GalleryItem[];
 };
 
+export type AboutPillarItem = {
+  id: string;
+  label: string;
+};
+
 export type AboutMainContent = {
   eyebrow?: string;
   heading: string;
@@ -188,6 +208,8 @@ export type AboutMainContent = {
   missionImage?: CmsImage;
   visionImage?: CmsImage;
   historyImage?: CmsImage;
+  /** Trust chips beside the header (canvas-editable). */
+  pillars?: AboutPillarItem[];
 };
 
 /** Intro chrome only — service cards live on `services.cards`. */
@@ -199,6 +221,10 @@ export type ServicesMainContent = {
 
 export type ServicesCardsContent = {
   cards: ServiceCard[];
+  /** Label for the detail-modal opener (default: Lees meer). */
+  readMoreLabel?: string;
+  /** Accessible label for the detail-panel close control (default: Sluiten). */
+  closeLabel?: string;
 };
 
 export type ProductsMainContent = {
@@ -210,6 +236,12 @@ export type ProductsMainContent = {
   body?: string;
   /** Flyer / promo image shown beside intro copy, CTAs, and note. */
   image?: CmsImage;
+  /** Primary CTA (default: contact). */
+  cta?: CmsButton;
+  /** Secondary CTA (default: phone). */
+  secondaryCta?: CmsButton;
+  /** Metrics strip under the flyer (value + label). */
+  metrics?: Array<{ id: string; value: string; label: string }>;
 };
 
 /** Assortment section: title + intro text + icon cards (no photos). */
@@ -283,6 +315,7 @@ export type ContactFormFieldPlaceholders = {
 /**
  * App-controlled inquiry / offerte forms; section exists so it can be hidden (not deleted).
  * Contact uses `scope`; offerte uses `glassScope` / `furnitureScope`.
+ * Offerte presentation (tabs/fields chrome) lives under optional nested `quote`.
  */
 export type ContactFormContent = {
   /** Eyebrow above the form heading (copy column). */
@@ -319,6 +352,11 @@ export type ContactFormContent = {
   scope?: FormScopeSnapshot;
   glassScope?: FormScopeSnapshot;
   furnitureScope?: FormScopeSnapshot;
+  /**
+   * Nested quoteRequestForm chrome for fixed `offerte.form` (tabs, field labels, submit/success).
+   * Contact.form ignores this; offerte seeds it when missing.
+   */
+  quote?: QuoteRequestFormBlockData;
 };
 
 export function defaultContactFormHighlights(): TextListItem[] {
@@ -394,6 +432,56 @@ export type PageSectionContent = Partial<{
   [K in FixedSectionKey]: SectionContentMap[K];
 }>;
 
+export function defaultAboutPillars(): AboutPillarItem[] {
+  return [
+    { id: "pillar_quality", label: "Premium kwaliteit" },
+    { id: "pillar_team", label: "Betrouwbaar team" },
+    { id: "pillar_contact", label: "Persoonlijk contact" },
+    { id: "pillar_sustainable", label: "Duurzame middelen" },
+  ];
+}
+
+export const DEFAULT_SERVICES_READ_MORE_LABEL = "Lees meer";
+export const DEFAULT_SERVICES_CLOSE_LABEL = "Sluiten";
+
+/** NL detail-panel bodies seeded onto factory service cards (paragraphs via \\n\\n). */
+export const DEFAULT_SERVICE_DETAIL_BODY_BY_ID: Record<string, string> = {
+  svc_regular: [
+    "Een schone werkomgeving is belangrijk voor zowel medewerkers als bezoekers. Het zorgt voor een professionele uitstraling, een prettige werksfeer en draagt bij aan hygiëne en productiviteit. Bij McCoy Cleaning verzorgen wij professionele reguliere schoonmaak voor bedrijven, kantoren, winkels, praktijken en bedrijfspanden in en rondom Twente.",
+    "Wij werken met vaste schoonmaakplannen die volledig worden afgestemd op jouw wensen en de behoeften van het pand. Of het nu gaat om dagelijkse schoonmaak, wekelijkse onderhoudsrondes of periodieke dieptereiniging: ons team zorgt ervoor dat iedere ruimte schoon, fris en representatief blijft.",
+    "Onze medewerkers werken met professionele schoonmaakmiddelen en moderne apparatuur om efficiënt én grondig te reinigen. Daarbij letten we niet alleen op zichtbare netheid, maar ook op hygiëne en detail. Denk aan werkplekken, sanitair, entrees, vergaderruimtes, keukens en algemene ruimtes.",
+    "Bij McCoy Cleaning staan betrouwbaarheid, kwaliteit en flexibiliteit centraal. Wij begrijpen dat ieder bedrijf anders is en zorgen daarom voor een aanpak die aansluit op jouw planning en werkzaamheden.",
+  ].join("\n\n"),
+  svc_horeca: [
+    "In de horeca draait alles om beleving, uitstraling en hygiëne. Gasten verwachten een schone en verzorgde omgeving vanaf het moment dat ze binnenkomen. Bij McCoy Cleaning begrijpen we hoe belangrijk dit is. Daarom verzorgen wij professionele horeca schoonmaak voor restaurants, cafés, hotels, lunchrooms en andere horecalocaties in en rondom Twente.",
+    "Een horecazaak krijgt dagelijks te maken met intensief gebruik. Keukens, vloeren, sanitair en meubilair moeten niet alleen schoon ogen, maar ook voldoen aan hoge hygiënestandaarden. Ons team werkt met professionele reinigingsmiddelen en efficiënte methodes om iedere ruimte grondig te reinigen.",
+    "Wij verzorgen zowel dagelijkse schoonmaak als periodiek onderhoud en kunnen werken buiten openingstijden om jouw bedrijfsprocessen niet te verstoren. Van keukenreiniging tot terrasonderhoud: wij zorgen voor een frisse en representatieve uitstraling waar gasten zich prettig voelen.",
+  ].join("\n\n"),
+  svc_oplevering: [
+    "Na een verbouwing, renovatie of bouwproject blijft vaak veel stof, vuil en bouwafval achter. Een ruimte kan pas echt worden opgeleverd wanneer alles schoon, fris en gebruiksklaar is. McCoy Cleaning verzorgt professionele opleveringsschoonmaak voor woningen, kantoren, winkels en bedrijfspanden in en rondom Twente.",
+    "Tijdens een bouw- of renovatieproject verspreidt stof zich vaak door het hele pand. Daarnaast blijven er regelmatig cementresten, verfspatten, stickers en ander bouwvuil achter. Ons team zorgt voor een grondige schoonmaak van iedere ruimte, zodat het pand netjes en representatief kan worden opgeleverd.",
+    "Wij werken efficiënt en zorgvuldig en besteden extra aandacht aan details. Van ramen en kozijnen tot sanitair en vloeren: alles wordt professioneel gereinigd zodat de ruimte direct klaar is voor gebruik.",
+  ].join("\n\n"),
+  svc_floor: [
+    "Vloeren bepalen voor een groot deel de uitstraling van een ruimte. Intensief dagelijks gebruik kan zorgen voor slijtage, vlekken en een doffe uitstraling. Met professioneel vloeronderhoud van McCoy Cleaning blijven jouw vloeren schoon, verzorgd en langer in topconditie.",
+    "Wij verzorgen specialistisch vloeronderhoud voor bedrijven, kantoren, horecagelegenheden en commerciële ruimtes in en rondom Twente. Daarbij maken wij gebruik van professionele machines, veilige reinigingsmiddelen en de juiste technieken voor ieder type vloer.",
+    "Of het nu gaat om tapijtreiniging, het schrobben en kristalliseren van harde vloeren of het stripppen en in de was zetten: wij zorgen voor een grondige aanpak die zichtbaar resultaat oplevert.",
+  ].join("\n\n"),
+  svc_furniture: [
+    "Stoffen meubels, leren banken, stoelen en bekleding verdienen specialistische zorg. McCoy Cleaning reinigt jouw meubilair met professionele extractie-apparatuur en pH-neutrale middelen die de vezels beschermen.",
+    "Wij verwijderen vlekken, geuren en ingesleten vuil en frissen de bekleding zichtbaar op. Geschikt voor kantoren, horeca, hotels, praktijken én particuliere woningen in en rondom Twente.",
+    "Het resultaat: een fris, hygiënisch en als nieuw ogend interieur — met een langere levensduur voor jouw meubilair.",
+  ].join("\n\n"),
+  svc_glass: [
+    "De buitenkant van een pand bepaalt de eerste indruk. Schone ramen, een verzorgde gevel en een nette entree dragen direct bij aan een professionele en betrouwbare uitstraling.",
+    "McCoy Cleaning is gespecialiseerd in glasbewassing en buitenreiniging voor bedrijven, winkels, horecalocaties en bedrijfspanden in Twente en omgeving.",
+    "Wij reinigen onder andere:\n• Ramen en glaspartijen\n• Kozijnen, deuren, houtwerk en boeiranden\n• Gevels, damwanden en gevelbeplating\n• Entrees en buitenruimtes\n• Bestrating rondom het pand\n• Zonnepanelen voor optimaal rendement",
+    "Of het nu gaat om periodieke glasbewassing of een eenmalige grondige buitenreiniging – wij leveren altijd maatwerk, afgestemd op jouw situatie.",
+    "Door weersinvloeden, vervuiling en dagelijks gebruik kunnen ramen, gevels en buitenruimtes snel hun frisse uitstraling verliezen. Met onze professionele apparatuur en veilige werkmethodes zorgen wij ervoor dat jouw pand weer schoon, representatief en uitnodigend oogt.",
+    "Wij werken veilig, efficiënt en met oog voor detail, zodat jouw pand het hele jaar door een verzorgde en professionele uitstraling behoudt.",
+  ].join("\n\n"),
+};
+
 export function defaultServiceCardCtaLabel(route: "contact" | "offerte"): string {
   return route === "offerte"
     ? DEFAULT_SERVICE_CARD_QUOTE_CTA_LABEL
@@ -426,6 +514,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Reguliere schoonmaak",
       description:
         "Een schone werkomgeving is belangrijk voor zowel medewerkers als bezoekers. Bij McCoy Cleaning verzorgen wij professionele reguliere schoonmaak voor bedrijven, kantoren, winkels, praktijken en bedrijfspanden in en rondom Twente.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_regular,
       image: localImage("/images/cms/work-regular-sander.png", "Reguliere schoonmaak"),
       cta: serviceCardCta("contact"),
     },
@@ -434,6 +523,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Horeca schoonmaak",
       description:
         "In de horeca draait alles om beleving, uitstraling en hygiëne. Wij verzorgen professionele horeca schoonmaak voor restaurants, cafés, hotels en lunchrooms in en rondom Twente.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_horeca,
       image: localImage("/images/cms/work-horeca.jpg", "Horeca schoonmaak"),
       cta: serviceCardCta("contact"),
     },
@@ -442,6 +532,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Opleveringsschoonmaak",
       description:
         "Na een verbouwing of renovatie blijft vaak veel stof en bouwafval achter. McCoy Cleaning verzorgt professionele opleveringsschoonmaak voor woningen, kantoren, winkels en bedrijfspanden in en rondom Twente.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_oplevering,
       image: localImage("/images/cms/work-oplevering-hal.png", "Opleveringsschoonmaak"),
       cta: serviceCardCta("contact"),
     },
@@ -450,6 +541,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Vloeronderhoud",
       description:
         "Vloeren bepalen voor een groot deel de uitstraling van een ruimte. Met professioneel vloeronderhoud van McCoy Cleaning blijven jouw vloeren schoon, verzorgd en langer in topconditie.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_floor,
       image: localImage("/images/cms/work-floor-scrubber.jpg", "Vloeronderhoud"),
       cta: serviceCardCta("contact"),
     },
@@ -458,6 +550,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Meubelreiniging",
       description:
         "Stoffen meubels, leren banken en stoelen verdienen specialistische zorg. Met professionele extractie en pH-neutrale producten reinigen wij grondig zonder de vezels te beschadigen.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_furniture,
       image: localImage("/images/cms/work-furniture-bank.jpg", "Meubelreiniging"),
       cta: serviceCardCta("offerte"),
     },
@@ -466,6 +559,7 @@ function defaultServiceCards(): ServiceCard[] {
       title: "Glasbewassing & Buitenreiniging",
       description:
         "De buitenkant van een pand bepaalt de eerste indruk. Schone ramen, een verzorgde gevel en een nette entree dragen direct bij aan een professionele en betrouwbare uitstraling.",
+      detailBody: DEFAULT_SERVICE_DETAIL_BODY_BY_ID.svc_glass,
       image: localImage("/images/cms/work-glass-van.jpg", "Glasbewassing & Buitenreiniging"),
       cta: serviceCardCta("offerte"),
     },
@@ -540,6 +634,7 @@ const serviceCardSchema = z.object({
   image: cmsImageSchema,
   link: cmsLinkSchema.optional(),
   cta: cmsButtonSchema.optional(),
+  detailBody: z.string().optional(),
 });
 
 const productCardSchema = z.object({
@@ -551,12 +646,25 @@ const productCardSchema = z.object({
   cta: cmsButtonSchema.optional(),
 });
 
+const aboutPillarItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+});
+
+const productsIntroMetricSchema = z.object({
+  id: z.string().min(1),
+  value: z.string(),
+  label: z.string(),
+});
+
 export const homeHeroContentSchema: z.ZodType<HomeHeroContent> = z.object({
   eyebrow: z.string().optional(),
   heading: z.string().min(1),
   headingAccent: z.string().optional(),
   body: z.string(),
   image: cmsImageSchema.optional(),
+  mediaKind: z.enum(["image", "video"]).optional(),
+  videoUrl: z.string().optional(),
   primaryCta: cmsButtonSchema.optional(),
   secondaryCta: cmsButtonSchema.optional(),
 });
@@ -594,6 +702,7 @@ export const aboutMainContentSchema: z.ZodType<AboutMainContent> = z.object({
   missionImage: cmsImageSchema.optional(),
   visionImage: cmsImageSchema.optional(),
   historyImage: cmsImageSchema.optional(),
+  pillars: z.array(aboutPillarItemSchema).optional(),
 });
 
 export const servicesMainContentSchema: z.ZodType<ServicesMainContent> = z.object({
@@ -604,6 +713,8 @@ export const servicesMainContentSchema: z.ZodType<ServicesMainContent> = z.objec
 
 export const servicesCardsContentSchema: z.ZodType<ServicesCardsContent> = z.object({
   cards: z.array(serviceCardSchema),
+  readMoreLabel: z.string().optional(),
+  closeLabel: z.string().optional(),
 });
 
 export const productsMainContentSchema: z.ZodType<ProductsMainContent> = z.object({
@@ -612,6 +723,9 @@ export const productsMainContentSchema: z.ZodType<ProductsMainContent> = z.objec
   intro: z.string(),
   body: z.string().optional(),
   image: cmsImageSchema.optional(),
+  cta: cmsButtonSchema.optional(),
+  secondaryCta: cmsButtonSchema.optional(),
+  metrics: z.array(productsIntroMetricSchema).optional(),
 });
 
 export const productsInfoContentSchema: z.ZodType<ProductsInfoContent> = z.object({
@@ -684,6 +798,7 @@ export const contactFormContentSchema: z.ZodType<ContactFormContent> = z.object(
   scope: formScopeSnapshotSchema.optional(),
   glassScope: formScopeSnapshotSchema.optional(),
   furnitureScope: formScopeSnapshotSchema.optional(),
+  quote: quoteRequestFormSchema.optional(),
 });
 
 function optLegacyFieldString(
@@ -777,6 +892,35 @@ export function normalizeContactFormContent(raw: unknown): ContactFormContent {
     scope: normalizeFormScopeSnapshot(rec.scope),
     glassScope: normalizeFormScopeSnapshot(rec.glassScope),
     furnitureScope: normalizeFormScopeSnapshot(rec.furnitureScope),
+  };
+}
+
+/**
+ * Normalize fixed `offerte.form` content and seed nested quote chrome when missing.
+ * Copies top-level heading/submit/success onto a freshly seeded quote only.
+ */
+export function normalizeOfferteFormContent(raw: unknown): ContactFormContent {
+  const base = normalizeContactFormContent(raw);
+  const rec =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const hadQuote = rec.quote !== undefined && rec.quote !== null;
+  let quote = hadQuote
+    ? normalizeQuoteRequestForm(rec.quote)
+    : createDefaultQuoteRequestForm();
+
+  if (!hadQuote) {
+    if (base.heading?.trim()) quote = { ...quote, heading: base.heading };
+    if (base.submitLabel?.trim()) quote = { ...quote, submitLabel: base.submitLabel };
+    if (base.successMessage?.trim()) {
+      quote = { ...quote, successMessage: base.successMessage };
+    }
+  }
+
+  return {
+    ...base,
+    quote,
   };
 }
 
@@ -882,13 +1026,15 @@ export function storageImage(
 ): CmsImage {
   const id = opts.assetId.startsWith("storage:") ? opts.assetId : `storage:${opts.assetId}`;
   const decorative = opts.decorative === true;
+  const width = typeof opts.width === "number" && opts.width > 0 ? opts.width : undefined;
+  const height = typeof opts.height === "number" && opts.height > 0 ? opts.height : undefined;
   return {
     assetId: id,
     src: opts.publicUrl,
     alt: decorative ? "" : (opts.alt ?? ""),
     decorative,
-    width: opts.width,
-    height: opts.height,
+    ...(width != null ? { width } : {}),
+    ...(height != null ? { height } : {}),
   };
 }
 
@@ -1033,6 +1179,7 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         missionImage: localImage("/images/cms/about-mission.png", "Missie — voor en na"),
         visionImage: localImage("/images/cms/about-vision.jpg", "Visie"),
         historyImage: localImage("/images/cms/about-history.jpg", "Historie"),
+        pillars: defaultAboutPillars(),
       } satisfies AboutMainContent;
     case "services.main":
       return {
@@ -1044,6 +1191,8 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
     case "services.cards":
       return {
         cards: defaultServiceCards(),
+        readMoreLabel: DEFAULT_SERVICES_READ_MORE_LABEL,
+        closeLabel: DEFAULT_SERVICES_CLOSE_LABEL,
       } satisfies ServicesCardsContent;
     case "products.main":
       return {
@@ -1053,6 +1202,19 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
           "Een belangrijk onderdeel van McCoy Cleaning is McCoy Products, onze groothandel. In ons assortiment vind je: hygiëne papier, professionele zepen, reinigingsmiddelen voor horeca en apparatuur en hardware om schoon te maken.\n\nVoor het verkrijgen van onze producten kunt u bellen of contact op nemen via het contactformulier, we helpen u dan graag.",
         body: "We zijn momenteel druk achter de schermen met de online webshop! Deze volgt binnenkort.",
         image: localImage("/images/cms/products-flyer.png", "McCoy Cleaning Products flyer"),
+        cta: {
+          label: "Contact opnemen",
+          link: { type: "internal_route", route: "contact" },
+        },
+        secondaryCta: {
+          label: MCCOY_NAP.telephoneDisplayNational,
+          link: { type: "external", url: napTelHref() },
+        },
+        metrics: [
+          { id: "metric_products", value: "100+", label: "Producten" },
+          { id: "metric_b2b", value: "B2B", label: "Groothandel" },
+          { id: "metric_contact", value: "24/7", label: "Contact" },
+        ],
       } satisfies ProductsMainContent;
     case "products.info":
       return {
@@ -1173,7 +1335,9 @@ export function defaultSectionContent(key: FixedSectionKey): SectionContentMap[F
         ],
       } satisfies ContactInfoContent;
     case "offerte.form":
-      return {} satisfies ContactFormContent;
+      return {
+        quote: createDefaultQuoteRequestForm(),
+      } satisfies ContactFormContent;
     case "privacy.main":
       return defaultPrivacyMainContent();
     case "terms.main":
@@ -1295,6 +1459,17 @@ export function migrateLegacyWorkGalleryContent(
 ): WorkGalleryContent {
   const def = defaultSectionContent("home.workGallery") as WorkGalleryContent;
   if (!existing || isLegacyPrototypeWorkGallery(existing)) return def;
+  // Empty gallery was never intentionally authored — seed the Ons-werk tiles
+  // so the canvas always shows the existing photos (add more from there).
+  if (existing.items.length === 0) {
+    return migrateOriginalWorkGalleryImages({
+      ...existing,
+      eyebrow: existing.eyebrow ?? def.eyebrow,
+      heading: existing.heading?.trim() ? existing.heading : def.heading,
+      body: existing.body ?? def.body,
+      items: def.items,
+    });
+  }
   return migrateOriginalWorkGalleryImages(existing);
 }
 

@@ -42,6 +42,9 @@ export type SeoHeadPageSnapshot = {
   alternates: Array<{ locale: string; url: string }>;
 };
 
+/** @deprecated Alias kept for older call sites / WIP merges. */
+export type SeoResolvedSnapshot = SeoHeadPageSnapshot;
+
 export type ResolveSeoMetadataOptions = {
   /**
    * Optional frozen deployed SEO fields (SEO-7 ≠ SEO-8).

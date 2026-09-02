@@ -10,13 +10,21 @@ import {
   Layers,
   LoaderCircle,
   X,
+  Eye,
+  Pencil,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { type CmsPage, type Locale } from "@mccoy/cms-schema";
 import { cms, useCms, useEditablePage } from "@/lib/cms/store";
 import { useCmsEditParentBridge } from "@/lib/cms/edit-bridge";
 import { buildStorefrontEditCanvasUrl } from "@/lib/cms/edit-canvas-url";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
-import { BuiltinLayoutEditor, SectiesOpenButton } from "@/components/admin/cms/BuiltinLayoutEditor";
+import { BuiltinLayoutEditor, AddSectionFab } from "@/components/admin/cms/BuiltinLayoutEditor";
+import { TemplatePicker } from "@/components/admin/cms/TemplatePicker";
+import { CanvasMediaPicker } from "@/components/admin/cms/CanvasMediaPicker";
+import type { BlockType } from "@/lib/cms/types";
+import type { CmsUiCommand } from "@mccoy/cms-schema";
 import {
   LegacyCmsImagesPanel,
   pageHasLegacyEmbeddedImages,
@@ -158,7 +166,8 @@ function EditCanvasIframe({
         ref={iframeRef}
         src={reachability === "unreachable" ? undefined : editUrl}
         title="edit"
-        className={cn("h-full w-full border-0 bg-background", className)}
+        className={cn("block h-full w-full border-0 bg-background", className)}
+        style={{ border: 0, display: "block", width: "100%" }}
         onLoad={onLoad}
       />
     </div>
@@ -254,6 +263,12 @@ function BuiltinPageSplitEditor({
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
   const [previewLocale, setPreviewLocale] = React.useState<Locale>("nl");
   const [sectionsOpen, setSectionsOpen] = React.useState(false);
+  const [pickerAt, setPickerAt] = React.useState<number | null>(null);
+  const [mediaTarget, setMediaTarget] = React.useState<
+    Extract<CmsUiCommand, { kind: "openMediaPicker" }>["target"] | null
+  >(null);
+  const mediaPickerOpenRef = React.useRef(false);
+  mediaPickerOpenRef.current = mediaTarget != null;
   const editRef = React.useRef<HTMLIFrameElement>(null);
   const origin = React.useMemo(() => storefrontOrigin(), []);
   const bridge = useCmsEditParentBridge(pageId, editRef, origin);
@@ -280,7 +295,11 @@ function BuiltinPageSplitEditor({
       cms.ensureLegalBlocksMigration(pageId);
     }
     const refreshFromServer = () => {
+      // File picker / media modal steals focus; reconciling on return used to race
+      // uploads and could push a stale draft into the edit iframe.
+      if (mediaPickerOpenRef.current) return;
       void cms.reconcileLocalCustomPagesWithServer().then(() => {
+        if (mediaPickerOpenRef.current) return;
         if (pageId === "page_products") {
           cms.ensureProductsBlocksMigration(pageId);
         }
@@ -327,8 +346,61 @@ function BuiltinPageSplitEditor({
   }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId], publishedUpdatedAt]);
 
   React.useEffect(() => {
-    if (bridge.selection) setSectionsOpen(true);
-  }, [bridge.selection]);
+    // Advanced settings only: canvas edits stay on the website; do not auto-open the drawer.
+    const cmd = bridge.uiCommand;
+    if (!cmd) return;
+    if (cmd.kind === "openAddPicker") {
+      setPickerAt(cmd.atIndex);
+      bridge.clearUiCommand();
+      return;
+    }
+    if (cmd.kind === "openAdvanced") {
+      bridge.setSelection(cmd.selection);
+      setSectionsOpen(true);
+      bridge.clearUiCommand();
+      return;
+    }
+    if (cmd.kind === "openMediaPicker") {
+      setMediaTarget(cmd.target);
+      bridge.clearUiCommand();
+    }
+  }, [bridge.uiCommand, bridge.clearUiCommand, bridge.setSelection]);
+
+  // Editor history shortcuts (admin chrome). Canvas iframe sends undo/redo when
+  // focus is inside the storefront and not in an active text field.
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        bridge.undo();
+        return;
+      }
+      if (key === "y" || (key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        bridge.redo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [bridge]);
+
+  // Removed: auto-open Secties on every canvas selection (WYSIWYG — edit on canvas).
+  // React.useEffect(() => {
+  //   if (bridge.selection) setSectionsOpen(true);
+  // }, [bridge.selection]);
 
   const onSave = () => {
     if (publishInFlight.current) return;
@@ -402,6 +474,7 @@ function BuiltinPageSplitEditor({
       }
       cms.discardDraft(pageId);
       cms.clearPreviewSnapshot(pageId);
+      bridge.clearHistory();
       setTimeout(() => {
         try {
           editRef.current?.contentWindow?.location.reload();
@@ -427,6 +500,12 @@ function BuiltinPageSplitEditor({
         previewLocale={previewLocale}
         onPreviewLocale={setPreviewLocale}
         saveLabel="Opslaan & publiceren"
+        interactionMode={bridge.interactionMode}
+        onInteractionMode={bridge.setInteractionMode}
+        canUndo={bridge.canUndo}
+        canRedo={bridge.canRedo}
+        onUndo={() => bridge.undo()}
+        onRedo={() => bridge.redo()}
       />
 
       {page ? (
@@ -447,19 +526,20 @@ function BuiltinPageSplitEditor({
         </div>
       ) : null}
 
-      {/* One shared shell: preview + Secties bind as a single composition. */}
+      {/* WYSIWYG: full-width website canvas; Secties only as advanced overlay. */}
       <div className="relative mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary/30 bg-primary/[0.03]">
         <div className="flex shrink-0 items-center gap-2.5 border-b border-white/10 px-4 py-2.5">
-          <span className="h-2 w-2 rounded-full bg-primary" />
-          <span className="text-sm font-semibold text-white/70">Voorbeeld van uw website</span>
-          {sectionsOpen ? (
-            <>
-              <span className="mx-1 hidden h-4 w-px bg-white/15 xl:block" aria-hidden />
-              <span className="hidden text-sm font-semibold text-sky-200/80 xl:inline">
-                Secties
-              </span>
-            </>
-          ) : null}
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              bridge.interactionMode === "preview" ? "bg-emerald-400" : "bg-primary",
+            )}
+          />
+          <span className="text-sm font-semibold text-white/70">
+            {bridge.interactionMode === "preview"
+              ? "Voorbeeld (bewerken uit)"
+              : "Website bewerken"}
+          </span>
           <PreviewLocaleToggle
             locale={previewLocale}
             onLocale={setPreviewLocale}
@@ -467,57 +547,80 @@ function BuiltinPageSplitEditor({
           />
         </div>
 
-        <div
-          className={cn(
-            "relative min-h-0 flex-1 xl:grid",
-            // Docked push only from xl (1280px); below that Secties is an overlay sheet.
-            "xl:transition-[grid-template-columns] xl:duration-500 xl:ease-[cubic-bezier(0.22,1,0.36,1)]",
-            "motion-reduce:xl:transition-none",
-            sectionsOpen
-              ? "xl:grid-cols-[minmax(0,1fr)_clamp(460px,34vw,560px)]"
-              : "xl:grid-cols-[minmax(0,1fr)_0px]",
-          )}
-        >
-          <div className="relative min-h-0 min-w-0 overflow-hidden">
-            <DeviceFrame device={device}>
-              <EditCanvasIframe
-                iframeRef={editRef}
-                editUrl={editUrl}
-                origin={origin}
-                onLoad={() => bridge.bump()}
-                className="h-full w-full border-0 bg-background"
-              />
-            </DeviceFrame>
-            {!sectionsOpen ? (
-              <SectiesOpenButton
-                count={page?.layout.length ?? 0}
-                onClick={() => setSectionsOpen(true)}
-              />
-            ) : null}
-          </div>
-
-          <div
-            className={cn(
-              "min-h-0 min-w-0 overflow-hidden border-white/10",
-              sectionsOpen
-                ? "absolute inset-0 z-30 border-0 xl:relative xl:inset-auto xl:border-l"
-                : "pointer-events-none max-xl:hidden",
-            )}
-          >
-            <BuiltinLayoutEditor
-              pageId={pageId}
-              open={sectionsOpen}
-              onOpenChange={setSectionsOpen}
-              showOpenButton={false}
-              docked
-              canvasSelection={bridge.selection}
-              onSelectLayoutItem={(selection) => {
-                bridge.setSelection(selection);
-              }}
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <DeviceFrame device={device}>
+            <EditCanvasIframe
+              iframeRef={editRef}
+              editUrl={editUrl}
+              origin={origin}
+              onLoad={() => bridge.bump()}
+              className="h-full w-full border-0 bg-background"
             />
-          </div>
+          </DeviceFrame>
+          {bridge.interactionMode === "edit" && !sectionsOpen ? (
+            <AddSectionFab
+              onClick={() => setPickerAt(page?.layout.length ?? 0)}
+            />
+          ) : null}
+
+          {sectionsOpen ? (
+            <div className="absolute inset-0 z-30 flex justify-end bg-black/35 xl:bg-transparent xl:pointer-events-none">
+              <div className="pointer-events-auto h-full w-full max-w-[min(560px,100%)] border-l border-white/10 bg-[#0c0e12]/97 shadow-2xl backdrop-blur-xl xl:max-w-[clamp(420px,32vw,520px)]">
+                <BuiltinLayoutEditor
+                  pageId={pageId}
+                  open={sectionsOpen}
+                  onOpenChange={setSectionsOpen}
+                  showOpenButton={false}
+                  docked
+                  canvasSelection={bridge.selection}
+                  onSelectLayoutItem={(selection) => {
+                    bridge.setSelection(selection);
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <TemplatePicker
+        open={pickerAt !== null}
+        onClose={() => setPickerAt(null)}
+        page={page}
+        onPick={(type: BlockType, templateId: string) => {
+          if (pickerAt === null) return;
+          const result = bridge.applyMutation({
+            kind: "layout",
+            op: "add",
+            blockType: type,
+            atIndex: pickerAt,
+            templateId,
+          });
+          setPickerAt(null);
+          if (result.ok) {
+            bridge.bump();
+            notifyToast({
+              kind: "success",
+              title: "Sectie toegevoegd",
+              dedupeKey: `cms-add-section:${pageId}`,
+            });
+          } else {
+            notifyToast({
+              kind: "error",
+              title: "Sectie toevoegen mislukt",
+              description: result.reason,
+            });
+          }
+        }}
+      />
+
+      <CanvasMediaPicker
+        pageId={pageId}
+        target={mediaTarget}
+        onClose={() => setMediaTarget(null)}
+        onApplied={() => bridge.bump()}
+        applyMutation={bridge.applyMutation}
+      />
     </div>
   );
 }
@@ -561,6 +664,35 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
     bridge.bump();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bridge.bump, pageId, state.draft[pageId], state.saved[pageId], publishedUpdatedAt]);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        bridge.undo();
+        return;
+      }
+      if (key === "y" || (key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        bridge.redo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [bridge]);
 
   const onSave = () => {
     if (publishInFlight.current) return;
@@ -635,6 +767,7 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
       const wasDraftOnly = page.isDraftOnly;
       cms.discardDraft(pageId);
       cms.clearPreviewSnapshot(pageId);
+      bridge.clearHistory();
       if (wasDraftOnly) {
         navigate({ to: "/website" });
         return;
@@ -673,6 +806,12 @@ function CustomPageSplitEditor({ pageId }: { pageId: string }) {
         previewLocale={previewLocale}
         onPreviewLocale={setPreviewLocale}
         saveLabel={page.isDraftOnly ? "Pagina publiceren" : "Opslaan & publiceren"}
+        interactionMode={bridge.interactionMode}
+        onInteractionMode={bridge.setInteractionMode}
+        canUndo={bridge.canUndo}
+        canRedo={bridge.canRedo}
+        onUndo={() => bridge.undo()}
+        onRedo={() => bridge.redo()}
       />
 
       <div className="mt-3 space-y-3">
@@ -972,6 +1111,12 @@ function SplitToolbar({
   previewLocale,
   onPreviewLocale,
   saveLabel = "Opslaan & publiceren",
+  interactionMode = "edit",
+  onInteractionMode,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: {
   pageId: string;
   title: string;
@@ -986,6 +1131,12 @@ function SplitToolbar({
   previewLocale: Locale;
   onPreviewLocale: (l: Locale) => void;
   saveLabel?: string;
+  interactionMode?: "edit" | "preview";
+  onInteractionMode?: (mode: "edit" | "preview") => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }) {
   const navigate = useNavigate();
   const [translationState, setTranslationState] = React.useState(() =>
@@ -1031,15 +1182,18 @@ function SplitToolbar({
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="truncate text-lg font-bold tracking-tight">{title}</div>
+            <div className="truncate text-lg font-bold tracking-tight">
+              <span className="text-white/45 font-medium">Bewerken:</span> {title}
+            </div>
             {hasDraft ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
                 <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
                 Concept — nog niet live
               </span>
             ) : (
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                Live
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                Gepubliceerd
               </span>
             )}
           </div>
@@ -1083,6 +1237,72 @@ function SplitToolbar({
           </div>
         )}
 
+        {onInteractionMode ? (
+          <div
+            className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1"
+            role="group"
+            aria-label="Bewerkingsmodus"
+          >
+            <button
+              type="button"
+              onClick={() => onInteractionMode("edit")}
+              aria-pressed={interactionMode === "edit"}
+              className={cn(
+                "inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition",
+                interactionMode === "edit"
+                  ? "bg-[#1e88e5] text-white shadow"
+                  : "text-white/55 hover:text-white",
+              )}
+            >
+              <Pencil className="h-4 w-4" aria-hidden />
+              Bewerken
+            </button>
+            <button
+              type="button"
+              onClick={() => onInteractionMode("preview")}
+              aria-pressed={interactionMode === "preview"}
+              className={cn(
+                "inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition",
+                interactionMode === "preview"
+                  ? "bg-[#1e88e5] text-white shadow"
+                  : "text-white/55 hover:text-white",
+              )}
+            >
+              <Eye className="h-4 w-4" aria-hidden />
+              Voorbeeld
+            </button>
+          </div>
+        ) : null}
+
+        <div
+          className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1"
+          role="group"
+          aria-label="Geschiedenis"
+        >
+          <button
+            type="button"
+            onClick={() => onUndo?.()}
+            disabled={!canUndo || saving || !onUndo}
+            data-cms-toolbar="undo"
+            aria-label="Ongedaan maken"
+            title="Ongedaan maken (Ctrl+Z)"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35"
+          >
+            <Undo2 className="h-4 w-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRedo?.()}
+            disabled={!canRedo || saving || !onRedo}
+            data-cms-toolbar="redo"
+            aria-label="Opnieuw uitvoeren"
+            title="Opnieuw uitvoeren (Ctrl+Y)"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35"
+          >
+            <Redo2 className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={onDiscard}
@@ -1113,7 +1333,7 @@ function SplitToolbar({
         </button>
       </div>
       <p className="mt-2.5 border-t border-white/5 px-1 pt-2.5 text-[13px] leading-snug text-white/45">
-        U kijkt naar een voorbeeld. Pas gerust aan — er gaat niets live voordat u op{" "}
+        U bewerkt de echte website. Wijzigingen blijven concept tot u op{" "}
         <span className="font-semibold text-white/70">“{saveLabel}”</span> klikt.
       </p>
     </div>
@@ -1158,12 +1378,13 @@ function PaneShell({
   );
 }
 
-/** Desktop storefront layout width used when the preview pane is narrower than this. */
+/** Desktop storefront layout width (CSS px). Visual scale fills the admin pane. */
 const DESKTOP_CANVAS_WIDTH = 1280;
 
 /**
- * Desktop: render at a real desktop width, then scale to fit the pane so Secties
- * never forces horizontal scrolling. Mobile: phone chrome as before.
+ * Desktop: paint at a real desktop width (1280), then scale to fill the pane —
+ * both down (narrow) and up (wide) so no empty right gutter remains next to the
+ * canvas. Iframe layout stays 1280 CSS px (E10 parity). Mobile: phone chrome.
  */
 function DeviceFrame({
   device,
@@ -1185,7 +1406,8 @@ function DeviceFrame({
       const w = el.clientWidth;
       const h = el.clientHeight;
       setHostHeight(h);
-      setScale(w > 0 ? Math.min(1, w / DESKTOP_CANVAS_WIDTH) : 1);
+      // Fill host width completely — never leave an unused side strip.
+      setScale(w > 0 ? w / DESKTOP_CANVAS_WIDTH : 1);
     };
 
     update();
@@ -1195,35 +1417,42 @@ function DeviceFrame({
   }, [device]);
 
   if (device === "mobile") {
+    // Content box is exactly 390 CSS px. Decorative chrome uses ring (not border)
+    // so border-box does not shrink the iframe below the storefront mobile viewport.
     return (
       <div className="flex h-full items-start justify-center overflow-auto p-4">
-        <div className="h-[calc(100%-1rem)] max-h-[820px] w-[390px] overflow-hidden rounded-[2rem] border-4 border-white/10 shadow-2xl">
-          {children}
+        <div
+          data-cms-device-frame="mobile"
+          className="relative h-[calc(100%-1rem)] max-h-[820px] w-[390px] overflow-hidden rounded-[2rem] shadow-2xl"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 rounded-[2rem] ring-4 ring-inset ring-white/10"
+          />
+          <div className="h-full w-full overflow-hidden rounded-[2rem]">{children}</div>
         </div>
       </div>
     );
   }
 
-  const needsScale = scale < 0.999;
+  const needsScale = Math.abs(scale - 1) > 0.001;
   const innerHeight = scale > 0 && hostHeight > 0 ? hostHeight / scale : "100%";
 
+  // Always paint at DESKTOP_CANVAS_WIDTH so Preview matches a real desktop
+  // storefront (1280 CSS). Scale to fill the admin host (no empty right gutter).
   return (
     <div ref={hostRef} className="h-full w-full min-w-0 overflow-hidden bg-background">
-      {needsScale ? (
-        <div
-          className="origin-top-left will-change-transform motion-reduce:transition-none"
-          style={{
-            width: DESKTOP_CANVAS_WIDTH,
-            height: innerHeight,
-            transform: `scale(${scale})`,
-            transition: "transform 480ms cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
-        >
-          {children}
-        </div>
-      ) : (
-        <div className="h-full w-full">{children}</div>
-      )}
+      <div
+        className="origin-top-left will-change-transform motion-reduce:transition-none"
+        style={{
+          width: DESKTOP_CANVAS_WIDTH,
+          height: innerHeight,
+          transform: needsScale ? `scale(${scale})` : undefined,
+          transition: "transform 480ms cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@
  */
 
 import {
+  CmsBlockEditScope,
   CmsFormAdaptersProvider,
   CmsPageIdProvider,
   RegisteredBlockView,
@@ -145,7 +146,11 @@ export function BlockView({
   const presentation = usesStorefrontPresentationAdapter(publicBlock)
     ? renderStorefrontPresentationAdapter(publicBlock)
     : null;
-  const rendered = presentation ?? (
+  const rendered = presentation ? (
+    <CmsBlockEditScope blockId={publicBlock.id} blockType={publicBlock.type}>
+      {presentation}
+    </CmsBlockEditScope>
+  ) : (
     <RegisteredBlockView block={publicBlock} adminMode={adminMode} />
   );
 

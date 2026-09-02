@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 import { createDefaultBlock, createItemId, localImage, type StepsBlockData } from "@mccoy/cms-schema";
 import { StepsSectionView } from "./StepsSectionView";
 import { RegisteredBlockView } from "./RegisteredBlockView";
+import {
+  CmsBlockEditScope,
+  CmsEditSurfaceProvider,
+  type CmsEditSurfaceApi,
+} from "../edit-surface";
 
 describe("StepsSectionView", () => {
   it("renders horizontal slider chrome with title and step cards", () => {
@@ -54,5 +59,47 @@ describe("StepsSectionView", () => {
     );
     expect(html).toContain("Nog geen stappen");
     expect(html).not.toContain("data-steps-slider");
+  });
+
+  it("exposes add/remove chrome hooks for edit surface wiring", () => {
+    // Without edit surface, add/remove chrome stays hidden (public markup).
+    const html = renderToStaticMarkup(
+      React.createElement(StepsSectionView, {
+        data: {
+          title: "Aanpak",
+          steps: [{ id: "s1", title: "Eén", body: "Tekst" }],
+        },
+      }),
+    );
+    expect(html).not.toContain("data-cms-list-add");
+    expect(html).not.toContain("Stap verwijderen");
+    expect(html).not.toContain("Stap toevoegen");
+  });
+
+  it("shows add and remove controls when edit surface is enabled", () => {
+    const surface: CmsEditSurfaceApi = {
+      enabled: true,
+      sendBlockPatch: () => undefined,
+      renderText: ({ value }) =>
+        React.createElement("span", { "data-cms-edit-text": "" }, value),
+      renderMedia: ({ children }) =>
+        React.createElement("div", { "data-cms-edit-media": "" }, children),
+      renderCta: ({ children }) => children,
+    };
+    const html = renderToStaticMarkup(
+      <CmsEditSurfaceProvider value={surface}>
+        <CmsBlockEditScope blockId="b1" blockType="steps">
+          <StepsSectionView
+            data={{
+              title: "Aanpak",
+              steps: [{ id: "s1", title: "Eén", body: "Tekst" }],
+            }}
+          />
+        </CmsBlockEditScope>
+      </CmsEditSurfaceProvider>,
+    );
+    expect(html).toContain("data-cms-list-add");
+    expect(html).toContain("Stap toevoegen");
+    expect(html).toContain("Stap verwijderen: Eén");
   });
 });

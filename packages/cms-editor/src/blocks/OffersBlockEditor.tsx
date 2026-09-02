@@ -1,6 +1,9 @@
 import * as React from "react";
 import {
   createOfferItem,
+  DEFAULT_OFFER_DISCOUNT_BADGE,
+  DEFAULT_OFFER_DISCOUNT_PRICE,
+  DEFAULT_OFFER_ORIGINAL_PRICE,
   normalizeOffersLayout,
   type OffersBlockData,
   type OfferItem,
@@ -65,43 +68,13 @@ function LayoutChoice({
   );
 }
 
-function PriceField({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-  hint?: string;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <input
-        className={inputClass}
-        type="number"
-        inputMode="decimal"
-        min={0}
-        max={1_000_000}
-        step="0.01"
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          onChange(Number.isFinite(n) && n >= 0 ? n : 0);
-        }}
-      />
-    </Field>
-  );
-}
-
 export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: Props) {
   const layout = normalizeOffersLayout(value.layout);
   return (
     <div className="space-y-6">
       <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] leading-relaxed text-white/55">
-        Promotionele aanbiedingen voor op de site. Prijzen zijn weergaveprijzen uit de CMS (geen
-        checkout of btw-berekening).
+        Promotionele aanbiedingen voor op de site. Prijzen en kortingsbadge zijn weergavetekst uit de
+        CMS (geen checkout of btw-berekening).
       </p>
 
       <Section title="Weergave">
@@ -140,10 +113,11 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
               description: item.description,
               originalPrice: item.originalPrice,
               discountPrice: item.discountPrice,
+              discountBadge: item.discountBadge,
             })
           }
           addLabel="Aanbieding toevoegen"
-          renderItem={(item, actions, index) => (
+          renderItem={(item, actions) => (
             <div className="space-y-3">
               <Field label="Titel">
                 <input
@@ -187,24 +161,48 @@ export function OffersBlockEditor({ value, onChange, blockId, ...imageProps }: P
                 onChange={(image) => actions.update({ ...item, image: image ?? undefined })}
               />
               <div className="grid gap-3 sm:grid-cols-2">
-                <PriceField
-                  label="Oorspronkelijke prijs (€)"
-                  value={item.originalPrice}
-                  hint="Weergaveprijs — geen orderbedrag"
-                  onChange={(originalPrice) => actions.update({ ...item, originalPrice })}
-                />
-                <PriceField
-                  label="Aanbiedingsprijs (€)"
-                  value={item.discountPrice}
-                  hint="Weergaveprijs — geen orderbedrag"
-                  onChange={(discountPrice) => actions.update({ ...item, discountPrice })}
-                />
+                <NlEnField
+                  label="Oorspronkelijke prijs"
+                  enPath={blockEnPath(blockId, `offers.${item.id}.originalPrice`)}
+                >
+                  <input
+                    className={inputClass}
+                    value={item.originalPrice}
+                    placeholder={DEFAULT_OFFER_ORIGINAL_PRICE}
+                    onChange={(e) => actions.update({ ...item, originalPrice: e.target.value })}
+                  />
+                </NlEnField>
+                <NlEnField
+                  label="Aanbiedingsprijs"
+                  enPath={blockEnPath(blockId, `offers.${item.id}.discountPrice`)}
+                >
+                  <input
+                    className={inputClass}
+                    value={item.discountPrice}
+                    placeholder={DEFAULT_OFFER_DISCOUNT_PRICE}
+                    onChange={(e) => actions.update({ ...item, discountPrice: e.target.value })}
+                  />
+                </NlEnField>
               </div>
-              {item.originalPrice > 0 && item.discountPrice > item.originalPrice ? (
-                <p className="text-[13px] text-amber-200" role="alert">
-                  Aanbiedingsprijs is hoger dan de oorspronkelijke prijs.
-                </p>
-              ) : null}
+              <p className="text-[12px] text-white/40">
+                Weergavetekst op de kaart (doorstreep + actieprijs) — geen orderbedrag.
+              </p>
+              <NlEnField
+                label="Kortingsbadge"
+                enPath={blockEnPath(blockId, `offers.${item.id}.discountBadge`)}
+              >
+                <input
+                  className={inputClass}
+                  value={item.discountBadge ?? ""}
+                  placeholder={DEFAULT_OFFER_DISCOUNT_BADGE}
+                  onChange={(e) =>
+                    actions.update({
+                      ...item,
+                      discountBadge: e.target.value.trim() || undefined,
+                    })
+                  }
+                />
+              </NlEnField>
             </div>
           )}
         />

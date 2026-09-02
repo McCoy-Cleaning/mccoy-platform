@@ -52,6 +52,23 @@ export const STAFF_AUDIT_ACTIONS = [
   "guest.linked_existing",
   "order.imported",
   "commerce.fixtures_seeded",
+  "commerce.company_provisioned",
+  "commerce.existing_customer_import_completed",
+  "commerce.existing_customer_import_failed",
+  "commerce.existing_customer_import_auto_invite",
+  "commerce.portal_company_deleted",
+  "customer.portal_invite_sent",
+  "customer.portal_invite_resent",
+  "customer.portal_invite_expired",
+  "customer.portal_invite_consumed",
+  "customer.portal_user_invited",
+  "customer.portal_activated",
+  "customer.membership_suspended",
+  "customer.membership_reactivated",
+  "customer.account_admin_transferred",
+  "customer.company_portal_suspended",
+  "customer.company_portal_reactivated",
+  "website_request.submitter_email_updated",
 ] as const;
 export type StaffAuditAction = (typeof STAFF_AUDIT_ACTIONS)[number];
 

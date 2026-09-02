@@ -67,6 +67,9 @@ export const appendWebsiteRequestReply: WebsiteRequestsStore["appendWebsiteReque
   nextStatus,
 ) => getWebsiteRequestsStore().appendWebsiteRequestReply(id, reply, nextStatus);
 
+export const updateWebsiteRequestSubmitterEmail: WebsiteRequestsStore["updateWebsiteRequestSubmitterEmail"] =
+  (id, email) => getWebsiteRequestsStore().updateWebsiteRequestSubmitterEmail(id, email);
+
 export const countWebsiteRequests: WebsiteRequestsStore["countWebsiteRequests"] = () =>
   getWebsiteRequestsStore().countWebsiteRequests();
 

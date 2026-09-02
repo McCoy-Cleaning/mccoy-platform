@@ -1,0 +1,3 @@
+Klantnummer,Klantsoort,Bedrijfsnaam,Handelsnaam,E-mail,Telefoon,Contactpersoon,KVK,BTW,Straat,Huisnummer,Toevoeging,Postcode,Plaats,Land,Factuur toegestaan
+10482,bedrijf,ABC Facility BV,ABC Facility,info@abc.example,0612345678,Jan de Vries,12345678,NL123456789B01,Hoofdstraat,12,a,1234 AB,Amsterdam,NL,nee
+10483,particulier,Maria Jansen,,maria@example.com,0687654321,,,,,,,Hoofdstraat,1,,1000 AA,Amsterdam,NL,nee

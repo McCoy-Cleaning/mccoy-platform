@@ -183,7 +183,7 @@ describe("gallery text+image render", () => {
     expect(html).toContain("group-hover:scale-110");
   });
 
-  it("fills the media frame edge-to-edge (object-cover)", () => {
+  it("fills the media frame edge-to-edge (object-cover) for imagesOnly mosaic", () => {
     const html = renderToStaticMarkup(
       React.createElement(RegisteredBlockView, {
         block: galleryBlock({
@@ -199,8 +199,11 @@ describe("gallery text+image render", () => {
         }),
       }),
     );
+    // imagesOnly is always Werkgalerij mosaic (featured), even if layout was grid.
+    expect(html).toContain("auto-rows-[220px]");
     expect(html).toContain("object-cover");
+    expect(html).toContain("absolute inset-0");
     expect(html).not.toContain("object-contain");
-    expect(html).toContain("aspect-square");
+    expect(html).not.toContain("aspect-square");
   });
 });

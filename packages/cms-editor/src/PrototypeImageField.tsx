@@ -102,7 +102,9 @@ export function PrototypeImageField({
   const pathMatchesValue = React.useCallback(
     (path: string) => {
       const normalized = path.startsWith("/") ? path : `/${path}`;
-      if (value.src === normalized || value.src.endsWith(normalized)) return true;
+      const src = typeof value.src === "string" ? value.src : "";
+      if (!src) return false;
+      if (src === normalized || src.endsWith(normalized)) return true;
       const resolved = lookupResolvedProjectImage(path, resolveProjectImage);
       return Boolean(resolved && resolved.assetId === value.assetId);
     },

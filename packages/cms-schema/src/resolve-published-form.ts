@@ -62,6 +62,8 @@ function sectionScope(
   kind: FormKind,
 ): FormScopeSnapshot | null {
   if (!content) return null;
+  const tabScope = content.quote?.tabs.find((t) => t.kind === kind)?.scope;
+  if (tabScope) return tabScope;
   if (kind === "glass_washing") return content.glassScope ?? null;
   if (kind === "furniture_cleaning") return content.furnitureScope ?? null;
   return content.scope ?? null;

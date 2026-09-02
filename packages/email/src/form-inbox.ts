@@ -1,4 +1,4 @@
-﻿import { ImapFlow, type MessageEnvelopeObject } from "imapflow";
+import { ImapFlow, type MessageEnvelopeObject } from "imapflow";
 import { simpleParser, type AddressObject, type Attachment, type ParsedMail } from "mailparser";
 import type { FormKind } from "@mccoy/domain";
 import { FIELD_LABELS_NL, KIND_LABELS } from "@mccoy/domain";

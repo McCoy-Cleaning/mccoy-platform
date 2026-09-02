@@ -85,7 +85,7 @@ export const specialisedEditorRegistry = {
   plans: def(
     PlansBlockEditor as ComponentType<BlockEditorProps<PlansBlockData>>,
     "dedicated",
-    ["title", "features", "plans"],
+    ["title", "featuresColumnLabel", "features", "plans"],
     {
       "plans.cta": "Edited via nested plan CTA controls in PlansBlockEditor",
     },
@@ -103,6 +103,7 @@ export const specialisedEditorRegistry = {
       "offers.description",
       "offers.originalPrice",
       "offers.discountPrice",
+      "offers.discountBadge",
       ...imageSupportedPaths("offers.image"),
     ],
   ),

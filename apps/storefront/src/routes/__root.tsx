@@ -210,6 +210,10 @@ function CmsUiLocaleBridge({ children }: { children: ReactNode }) {
   return <CmsUiLocaleProvider locale={locale}>{children}</CmsUiLocaleProvider>;
 }
 
+function isAccountPortalPath(pathname: string): boolean {
+  return pathname === "/account" || pathname.startsWith("/account/");
+}
+
 function isCmsBridgePath(pathname: string): boolean {
   return (
     pathname === "/cms-preview" ||
@@ -219,10 +223,14 @@ function isCmsBridgePath(pathname: string): boolean {
   );
 }
 
+function isStandaloneShellPath(pathname: string): boolean {
+  return isCmsBridgePath(pathname) || isAccountPortalPath(pathname);
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const cmsBridge = useRouterState({
-    select: (s) => isCmsBridgePath(s.location.pathname),
+  const standaloneShell = useRouterState({
+    select: (s) => isStandaloneShellPath(s.location.pathname),
   });
 
   return (
@@ -230,7 +238,7 @@ function RootComponent() {
       <PublishedCmsProvider>
         <CmsUiLocaleBridge>
           <DeferredCmsEditShell>
-            {cmsBridge ? (
+            {standaloneShell ? (
               <Outlet />
             ) : (
               <MarketingChrome>

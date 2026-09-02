@@ -11,7 +11,15 @@ import {
 import { Award, Eye, History, Leaf, ShieldCheck, Target, Users } from "lucide-react";
 import type { CmsButton, CmsImage } from "@mccoy/cms-schema";
 import { isCmsButtonInteractive, withResolvedPublicImageAlt } from "@mccoy/cms-schema";
-import { CmsButtonView, CmsImageView, SECTION_PAGE_RAIL } from "@mccoy/cms-renderer";
+import {
+  CmsButtonView,
+  CmsImageView,
+  EditableCta,
+  EditableMedia,
+  EditableText,
+  SECTION_PAGE_RAIL,
+  useCmsEditSurface,
+} from "@mccoy/cms-renderer";
 import { useMobileLiteMotion } from "@/lib/use-mobile-lite-motion";
 
 const PILLAR_ICONS: Record<string, typeof Award> = {
@@ -35,13 +43,17 @@ export function AboutIntroView({
   heading,
   pillars,
   cta,
+  editBlockId,
 }: {
   eyebrow: string;
   heading: string;
   pillars: AboutIntroPillarView[];
   /** Optional Over ons knop — same CmsButton model as other CTA sections. */
   cta?: CmsButton | null;
+  /** When set (Content-tab centered aboutIntro), enable canvas edits. */
+  editBlockId?: string;
 }) {
+  const editing = Boolean(useCmsEditSurface()?.enabled && editBlockId);
   const showCta = cta && isCmsButtonInteractive(cta);
   return (
     <section id="about" className="relative overflow-hidden py-24 sm:py-28">
@@ -49,24 +61,49 @@ export function AboutIntroView({
       <div className={SECTION_PAGE_RAIL}>
         <div className="grid gap-10 lg:grid-cols-12">
           <motion.div variants={undefined} initial={false} className="lg:col-span-7">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              {editing ? (
+                <EditableText path="eyebrow" value={eyebrow}>
+                  {eyebrow}
+                </EditableText>
+              ) : (
+                eyebrow
+              )}
+            </p>
             <h1 className="font-display mt-4 text-4xl text-white md:text-5xl lg:text-6xl">
-              {heading}
+              {editing ? (
+                <EditableText path="title" value={heading} as="span">
+                  {heading}
+                </EditableText>
+              ) : (
+                heading
+              )}
             </h1>
             {showCta ? (
               <div className="mt-8">
-                <CmsButtonView
-                  button={cta}
-                  className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-                >
-                  {cta.label}
-                </CmsButtonView>
+                {editing ? (
+                  <EditableCta path="cta" button={cta}>
+                    <CmsButtonView
+                      button={cta}
+                      className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+                    >
+                      {cta.label}
+                    </CmsButtonView>
+                  </EditableCta>
+                ) : (
+                  <CmsButtonView
+                    button={cta}
+                    className="inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+                  >
+                    {cta.label}
+                  </CmsButtonView>
+                )}
               </div>
             ) : null}
           </motion.div>
 
           <div className="grid grid-cols-2 gap-3 lg:col-span-5">
-            {pillars.map((p) => {
+            {pillars.map((p, index) => {
               const Icon = PILLAR_ICONS[p.icon] ?? Award;
               return (
                 <div
@@ -76,7 +113,15 @@ export function AboutIntroView({
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span className="text-sm font-semibold text-white/85">{p.label}</span>
+                  <span className="text-sm font-semibold text-white/85">
+                    {editing ? (
+                      <EditableText path={`pillars.${index}.label`} value={p.label}>
+                        {p.label}
+                      </EditableText>
+                    ) : (
+                      p.label
+                    )}
+                  </span>
                 </div>
               );
             })}
@@ -98,6 +143,7 @@ type PillarRowProps = {
   objectPosition?: string;
   aspectClassName?: string;
   scaleValues?: [number, number, number];
+  editBlockId?: string;
 };
 
 export function AboutPillarRowView({
@@ -111,11 +157,13 @@ export function AboutPillarRowView({
   objectPosition,
   aspectClassName = "aspect-[5/4]",
   scaleValues,
+  editBlockId,
 }: PillarRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const mobileLite = useMobileLiteMotion();
   const soft = Boolean(reduced) || mobileLite;
+  const editing = Boolean(useCmsEditSurface()?.enabled && editBlockId);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
@@ -136,6 +184,69 @@ export function AboutPillarRowView({
   const imgSrc =
     image && typeof image.src === "string" && image.src.trim() ? image.src : imageSrcFallback;
 
+  const titleNode = editing ? (
+    <EditableText path="title" value={title} as="span">
+      {title}
+    </EditableText>
+  ) : (
+    title
+  );
+  const bodyNode = editing ? (
+    <EditableText path="body" value={body} multiline>
+      {body}
+    </EditableText>
+  ) : (
+    body.split("\n\n").map((p, idx) => (
+      <p key={idx} className="whitespace-pre-line">
+        {p}
+      </p>
+    ))
+  );
+  const tagNode = editing ? (
+    <EditableText path="tag" value={tag}>
+      {tag}
+    </EditableText>
+  ) : (
+    tag
+  );
+
+  const media = (
+    <>
+      {image && !imageSrcFallback ? (
+        <motion.div
+          style={
+            soft
+              ? { objectPosition: objectPosition ?? "center" }
+              : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
+          }
+          className={`absolute inset-0 h-full w-full${soft ? "" : " will-change-transform"}`}
+        >
+          <CmsImageView
+            image={withResolvedPublicImageAlt(image, title)}
+            className="h-full w-full object-cover"
+          />
+        </motion.div>
+      ) : imgSrc ? (
+        <motion.img
+          src={imgSrc}
+          alt={title}
+          width={1280}
+          height={896}
+          loading="lazy"
+          decoding="async"
+          style={
+            soft
+              ? { objectPosition: objectPosition ?? "center" }
+              : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
+          }
+          className={`absolute inset-0 h-full w-full object-cover${soft ? "" : " will-change-transform"}`}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-card/40" aria-hidden />
+      )}
+    </>
+  );
+
   return (
     <section className={SECTION_PAGE_RAIL + " py-12 sm:py-16"}>
       <div
@@ -151,37 +262,12 @@ export function AboutPillarRowView({
         >
           <div className="relative overflow-hidden rounded-[2rem] border border-white/10 shadow-[0_30px_80px_-30px_rgba(63,182,242,0.45)]">
             <div className={`relative ${aspectClassName} w-full overflow-hidden`}>
-              {image && !imageSrcFallback ? (
-                <motion.div
-                  style={
-                    soft
-                      ? { objectPosition: objectPosition ?? "center" }
-                      : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
-                  }
-                  className={`absolute inset-0 h-full w-full${soft ? "" : " will-change-transform"}`}
-                >
-                  <CmsImageView
-                    image={withResolvedPublicImageAlt(image, title)}
-                    className="h-full w-full object-cover"
-                  />
-                </motion.div>
-              ) : imgSrc ? (
-                <motion.img
-                  src={imgSrc}
-                  alt={title}
-                  width={1280}
-                  height={896}
-                  loading="lazy"
-                  decoding="async"
-                  style={
-                    soft
-                      ? { objectPosition: objectPosition ?? "center" }
-                      : { y: imgY, scale: imgScale, objectPosition: objectPosition ?? "center" }
-                  }
-                  className={`absolute inset-0 h-full w-full object-cover${soft ? "" : " will-change-transform"}`}
-                />
+              {editing ? (
+                <EditableMedia path="image" image={image} className="absolute inset-0 h-full w-full">
+                  {media}
+                </EditableMedia>
               ) : (
-                <div className="absolute inset-0 bg-card/40" aria-hidden />
+                media
               )}
               <motion.div
                 style={soft ? undefined : { opacity: overlayOpacity }}
@@ -192,7 +278,7 @@ export function AboutPillarRowView({
               style={soft ? undefined : { rotate: tagRotate }}
               className="absolute -right-4 -top-4 flex h-20 w-20 items-center justify-center rounded-full border border-primary/40 bg-background/70 font-display text-2xl text-primary shadow-[0_10px_40px_-10px_rgba(63,182,242,0.6)] backdrop-blur"
             >
-              {tag}
+              {tagNode}
             </motion.div>
           </div>
           <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[3rem] bg-primary/10 blur-3xl" />
@@ -210,19 +296,13 @@ export function AboutPillarRowView({
                 <Icon className="h-6 w-6" />
               </div>
               <span className="font-display text-sm uppercase tracking-[0.3em] text-primary/80">
-                {tag}
+                {tagNode}
               </span>
             </div>
             <h3 className="font-display mt-5 text-4xl text-white md:text-5xl lg:text-6xl">
-              {title}
+              {titleNode}
             </h3>
-            <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/75">
-              {body.split("\n\n").map((p, idx) => (
-                <p key={idx} className="whitespace-pre-line">
-                  {p}
-                </p>
-              ))}
-            </div>
+            <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/75">{bodyNode}</div>
           </motion.div>
         </motion.div>
       </div>

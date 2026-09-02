@@ -29,6 +29,7 @@ Safe Mode: [`SEO-SAFE-MODE.md`](./SEO-SAFE-MODE.md).
 | SEO-31…32 | Later master-plan phases | deferred / approval-gated |
 | Phase 10 | Image alts + perf report | **done** → [`performance-seo-report.md`](./performance-seo-report.md) |
 | Phase 12 | Final report + ops docs | **done locally** → [`mccoy-seo-final-report.md`](./mccoy-seo-final-report.md) |
+| Ops | Semrush Opportunities triage | [`semrush-opportunities-triage.md`](./semrush-opportunities-triage.md) |
 
 ## Key paths
 

@@ -97,8 +97,10 @@ export const mediaSocialEditorRegistry = {
   video: def(VideoBlockEditor, "typed-composed", [
     "title",
     "description",
+    "mediaKind",
     "videoUrl",
     ...imageSupportedPaths("poster"),
+    ...imageSupportedPaths("image"),
   ]),
   beforeAfter: def(BeforeAfterBlockEditor, "typed-composed", [
     "title",

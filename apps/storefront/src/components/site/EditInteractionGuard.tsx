@@ -25,6 +25,13 @@ export function EditInteractionGuard({
       const t = e.target as HTMLElement | null;
       if (!t) return;
 
+      // Canvas inline editors / chrome must receive the click (button/form panels).
+      // Still preventDefault on anchors so the iframe does not navigate.
+      if (t.closest("[data-cms-editor-chrome], [data-cms-inline-edit]")) {
+        if (t.closest("a")) e.preventDefault();
+        return;
+      }
+
       const interactive = t.closest("a, button[data-cms-nav], [data-cms-navigate]");
       if (interactive instanceof HTMLAnchorElement || interactive?.getAttribute("data-cms-nav") != null) {
         e.preventDefault();

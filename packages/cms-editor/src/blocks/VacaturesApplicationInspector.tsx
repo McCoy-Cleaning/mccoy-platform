@@ -30,6 +30,10 @@ const VACATURES_APP_COPY_KEYS = [
   "mediaHeading",
   "mediaBadge",
   "mediaLinkLabel",
+  "submitLabel",
+  "successMessage",
+  "roleLabel",
+  "filePickLabel",
 ] as const;
 
 const FALLBACK_IMAGE = localImage("/images/hero-placeholder.jpg", "", true);
@@ -160,6 +164,43 @@ export function VacaturesApplicationInspector({
             value={content.formIntro ?? ""}
             onChange={(e) => onPatch({ formIntro: e.target.value || undefined })}
             placeholder="Vul je gegevens in…"
+          />
+        </NlEnField>
+        <NlEnField label="Functielabel" enPath={sectionEnPath("vacatures.application", "roleLabel")}>
+          <input
+            className={inputClass}
+            value={content.roleLabel ?? ""}
+            onChange={(e) => onPatch({ roleLabel: e.target.value || undefined })}
+            placeholder="Functie"
+          />
+        </NlEnField>
+        <NlEnField label="Verstuurknop" enPath={sectionEnPath("vacatures.application", "submitLabel")}>
+          <input
+            className={inputClass}
+            value={content.submitLabel ?? ""}
+            onChange={(e) => onPatch({ submitLabel: e.target.value || undefined })}
+            placeholder="Verstuur sollicitatie"
+          />
+        </NlEnField>
+        <NlEnField
+          label="Succesbericht"
+          enPath={sectionEnPath("vacatures.application", "successMessage")}
+        >
+          <input
+            className={inputClass}
+            value={content.successMessage ?? ""}
+            onChange={(e) => onPatch({ successMessage: e.target.value || undefined })}
+          />
+        </NlEnField>
+        <NlEnField
+          label="Bestand kiezen"
+          enPath={sectionEnPath("vacatures.application", "filePickLabel")}
+        >
+          <input
+            className={inputClass}
+            value={content.filePickLabel ?? ""}
+            onChange={(e) => onPatch({ filePickLabel: e.target.value || undefined })}
+            placeholder="Bestand kiezen"
           />
         </NlEnField>
         <FormScopeField

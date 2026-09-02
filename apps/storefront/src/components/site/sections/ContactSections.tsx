@@ -33,6 +33,12 @@ import {
   SectionSurface,
 } from "@mccoy/cms-renderer";
 import { cn } from "@/lib/utils";
+import {
+  WysiwygFormFieldChrome,
+  WysiwygFormFieldsToolbar,
+} from "../cms-editor/WysiwygFormField";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 
 const INFO_ICONS: Record<ContactInfoIcon, LucideIcon> = {
   mail: Mail,
@@ -49,8 +55,19 @@ function InfoCardsSection({
   sectionKey: Extract<FixedSectionKey, "contact.info" | "offerte.info">;
 }) {
   const { t } = useI18n();
+  const { sendMutation, showEditorChrome } = useLiveEditApi();
   const raw = useTypedSectionContent(pageId, sectionKey) as ContactInfoContent;
   const content = localizedContactInfoContent(sectionKey, raw, t);
+
+  const patchItem = (id: string, field: "label" | "value", next: string) => {
+    sendMutation({
+      kind: "section",
+      sectionKey,
+      patch: {
+        items: raw.items.map((item) => (item.id === id ? { ...item, [field]: next } : item)),
+      },
+    });
+  };
 
   return (
     <section
@@ -69,9 +86,28 @@ function InfoCardsSection({
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {c.label}
+                <WysiwygInlineText
+                  as="span"
+                  label="Label"
+                  value={c.label}
+                  target={{
+                    kind: "custom",
+                    onCommit: (next) => patchItem(c.id, "label", next),
+                  }}
+                />
               </div>
-              <div className="mt-1 whitespace-pre-line text-sm text-foreground">{c.value}</div>
+              <div className="mt-1 whitespace-pre-line text-sm text-foreground">
+                <WysiwygInlineText
+                  as="span"
+                  multiline
+                  label="Waarde"
+                  value={c.value}
+                  target={{
+                    kind: "custom",
+                    onCommit: (next) => patchItem(c.id, "value", next),
+                  }}
+                />
+              </div>
             </div>
           </>
         );
@@ -83,7 +119,7 @@ function InfoCardsSection({
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: i * 0.05 }}
           >
-            {c.href ? (
+            {c.href && !showEditorChrome ? (
               <a href={c.href} className="block h-full transition hover:opacity-95">
                 <SectionSurface
                   variant="outlined"
@@ -119,10 +155,14 @@ function isFieldRequired(field: FormFieldItem): boolean {
 export function ContactFormSection() {
   const content = useTypedSectionContent("page_contact", "contact.form") as ContactFormContent;
   const { t } = useI18n();
+  const { sendMutation } = useLiveEditApi();
   const clientReady = useClientReady();
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const patchForm = (patch: Record<string, unknown>) =>
+    sendMutation({ kind: "section", sectionKey: "contact.form", patch });
 
   const eyebrow = cmsTextOrFallback(content.eyebrow, t.contact.kicker, "Contact");
   const heading = cmsTextOrFallback(content.heading, t.contact.title, "Laten we praten over uw pand.");
@@ -164,6 +204,9 @@ export function ContactFormSection() {
 
   const fieldLabel = (field: FormFieldItem) => {
     const key = formFieldPayloadKey(field);
+    // Name/email are re-injected builtins — labels map is the editable source of truth.
+    const injectedNameEmail = key === "name" || key === "email";
+    if (!injectedNameEmail && field.label.trim()) return field.label.trim();
     if (key === "name") return cmsTextOrFallback(content.labels?.name, t.contact.name, field.label);
     if (key === "company") {
       return cmsTextOrFallback(content.labels?.company, t.contact.company, field.label);
@@ -215,15 +258,39 @@ export function ContactFormSection() {
 
   const copyColumn = (
     <aside className={cn(sideBySide && "lg:col-span-5", textPlacement === "top" && "max-w-3xl")}>
-      <SectionEyebrow>{eyebrow}</SectionEyebrow>
+      <SectionEyebrow>
+        <WysiwygInlineText
+          label="Eyebrow"
+          value={eyebrow}
+          enFieldPath="section:contact.form:eyebrow"
+          target={{ kind: "custom", onCommit: (next) => patchForm({ eyebrow: next }) }}
+        />
+      </SectionEyebrow>
       <h2 className="font-display mt-4 text-3xl leading-tight text-foreground md:text-4xl lg:text-[2.75rem]">
-        {heading}
+        <WysiwygInlineText
+          as="span"
+          label="Kop"
+          value={heading}
+          enFieldPath="section:contact.form:heading"
+          target={{ kind: "custom", onCommit: (next) => patchForm({ heading: next }) }}
+        />
       </h2>
-      <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">{intro}</p>
+      <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
+        <WysiwygInlineText
+          as="span"
+          multiline
+          label="Intro"
+          value={intro}
+          enFieldPath="section:contact.form:body"
+          target={{ kind: "custom", onCommit: (next) => patchForm({ body: next }) }}
+        />
+      </p>
       {highlights.length > 0 ? (
         <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
-          {highlights.map((text, index) => (
-            <li key={`${index}-${text}`} className="flex items-start gap-3">
+          {(content.highlights ?? [])
+            .filter((h) => h.text.trim())
+            .map((item, index) => (
+            <li key={item.id} className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
                 {index === 0 ? (
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
@@ -231,7 +298,21 @@ export function ContactFormSection() {
                   <Mail className="h-3.5 w-3.5" aria-hidden />
                 )}
               </span>
-              {text}
+              <WysiwygInlineText
+                as="span"
+                label="Highlight"
+                value={item.text}
+                target={{
+                  kind: "custom",
+                  onCommit: (next) => {
+                    patchForm({
+                      highlights: (content.highlights ?? []).map((h) =>
+                        h.id === item.id ? { ...h, text: next } : h,
+                      ),
+                    });
+                  },
+                }}
+              />
             </li>
           ))}
         </ul>
@@ -241,6 +322,12 @@ export function ContactFormSection() {
 
   const formColumn = (
     <SectionSurface variant="form" className={cn(sideBySide && "lg:col-span-7")}>
+      <WysiwygFormFieldsToolbar
+        fields={fields}
+        target={{ kind: "section", sectionKey: "contact.form" }}
+        formColumnsDesktop={formColumnsDesktop}
+        className="mb-5"
+      />
       {sent ? (
         <div
           className="flex flex-col items-center gap-4 py-14 text-center"
@@ -250,8 +337,25 @@ export function ContactFormSection() {
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
             <CheckCircle2 className="h-8 w-8" aria-hidden />
           </div>
-          <p className="font-display text-2xl text-foreground md:text-3xl">{successMessage}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">{successDetail}</p>
+          <p className="font-display text-2xl text-foreground md:text-3xl">
+            <WysiwygInlineText
+              as="span"
+              label="Succes"
+              value={successMessage}
+              enFieldPath="section:contact.form:successMessage"
+              target={{ kind: "custom", onCommit: (next) => patchForm({ successMessage: next }) }}
+            />
+          </p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            <WysiwygInlineText
+              as="span"
+              multiline
+              label="Succes detail"
+              value={successDetail}
+              enFieldPath="section:contact.form:successDetail"
+              target={{ kind: "custom", onCommit: (next) => patchForm({ successDetail: next }) }}
+            />
+          </p>
         </div>
       ) : (
         <form
@@ -294,7 +398,14 @@ export function ContactFormSection() {
             const label = fieldLabel(field);
             const placeholder = fieldPlaceholder(field);
             return (
-              <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
+              <WysiwygFormFieldChrome
+                key={field.id}
+                field={field}
+                fields={fields}
+                target={{ kind: "section", sectionKey: "contact.form" }}
+                className={spanFull ? "sm:col-span-2" : undefined}
+              >
+              <div>
                 <label
                   htmlFor={id}
                   className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/55"
@@ -317,7 +428,7 @@ export function ContactFormSection() {
                     id={id}
                     name={key}
                     required={required}
-                    className="w-full rounded-2xl border border-white/12 bg-background/50 px-4 py-3.5 text-sm text-white outline-none transition hover:border-white/20 focus:border-primary/70 focus:bg-background/70 focus-visible:ring-2 focus-visible:ring-primary/40"
+                    className="w-full cursor-pointer appearance-none rounded-2xl border border-white/12 bg-background/50 bg-[length:12px] bg-[right_1rem_center] bg-no-repeat px-4 py-3.5 pr-10 text-sm text-white outline-none transition hover:border-white/20 focus:border-primary/70 focus:bg-background/70 focus-visible:ring-2 focus-visible:ring-primary/40 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22 stroke=%22%23ffffff99%22 stroke-width=%222%22%3E%3Cpath d=%22M3 4.5 6 7.5 9 4.5%22/%3E%3C/svg%3E')]"
                     defaultValue=""
                   >
                     <option value="">{required ? "Maak een keuze…" : "—"}</option>
@@ -352,6 +463,7 @@ export function ContactFormSection() {
                   />
                 )}
               </div>
+              </WysiwygFormFieldChrome>
             );
           })}
           {error ? (
@@ -371,14 +483,33 @@ export function ContactFormSection() {
               twoCol && "sm:col-span-2",
             )}
           >
-            <p className="text-xs leading-relaxed text-white/45">{consent}</p>
+            <p className="text-xs leading-relaxed text-white/45">
+              <WysiwygInlineText
+                as="span"
+                multiline
+                label="Toestemming"
+                value={consent}
+                enFieldPath="section:contact.form:consent"
+                target={{ kind: "custom", onCommit: (next) => patchForm({ consent: next }) }}
+              />
+            </p>
             <button
               type="submit"
               disabled={!clientReady || submitting}
               aria-disabled={!clientReady || submitting}
               className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-[1.02] hover:shadow-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
             >
-              {submitting ? t.contact.submitting : submitLabel}
+              {submitting ? (
+                t.contact.submitting
+              ) : (
+                <WysiwygInlineText
+                  as="span"
+                  label="Verstuur"
+                  value={submitLabel}
+                  enFieldPath="section:contact.form:submitLabel"
+                  target={{ kind: "custom", onCommit: (next) => patchForm({ submitLabel: next }) }}
+                />
+              )}
               {!submitting ? (
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
               ) : null}

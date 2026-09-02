@@ -46,6 +46,7 @@ export * from "./section-content";
 export * from "./cms-text-fallback";
 export * from "./paragraph-structure";
 export * from "./edit-protocol";
+export * from "./editor-history";
 export * from "./edit-origins";
 export * from "./trusted-message";
 export * from "./sync-protocol";

@@ -14,6 +14,25 @@ export { CmsImageView, CmsButtonView };
 export { RegisteredBlockView, CmsBlockView } from "./blocks/RegisteredBlockView";
 export type { RegisteredBlockViewProps } from "./blocks/RegisteredBlockView";
 export {
+  CmsBlockEditScope,
+  CmsEditSurfaceProvider,
+  CmsListAddButton,
+  CmsListRemoveButton,
+  EditableCta,
+  EditableMedia,
+  EditableText,
+  CmsMediaPlaceholder,
+  useCmsBlockEditScope,
+  useCmsEditSurface,
+  useCmsListEditor,
+  useCmsTypedListEditor,
+} from "./edit-surface";
+export type {
+  CmsBlockEditScopeValue,
+  CmsEditSurfaceApi,
+  CmsListEditorApi,
+} from "./edit-surface";
+export {
   WorkMosaicGallery,
   workMosaicShapeClass,
   workMosaicLegacyIndexClass,
@@ -49,6 +68,16 @@ export type {
   NewsletterSubmitInput,
   ContactFormSubmitInput,
 } from "./blocks/form-adapters";
+export {
+  QuoteFieldChromeProvider,
+  type QuoteFieldChromeRender,
+} from "./blocks/QuoteRequestFormSectionView";
+export {
+  ContactFormToolbarProvider,
+  ContactFormFieldChromeProvider,
+  type ContactFormToolbarRender,
+  type ContactFormFieldChromeRender,
+} from "./blocks/ConversionSectionViews";
 export {
   NewsletterSectionView,
   ContactFormSectionView,

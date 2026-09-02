@@ -27,10 +27,10 @@ describe("ServicesCards media + dual CTAs", () => {
     expect(servicesCardsBody).toContain("ServiceDetailPanel");
     const panelSrc = readFileSync(join(dir, "ServiceDetailPanel.tsx"), "utf8");
     expect(panelSrc).toContain("service-modal-panel");
-    expect(servicesCardsBody).toContain("t.services.readMore");
+    expect(servicesCardsBody).toContain("readMoreLabel");
     expect(servicesCardsBody).toContain("serviceDetailHref");
     expect(servicesCardsBody).toContain("aria-label");
-    expect(servicesCardsBody).toMatch(/aria-label=\{`\$\{t\.services\.readMore\}: \$\{card\.title\}`\}/);
+    expect(servicesCardsBody).toMatch(/aria-label=\{`\$\{readMoreLabel\}: \$\{card\.title\}`\}/);
     expect(servicesCardsBody).toContain("openService");
 
     expect(servicesCardsBody).toContain("CmsButtonView");

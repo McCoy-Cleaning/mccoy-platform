@@ -1,11 +1,15 @@
 import * as React from "react";
 import {
+  createDefaultQuoteRequestForm,
   normalizeContactFormColumnsDesktop,
   normalizeContactFormTextPlacement,
+  normalizeQuoteRequestForm,
   seedDefaultContactFormFields,
   type ContactFormColumnsDesktop,
   type ContactFormContent,
   type ContactFormTextPlacement,
+  type QuoteRequestFormBlockData,
+  type QuoteRequestFormTab,
 } from "@mccoy/cms-schema";
 import {
   SectionAiToolbar,
@@ -70,6 +74,23 @@ export function ContactFormInspector({
           placeholders: content.placeholders,
         });
   const pathPrefix = `section:${sectionKey}`;
+  const quote = normalizeQuoteRequestForm(
+    content.quote ?? createDefaultQuoteRequestForm(),
+  );
+
+  const patchQuote = (next: QuoteRequestFormBlockData) => {
+    onPatch({
+      quote: next,
+      heading: next.heading,
+      submitLabel: next.submitLabel,
+      successMessage: next.successMessage,
+    });
+  };
+
+  const updateTab = (index: number, patch: Partial<QuoteRequestFormTab>) => {
+    const tabs = quote.tabs.map((tab, i) => (i === index ? { ...tab, ...patch } : tab));
+    patchQuote({ ...quote, tabs });
+  };
 
   const aiFields = collectShallowStringFields(
     content as unknown as Record<string, unknown>,
@@ -91,10 +112,10 @@ export function ContactFormInspector({
     <div className="space-y-4">
       <p className="text-[11px] leading-relaxed text-white/50">
         Het {formLabel.toLowerCase()} is vast onderdeel van de pagina: verbergen kan, verwijderen
-        niet. Kop, tekst, punten, knop en formuliervelden zijn hier bewerkbaar. Via de
-        sectiecatalogus kunt u het formulier ook als blok toevoegen (vervangt deze vaste sectie op
-        Contact). Engelse concepten staan in het AI-paneel (of onder formuliervelden); Opslaan vult
-        ontbrekende EN-drafts vanuit NL.
+        niet.{" "}
+        {isOfferte
+          ? "Kop, tabteksten, knop, succesbericht en veldlabels zijn hier bewerkbaar. Formuliertype, submission keys en veldtypes blijven vast (E12)."
+          : "Kop, tekst, punten, knop en formuliervelden zijn hier bewerkbaar. Via de sectiecatalogus kunt u het formulier ook als blok toevoegen (vervangt deze vaste sectie op Contact). Engelse concepten staan in het AI-paneel (of onder formuliervelden); Opslaan vult ontbrekende EN-drafts vanuit NL."}
       </p>
 
       {!isOfferte ? (
@@ -128,9 +149,16 @@ export function ContactFormInspector({
         <NlEnField label="Kop boven formulier" enPath={sectionEnPath(sectionKey, "heading")}>
           <input
             className={inputClass}
-            value={content.heading ?? ""}
-            onChange={(e) => onPatch({ heading: e.target.value || undefined })}
-            placeholder="Laten we praten over uw pand."
+            value={isOfferte ? (quote.heading ?? content.heading ?? "") : (content.heading ?? "")}
+            onChange={(e) => {
+              const next = e.target.value || undefined;
+              if (isOfferte) {
+                patchQuote({ ...quote, heading: next });
+                return;
+              }
+              onPatch({ heading: next });
+            }}
+            placeholder={isOfferte ? "Optionele kop" : "Laten we praten over uw pand."}
           />
         </NlEnField>
         {!isOfferte ? (
@@ -210,6 +238,91 @@ export function ContactFormInspector({
           </Field>
         ) : null}
       </Section>
+
+      {isOfferte ? (
+        <>
+          <Section title="Versturen & bevestiging">
+            <NlEnField label="Knoptekst" enPath={sectionEnPath(sectionKey, "submitLabel")}>
+              <input
+                className={inputClass}
+                value={quote.submitLabel}
+                onChange={(e) =>
+                  patchQuote({ ...quote, submitLabel: e.target.value || quote.submitLabel })
+                }
+                placeholder="Verstuur aanvraag"
+              />
+            </NlEnField>
+            <NlEnField
+              label="Succesbericht"
+              enPath={sectionEnPath(sectionKey, "successMessage")}
+              multiline
+            >
+              <textarea
+                className={`${inputClass} min-h-[3rem]`}
+                value={quote.successMessage}
+                onChange={(e) =>
+                  patchQuote({
+                    ...quote,
+                    successMessage: e.target.value || quote.successMessage,
+                  })
+                }
+              />
+            </NlEnField>
+          </Section>
+
+          <Section title="Tabs">
+            <p className="mb-2 text-[11px] text-white/45">
+              Tag, titel en beschrijving zijn presentatie. Formuliertype (glas / meubel) blijft vast.
+            </p>
+            {quote.tabs.map((tab, index) => (
+              <div
+                key={tab.id}
+                className="mb-3 space-y-3 rounded-lg border border-white/10 bg-black/10 p-3"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                  {tab.kind === "furniture_cleaning" ? "Meubelreiniging" : "Glasbewassing"}
+                </p>
+                <NlEnField
+                  label="Tag"
+                  enPath={sectionEnPath(sectionKey, `quote.tabs.${index}.tag`)}
+                >
+                  <input
+                    className={inputClass}
+                    value={tab.tag}
+                    onChange={(e) => updateTab(index, { tag: e.target.value })}
+                  />
+                </NlEnField>
+                <NlEnField
+                  label="Titel"
+                  enPath={sectionEnPath(sectionKey, `quote.tabs.${index}.title`)}
+                >
+                  <input
+                    className={inputClass}
+                    value={tab.title}
+                    onChange={(e) => updateTab(index, { title: e.target.value })}
+                  />
+                </NlEnField>
+                <NlEnField
+                  label="Beschrijving"
+                  enPath={sectionEnPath(sectionKey, `quote.tabs.${index}.description`)}
+                  multiline
+                >
+                  <textarea
+                    className={`${inputClass} min-h-[4rem]`}
+                    value={tab.description}
+                    onChange={(e) => updateTab(index, { description: e.target.value })}
+                  />
+                </NlEnField>
+                <ContactFormFieldsEditor
+                  fields={tab.fields}
+                  onChange={(nextFields) => updateTab(index, { fields: nextFields })}
+                  sectionKey={sectionKey}
+                />
+              </div>
+            ))}
+          </Section>
+        </>
+      ) : null}
 
       {!isOfferte ? (
         <Section title="Punten naast het formulier">

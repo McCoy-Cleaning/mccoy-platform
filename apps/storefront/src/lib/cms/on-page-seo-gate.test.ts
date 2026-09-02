@@ -176,4 +176,16 @@ describe("Phase 11 on-page SEO gate", () => {
       expect(matches.length, `${route} → ${file}`).toBe(1);
     }
   });
+
+  it("frozen NL titles meet audit length bands on commercial + legal pages", () => {
+    const paths = [...COMMERCIAL_NL_PATHS, "/privacy", "/terms"] as const;
+    for (const path of paths) {
+      const seo = FROZEN_DEPLOYED_NL_SEO[path];
+      expect(seo, `missing frozen NL SEO for ${path}`).toBeTruthy();
+      expect(seo!.title.length).toBeGreaterThanOrEqual(30);
+      expect(seo!.title.length).toBeLessThanOrEqual(65);
+      expect(seo!.description.length).toBeGreaterThanOrEqual(70);
+      expect(seo!.description.length).toBeLessThanOrEqual(160);
+    }
+  });
 });

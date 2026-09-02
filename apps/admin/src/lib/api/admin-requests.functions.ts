@@ -15,7 +15,9 @@ import {
   processNotificationOutbox,
   requireAdminSession,
   setWebsiteRequestStatus,
+  updateWebsiteRequestSubmitterEmail,
   upsertWebsiteRequestMailMessage,
+  writeStaffAudit,
 } from "@mccoy/database/server";
 import {
   FormInboxConfigError,
@@ -46,6 +48,7 @@ import {
   adminInboxListSchema,
   adminInboxMessageIdSchema,
   adminInboxReplySchema,
+  adminInboxUpdateSubmitterEmailSchema,
   adminRequestIdSchema,
   adminRequestListSchema,
   adminRequestReplySchema,
@@ -581,6 +584,79 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
         return { ok: false as const, error: error.message, code: "rate_limit" as const };
       }
       return inboxErrorResult(error);
+    }
+  });
+
+export const updateAdminFormInboxSubmitterEmail = createServerFn({ method: "POST" })
+  .validator(adminInboxUpdateSubmitterEmailSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureInboxEnv();
+      const session = await requireAdminSession();
+
+      let requestId: string | null = null;
+      try {
+        const decoded = decodeInboxMessageId(data.id);
+        if (decoded.provider === "request" || decoded.provider === "e2e") {
+          requestId = decoded.requestId;
+        }
+      } catch {
+        /* invalid id handled below */
+      }
+
+      if (!requestId) {
+        return {
+          ok: false as const,
+          error:
+            "Het e-mailadres kan alleen worden aangepast bij formulieraanvragen (niet bij losse mailboxberichten).",
+          code: "validation" as const,
+        };
+      }
+
+      const existing = await getWebsiteRequest(requestId);
+      if (!existing) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+
+      const normalized = data.email.trim().toLowerCase();
+      if (normalized === existing.submitterEmail.trim().toLowerCase()) {
+        return {
+          ok: true as const,
+          submitterEmail: existing.submitterEmail,
+          requestId: existing.id,
+        };
+      }
+
+      const updated = await updateWebsiteRequestSubmitterEmail(requestId, normalized);
+      if (!updated) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+
+      await writeStaffAudit({
+        actorUserId: session.userId ?? null,
+        action: "website_request.submitter_email_updated",
+        targetType: "website_request",
+        targetId: updated.id,
+        before: { submitterEmail: existing.submitterEmail },
+        after: { submitterEmail: updated.submitterEmail },
+        metadata: { requestNumber: updated.number, inboxMessageId: data.id },
+      });
+
+      return {
+        ok: true as const,
+        submitterEmail: updated.submitterEmail,
+        requestId: updated.id,
+      };
+    } catch (error) {
+      return authErrorResult(error);
     }
   });
 

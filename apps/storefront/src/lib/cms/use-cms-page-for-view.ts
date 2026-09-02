@@ -38,7 +38,11 @@ export function useCmsPageForView(pageId: string): CmsPage | undefined {
   } else if (isEdit) {
     // Still localize — Admin preview chrome `?_cmsLocale=` must show EN overlays
     // in the edit iframe (LanguageToggle is blocked by EditInteractionGuard).
-    page = live?.pageId === pageId ? live.page : (editable ?? published);
+    if (live?.pageId === pageId) {
+      page = live.page;
+    } else {
+      page = editable ?? published;
+    }
   } else if (routePage?.id === pageId) {
     if (
       bundleHydrated &&

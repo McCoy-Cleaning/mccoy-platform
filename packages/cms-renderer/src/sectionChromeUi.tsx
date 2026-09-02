@@ -57,18 +57,19 @@ export function SectionHeader({
   className,
   align,
 }: {
-  eyebrow?: string;
-  title?: string;
-  body?: string;
+  eyebrow?: React.ReactNode;
+  title?: React.ReactNode;
+  body?: React.ReactNode;
   titleAs?: "h1" | "h2" | "h3";
   className?: string;
   align?: "left" | "center" | "right";
 }) {
   const ctxAlign = useContentAlign();
   const resolved = align ?? ctxAlign ?? "center";
-  const hasEyebrow = !!eyebrow?.trim();
-  const hasTitle = !!title?.trim();
-  const hasBody = !!body?.trim();
+  const hasEyebrow =
+    typeof eyebrow === "string" ? !!eyebrow.trim() : eyebrow != null && eyebrow !== false;
+  const hasTitle = typeof title === "string" ? !!title.trim() : title != null && title !== false;
+  const hasBody = typeof body === "string" ? !!body.trim() : body != null && body !== false;
   if (!hasTitle && !hasEyebrow && !hasBody) return null;
 
   const textAlign =

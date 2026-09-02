@@ -19,6 +19,7 @@ type VacaturesJobsHostPage = {
   layout: LayoutItem[];
 };
 
+/** Legacy enum keys (still accepted on normalize → Dutch display labels). */
 export const EMPLOYMENT_TYPES = [
   "full-time",
   "part-time",
@@ -41,6 +42,16 @@ export const EMPLOYMENT_TYPE_LABELS_NL: Record<EmploymentType, string> = {
   other: "Overig",
 };
 
+/**
+ * Quick-pick presets for the admin sidebar. The stored field is free text —
+ * editors may type any label; presets only fill the same string.
+ */
+export const EMPLOYMENT_TYPE_PRESETS_NL = ["Fulltime", "Parttime", "Seizoenswerk"] as const;
+
+export type EmploymentTypePresetNl = (typeof EMPLOYMENT_TYPE_PRESETS_NL)[number];
+
+const DEFAULT_EMPLOYMENT_LABEL = EMPLOYMENT_TYPE_LABELS_NL["full-time"];
+
 export type VacancyHoursPerWeek = {
   minimum?: number;
   maximum?: number;
@@ -54,21 +65,46 @@ export type VacancyHourlyRate = {
   showOnWebsite: boolean;
 };
 
+/**
+ * Vacancy card content (primary layout):
+ * 1. title + employmentType badge
+ * 2. shortDescription — "Details" (plain text)
+ * 3. benefits — "Wat wij bieden"
+ * 4. requirements — "Wat wij zoeken"
+ *
+ * `responsibilities`, `fullDescription`, and contact* remain in the model for
+ * legacy payloads (normalize preserves them) but are not part of the card UI.
+ */
 export type VacancyItem = {
   id: string;
   title: string;
   slug?: string;
   department?: string;
   location: string;
-  employmentType: EmploymentType;
+  /**
+   * Employment badge label shown on the card (free text).
+   * Legacy enum keys (`full-time`, …) are normalized to Dutch labels.
+   */
+  employmentType: string;
   hoursPerWeek?: VacancyHoursPerWeek;
   hourlyRate?: VacancyHourlyRate;
   salaryText?: string;
+  /** Primary body / details shown on the vacancy card (plain text, not bullets). */
   shortDescription: string;
+  /** Optional heading above details; defaults to {@link VACANCY_CARD_LABELS_NL.details}. */
+  detailsHeading?: string;
+  /** @deprecated Prefer shortDescription; preserved for legacy content. */
   fullDescription?: string;
+  /** @deprecated Dropped from card UI; preserved for legacy content. */
   responsibilities?: string[];
+  /** "Wat wij zoeken" bullet list. */
   requirements?: string[];
+  /** Optional heading for requirements; defaults to {@link VACANCY_CARD_LABELS_NL.lookingFor}. */
+  requirementsHeading?: string;
+  /** "Wat wij bieden" bullet list. */
   benefits?: string[];
+  /** Optional heading for benefits; defaults to {@link VACANCY_CARD_LABELS_NL.offer}. */
+  benefitsHeading?: string;
   startDate?: string;
   applicationDeadline?: string;
   contactName?: string;
@@ -79,6 +115,24 @@ export type VacancyItem = {
   featured?: boolean;
   visible: boolean;
 };
+
+/** Dutch UI labels for the primary vacancy card lists. */
+export const VACANCY_CARD_LABELS_NL = {
+  details: "Details",
+  offer: "Wat wij bieden",
+  lookingFor: "Wat wij zoeken",
+} as const;
+
+/** Placeholder bullets for a freshly created "Nieuwe vacature". */
+export const DEFAULT_VACANCY_OFFER: string[] = [
+  "Goede arbeidsvoorwaarden",
+  "Prettige werksfeer in een vast team",
+];
+
+export const DEFAULT_VACANCY_LOOKING_FOR: string[] = [
+  "Motivatie en betrouwbaarheid",
+  "Flexibele inzetbaarheid",
+];
 
 export type JobsBlockData = {
   heading: string;
@@ -123,17 +177,73 @@ function stringList(raw: unknown): string[] | undefined {
   return items.length ? items : undefined;
 }
 
-function mapEmploymentType(raw: string | undefined): EmploymentType {
-  if (!raw) return "full-time";
-  const n = raw.trim().toLowerCase();
-  if (EMPLOYMENT_TYPES.includes(n as EmploymentType)) return n as EmploymentType;
-  if (n.includes("full") || n.includes("voltijd")) return "full-time";
-  if (n.includes("part") || n.includes("deeltijd")) return "part-time";
-  if (n.includes("stage") || n.includes("intern")) return "internship";
-  if (n.includes("oproep") || n.includes("on-call") || n.includes("on call")) return "on-call";
-  if (n.includes("freelance") || n.includes("zzp")) return "freelance";
-  if (n.includes("tijdelijk") || n.includes("temp") || n.includes("contract")) return "temporary";
-  return "other";
+/**
+ * Resolve stored employment value to the display badge string.
+ * Converts legacy enum keys and common Dutch/English synonyms to labels;
+ * preserves free text that does not match a known type.
+ */
+export function resolveEmploymentTypeLabel(raw: string | undefined | null): string {
+  if (!raw || !String(raw).trim()) return DEFAULT_EMPLOYMENT_LABEL;
+  const trimmed = String(raw).trim();
+  if ((EMPLOYMENT_TYPES as readonly string[]).includes(trimmed)) {
+    return EMPLOYMENT_TYPE_LABELS_NL[trimmed as EmploymentType];
+  }
+  const n = trimmed.toLowerCase();
+  if ((EMPLOYMENT_TYPES as readonly string[]).includes(n)) {
+    return EMPLOYMENT_TYPE_LABELS_NL[n as EmploymentType];
+  }
+  // Already a known Dutch label — keep casing from presets when close enough.
+  for (const preset of EMPLOYMENT_TYPE_PRESETS_NL) {
+    if (preset.toLowerCase() === n) return preset;
+  }
+  for (const label of Object.values(EMPLOYMENT_TYPE_LABELS_NL)) {
+    if (label.toLowerCase() === n) return label;
+  }
+  if (n.includes("full") || n.includes("voltijd")) return EMPLOYMENT_TYPE_LABELS_NL["full-time"];
+  if (n.includes("part") || n.includes("deeltijd")) return EMPLOYMENT_TYPE_LABELS_NL["part-time"];
+  if (n.includes("stage") || n.includes("intern")) return EMPLOYMENT_TYPE_LABELS_NL.internship;
+  if (n.includes("oproep") || n.includes("on-call") || n.includes("on call")) {
+    return EMPLOYMENT_TYPE_LABELS_NL["on-call"];
+  }
+  if (n.includes("freelance") || n.includes("zzp")) return EMPLOYMENT_TYPE_LABELS_NL.freelance;
+  if (n.includes("seizoen") || n.includes("season")) return "Seizoenswerk";
+  if (n.includes("tijdelijk") || n.includes("temp") || n.includes("contract")) {
+    return EMPLOYMENT_TYPE_LABELS_NL.temporary;
+  }
+  return trimmed;
+}
+
+/** Map free-text / legacy employment labels to schema.org JobPosting employmentType. */
+export function toSchemaOrgEmploymentType(raw: string | undefined | null): string {
+  if (!raw || !String(raw).trim()) return "OTHER";
+  const n = String(raw).trim().toLowerCase();
+  if ((EMPLOYMENT_TYPES as readonly string[]).includes(n)) {
+    const map: Record<EmploymentType, string> = {
+      "full-time": "FULL_TIME",
+      "part-time": "PART_TIME",
+      temporary: "TEMPORARY",
+      freelance: "CONTRACTOR",
+      internship: "INTERN",
+      "on-call": "OTHER",
+      other: "OTHER",
+    };
+    return map[n as EmploymentType];
+  }
+  if (n.includes("full") || n.includes("voltijd")) return "FULL_TIME";
+  if (n.includes("part") || n.includes("deeltijd")) return "PART_TIME";
+  if (n.includes("stage") || n.includes("intern")) return "INTERN";
+  if (n.includes("freelance") || n.includes("zzp")) return "CONTRACTOR";
+  if (
+    n.includes("seizoen") ||
+    n.includes("season") ||
+    n.includes("tijdelijk") ||
+    n.includes("temp") ||
+    n.includes("contract")
+  ) {
+    return "TEMPORARY";
+  }
+  if (n.includes("oproep") || n.includes("on-call") || n.includes("on call")) return "OTHER";
+  return "OTHER";
 }
 
 const hoursSchema = z
@@ -183,15 +293,18 @@ export const vacancyItemSchema: z.ZodType<VacancyItem> = z.object({
   slug: z.string().optional(),
   department: z.string().optional(),
   location: z.string(),
-  employmentType: z.enum(EMPLOYMENT_TYPES),
+  employmentType: z.string().min(1),
   hoursPerWeek: hoursSchema.optional(),
   hourlyRate: hourlyRateSchema.optional(),
   salaryText: z.string().optional(),
   shortDescription: z.string(),
+  detailsHeading: z.string().optional(),
   fullDescription: z.string().optional(),
   responsibilities: z.array(z.string()).optional(),
   requirements: z.array(z.string()).optional(),
+  requirementsHeading: z.string().optional(),
   benefits: z.array(z.string()).optional(),
+  benefitsHeading: z.string().optional(),
   startDate: z.string().optional(),
   applicationDeadline: z.string().optional(),
   contactName: z.string().optional(),
@@ -214,20 +327,53 @@ export const jobsBlockSchema: z.ZodType<JobsBlockData> = z.object({
 
 export function createDefaultVacancy(partial?: Partial<VacancyItem>): VacancyItem {
   const title = partial?.title ?? "Nieuwe vacature";
+  // Seed offer/looking-for placeholders only when the caller omits those keys
+  // (admin "Vacature toevoegen"). Normalize always passes the keys explicitly so
+  // existing content without lists stays empty rather than gaining placeholders.
+  const benefits =
+    partial !== undefined && "benefits" in partial
+      ? partial.benefits
+      : [...DEFAULT_VACANCY_OFFER];
+  const requirements =
+    partial !== undefined && "requirements" in partial
+      ? partial.requirements
+      : [...DEFAULT_VACANCY_LOOKING_FOR];
+  const shortDescription =
+    partial?.shortDescription ??
+    (title === "Nieuwe vacature" ? "Beschrijf hier de functie en het werk." : "");
+  const employmentType = resolveEmploymentTypeLabel(
+    partial?.employmentType ?? DEFAULT_EMPLOYMENT_LABEL,
+  );
+  // Section headings: seed Dutch defaults for new vacancies; normalize may omit.
+  const benefitsHeading =
+    partial !== undefined && "benefitsHeading" in partial
+      ? partial.benefitsHeading
+      : VACANCY_CARD_LABELS_NL.offer;
+  const requirementsHeading =
+    partial !== undefined && "requirementsHeading" in partial
+      ? partial.requirementsHeading
+      : VACANCY_CARD_LABELS_NL.lookingFor;
+  const detailsHeading =
+    partial !== undefined && "detailsHeading" in partial
+      ? partial.detailsHeading
+      : VACANCY_CARD_LABELS_NL.details;
   return {
     id: partial?.id && partial.id.trim() ? partial.id : createItemId("job"),
     title,
     department: partial?.department,
     location: partial?.location ?? "",
-    employmentType: partial?.employmentType ?? "full-time",
+    employmentType,
     hoursPerWeek: partial?.hoursPerWeek,
     hourlyRate: partial?.hourlyRate,
     salaryText: partial?.salaryText,
-    shortDescription: partial?.shortDescription ?? "",
+    shortDescription,
+    detailsHeading,
     fullDescription: partial?.fullDescription,
     responsibilities: partial?.responsibilities,
-    requirements: partial?.requirements,
-    benefits: partial?.benefits,
+    requirements,
+    requirementsHeading,
+    benefits,
+    benefitsHeading,
     startDate: partial?.startDate,
     applicationDeadline: partial?.applicationDeadline,
     contactName: partial?.contactName,
@@ -297,9 +443,11 @@ export function createVacaturesSeedJobs(): JobsBlockData {
         slug: "reguliere-schoonmaak",
         department: "Operations",
         location: "Twente",
-        employmentType: "full-time",
+        employmentType: "Fulltime",
         shortDescription:
           "Voor onze vaste schoonmaakrondes bij kantoren en bedrijven zoeken wij medewerkers die oog hebben voor detail en plezier hebben in hun werk.",
+        benefits: undefined,
+        requirements: undefined,
         applicationLink: { type: "none" },
         buttonLabel: "Solliciteer",
       }),
@@ -309,9 +457,11 @@ export function createVacaturesSeedJobs(): JobsBlockData {
         slug: "glazenwasser",
         department: "Operations",
         location: "Twente",
-        employmentType: "full-time",
+        employmentType: "Fulltime",
         shortDescription:
           "Werk in een hecht team aan glasbewassing en gevelreiniging. Ervaring is een pre, motivatie een must.",
+        benefits: undefined,
+        requirements: undefined,
         applicationLink: { type: "none" },
       }),
       createDefaultVacancy({
@@ -320,9 +470,11 @@ export function createVacaturesSeedJobs(): JobsBlockData {
         slug: "oproepkracht",
         department: "Operations",
         location: "Twente",
-        employmentType: "on-call",
+        employmentType: "Oproep",
         shortDescription:
           "Flexibel inzetbaar voor opleveringen en specialistische projecten — ideaal voor wie variatie zoekt.",
+        benefits: undefined,
+        requirements: undefined,
         applicationLink: { type: "none" },
       }),
     ],
@@ -352,10 +504,17 @@ function normalizeVacancy(row: Record<string, unknown>, id: string): VacancyItem
       ? (row.hourlyRate as Record<string, unknown>)
       : null;
 
-  const employmentType =
+  const employmentType = resolveEmploymentTypeLabel(
     typeof row.employmentType === "string"
-      ? mapEmploymentType(row.employmentType)
-      : mapEmploymentType(typeof row.type === "string" ? row.type : undefined);
+      ? row.employmentType
+      : typeof row.type === "string"
+        ? row.type
+        : undefined,
+  );
+
+  const detailsHeading = str(row, "detailsHeading") || undefined;
+  const benefitsHeading = str(row, "benefitsHeading") || undefined;
+  const requirementsHeading = str(row, "requirementsHeading") || undefined;
 
   return createDefaultVacancy({
     id,
@@ -380,11 +539,17 @@ function normalizeVacancy(row: Record<string, unknown>, id: string): VacancyItem
         }
       : undefined,
     salaryText: str(row, "salaryText") || undefined,
-    shortDescription: str(row, "shortDescription"),
+    // Prefer shortDescription; fall back to fullDescription so legacy "details"
+    // that lived only in fullDescription still surface on the simplified card.
+    shortDescription: str(row, "shortDescription") || str(row, "fullDescription"),
+    detailsHeading,
     fullDescription: str(row, "fullDescription") || undefined,
+    // Preserved for legacy payloads; not shown on the primary card UI.
     responsibilities: stringList(row.responsibilities),
     requirements: stringList(row.requirements),
+    requirementsHeading,
     benefits: stringList(row.benefits),
+    benefitsHeading,
     startDate: str(row, "startDate") || undefined,
     applicationDeadline: str(row, "applicationDeadline") || undefined,
     contactName: str(row, "contactName") || undefined,
@@ -543,7 +708,7 @@ export function validateJobsForPublish(data: unknown): string[] {
       case PUBLISH_VALIDATION_CODES.JOBS_LOCATION_REQUIRED:
         return "Vacature: locatie is verplicht";
       case PUBLISH_VALIDATION_CODES.JOBS_DESCRIPTION_REQUIRED:
-        return "Vacature: korte beschrijving is verplicht";
+        return "Vacature: details zijn verplicht";
       case PUBLISH_VALIDATION_CODES.JOBS_APPLICATION_LINK_INVALID:
         return "Vacature: sollicitatiebestemming is ongeldig";
       case PUBLISH_VALIDATION_CODES.JOBS_HOURS_INVALID:

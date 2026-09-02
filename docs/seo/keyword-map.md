@@ -12,3 +12,5 @@ See **[`mccoy-keyword-map.md`](./mccoy-keyword-map.md)** for Phase 6 candidate v
 | EN brand | cleaning company Twente | commercial cleaning | en | `/en` | deployed Phase 6 |
 
 Future location/service pages remain approval-gated (not implemented here).
+
+Operator Semrush Tracked set (Oldenzaal niches, brand variants, Wijk bij Duurstede dakgoot): see **[`mccoy-keyword-map.md`](./mccoy-keyword-map.md)** → *Operator tracker*. Suggested civic/weather/real-estate terms are **avoid**.

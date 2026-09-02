@@ -20,6 +20,7 @@ export {
   adminInboxMessageIdSchema,
   adminInboxBulkDeleteSchema,
   adminInboxReplySchema,
+  adminInboxUpdateSubmitterEmailSchema,
   adminInboxAttachmentSchema,
   notificationListSchema,
   notificationIdSchema,
@@ -50,6 +51,8 @@ export {
   adminConvertGuestSchema,
   adminCustomerExportSchema,
   adminCustomerImportSchema,
+  adminExistingCustomerFileImportSchema,
+  adminDeletePortalCompaniesSchema,
   adminSeedCommerceFixturesSchema,
 } from "./schemas";
 

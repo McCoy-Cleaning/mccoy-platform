@@ -16,6 +16,7 @@ import {
   migrateOriginalWorkGalleryImages,
   migrateOriginalHeroImage,
   normalizeContactFormContent,
+  normalizeOfferteFormContent,
   parseCmsEditMessage,
   parseSectionContent,
   ensureBuiltinSectionContent,
@@ -30,6 +31,8 @@ import {
   collectLegacyEmbeddedImages,
   replaceCmsImagesInTree,
   SECTION_CONTENT_SCHEMAS,
+  createDefaultQuoteRequestForm,
+  type ContactFormContent,
 } from "./index";
 import type { FixedSectionKey } from "./sections";
 import { FIXED_SECTION_DEFS } from "./sections";
@@ -146,6 +149,19 @@ describe("section content", () => {
       "Meubelreiniging",
       "Glasbewassing & Buitenreiniging",
     ]);
+  });
+
+  it("seeds empty work gallery with the default Ons-werk tiles", () => {
+    const migrated = migrateLegacyWorkGalleryContent({
+      eyebrow: "Custom",
+      heading: "Custom heading",
+      body: "Custom body",
+      items: [],
+    });
+    expect(migrated.eyebrow).toBe("Custom");
+    expect(migrated.heading).toBe("Custom heading");
+    expect(migrated.items).toHaveLength(6);
+    expect(migrated.items[0]?.id).toBe("gallery_regular");
   });
 
   it("remaps mis-seeded service and gallery images to the original paths", () => {
@@ -728,6 +744,42 @@ describe("uploadedImage", () => {
       "Vraag",
     ]);
     expect(normalized.fields?.find((f) => f.type === "phone")?.placeholder).toBe("Bel ons");
+  });
+
+  it("default offerte.form seeds nested quote chrome", () => {
+    const form = defaultSectionContent("offerte.form") as ContactFormContent;
+    expect(form.quote?.tabs).toHaveLength(2);
+    expect(form.quote?.tabs.map((t) => t.kind)).toEqual([
+      "glass_washing",
+      "furniture_cleaning",
+    ]);
+    expect(form.quote?.submitLabel).toBe("Verstuur aanvraag");
+    expect(SECTION_CONTENT_SCHEMAS["offerte.form"].safeParse(form).success).toBe(true);
+  });
+
+  it("normalizeOfferteFormContent seeds quote and copies top-level presentation", () => {
+    const normalized = normalizeOfferteFormContent({
+      heading: "Offerte kop",
+      submitLabel: "Stuur door",
+      successMessage: "Binnen!",
+    });
+    expect(normalized.quote?.heading).toBe("Offerte kop");
+    expect(normalized.quote?.submitLabel).toBe("Stuur door");
+    expect(normalized.quote?.successMessage).toBe("Binnen!");
+    expect(normalized.quote?.tabs).toHaveLength(2);
+  });
+
+  it("normalizeOfferteFormContent keeps existing quote presentation", () => {
+    const quote = createDefaultQuoteRequestForm();
+    quote.heading = "Quote kop";
+    quote.submitLabel = "Quote knop";
+    const normalized = normalizeOfferteFormContent({
+      heading: "Top kop",
+      submitLabel: "Top knop",
+      quote,
+    });
+    expect(normalized.quote?.heading).toBe("Quote kop");
+    expect(normalized.quote?.submitLabel).toBe("Quote knop");
   });
 
   it("resolveContactFormHighlights never injects hard-coded fallbacks", () => {

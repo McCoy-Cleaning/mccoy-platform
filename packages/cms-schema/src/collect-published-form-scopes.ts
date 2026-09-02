@@ -82,6 +82,9 @@ export function collectPublishedFormScopes(pages: CmsPage[]): PublishedFormScope
       addScope(map, offerteFormContent?.scope);
       addScope(map, offerteFormContent?.glassScope);
       addScope(map, offerteFormContent?.furnitureScope);
+      for (const tab of offerteFormContent?.quote?.tabs ?? []) {
+        addScope(map, tab.scope);
+      }
     }
 
     const vacaturesApplication = page.sectionContent?.[

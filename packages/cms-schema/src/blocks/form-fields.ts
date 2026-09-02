@@ -40,6 +40,11 @@ export type FormFieldItem = {
   /** Optional input placeholder shown on the storefront. */
   placeholder?: string;
   options?: FormFieldOption[];
+  /**
+   * Frozen submission payload key (E12).
+   * When set, label edits must not change {@link formFieldPayloadKey}.
+   */
+  payloadKey?: string;
 };
 
 export const formFieldOptionSchema: z.ZodType<FormFieldOption> = z.object({
@@ -55,6 +60,7 @@ export const formFieldItemSchema: z.ZodType<FormFieldItem> = z.object({
   required: z.boolean().optional(),
   placeholder: z.string().optional(),
   options: z.array(formFieldOptionSchema).optional(),
+  payloadKey: z.string().min(1).max(64).optional(),
 });
 
 export function createFormFieldOption(label = "", value?: string): FormFieldOption {
@@ -64,7 +70,7 @@ export function createFormFieldOption(label = "", value?: string): FormFieldOpti
 export function createFormFieldItem(
   label: string,
   type: FormFieldType = "text",
-  partial?: Partial<Omit<FormFieldItem, "id" | "label" | "type">>,
+  partial?: Partial<Omit<FormFieldItem, "id" | "label" | "type">> & { id?: string },
 ): FormFieldItem {
   const required =
     partial?.required ?? (type === "name" || type === "email" ? true : undefined);
@@ -72,13 +78,22 @@ export function createFormFieldItem(
     typeof partial?.placeholder === "string" && partial.placeholder.trim()
       ? partial.placeholder
       : undefined;
+  const payloadKey =
+    typeof partial?.payloadKey === "string" && partial.payloadKey.trim()
+      ? sanitizePayloadKey(partial.payloadKey)
+      : undefined;
+  const id =
+    typeof partial?.id === "string" && partial.id.trim()
+      ? partial.id.trim()
+      : createItemId("fld");
   return {
-    id: createItemId("fld"),
+    id,
     label,
     type,
     required,
     placeholder,
     options: partial?.options,
+    payloadKey,
   };
 }
 
@@ -256,6 +271,57 @@ function slugFromLabel(label: string, id: string): string {
   return lower || `field_${id.slice(0, 12)}`;
 }
 
+export function sanitizePayloadKey(raw: string): string {
+  return slugFromLabel(raw, "key").slice(0, 64) || "field";
+}
+
+/**
+ * Derive a submission key without reading `payloadKey` (used to freeze keys).
+ */
+export function deriveFormFieldPayloadKey(field: FormFieldItem): string {
+  if (field.type === "name") return "name";
+  if (field.type === "email") return "email";
+  if (field.type === "phone") return "phone";
+  if (field.type === "company") return "company";
+  if (field.id === BUILTIN_CONTACT_MESSAGE_ID) return "message";
+  if (field.id === BUILTIN_CONTACT_COMPANY_ID) return "company";
+  if (field.id === BUILTIN_CONTACT_PHONE_ID) return "phone";
+  if (field.id === BUILTIN_JOB_CV_ID) return "cv";
+  if (field.id === BUILTIN_JOB_LETTER_ID) return "letter";
+  if (field.id === BUILTIN_JOB_MOTIVATION_ID) return "motivation";
+  const lower = field.label.trim().toLowerCase();
+  if (/^(naam|name)$/i.test(lower)) return "name";
+  if (/^(e-?mail|email)$/i.test(lower)) return "email";
+  if (/^(uw\s+)?(bericht|message|opmerking)$/i.test(lower)) return "message";
+  if (/^(motivatie|motivation|korte motivatie)$/i.test(lower)) return "motivation";
+  if (/^(telefoon|phone|tel|mobiel)$/i.test(lower)) return "phone";
+  if (/^(bedrijf|bedrijfsnaam|company|organisatie)$/i.test(lower)) return "company";
+  if (/^(cv|curriculum|resumé|resume)(\b|\/|\s|$)/i.test(lower)) return "cv";
+  if (/^(motivatiebrief|letter|cover\s*letter)$/i.test(lower)) return "letter";
+  if (field.type === "file" && /foto|photo|image|afbeelding/i.test(lower)) return "photos";
+  return slugFromLabel(field.label, field.id);
+}
+
+/** Map a configured field to the payload key used by website form submit. */
+export function formFieldPayloadKey(field: FormFieldItem): string {
+  if (typeof field.payloadKey === "string" && field.payloadKey.trim()) {
+    return sanitizePayloadKey(field.payloadKey);
+  }
+  return deriveFormFieldPayloadKey(field);
+}
+
+/** Persist a frozen submission key so later label edits cannot rename it. */
+export function withFrozenPayloadKey(field: FormFieldItem): FormFieldItem {
+  if (typeof field.payloadKey === "string" && field.payloadKey.trim()) {
+    return { ...field, payloadKey: sanitizePayloadKey(field.payloadKey) };
+  }
+  return { ...field, payloadKey: deriveFormFieldPayloadKey(field) };
+}
+
+export function withFrozenPayloadKeys(fields: FormFieldItem[]): FormFieldItem[] {
+  return fields.map(withFrozenPayloadKey);
+}
+
 function normalizeFieldOptions(value: unknown): FormFieldOption[] | undefined {
   if (!Array.isArray(value) || value.length === 0) return undefined;
   const out: FormFieldOption[] = [];
@@ -329,6 +395,10 @@ export function normalizeFormFields(value: unknown): FormFieldItem[] {
         ? rec.placeholder
         : undefined;
     const options = type === "select" ? normalizeFieldOptions(rec.options) : undefined;
+    const payloadKey =
+      typeof rec.payloadKey === "string" && rec.payloadKey.trim()
+        ? sanitizePayloadKey(rec.payloadKey)
+        : undefined;
     out.push({
       id,
       label: label || "Veld",
@@ -336,6 +406,7 @@ export function normalizeFormFields(value: unknown): FormFieldItem[] {
       required,
       placeholder,
       options,
+      payloadKey,
     });
   }
   return out;
@@ -366,31 +437,6 @@ export function resolveJobApplicationFields(customFields: unknown): FormFieldIte
     (field) => field.label.trim() && !isReservedContactFormField(field),
   );
   return [BUILTIN_CONTACT_FORM_NAME_FIELD, BUILTIN_CONTACT_FORM_EMAIL_FIELD, ...custom];
-}
-
-/** Map a configured field to the payload key used by website form submit. */
-export function formFieldPayloadKey(field: FormFieldItem): string {
-  if (field.type === "name") return "name";
-  if (field.type === "email") return "email";
-  if (field.type === "phone") return "phone";
-  if (field.type === "company") return "company";
-  if (field.id === BUILTIN_CONTACT_MESSAGE_ID) return "message";
-  if (field.id === BUILTIN_CONTACT_COMPANY_ID) return "company";
-  if (field.id === BUILTIN_CONTACT_PHONE_ID) return "phone";
-  if (field.id === BUILTIN_JOB_CV_ID) return "cv";
-  if (field.id === BUILTIN_JOB_LETTER_ID) return "letter";
-  if (field.id === BUILTIN_JOB_MOTIVATION_ID) return "motivation";
-  const lower = field.label.trim().toLowerCase();
-  if (/^(naam|name)$/i.test(lower)) return "name";
-  if (/^(e-?mail|email)$/i.test(lower)) return "email";
-  if (/^(uw\s+)?(bericht|message|opmerking)$/i.test(lower)) return "message";
-  if (/^(motivatie|motivation|korte motivatie)$/i.test(lower)) return "motivation";
-  if (/^(telefoon|phone|tel|mobiel)$/i.test(lower)) return "phone";
-  if (/^(bedrijf|bedrijfsnaam|company|organisatie)$/i.test(lower)) return "company";
-  if (/^(cv|curriculum|resumé|resume)(\b|\/|\s|$)/i.test(lower)) return "cv";
-  if (/^(motivatiebrief|letter|cover\s*letter)$/i.test(lower)) return "letter";
-  if (field.type === "file" && /foto|photo|image|afbeelding/i.test(lower)) return "photos";
-  return slugFromLabel(field.label, field.id);
 }
 
 /** Storefront field order for the fixed Contact form (matches historical layout). */

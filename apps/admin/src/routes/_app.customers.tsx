@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { CustomersPage, validateCustomersSearch } from "@/features/customers";
 
 export const Route = createFileRoute("/_app/customers")({
@@ -7,6 +7,13 @@ export const Route = createFileRoute("/_app/customers")({
 });
 
 function CustomersRoute() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isDetailRoute = /\/customers\/(company|registered|guest)\//.test(pathname);
+
+  if (isDetailRoute) {
+    return <Outlet />;
+  }
+
   const search = Route.useSearch();
   return <CustomersPage search={search} />;
 }

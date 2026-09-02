@@ -105,7 +105,7 @@ export async function seedCommerceFixtures(actorUserId: string | null): Promise<
       status: "active",
     });
   });
-  await addCompanyMember({ companyId: aCompany.id, userId: aId, role: "owner" });
+  await addCompanyMember({ companyId: aCompany.id, userId: aId, role: "account_admin" });
   for (const [i, subtotal, tax, total] of [
     [1, 10000, 2100, 12100],
     [2, 20000, 4200, 24200],
@@ -153,7 +153,7 @@ export async function seedCommerceFixtures(actorUserId: string | null): Promise<
     const existing = await listCompaniesForUser(bId);
     return existing[0] ?? createCompany({ legalName: "Fixture Company B BV", email: bEmail, status: "active" });
   });
-  await addCompanyMember({ companyId: bCompany.id, userId: bId, role: "owner" });
+  await addCompanyMember({ companyId: bCompany.id, userId: bId, role: "account_admin" });
 
   // Company with multiple users
   const c1 = "fixture.multi.owner@example.mccoy.test";
@@ -171,8 +171,8 @@ export async function seedCommerceFixtures(actorUserId: string | null): Promise<
     const existing = await listCompaniesForUser(c1Id);
     return existing[0] ?? createCompany({ legalName: "Fixture Multi User BV", email: c1, status: "active" });
   });
-  await addCompanyMember({ companyId: multiCompany.id, userId: c1Id, role: "owner" });
-  await addCompanyMember({ companyId: multiCompany.id, userId: c2Id, role: "member" });
+  await addCompanyMember({ companyId: multiCompany.id, userId: c1Id, role: "account_admin" });
+  await addCompanyMember({ companyId: multiCompany.id, userId: c2Id, role: "account_user" });
 
   // Guest with multiple paid orders
   const gA = "fixture.guest.a@example.mccoy.test";
@@ -259,7 +259,7 @@ export async function seedCommerceFixtures(actorUserId: string | null): Promise<
     const existing = await listCompaniesForUser(collUserId);
     return existing[0] ?? createCompany({ legalName: "Fixture Collision BV", email: collEmail, status: "active" });
   });
-  await addCompanyMember({ companyId: collCompany.id, userId: collUserId, role: "owner" });
+  await addCompanyMember({ companyId: collCompany.id, userId: collUserId, role: "account_admin" });
   const collGuest = await ensureGuestPurchaser({
     email: collEmail,
     fullName: "Fixture Collision Guest Name",

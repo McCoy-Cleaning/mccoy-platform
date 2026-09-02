@@ -116,7 +116,7 @@ describe("business JSON-LD invariants", () => {
       title: "Glazenwasser",
       slug: "glazenwasser",
       shortDescription: "Glasbewassing in Twente.",
-      employmentType: "full-time",
+      employmentType: "Fulltime",
       location: "Twente",
       startDate: "2026-01-15",
     });

@@ -7,6 +7,8 @@ import {
   adminCustomerExportSchema,
   adminCustomerIdSchema,
   adminCustomerImportSchema,
+  adminExistingCustomerFileImportSchema,
+  adminDeletePortalCompaniesSchema,
   adminCustomerListSchema,
   adminGuestIdSchema,
   adminInviteCustomerSchema,
@@ -18,7 +20,9 @@ import {
 import {
   commerceFixturesAllowed,
   commitCustomerImport,
+  commitExistingCustomerImport,
   convertGuestPurchaser,
+  deletePortalServiceCompanies,
   exportCustomersCsv,
   getCustomerById,
   getGuestById,
@@ -30,12 +34,27 @@ import {
   listOrdersForCustomer,
   listOrdersForGuest,
   listRegisteredCustomers,
+  previewExistingCustomerImport,
   requireAdminSession,
   seedCommerceFixtures,
   setCustomerBlocked,
   updateCompany,
   updateCustomerProfile,
   writeStaffAudit,
+  listPortalCompanies,
+  staffInviteAccountAdmin,
+  staffInviteAccountUser,
+  getCompanyById,
+  listCompanyMemberships,
+  listInvitationsForCompany,
+  resolveCustomerPortalStatus,
+  syncExistingServiceClients,
+  processCommerceEmailOutbox,
+  processExpiredCustomerInvitations,
+  transferAccountAdmin,
+  resendPortalInvitation,
+  staffSuspendCompanyMembership,
+  staffReactivateCompanyMembership,
 } from "@mccoy/database/server";
 
 const adminOrderIdSchema = z.object({ orderId: z.string().uuid() });
@@ -249,6 +268,100 @@ export const importAdminCustomers = createServerFn({ method: "POST" })
     }
   });
 
+/** Existing service clients: CSV/XLSX → mirror → sync → auto Account Admin invite for NEW+email. */
+export const importAdminExistingServiceClients = createServerFn({ method: "POST" })
+  .validator(adminExistingCustomerFileImportSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+
+      let bytes: Buffer;
+      try {
+        bytes = Buffer.from(data.fileBase64, "base64");
+      } catch {
+        return { ok: false as const, error: "Bestand kon niet worden gelezen." };
+      }
+      if (!bytes.byteLength) {
+        return { ok: false as const, error: "Bestand is leeg." };
+      }
+
+      const columnMap = data.columnMap ?? undefined;
+      const sheetName = data.sheetName ?? undefined;
+
+      if (!data.commit) {
+        const preview = await previewExistingCustomerImport({
+          fileName: data.fileName,
+          bytes,
+          columnMap,
+          sheetName: sheetName || undefined,
+        });
+        if ("ok" in preview && preview.ok === false) {
+          return { ok: false as const, error: preview.error };
+        }
+        const full = preview as Exclude<
+          Awaited<ReturnType<typeof previewExistingCustomerImport>>,
+          { ok: false }
+        >;
+        return {
+          ok: true as const,
+          mode: "preview" as const,
+          preview: {
+            fileName: full.fileName,
+            sheetName: full.sheetName,
+            headers: full.headers,
+            sheetNames: full.sheetNames,
+            totalRows: full.totalRows,
+            counts: full.counts,
+            inviteCounts: full.inviteCounts,
+            importableCount: full.importableCount,
+            rows: full.rows.map((r) => ({
+              sourceRowNumber: r.sourceRowNumber,
+              externalCustomerId: r.externalCustomerId,
+              companyName: r.companyName,
+              classification: r.classification,
+              reason: r.reason,
+              autoInvitePlan: r.autoInvitePlan,
+            })),
+          },
+        };
+      }
+
+      const result = await commitExistingCustomerImport({
+        fileName: data.fileName,
+        bytes,
+        columnMap,
+        sheetName: sheetName || undefined,
+        actorUserId: session.userId,
+      });
+      if ("ok" in result && result.ok === false) {
+        return { ok: false as const, error: result.error };
+      }
+      const committed = result as Exclude<
+        Awaited<ReturnType<typeof commitExistingCustomerImport>>,
+        { ok: false }
+      >;
+      return {
+        ok: true as const,
+        mode: "commit" as const,
+        fileName: committed.fileName,
+        mirrored: committed.mirrored,
+        unchanged: committed.unchanged,
+        skippedInvalid: committed.skippedInvalid,
+        skippedConflict: committed.skippedConflict,
+        sync: committed.sync,
+        invites: {
+          sent: committed.invites.sent,
+          skipped: committed.invites.skipped,
+          failed: committed.invites.failed,
+        },
+      };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
 export const seedAdminCommerceFixtures = createServerFn({ method: "POST" })
   .validator(adminSeedCommerceFixturesSchema)
   .handler(async () => {
@@ -259,7 +372,237 @@ export const seedAdminCommerceFixtures = createServerFn({ method: "POST" })
         return { ok: false as const, error: "Fixtures zijn uitgeschakeld in productie." };
       }
       const result = await seedCommerceFixtures(session.userId ?? null);
+      await syncExistingServiceClients({ actorUserId: session.userId ?? null });
       return { ok: true as const, emails: result.emails };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+const portalCompanyListSchema = z.object({
+  q: z.string().max(200).optional(),
+  portalStatus: z.string().optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(100).optional(),
+});
+
+const portalInviteSchema = z.object({
+  companyId: z.string().uuid(),
+  email: z.string().email(),
+  firstName: z.string().max(120).optional().nullable(),
+  lastName: z.string().max(120).optional().nullable(),
+});
+
+export const listAdminPortalCompanies = createServerFn({ method: "POST" })
+  .validator(portalCompanyListSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      const portalStatus =
+        data.portalStatus && data.portalStatus !== "all"
+          ? (data.portalStatus as import("@mccoy/domain").CustomerPortalStatus)
+          : "all";
+      const result = await listPortalCompanies({
+        q: data.q,
+        portalStatus,
+        page: data.page,
+        pageSize: data.pageSize,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const inviteAdminPortalAccountAdmin = createServerFn({ method: "POST" })
+  .validator(portalInviteSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      const result = await staffInviteAccountAdmin({
+        companyId: data.companyId,
+        email: data.email,
+        actorUserId: session.userId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const inviteAdminPortalAccountUser = createServerFn({ method: "POST" })
+  .validator(
+    portalInviteSchema.extend({
+      phone: z.string().trim().max(40).nullable().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      const result = await staffInviteAccountUser({
+        companyId: data.companyId,
+        email: data.email,
+        actorUserId: session.userId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const setAdminPortalMembershipStatus = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      companyId: z.string().uuid(),
+      userId: z.string().uuid(),
+      status: z.enum(["active", "suspended"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      if (data.status === "suspended") {
+        await staffSuspendCompanyMembership({
+          companyId: data.companyId,
+          userId: data.userId,
+          actorUserId: session.userId,
+        });
+      } else {
+        await staffReactivateCompanyMembership({
+          companyId: data.companyId,
+          userId: data.userId,
+          actorUserId: session.userId,
+        });
+      }
+      return { ok: true as const };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const getAdminCompanyPortalDetail = createServerFn({ method: "POST" })
+  .validator(z.object({ companyId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      const company = await getCompanyById(data.companyId);
+      if (!company) return { ok: false as const, error: "Bedrijf niet gevonden." };
+      const portalStatus = await resolveCustomerPortalStatus(data.companyId);
+      const members = await listCompanyMemberships(data.companyId);
+      const invitations = await listInvitationsForCompany(data.companyId);
+      return { ok: true as const, company, portalStatus, members, invitations };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const syncAdminServiceClients = createServerFn({ method: "POST" }).handler(async () => {
+  try {
+    ensureMonorepoEnvLoaded();
+    const session = await requireAdminSession();
+    const result = await syncExistingServiceClients({ actorUserId: session.userId ?? null });
+    await processCommerceEmailOutbox(10);
+    return { ok: true as const, ...result };
+  } catch (error) {
+    return authErrorResult(error);
+  }
+});
+
+export const deleteAdminPortalCompanies = createServerFn({ method: "POST" })
+  .validator(adminDeletePortalCompaniesSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      const summary = await deletePortalServiceCompanies({
+        companyIds: data.companyIds,
+        actorUserId: session.userId,
+      });
+      return {
+        ok: true as const,
+        deleted: summary.deleted,
+        failed: summary.failed,
+        results: summary.results.map((r) =>
+          r.ok
+            ? { ok: true as const, companyId: r.companyId, legalName: r.legalName }
+            : { ok: false as const, companyId: r.companyId, error: r.error, code: r.code },
+        ),
+      };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const processAdminCommerceJobs = createServerFn({ method: "POST" }).handler(async () => {
+  try {
+    ensureMonorepoEnvLoaded();
+    await requireAdminSession();
+    const reminders = await processExpiredCustomerInvitations(25);
+    const emails = await processCommerceEmailOutbox(25);
+    return { ok: true as const, reminders, emails };
+  } catch (error) {
+    return authErrorResult(error);
+  }
+});
+
+export const resendAdminPortalInvitation = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      companyId: z.string().uuid(),
+      email: z.string().email(),
+      intendedRole: z.enum(["account_admin", "account_user"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      const result = await resendPortalInvitation({
+        companyId: data.companyId,
+        email: data.email,
+        intendedRole: data.intendedRole,
+        invitedByType: "staff",
+        actorUserId: session.userId,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+export const transferAdminAccountAdmin = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      companyId: z.string().uuid(),
+      newUserId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      if (!session.userId) return { ok: false as const, error: "Niet geautoriseerd." };
+      await transferAccountAdmin({
+        companyId: data.companyId,
+        newUserId: data.newUserId,
+        actorUserId: session.userId,
+      });
+      return { ok: true as const };
     } catch (error) {
       return authErrorResult(error);
     }

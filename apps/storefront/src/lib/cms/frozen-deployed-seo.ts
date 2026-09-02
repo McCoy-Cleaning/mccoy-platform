@@ -21,7 +21,7 @@ export const FROZEN_DEPLOYED_NL_SEO: Record<string, FrozenSeo> = {
   "/services": {
     title: "Schoonmaakdiensten Twente — McCoy Cleaning",
     description:
-      "Kantoorschoonmaak, horeca-, opleverings- en vloeronderhoud, meubelreiniging en glasbewassing in Twente. Vast eigen team van McCoy Cleaning in Oldenzaal — vraag een offerte aan.",
+      "Kantoorschoonmaak, horeca-, opleverings- en vloeronderhoud, meubelreiniging en glasbewassing in Twente. Vast team McCoy Cleaning Oldenzaal — vraag offerte aan.",
   },
   "/products": {
     title: "Producten — McCoy Cleaning Products | Groothandel",
@@ -36,7 +36,7 @@ export const FROZEN_DEPLOYED_NL_SEO: Record<string, FrozenSeo> = {
   "/offerte": {
     title: "Offerte aanvragen — Schoonmaak Twente | McCoy Cleaning",
     description:
-      "Offerte aanvragen voor kantoorschoonmaak, glasbewassing, vloer- en meubelonderhoud in Twente. Persoonlijk antwoord binnen één werkdag — McCoy Cleaning Oldenzaal.",
+      "Offerte voor kantoorschoonmaak, glasbewassing, vloer- en meubelonderhoud in Twente. Persoonlijk antwoord binnen één werkdag — McCoy Cleaning Oldenzaal.",
   },
   "/vacatures": {
     title: "Vacatures Schoonmaak Twente — Werken bij McCoy Cleaning",
@@ -46,12 +46,12 @@ export const FROZEN_DEPLOYED_NL_SEO: Record<string, FrozenSeo> = {
   "/privacy": {
     title: "Privacyverklaring — McCoy Cleaning",
     description:
-      "Privacyverklaring van McCoy Cleaning B.V.: hoe wij persoonsgegevens verwerken, bewaren en beveiligen.",
+      "Privacyverklaring van McCoy Cleaning B.V.: hoe wij persoonsgegevens verwerken, bewaren en beveiligen voor klanten en websitebezoekers.",
   },
   "/terms": {
     title: "Algemene Voorwaarden — McCoy Cleaning",
     description:
-      "Algemene voorwaarden van McCoy Schoonmaak en Reiniging — offertes, uitvoering, aansprakelijkheid en geschillen.",
+      "Algemene voorwaarden van McCoy Cleaning B.V. in Oldenzaal: offertes, uitvoering, aansprakelijkheid, betaling en geschillen onder Nederlands recht.",
   },
 };
 
@@ -63,7 +63,7 @@ export const FROZEN_DEPLOYED_EN_SEO: Record<string, FrozenSeo> = {
   "/": {
     title: "McCoy Cleaning — Cleaning Company Twente | Oldenzaal",
     description:
-      "Professional cleaning company in Twente since 1998. Office cleaning, window cleaning, floor care and hospitality cleaning from Oldenzaal — permanent in-house team.",
+      "Professional cleaning company in Twente since 1998. Office cleaning, window cleaning, floor care and hospitality cleaning from Oldenzaal — permanent team.",
   },
   "/about": {
     title: "About McCoy Cleaning — Cleaning Company Twente since 1998",
@@ -73,7 +73,7 @@ export const FROZEN_DEPLOYED_EN_SEO: Record<string, FrozenSeo> = {
   "/services": {
     title: "Cleaning Services Twente — McCoy Cleaning",
     description:
-      "Office, hospitality, post-construction and floor cleaning, furniture care and window cleaning in Twente. Permanent in-house team from McCoy Cleaning in Oldenzaal.",
+      "Office, hospitality, post-construction and floor cleaning, furniture care and window cleaning in Twente. In-house team from McCoy Cleaning, Oldenzaal.",
   },
   "/products": {
     title: "Products — McCoy Cleaning Products | Wholesale",

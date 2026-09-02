@@ -5,6 +5,7 @@
 import {
   addLayoutBlock,
   addFixedLayoutItem,
+  applyDraftToPage,
   canEnableCustomPageInNav,
   cloneJobsDataWithNewIds,
   createDefaultBlock,
@@ -12,6 +13,7 @@ import {
   effectiveOverrides,
   forceProductsIntroAssortmentPair,
   getSectionContent,
+  hashCmsPageContent,
   isDraftDirty,
   mergeSectionPatch,
   minInsertIndex,
@@ -573,6 +575,58 @@ export const cmsLayoutApi = {
       s.pages = s.pages.filter((p) => p.id !== pageId);
     }
     writeOrAlert(s);
+  },
+
+  /** Capture the current page draft for editor history (null = published baseline). */
+  captureDraftSnapshot(pageId: string): PageDraft | null {
+    const draft = read().draft[pageId];
+    if (!draft || !isDraftDirty(draft)) return null;
+    const { editorMeta: _drop, ...rest } = draft;
+    void _drop;
+    return structuredClone(rest);
+  },
+
+  /**
+   * Restore a draft snapshot without recording history.
+   * When the snapshot matches the published page content, the draft is cleared
+   * so dirty state returns to clean.
+   */
+  restoreDraftSnapshot(
+    pageId: string,
+    snapshot: PageDraft | null,
+  ): { ok: true } | { ok: false; reason: string } {
+    const s = read();
+    const published = s.pages.find((p) => p.id === pageId);
+    if (!published) return { ok: false, reason: "Pagina niet gevonden" };
+
+    if (!snapshot || !isDraftDirty(snapshot)) {
+      delete s.draft[pageId];
+      sessionPreviewSnapshots.delete(pageId);
+      markPreviewStale(pageId);
+      if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
+      return { ok: true };
+    }
+
+    const { editorMeta: _drop, ...clean } = structuredClone(snapshot);
+    void _drop;
+    const applied = applyDraftToPage(published, clean);
+    if (hashCmsPageContent(applied) === hashCmsPageContent(published)) {
+      // Content equals published baseline — clear draft for dirty=false.
+      delete s.draft[pageId];
+      sessionPreviewSnapshots.delete(pageId);
+      markPreviewStale(pageId);
+      if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
+      return { ok: true };
+    }
+
+    s.draft = {
+      ...s.draft,
+      [pageId]: clean,
+    };
+    sessionPreviewSnapshots.delete(pageId);
+    markPreviewStale(pageId);
+    if (!write(s)) return { ok: false, reason: WRITE_FAIL_REASON };
+    return { ok: true };
   },
 
   reset() {

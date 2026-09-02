@@ -3,11 +3,59 @@
 export const COMPANY_TYPES = ["product_customer", "service_client"] as const;
 export type CompanyType = (typeof COMPANY_TYPES)[number];
 
+/** Legal party: B2B company vs private person (existing-customer import / display). */
+export const COMPANY_PARTY_TYPES = ["company", "private_person"] as const;
+export type CompanyPartyType = (typeof COMPANY_PARTY_TYPES)[number];
+
+export function partyTypeLabelNl(partyType: CompanyPartyType): string {
+  switch (partyType) {
+    case "company":
+      return "Bedrijf";
+    case "private_person":
+      return "Particulier";
+    default:
+      return partyType;
+  }
+}
+
 export const COMPANY_STATUSES = ["pending", "active", "blocked"] as const;
 export type CompanyStatus = (typeof COMPANY_STATUSES)[number];
 
-export const COMPANY_MEMBER_ROLES = ["owner", "member"] as const;
+export const COMPANY_MEMBER_ROLES = ["account_admin", "account_user"] as const;
 export type CompanyMemberRole = (typeof COMPANY_MEMBER_ROLES)[number];
+
+export const COMPANY_MEMBER_STATUSES = ["active", "suspended"] as const;
+export type CompanyMemberStatus = (typeof COMPANY_MEMBER_STATUSES)[number];
+
+/** Portal onboarding states (derived server-side — not company operational status). */
+export const CUSTOMER_PORTAL_STATUSES = [
+  "registration_required",
+  "invited",
+  "reminder_sent",
+  "invite_expired",
+  "active",
+  "suspended",
+] as const;
+export type CustomerPortalStatus = (typeof CUSTOMER_PORTAL_STATUSES)[number];
+
+export function portalStatusLabelNl(status: CustomerPortalStatus): string {
+  switch (status) {
+    case "registration_required":
+      return "Registratie nodig";
+    case "invited":
+      return "Uitgenodigd";
+    case "reminder_sent":
+      return "Herinnering verstuurd";
+    case "invite_expired":
+      return "Link verlopen";
+    case "active":
+      return "Actief";
+    case "suspended":
+      return "Opgeschort";
+    default:
+      return status;
+  }
+}
 
 export const ORDER_STATUSES = ["pending", "confirmed", "cancelled", "completed"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -44,6 +92,22 @@ export const COMMERCE_AUDIT_ACTIONS = [
   "guest.linked_existing",
   "order.imported",
   "commerce.fixtures_seeded",
+  "commerce.company_provisioned",
+  "commerce.existing_customer_import_completed",
+  "commerce.existing_customer_import_failed",
+  "commerce.existing_customer_import_auto_invite",
+  "commerce.portal_company_deleted",
+  "customer.portal_invite_sent",
+  "customer.portal_invite_resent",
+  "customer.portal_invite_expired",
+  "customer.portal_invite_consumed",
+  "customer.portal_user_invited",
+  "customer.portal_activated",
+  "customer.membership_suspended",
+  "customer.membership_reactivated",
+  "customer.account_admin_transferred",
+  "customer.company_portal_suspended",
+  "customer.company_portal_reactivated",
 ] as const;
 export type CommerceAuditAction = (typeof COMMERCE_AUDIT_ACTIONS)[number];
 
@@ -69,12 +133,21 @@ export type Company = {
   kvkNumber: string | null;
   vatNumber: string | null;
   companyType: CompanyType;
+  partyType: CompanyPartyType;
   status: CompanyStatus;
   invoiceAllowed: boolean;
   email: string | null;
   phone: string | null;
+  contactPersonName: string | null;
+  addressStreet: string | null;
+  addressHouseNumber: string | null;
+  addressHouseSuffix: string | null;
+  addressPostalCode: string | null;
+  addressCity: string | null;
+  addressCountry: string | null;
   blockedAt: string | null;
   notes: string | null;
+  externalCustomerId: string | null;
   createdAt: string;
   updatedAt: string;
 };

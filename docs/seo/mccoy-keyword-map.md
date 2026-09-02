@@ -2,7 +2,7 @@
 
 Planning + verification status for commercial clusters. **No invented search volumes** (GSC/Bing exports are operator-owned).
 
-Companions: [`keyword-map.md`](./keyword-map.md), [`keyword-baseline.md`](./keyword-baseline.md), [`proposed-metadata.md`](./proposed-metadata.md), [`mccoy-content-improvement-proposals.md`](./mccoy-content-improvement-proposals.md).
+Companions: [`keyword-map.md`](./keyword-map.md), [`keyword-baseline.md`](./keyword-baseline.md), [`proposed-metadata.md`](./proposed-metadata.md), [`mccoy-content-improvement-proposals.md`](./mccoy-content-improvement-proposals.md), [`semrush-opportunities-triage.md`](./semrush-opportunities-triage.md).
 
 ## Legend
 
@@ -55,10 +55,63 @@ Companions: [`keyword-map.md`](./keyword-map.md), [`keyword-baseline.md`](./keyw
 |--------|--------|
 | Google Search Console export | **Operator** — fill post-deploy; see [`search-console-post-deploy.md`](./search-console-post-deploy.md) |
 | Bing Webmaster | **Operator** — [`bing-post-deploy.md`](./bing-post-deploy.md) |
-| Third-party volume tools | **Not used** in this program (no fabricated monthly searches) |
+| Semrush keyword tracker (operator screenshot, 2024–2026) | **Recorded below** — ranks/CTR where visible; monthly volume left blank (tool showed `—`; do not invent) |
+| Third-party volume tools | **Not used** to invent monthly searches |
+
+## Operator tracker — Tracked (add to McCoy set)
+
+Source: Semrush-style keyword list provided by operator (Universe = Tracked). Commercial / brand / local service intent only.
+
+| Query | Locale | Intent | Tracker notes | Target URL | Status |
+|-------|--------|--------|---------------|------------|--------|
+| mc coy | nl | brand | Tracked (added ~Aug 2024); brand spelling variant | `/` | verified |
+| mccoy oldenzaal | nl | brand + local | Tracked (added ~Aug 2024) | `/` | verified |
+| schoonmaakbedrijf oldenzaal | nl | commercial | Tracked (added ~Sep 2024); already Phase 6 home signal | `/` | verified |
+| schoonmaakbedrijven oldenzaal | nl | commercial | Tracked (added ~Sep 2024); plural variant | `/` | candidate |
+| schoonmaak oldenzaal | nl | commercial | Tracked (added ~Sep 2024) | `/` | candidate |
+| glazenwasser oldenzaal | nl | service | Tracked (added ~Sep 2024); glass cluster support | `/services#glas-gevelreiniging` | verified |
+| gevelreiniging oldenzaal | nl | service | Tracked (added ~Aug 2024) | `/services#glas-gevelreiniging` | candidate |
+| zonnepanelen schoonmaken oldenzaal | nl | service | Tracked (added ~Sep 2024); niche outdoor | TBD vs services hash | candidate |
+| dakkapel schoonmaken oldenzaal | nl | service | Tracked (added ~Sep 2024); niche outdoor | TBD vs services hash | candidate |
+| dakgoot schoonmaken wijk bij duurstede | nl | service + geo | Tracked (added ~Aug 2024); outside Twente primary | TBD (approval-gated city/service) | candidate |
+
+## Operator tracker — Semrush IMPROVE visibility (existing rankings)
+
+Source: Semrush Opportunities “Improve existing visibility” rows (operator screenshots). These are **content/ranking** opportunities, not code defects. Tracked here so GSC/content work can prioritize them; do not invent landings or stuffing.
+
+| Query | Locale | Intent | Target URL | Status | Notes |
+|-------|--------|--------|------------|--------|-------|
+| glazenwasser oldenzaal | nl | service | `/services#glas-gevelreiniging` | verified | Also in Tracked table above |
+| schoonmaakster oldenzaal | nl | service + role | `/vacatures` vs `/services` | candidate | Role-intent; jobs list is primary; avoid new URL |
+| schoonmaakbedrijf | nl | commercial (broad) | `/` | candidate | Broad head term; home already targets Twente/Oldenzaal |
+| schoonmaakdienst | nl | commercial (broad) | `/services` | candidate | Singular/service hub support |
+| mccoy vacatures | nl | brand + jobs | `/vacatures` | verified | Brand+jobs; Phase 6 vacatures title |
+| zonnepanelen schoonmaken oldenzaal | nl | service | TBD vs services hash | candidate | Also in Tracked; niche outdoor |
+
+## Operator tracker — Suggested (do **not** treat as McCoy targets)
+
+Universe = Suggested in the same export. Mostly unrelated local noise or competitors — keep out of titles/H1/meta.
+
+| Query | Disposition | Reason |
+|-------|-------------|--------|
+| buienradar oldenzaal | avoid | Weather tool, not cleaning |
+| weer oldenzaal | avoid | Weather |
+| funda oldenzaal | avoid | Real-estate portal |
+| funda wijk bij duurstede | avoid | Real-estate portal |
+| gemeente oldenzaal | avoid | Municipality |
+| gemeente wijk bij duurstede | avoid | Municipality |
+| burgerzaken | avoid | Civic admin, not commercial cleaning |
+| kartbaan oldenzaal / karthuizer oldenzaal | avoid | Unrelated venue / noise |
+| oldenzaal classics | avoid | Unrelated event/brand |
+| ppo wijk bij duurstede | avoid | Unrelated org |
+| wijk bij duurstede | avoid | Bare geo (too broad; no cleaning intent) |
+| banierix / benerink oldenzaal | avoid | Unclear / non-McCoy brand noise |
+| dejasque / dejacque oldenzaal | avoid | Unclear / non-McCoy brand noise |
+| vobago / valego cleaning services | competitive watch | Competitor brand — do not target as McCoy primary; optional competitive note only |
 
 ## Out of scope here
 
 - New location/service URL creation without approval
 - Thin EN legal / offerte inventiveness
 - Ecommerce Offer schema — [`product-seo-roadmap.md`](./product-seo-roadmap.md)
+- Promoting Semrush “Suggested” geo/civic noise into on-page copy

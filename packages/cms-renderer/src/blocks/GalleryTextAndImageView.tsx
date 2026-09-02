@@ -12,6 +12,7 @@ import {
   GalleryUnifiedPanel,
 } from "./GallerySectionIntro";
 import { SectionShell } from "../SectionShell";
+import { CmsListRemoveButton } from "../edit-surface";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -32,6 +33,8 @@ export type GalleryTextAndImageProps = {
   items: GalleryTextAndImageItem[];
   textPlacement?: GalleryTextPlacement;
   columns?: GalleryColumns;
+  /** Edit-mode remove control per item (Content/Media canvas lists). */
+  onRemoveItem?: (id: string) => void;
 };
 
 type CopyFields = {
@@ -170,10 +173,12 @@ function ServiceColumn({
   item,
   index,
   textFirst,
+  onRemove,
 }: {
   item: GalleryTextAndImageItem;
   index: number;
   textFirst: boolean;
+  onRemove?: () => void;
 }) {
   const fields = readCopy(item);
   const copy = fields ? (
@@ -193,6 +198,12 @@ function ServiceColumn({
         "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
       )}
     >
+      {onRemove ? (
+        <CmsListRemoveButton
+          label={`Afbeelding verwijderen: ${item.title || `item ${index + 1}`}`}
+          onRemove={onRemove}
+        />
+      ) : null}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-70"
         aria-hidden
@@ -262,6 +273,7 @@ export function GalleryTextAndImageView({
   items,
   textPlacement: textPlacementRaw,
   columns: columnsRaw,
+  onRemoveItem,
 }: GalleryTextAndImageProps) {
   const textPlacement = normalizeGalleryTextPlacement(textPlacementRaw);
   const columns = normalizeGalleryColumns(columnsRaw);
@@ -297,12 +309,18 @@ export function GalleryTextAndImageView({
                 <article
                   key={item.id}
                   className={cn(
-                    "group grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-16",
+                    "group relative grid items-center gap-8 sm:gap-10 md:gap-12 lg:gap-16",
                     textFirst
                       ? "md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
                       : "md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]",
                   )}
                 >
+                  {onRemoveItem ? (
+                    <CmsListRemoveButton
+                      label={`Afbeelding verwijderen: ${item.title || `item ${index + 1}`}`}
+                      onRemove={() => onRemoveItem(item.id)}
+                    />
+                  ) : null}
                   {textFirst ? (
                     <>
                       {copy}
@@ -332,6 +350,7 @@ export function GalleryTextAndImageView({
                 item={item}
                 index={index}
                 textFirst={textFirst}
+                onRemove={onRemoveItem ? () => onRemoveItem(item.id) : undefined}
               />
             ))}
           </div>

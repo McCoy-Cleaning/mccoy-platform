@@ -7,7 +7,9 @@ import {
   parseCmsEditMessage,
   resolveAdminParentOrigins,
   shouldApplyDraft,
+  type CmsEditorInteractionMode,
   type CmsMutation,
+  type CmsUiCommand,
   type EditableDraftSnapshot,
 } from "@mccoy/cms-schema";
 import {
@@ -16,11 +18,18 @@ import {
   type LiveEditApi,
   type LiveEditDraft,
 } from "./live-edit-api-context";
+import { shouldScrollOnLocalCanvasSelection } from "./live-edit-selection-scroll";
 
 export type { CmsCanvasSelection, LiveEditDraft } from "./live-edit-api-context";
 export { useLiveEditApi, useLiveEditDraft } from "./live-edit-api-context";
 export { useCmsPageForView, useSectionContentMap } from "./use-cms-page-for-view";
+export { shouldScrollOnLocalCanvasSelection } from "./live-edit-selection-scroll";
 
+/**
+ * Scroll only for parent-driven navigation (inspector / sectielijst).
+ * Canvas clicks already have the target under the pointer — scrolling the
+ * whole section into view jumps users away from the text they just focused.
+ */
 function scrollCanvasToSelection(sel: CmsCanvasSelection) {
   if (!sel || typeof document === "undefined") return;
   const run = () => {
@@ -38,7 +47,10 @@ function scrollCanvasToSelection(sel: CmsCanvasSelection) {
     }
     if (!(el instanceof HTMLElement)) return;
     el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    if (document.activeElement === document.body || document.activeElement === document.documentElement) {
+    if (
+      document.activeElement === document.body ||
+      document.activeElement === document.documentElement
+    ) {
       el.focus({ preventScroll: true });
     }
   };
@@ -92,6 +104,8 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
   const { isEdit, pageId } = useEditRoute();
   const [live, setLive] = React.useState<LiveEditDraft | null>(null);
   const [selection, setSelectionState] = React.useState<CmsCanvasSelection>(null);
+  const [interactionMode, setInteractionMode] =
+    React.useState<CmsEditorInteractionMode>("edit");
   const sessionIdRef = React.useRef(createSessionId());
   const lastAppliedRevision = React.useRef(0);
 
@@ -109,7 +123,10 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
   const setSelection = React.useCallback(
     (sel: CmsCanvasSelection) => {
       setSelectionState(sel);
-      scrollCanvasToSelection(sel);
+      // Local canvas clicks must not scroll — only parent cms-selection messages do.
+      if (shouldScrollOnLocalCanvasSelection()) {
+        scrollCanvasToSelection(sel);
+      }
       if (!pageId) return;
       postToParents({
         type: "cms-selection",
@@ -136,10 +153,57 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
     [pageId, live, postToParents],
   );
 
+  const sendUiCommand = React.useCallback(
+    (command: CmsUiCommand) => {
+      if (!pageId) return;
+      postToParents({
+        type: "cms-ui-command",
+        sessionId: sessionIdRef.current,
+        pageId,
+        command,
+      });
+    },
+    [pageId, postToParents],
+  );
+
+  // Semantic undo/redo when canvas focus is not inside uncommitted text editing.
+  React.useEffect(() => {
+    if (!isEdit || !pageId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("[contenteditable=true]") ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        // Native text undo while an inline edit session is active.
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        sendUiCommand({ kind: "undo" });
+        return;
+      }
+      if (key === "y" || (key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        sendUiCommand({ kind: "redo" });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isEdit, pageId, sendUiCommand]);
+
   React.useEffect(() => {
     if (!isEdit || !pageId) {
       setLive(null);
       lastAppliedRevision.current = 0;
+      setInteractionMode("edit");
       return;
     }
 
@@ -181,6 +245,13 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
         return;
       }
 
+      if (msg.type === "cms-editor-mode") {
+        if (msg.pageId !== pageId) return;
+        if (msg.sessionId !== sessionId) return;
+        setInteractionMode(msg.interactionMode);
+        return;
+      }
+
       if (msg.type === "cms-mutation-rejected") {
         if (msg.sessionId !== sessionId) return;
         if (import.meta.env.VITE_E2E_CMS) {
@@ -217,16 +288,31 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
     return unsubscribe;
   }, [isEdit, pageId, postToParents]);
 
+  const showEditorChrome = isEdit && interactionMode === "edit";
+
   const api = React.useMemo<LiveEditApi>(
     () => ({
       draft: live,
       selection,
       setSelection,
       sendMutation,
+      sendUiCommand,
       isEdit,
+      interactionMode,
+      showEditorChrome,
       pageId,
     }),
-    [live, selection, setSelection, sendMutation, isEdit, pageId],
+    [
+      live,
+      selection,
+      setSelection,
+      sendMutation,
+      sendUiCommand,
+      isEdit,
+      interactionMode,
+      showEditorChrome,
+      pageId,
+    ],
   );
 
   React.useEffect(() => {
@@ -252,4 +338,3 @@ export function LiveEditDraftProvider({ children }: { children: React.ReactNode 
 
   return <LiveEditCtx.Provider value={api}>{children}</LiveEditCtx.Provider>;
 }
-

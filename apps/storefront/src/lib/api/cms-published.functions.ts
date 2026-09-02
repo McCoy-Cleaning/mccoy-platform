@@ -108,30 +108,38 @@ export const resolvePublishedCmsPath = createServerFn({ method: "POST" })
   });
 
 export const getPublishedSitemapXml = createServerFn({ method: "POST" }).handler(async () => {
-  const { buildPublishedSitemapEntries } = await import("@mccoy/database/server");
-  const store = await getStoreForRead();
-  const entries = await buildPublishedSitemapEntries({ store });
-  const urls = entries
-    .map((entry) => {
-      const alts = entry.alternates
-        .map(
-          (a) =>
-            `    <xhtml:link rel="alternate" hreflang="${a.locale}" href="${a.url}" />`,
-        )
-        .join("\n");
-      return `  <url>
+  try {
+    const { buildPublishedSitemapEntries } = await import("@mccoy/database/server");
+    const store = await getStoreForRead();
+    const entries = await buildPublishedSitemapEntries({ store });
+    if (entries.length === 0) {
+      return { ok: false as const, error: "empty_sitemap" };
+    }
+    const urls = entries
+      .map((entry) => {
+        const alts = entry.alternates
+          .map(
+            (a) =>
+              `    <xhtml:link rel="alternate" hreflang="${a.locale}" href="${a.url}" />`,
+          )
+          .join("\n");
+        return `  <url>
     <loc>${entry.loc}</loc>
 ${entry.lastmod ? `    <lastmod>${entry.lastmod.slice(0, 10)}</lastmod>\n` : ""}${alts}
   </url>`;
-    })
-    .join("\n");
+      })
+      .join("\n");
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls}
 </urlset>`;
-  return { ok: true as const, xml };
+    return { ok: true as const, xml };
+  } catch (error) {
+    console.error("[sitemap] build failed", error);
+    return { ok: false as const, error: "sitemap_build_failed" };
+  }
 });
 
 export const processCmsPublishOutbox = createServerFn({ method: "POST" }).handler(async () => {

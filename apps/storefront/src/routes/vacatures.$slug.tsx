@@ -1,12 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
-  EMPLOYMENT_TYPE_LABELS_NL,
   formatHourlyRateNl,
   formatHoursPerWeekNl,
   normalizeJobs,
   resolveVacancyPublicSlug,
+  resolveEmploymentTypeLabel,
   buildJobPostingJsonLd,
+  VACANCY_CARD_LABELS_NL,
   type VacancyItem,
   type ResolvedPublishedCmsPage,
 } from "@mccoy/cms-schema";
@@ -103,15 +104,12 @@ function VacatureDetailPageBody() {
 
   const rate = formatHourlyRateNl(vacancy.hourlyRate);
   const hours = formatHoursPerWeekNl(vacancy.hoursPerWeek);
-  const meta = [
-    vacancy.department,
-    vacancy.location,
-    EMPLOYMENT_TYPE_LABELS_NL[vacancy.employmentType],
-    hours,
-    rate,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const employmentLabel = resolveEmploymentTypeLabel(vacancy.employmentType);
+  const meta = [vacancy.department, vacancy.location, hours, rate].filter(Boolean).join(" · ");
+  const detailsHeading = vacancy.detailsHeading?.trim() || VACANCY_CARD_LABELS_NL.details;
+  const benefitsHeading = vacancy.benefitsHeading?.trim() || VACANCY_CARD_LABELS_NL.offer;
+  const requirementsHeading =
+    vacancy.requirementsHeading?.trim() || VACANCY_CARD_LABELS_NL.lookingFor;
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-20 pt-32 sm:px-6 lg:px-8">
@@ -124,28 +122,35 @@ function VacatureDetailPageBody() {
               Uitgelicht
             </p>
           ) : null}
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {vacancy.title}
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {vacancy.title}
+            </h1>
+            {employmentLabel ? (
+              <span className="rounded-md bg-primary/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                {employmentLabel}
+              </span>
+            ) : null}
+          </div>
           {meta ? <p className="mt-2 text-sm text-white/55">{meta}</p> : null}
           {vacancy.shortDescription ? (
-            <p className="mt-6 text-base leading-relaxed text-white/80">
-              {vacancy.shortDescription}
-            </p>
-          ) : null}
-          {vacancy.fullDescription ? (
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
-              {vacancy.fullDescription}
-            </p>
+            <section className="mt-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/45">
+                {detailsHeading}
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-white/80">
+                {vacancy.shortDescription}
+              </p>
+            </section>
           ) : null}
 
-          {vacancy.responsibilities?.length ? (
+          {vacancy.benefits?.length ? (
             <section className="mt-8">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-white/45">
-                Verantwoordelijkheden
+                {benefitsHeading}
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/75">
-                {vacancy.responsibilities.map((item) => (
+                {vacancy.benefits.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
@@ -154,22 +159,10 @@ function VacatureDetailPageBody() {
           {vacancy.requirements?.length ? (
             <section className="mt-6">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-white/45">
-                Eisen
+                {requirementsHeading}
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/75">
                 {vacancy.requirements.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-          {vacancy.benefits?.length ? (
-            <section className="mt-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/45">
-                Arbeidsvoorwaarden
-              </h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/75">
-                {vacancy.benefits.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>

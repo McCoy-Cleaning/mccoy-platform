@@ -15,10 +15,38 @@ import {
 import { SectionEyebrow, SectionSurface } from "../sectionChromeUi";
 import { SECTION_PAGE_RAIL } from "../sectionLayout";
 import { SectionShell } from "../SectionShell";
+import { EditableText } from "../edit-surface";
 import { cn } from "./blockViewShared";
 import { FormFileUploadField } from "./FormFileUploadField";
 import { WEBSITE_FORM_MEDIA_FILE_ACCEPT } from "../form-file-attachments";
 import { useCmsFormAdapters, useCmsPageId } from "./form-adapters";
+
+// Storefront-only chrome is injected via optional callback to avoid cms-renderer
+// depending on storefront. When absent, fields render without edit overlays.
+export type QuoteFieldChromeRender = (args: {
+  field: FormFieldItem;
+  tab: QuoteRequestFormTab;
+  tabIndex: number;
+  blockId: string;
+  className?: string;
+  children: React.ReactNode;
+}) => React.ReactNode;
+
+const QuoteFieldChromeCtx = React.createContext<QuoteFieldChromeRender | null>(null);
+
+export function QuoteFieldChromeProvider({
+  value,
+  children,
+}: {
+  value: QuoteFieldChromeRender | null;
+  children: React.ReactNode;
+}) {
+  return <QuoteFieldChromeCtx.Provider value={value}>{children}</QuoteFieldChromeCtx.Provider>;
+}
+
+function useQuoteFieldChrome() {
+  return React.useContext(QuoteFieldChromeCtx);
+}
 
 type ConversionRenderMode = "storefront" | "preview";
 
@@ -64,7 +92,15 @@ function iconForTab(tab: QuoteRequestFormTab): React.ComponentType<{ className?:
 }
 
 const QUOTE_FILE_INPUT_CLASS =
-  "w-full rounded-2xl border border-dashed border-white/15 bg-background/40 px-4 py-3 text-sm text-white/75 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground";
+  "w-full rounded-2xl border border-dashed border-white/15 bg-background/40 px-4 py-3 text-sm text-white/75 file:mr-3 file:appearance-none file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground";
+
+/** Deterministic select chrome (no OS widget) — matches cms-editor selectClass pattern. */
+const QUOTE_SELECT_CLASS =
+  "w-full cursor-pointer appearance-none rounded-2xl border border-white/10 bg-background/40 bg-[length:12px] bg-[right_1rem_center] bg-no-repeat px-4 py-3 pr-10 text-white outline-none transition focus:border-primary bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22 stroke=%22%23ffffff99%22 stroke-width=%222%22%3E%3Cpath d=%22M3 4.5 6 7.5 9 4.5%22/%3E%3C/svg%3E')]";
+
+function quoteFieldSpansFull(field: FormFieldItem): boolean {
+  return field.type === "textarea" || field.type === "file";
+}
 
 function FieldControl({
   field,
@@ -74,6 +110,8 @@ function FieldControl({
   files,
   onFilesChange,
   disabled = false,
+  /** When false, omit grid span — chrome host owns `sm:col-span-2`. */
+  applyGridSpan = true,
 }: {
   field: FormFieldItem;
   value: string;
@@ -82,9 +120,11 @@ function FieldControl({
   files: File[];
   onFilesChange: (files: File[]) => void;
   disabled?: boolean;
+  applyGridSpan?: boolean;
 }) {
   const id = `${idPrefix}-${formFieldPayloadKey(field)}`;
   const key = formFieldPayloadKey(field);
+  const spanClass = applyGridSpan && quoteFieldSpansFull(field) ? "sm:col-span-2" : undefined;
   const label = (
     <label
       htmlFor={id}
@@ -97,7 +137,7 @@ function FieldControl({
 
   if (field.type === "textarea") {
     return (
-      <div className="sm:col-span-2">
+      <div className={spanClass}>
         {label}
         <textarea
           id={id}
@@ -117,7 +157,7 @@ function FieldControl({
   if (field.type === "select") {
     const options = field.options ?? [];
     return (
-      <div>
+      <div className={spanClass}>
         {label}
         <select
           id={id}
@@ -125,7 +165,7 @@ function FieldControl({
           required={field.required}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-background/40 px-4 py-3 text-white outline-none transition focus:border-primary"
+          className={QUOTE_SELECT_CLASS}
         >
           {options.map((o) => (
             <option key={o.id} value={o.value ?? o.label} className="bg-background">
@@ -139,7 +179,7 @@ function FieldControl({
 
   if (field.type === "file") {
     return (
-      <div className="sm:col-span-2">
+      <div className={spanClass}>
         {label}
         <FormFileUploadField
           id={id}
@@ -162,7 +202,7 @@ function FieldControl({
     field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text";
 
   return (
-    <div>
+    <div className={spanClass}>
       {label}
       <input
         id={id}
@@ -181,12 +221,14 @@ function FieldControl({
 
 function TabForm({
   tab,
+  tabIndex,
   blockId,
   submitLabel,
   successMessage,
   mode,
 }: {
   tab: QuoteRequestFormTab;
+  tabIndex: number;
   blockId: string;
   submitLabel: string;
   successMessage: string;
@@ -194,6 +236,7 @@ function TabForm({
 }) {
   const adapters = useCmsFormAdapters();
   const pageId = useCmsPageId();
+  const fieldChrome = useQuoteFieldChrome();
   const fields = React.useMemo(
     () => resolveContactFormFields(tab.fields),
     [tab.fields],
@@ -269,9 +312,21 @@ function TabForm({
         <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
           <Icon className="h-5 w-5" />
         </div>
-        <SectionEyebrow className="mt-6 tracking-[0.25em]">{tab.tag}</SectionEyebrow>
-        <h2 className="font-display mt-3 text-4xl text-foreground md:text-5xl">{tab.title}</h2>
-        <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">{tab.description}</p>
+        <SectionEyebrow className="mt-6 tracking-[0.25em]">
+          <EditableText path={`tabs.${tabIndex}.tag`} value={tab.tag}>
+            {tab.tag}
+          </EditableText>
+        </SectionEyebrow>
+        <h2 className="font-display mt-3 text-4xl text-foreground md:text-5xl">
+          <EditableText path={`tabs.${tabIndex}.title`} value={tab.title} as="span">
+            {tab.title}
+          </EditableText>
+        </h2>
+        <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">
+          <EditableText path={`tabs.${tabIndex}.description`} value={tab.description} multiline>
+            {tab.description}
+          </EditableText>
+        </p>
       </aside>
 
       <SectionSurface variant="form" className="lg:col-span-7">
@@ -304,9 +359,10 @@ function TabForm({
             </div>
             {fields.map((field) => {
               const key = formFieldPayloadKey(field);
-              return (
+              const isTabField = tab.fields.some((f) => f.id === field.id);
+              const spanClass = quoteFieldSpansFull(field) ? "sm:col-span-2" : undefined;
+              const control = (
                 <FieldControl
-                  key={field.id}
                   field={field}
                   idPrefix={`quote-${tab.id}`}
                   value={values[key] ?? ""}
@@ -316,7 +372,27 @@ function TabForm({
                     setFileValues((prev) => ({ ...prev, [key]: next }))
                   }
                   disabled={!clientReady || status === "loading" || preview}
+                  applyGridSpan={false}
                 />
+              );
+              // Same relative grid host in storefront + Preview + Edit (E10).
+              // Chrome injects overlays only — never an extra layout wrapper.
+              return (
+                <div
+                  key={field.id}
+                  className={cn("relative", spanClass)}
+                  data-cms-form-field-chrome=""
+                >
+                  {fieldChrome && isTabField
+                    ? fieldChrome({
+                        field,
+                        tab,
+                        tabIndex,
+                        blockId,
+                        children: control,
+                      })
+                    : control}
+                </div>
               );
             })}
             {error ? (
@@ -392,11 +468,17 @@ export function QuoteRequestFormSectionView({
     <div data-cms-block-type={type}>
       {d.heading ? (
         <h2 className={cn(SECTION_PAGE_RAIL, "mt-16 font-display text-3xl text-foreground md:text-4xl")}>
-          {d.heading}
+          <EditableText path="heading" value={d.heading}>
+            {d.heading}
+          </EditableText>
         </h2>
       ) : null}
       {d.description ? (
-        <p className={cn(SECTION_PAGE_RAIL, "mt-3 max-w-2xl text-muted-foreground")}>{d.description}</p>
+        <p className={cn(SECTION_PAGE_RAIL, "mt-3 max-w-2xl text-muted-foreground")}>
+          <EditableText path="description" value={d.description} multiline>
+            {d.description}
+          </EditableText>
+        </p>
       ) : null}
 
       <section className={cn(SECTION_PAGE_RAIL, "mt-20")}>
@@ -404,6 +486,7 @@ export function QuoteRequestFormSectionView({
           {d.tabs.map((tb) => {
             const Icon = iconForTab(tb);
             const selected = tb.id === active.id;
+            // Tab cards stay plain text (navigation). Edit tag/title in the active TabForm aside.
             return (
               <button
                 key={tb.id}
@@ -439,6 +522,10 @@ export function QuoteRequestFormSectionView({
         <TabForm
           key={active.id}
           tab={active}
+          tabIndex={Math.max(
+            0,
+            d.tabs.findIndex((t) => t.id === active.id),
+          )}
           blockId={blockId}
           submitLabel={d.submitLabel}
           successMessage={d.successMessage}

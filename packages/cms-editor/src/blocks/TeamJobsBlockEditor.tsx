@@ -2,11 +2,10 @@ import * as React from "react";
 import {
   createDefaultVacancy,
   createItemId,
-  EMPLOYMENT_TYPE_LABELS_NL,
-  EMPLOYMENT_TYPES,
+  EMPLOYMENT_TYPE_PRESETS_NL,
+  VACANCY_CARD_LABELS_NL,
   type CmsImage,
   type CmsLink,
-  type EmploymentType,
   type JobsBlockData,
   type VacancyItem,
 } from "@mccoy/cms-schema";
@@ -25,7 +24,7 @@ function PlainStringList({
   items: string[];
   onChange: (items: string[]) => void;
   addLabel: string;
-  /** e.g. `block:{id}:vacancies.0.responsibilities` → `.0`, `.1`, … */
+  /** e.g. `block:{id}:vacancies.0.benefits` → `.0`, `.1`, … */
   enPathPrefix?: string;
 }) {
   return (
@@ -282,21 +281,39 @@ function VacancyEditor({
               onChange={(e) => onChange({ ...vacancy, location: e.target.value })}
             />
           </NlEnField>
-          <Field label="Dienstverband *">
-            <select
-              className={selectClass}
+          <NlEnField
+            label="Dienstverband *"
+            enPath={v("employmentType")}
+            hint="Vrije tekst of kies een snelle optie hieronder"
+          >
+            <input
+              className={inputClass}
               value={vacancy.employmentType}
               onChange={(e) =>
-                onChange({ ...vacancy, employmentType: e.target.value as EmploymentType })
+                onChange({
+                  ...vacancy,
+                  employmentType: e.target.value || "Fulltime",
+                })
               }
+              placeholder="bijv. Fulltime"
+            />
+          </NlEnField>
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Snelle keuze dienstverband">
+          {EMPLOYMENT_TYPE_PRESETS_NL.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                vacancy.employmentType === preset
+                  ? "border-sky-400/60 bg-sky-500/20 text-sky-100"
+                  : "border-white/12 bg-white/[0.03] text-white/65 hover:border-white/25"
+              }`}
+              onClick={() => onChange({ ...vacancy, employmentType: preset })}
             >
-              {EMPLOYMENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {EMPLOYMENT_TYPE_LABELS_NL[t]}
-                </option>
-              ))}
-            </select>
-          </Field>
+              {preset}
+            </button>
+          ))}
         </div>
       </Section>
 
@@ -383,9 +400,25 @@ function VacancyEditor({
 
       <Section title="Functiebeschrijving">
         <NlEnField
-          label="Korte beschrijving *"
+          label="Sectiekop details"
+          enPath={v("detailsHeading")}
+          hint="Kop boven de detailtekst op de kaart"
+        >
+          <input
+            className={inputClass}
+            value={vacancy.detailsHeading ?? VACANCY_CARD_LABELS_NL.details}
+            onChange={(e) =>
+              onChange({
+                ...vacancy,
+                detailsHeading: e.target.value.trim() || VACANCY_CARD_LABELS_NL.details,
+              })
+            }
+          />
+        </NlEnField>
+        <NlEnField
+          label={`${VACANCY_CARD_LABELS_NL.details} *`}
           enPath={v("shortDescription")}
-          hint="Wordt op de vacaturekaart getoond"
+          hint="Eenvoudige tekst zonder opsommingstekens — wordt op de vacaturekaart getoond"
           multiline
         >
           <textarea
@@ -394,50 +427,22 @@ function VacancyEditor({
             onChange={(e) => onChange({ ...vacancy, shortDescription: e.target.value })}
           />
         </NlEnField>
-        <NlEnField
-          label="Volledige beschrijving"
-          enPath={v("fullDescription")}
-          hint="Uitklapbaar op de website"
-          multiline
-        >
-          <textarea
-            className={`${inputClass} min-h-[6rem]`}
-            value={vacancy.fullDescription ?? ""}
-            onChange={(e) => onChange({ ...vacancy, fullDescription: e.target.value || undefined })}
-          />
-        </NlEnField>
       </Section>
 
-      <Section title="Verantwoordelijkheden en eisen">
-        <Field label="Verantwoordelijkheden">
-          <PlainStringList
-            items={vacancy.responsibilities ?? []}
-            enPathPrefix={v("responsibilities")}
-            onChange={(responsibilities) =>
+      <Section title={vacancy.benefitsHeading?.trim() || VACANCY_CARD_LABELS_NL.offer}>
+        <NlEnField label="Sectiekop" enPath={v("benefitsHeading")}>
+          <input
+            className={inputClass}
+            value={vacancy.benefitsHeading ?? VACANCY_CARD_LABELS_NL.offer}
+            onChange={(e) =>
               onChange({
                 ...vacancy,
-                responsibilities: responsibilities.filter((s) => s.trim()).length
-                  ? responsibilities
-                  : undefined,
+                benefitsHeading: e.target.value.trim() || VACANCY_CARD_LABELS_NL.offer,
               })
             }
-            addLabel="Verantwoordelijkheid toevoegen"
           />
-        </Field>
-        <Field label="Eisen">
-          <PlainStringList
-            items={vacancy.requirements ?? []}
-            enPathPrefix={v("requirements")}
-            onChange={(requirements) =>
-              onChange({
-                ...vacancy,
-                requirements: requirements.filter((s) => s.trim()).length ? requirements : undefined,
-              })
-            }
-            addLabel="Eis toevoegen"
-          />
-        </Field>
-        <Field label="Arbeidsvoorwaarden">
+        </NlEnField>
+        <Field label="Punten" hint="Wat wij bieden aan de kandidaat">
           <PlainStringList
             items={vacancy.benefits ?? []}
             enPathPrefix={v("benefits")}
@@ -447,7 +452,35 @@ function VacancyEditor({
                 benefits: benefits.filter((s) => s.trim()).length ? benefits : undefined,
               })
             }
-            addLabel="Voordeel toevoegen"
+            addLabel="Punt toevoegen"
+          />
+        </Field>
+      </Section>
+
+      <Section title={vacancy.requirementsHeading?.trim() || VACANCY_CARD_LABELS_NL.lookingFor}>
+        <NlEnField label="Sectiekop" enPath={v("requirementsHeading")}>
+          <input
+            className={inputClass}
+            value={vacancy.requirementsHeading ?? VACANCY_CARD_LABELS_NL.lookingFor}
+            onChange={(e) =>
+              onChange({
+                ...vacancy,
+                requirementsHeading: e.target.value.trim() || VACANCY_CARD_LABELS_NL.lookingFor,
+              })
+            }
+          />
+        </NlEnField>
+        <Field label="Punten" hint="Wat wij zoeken in de kandidaat">
+          <PlainStringList
+            items={vacancy.requirements ?? []}
+            enPathPrefix={v("requirements")}
+            onChange={(requirements) =>
+              onChange({
+                ...vacancy,
+                requirements: requirements.filter((s) => s.trim()).length ? requirements : undefined,
+              })
+            }
+            addLabel="Punt toevoegen"
           />
         </Field>
       </Section>
@@ -470,31 +503,6 @@ function VacancyEditor({
               onChange={(e) =>
                 onChange({ ...vacancy, applicationDeadline: e.target.value || undefined })
               }
-            />
-          </Field>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <NlEnField label="Contactpersoon" enPath={v("contactName")}>
-            <input
-              className={inputClass}
-              value={vacancy.contactName ?? ""}
-              onChange={(e) => onChange({ ...vacancy, contactName: e.target.value || undefined })}
-            />
-          </NlEnField>
-          <Field label="Contact e-mail">
-            <input
-              type="email"
-              className={inputClass}
-              value={vacancy.contactEmail ?? ""}
-              onChange={(e) => onChange({ ...vacancy, contactEmail: e.target.value || undefined })}
-            />
-          </Field>
-          <Field label="Contact telefoon">
-            <input
-              type="tel"
-              className={inputClass}
-              value={vacancy.contactPhone ?? ""}
-              onChange={(e) => onChange({ ...vacancy, contactPhone: e.target.value || undefined })}
             />
           </Field>
         </div>

@@ -34,7 +34,7 @@ function inviteRedirectUrl(): string {
   // Customer invite landing — storefront account onboarding will use this later.
   // Admin app origin is fine as a safe redirect host already allow-listed for Auth.
   const site = process.env.STOREFRONT_ORIGIN?.replace(/\/$/, "") || "https://www.mccoy.nl";
-  return `${site}/account/invite`;
+  return `${site}/account/activate`;
 }
 
 /**
@@ -161,7 +161,7 @@ export async function convertGuestPurchaser(input: {
       companyType: "product_customer",
     });
     companyId = company.id;
-    await addCompanyMember({ companyId, userId, role: "owner" });
+    await addCompanyMember({ companyId, userId, role: "account_admin" });
   }
 
   const ordersLinked = await linkOrdersToCustomer({
@@ -255,7 +255,7 @@ export async function inviteRegisteredCustomer(input: {
     phone: input.phone,
     status: "active",
   });
-  await addCompanyMember({ companyId: company.id, userId: authUserId, role: "owner" });
+  await addCompanyMember({ companyId: company.id, userId: authUserId, role: "account_admin" });
 
   await writeStaffAudit({
     actorUserId: input.actorUserId,

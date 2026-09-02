@@ -1,5 +1,13 @@
 import * as React from "react";
-import type { CmsMutation, CmsPage, FixedSectionKey, PageOverrides, PageSectionContent } from "@mccoy/cms-schema";
+import type {
+  CmsMutation,
+  CmsPage,
+  CmsUiCommand,
+  FixedSectionKey,
+  PageOverrides,
+  PageSectionContent,
+} from "@mccoy/cms-schema";
+import type { CmsEditorInteractionMode } from "@mccoy/cms-schema";
 
 export type CmsCanvasSelection =
   | { kind: "fixed"; sectionKey: FixedSectionKey; part?: string }
@@ -20,7 +28,12 @@ export type LiveEditApi = {
   selection: CmsCanvasSelection;
   setSelection: (sel: CmsCanvasSelection) => void;
   sendMutation: (patch: CmsMutation) => void;
+  sendUiCommand: (command: CmsUiCommand) => void;
   isEdit: boolean;
+  /** When preview, draft sync continues but WYSIWYG chrome is hidden. */
+  interactionMode: CmsEditorInteractionMode;
+  /** True when edit session is active and chrome should render. */
+  showEditorChrome: boolean;
   pageId: string | null;
 };
 
@@ -29,7 +42,10 @@ const defaultApi: LiveEditApi = {
   selection: null,
   setSelection: () => {},
   sendMutation: () => {},
+  sendUiCommand: () => {},
   isEdit: false,
+  interactionMode: "edit",
+  showEditorChrome: false,
   pageId: null,
 };
 

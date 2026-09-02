@@ -80,7 +80,7 @@ export function GuestCustomerDetailPage({ guestId }: { guestId: string }) {
     <div className="space-y-6 animate-fade-in">
       <Link
         to="/customers"
-        search={{ tab: "guests", q: "", status: "all", page: 1 }}
+        search={{ tab: "guests", q: "", status: "all", portalStatus: "all", page: 1 }}
         className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Terug naar gastkopers

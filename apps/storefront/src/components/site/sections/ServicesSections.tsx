@@ -28,6 +28,9 @@ import {
   cmsTextOrFallback,
   DEFAULT_SERVICE_CARD_CTA_LABEL,
   DEFAULT_SERVICE_CARD_QUOTE_CTA_LABEL,
+  DEFAULT_SERVICE_DETAIL_BODY_BY_ID,
+  DEFAULT_SERVICES_CLOSE_LABEL,
+  DEFAULT_SERVICES_READ_MORE_LABEL,
   defaultSectionContent,
   isCmsButtonInteractive,
   resolveLegacyLinkAsCmsButton,
@@ -47,6 +50,10 @@ import {
   serviceDetailAnchorForCard,
   serviceDetailHref,
 } from "./service-detail-anchors";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
+import { WysiwygButtonEditor, WysiwygMediaFrame } from "../cms-editor/WysiwygMediaButton";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
+import type { ServiceCard, ServicesCardsContent } from "@mccoy/cms-schema";
 
 function isCmsPlaceholderSrc(src: string | undefined): boolean {
   return !src || src.includes("placeholder");
@@ -118,17 +125,37 @@ function useLocalizedServiceCards() {
           ),
         }
       : null;
+    const detailBody = cmsTextOrFallback(
+      card.detailBody,
+      (i18nItem?.full ?? []).join("\n\n"),
+      factory?.detailBody ?? DEFAULT_SERVICE_DETAIL_BODY_BY_ID[card.id] ?? card.description,
+    );
     return {
       id: card.id,
       title: card.title,
       desc: card.description,
-      full: i18nItem?.full ?? (card.description ? [card.description] : []),
+      full: detailBody
+        .replace(/\r\n/g, "\n")
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+      detailBody,
       imageSrc,
       cta: resolvedCta && isCmsButtonInteractive(resolvedCta) ? resolvedCta : null,
       Icon: serviceIcons[i] ?? Wind,
     };
   });
-  return { t, localized, cards };
+  const readMoreLabel = cmsTextOrFallback(
+    cardsContent.readMoreLabel,
+    t.services.readMore,
+    DEFAULT_SERVICES_READ_MORE_LABEL,
+  );
+  const closeLabel = cmsTextOrFallback(
+    cardsContent.closeLabel,
+    "Sluiten",
+    DEFAULT_SERVICES_CLOSE_LABEL,
+  );
+  return { t, localized, cards, readMoreLabel, closeLabel, cardsContent };
 }
 
 /** Services intro chrome — cards live on `services.cards`. */
@@ -142,9 +169,33 @@ export function ServicesMain() {
       <div className={cn("relative", SECTION_PAGE_RAIL)}>
         <CompositePartSelectChrome sectionKey="services.main" part="header" label="Intro">
           <div className="max-w-2xl">
-            <SectionEyebrow>{eyebrow}</SectionEyebrow>
-            <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">{heading}</h1>
-            {intro ? <p className="mt-4 whitespace-pre-line text-muted-foreground">{intro}</p> : null}
+            <SectionEyebrow>
+              <WysiwygInlineText
+                label="Eyebrow"
+                value={eyebrow ?? ""}
+                enFieldPath="section:services.main:eyebrow"
+                target={{ kind: "section", sectionKey: "services.main", field: "eyebrow" }}
+              />
+            </SectionEyebrow>
+            <h1 className="font-display mt-4 text-4xl text-foreground md:text-5xl">
+              <WysiwygInlineText
+                as="span"
+                label="Kop"
+                value={heading}
+                enFieldPath="section:services.main:heading"
+                target={{ kind: "section", sectionKey: "services.main", field: "heading" }}
+              />
+            </h1>
+            <p className="mt-4 whitespace-pre-line text-muted-foreground">
+              <WysiwygInlineText
+                as="span"
+                multiline
+                label="Intro"
+                value={intro ?? ""}
+                enFieldPath="section:services.main:intro"
+                target={{ kind: "section", sectionKey: "services.main", field: "intro" }}
+              />
+            </p>
           </div>
         </CompositePartSelectChrome>
       </div>
@@ -157,10 +208,25 @@ export function ServicesMain() {
  * Template: [Lees meer → hash link + detail panel] + [Contact CTA → CmsButton].
  */
 export function ServicesCards() {
-  const { t, localized, cards } = useLocalizedServiceCards();
+  const { t, localized, cards, readMoreLabel, closeLabel, cardsContent } = useLocalizedServiceCards();
+  const { sendMutation, showEditorChrome } = useLiveEditApi();
   const eyebrow = localized.eyebrow;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState<number | null>(null);
+
+  const patchCard = (id: string, patch: Partial<ServiceCard>) => {
+    sendMutation({
+      kind: "section",
+      sectionKey: "services.cards",
+      patch: {
+        cards: cardsContent.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      },
+    });
+  };
+
+  const patchCardsSection = (patch: Partial<ServicesCardsContent>) => {
+    sendMutation({ kind: "section", sectionKey: "services.cards", patch });
+  };
 
   const openService = (index: number, anchor: string) => {
     setOpen(index);
@@ -231,49 +297,96 @@ export function ServicesCards() {
               >
               <article className="flex h-full flex-col">
                 <div className="relative h-44 shrink-0 overflow-hidden bg-black/35">
-                  <DeliveryImage
-                    src={card.imageSrc}
-                    alt={card.title}
-                    variant="gallery"
-                    width={600}
-                    height={360}
-                    // First desktop row is above/near fold; keep below-fold lazy.
-                    loading={i < 3 ? "eager" : "lazy"}
-                    fetchPriority={i === 0 ? "high" : i < 3 ? "low" : undefined}
-                    sizes={SERVICES_CARD_IMAGE_SIZES}
-                    className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+                  <WysiwygMediaFrame
+                    className="absolute inset-0"
+                    target={{
+                      kind: "section",
+                      sectionKey: "services.cards",
+                      field: "cards",
+                      listItemId: card.id,
+                      listImageKey: "image",
+                    }}
+                  >
+                    <DeliveryImage
+                      src={card.imageSrc}
+                      alt={card.title}
+                      variant="gallery"
+                      width={600}
+                      height={360}
+                      loading={i < 3 ? "eager" : "lazy"}
+                      fetchPriority={i === 0 ? "high" : i < 3 ? "low" : undefined}
+                      sizes={SERVICES_CARD_IMAGE_SIZES}
+                      className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
+                    />
+                  </WysiwygMediaFrame>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
                   <div className="absolute left-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/40">
                     <Icon className="h-5 w-5" />
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col p-6">
-                  <h3 className="font-display text-2xl text-foreground">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
+                  <h3 className="font-display text-2xl text-foreground">
+                    <WysiwygInlineText
+                      as="span"
+                      label="Titel"
+                      value={card.title}
+                      target={{
+                        kind: "custom",
+                        onCommit: (next) => patchCard(card.id, { title: next }),
+                      }}
+                    />
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    <WysiwygInlineText
+                      as="span"
+                      multiline
+                      label="Beschrijving"
+                      value={card.desc}
+                      target={{
+                        kind: "custom",
+                        onCommit: (next) => patchCard(card.id, { description: next }),
+                      }}
+                    />
+                  </p>
 
                   <div className="mt-auto flex w-full items-center justify-between gap-3 pt-5">
                     <a
                       href={href}
-                      aria-label={`${t.services.readMore}: ${card.title}`}
+                      aria-label={`${readMoreLabel}: ${card.title}`}
                       onClick={(e) => {
-                        // Progressive enhancement: open the SSR panel without a full navigation.
+                        if (showEditorChrome) {
+                          e.preventDefault();
+                          return;
+                        }
                         e.preventDefault();
                         openService(i, anchor);
                       }}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-foreground/80 transition hover:border-primary/40 hover:text-foreground"
                     >
                       <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                      {t.services.readMore}
+                      <WysiwygInlineText
+                        as="span"
+                        label="Lees meer"
+                        value={readMoreLabel}
+                        target={{
+                          kind: "custom",
+                          onCommit: (next) => patchCardsSection({ readMoreLabel: next }),
+                        }}
+                      />
                     </a>
                     {card.cta ? (
-                      <CmsButtonView
+                      <WysiwygButtonEditor
                         button={card.cta}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
+                        onChange={(next) => patchCard(card.id, { cta: next })}
                       >
-                        {card.cta.label}
-                        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                      </CmsButtonView>
+                        <CmsButtonView
+                          button={card.cta}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary transition group-hover:gap-2.5"
+                        >
+                          {card.cta.label}
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                        </CmsButtonView>
+                      </WysiwygButtonEditor>
                     ) : null}
                   </div>
                 </div>
@@ -296,8 +409,18 @@ export function ServicesCards() {
               anchor={anchor}
               open={open === i}
               eyebrow={eyebrow}
-              closeLabel="Sluiten"
+              closeLabel={closeLabel}
               onClose={closeService}
+              onPatchDetailBody={
+                showEditorChrome
+                  ? (next) => patchCard(card.id, { detailBody: next })
+                  : undefined
+              }
+              onPatchCloseLabel={
+                showEditorChrome
+                  ? (next) => patchCardsSection({ closeLabel: next })
+                  : undefined
+              }
             />
           );
         })}

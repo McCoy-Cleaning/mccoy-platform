@@ -261,6 +261,39 @@ export async function appendWebsiteRequestReply(
   return getWebsiteRequest(id);
 }
 
+export async function updateWebsiteRequestSubmitterEmail(
+  id: string,
+  email: string,
+): Promise<WebsiteRequest | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const existing = await getWebsiteRequest(id);
+  if (!existing) return null;
+
+  const nextFields: Record<string, string> = {
+    ...(existing.fields ?? {}),
+    email: normalized,
+  };
+
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from("website_requests")
+    .update({
+      submitter_email: normalized,
+      fields: nextFields,
+    })
+    .eq("id", id)
+    .select("*, website_request_replies(*)")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`updateWebsiteRequestSubmitterEmail failed: ${error.message}`);
+  }
+  if (!data) return null;
+  return mapRequest(data as WebsiteRequestRow);
+}
+
 export async function countWebsiteRequests(): Promise<number> {
   const supabase = createSupabaseServiceClient();
   const { count, error } = await supabase
@@ -339,6 +372,7 @@ export const supabaseWebsiteRequestsStore: WebsiteRequestsStore = {
   getWebsiteRequest,
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
+  updateWebsiteRequestSubmitterEmail,
   countWebsiteRequests,
   countWebsiteRequestsCreatedBetween,
   clearOrphanWebsiteRequestScopes,

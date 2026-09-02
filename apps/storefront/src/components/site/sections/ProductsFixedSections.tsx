@@ -6,10 +6,14 @@
 import { ProductsAssortmentView, ProductsIntroView } from "./ProductsBlockViews";
 import { useI18n } from "@/lib/i18n";
 import { useTypedSectionContent } from "@/lib/cms/use-section-content";
+import { useLiveEditApi } from "@/lib/cms/live-edit-api-context";
 import {
   cmsTextOrFallback,
   defaultSectionContent,
   resolveLegacyLinkAsCmsButton,
+  type CmsButton,
+  type ProductCard,
+  type ProductsInfoContent,
 } from "@mccoy/cms-schema";
 
 export function ProductsMain() {
@@ -33,6 +37,9 @@ export function ProductsMain() {
     : productsDef.body ?? "";
   const notice = cmsTextOrFallback(content.body, noticeFallback, productsDef.body);
   const image = content.image ?? productsDef.image;
+  const cta = content.cta ?? productsDef.cta;
+  const secondaryCta = content.secondaryCta ?? productsDef.secondaryCta;
+  const metrics = content.metrics ?? productsDef.metrics;
 
   return (
     <ProductsIntroView
@@ -41,8 +48,12 @@ export function ProductsMain() {
       intro={intro}
       notice={notice}
       image={image}
+      cta={cta}
+      secondaryCta={secondaryCta}
       ctaLabel={t.products.cta}
       isEn={isEn}
+      metrics={metrics}
+      editSectionKey="products.main"
     />
   );
 }
@@ -50,8 +61,9 @@ export function ProductsMain() {
 /** Assortment cards — icon + text; movable above/below Intro. */
 export function ProductsInfo() {
   const { t, lang } = useI18n();
-  const content = useTypedSectionContent("page_products", "products.info");
-  const productsInfoDef = defaultSectionContent("products.info") as import("@mccoy/cms-schema").ProductsInfoContent;
+  const { sendMutation } = useLiveEditApi();
+  const content = useTypedSectionContent("page_products", "products.info") as ProductsInfoContent;
+  const productsInfoDef = defaultSectionContent("products.info") as ProductsInfoContent;
   const isEn = lang === "en";
   const eyebrow = cmsTextOrFallback(
     content.eyebrow,
@@ -82,11 +94,26 @@ export function ProductsInfo() {
     },
   };
 
+  const onPatchCard = (
+    id: string,
+    patch: { title?: string; description?: string; cta?: CmsButton },
+  ) => {
+    sendMutation({
+      kind: "section",
+      sectionKey: "products.info",
+      patch: {
+        cards: content.cards.map((c: ProductCard) => (c.id === id ? { ...c, ...patch } : c)),
+      },
+    });
+  };
+
   return (
     <ProductsAssortmentView
       eyebrow={eyebrow}
       heading={heading}
       intro={intro}
+      editSectionKey="products.info"
+      onPatchCard={onPatchCard}
       cards={content.cards.map((card) => {
         const factory = productsInfoDef.cards.find((c) => c.id === card.id);
         const en = cardEn[card.id];

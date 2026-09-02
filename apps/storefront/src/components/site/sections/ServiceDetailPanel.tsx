@@ -8,12 +8,14 @@ import { ArrowRight, X, type LucideIcon } from "lucide-react";
 import type { CmsButton } from "@mccoy/cms-schema";
 import { CmsButtonView } from "@mccoy/cms-renderer";
 import { DeliveryImage } from "@/components/site/DeliveryImage";
+import { WysiwygInlineText } from "../cms-editor/WysiwygInlineText";
 import type { ServiceDetailAnchor } from "./service-detail-anchors";
 
 export type ServiceDetailCard = {
   id: string;
   title: string;
   full: readonly string[];
+  detailBody?: string;
   imageSrc: string;
   cta: CmsButton | null;
   Icon: LucideIcon;
@@ -26,6 +28,8 @@ type ServiceDetailPanelProps = {
   eyebrow: string;
   closeLabel: string;
   onClose: () => void;
+  onPatchDetailBody?: (next: string) => void;
+  onPatchCloseLabel?: (next: string) => void;
 };
 
 export function ServiceDetailPanel({
@@ -35,12 +39,17 @@ export function ServiceDetailPanel({
   eyebrow,
   closeLabel,
   onClose,
+  onPatchDetailBody,
+  onPatchCloseLabel,
 }: ServiceDetailPanelProps) {
   const Icon = card.Icon;
   const titleId = `service-modal-title-${anchor}`;
   // Remount motion nodes when opening so entrance animation matches the prior modal UX,
   // while closed SSR still emits the same text nodes (no crawler-only duplicate copy).
   const motionKey = open ? "open" : "ssr";
+  const detailBody =
+    card.detailBody ??
+    card.full.join("\n\n");
 
   return (
     <div
@@ -82,6 +91,17 @@ export function ServiceDetailPanel({
           >
             <X className="h-4 w-4" />
           </button>
+          {onPatchCloseLabel ? (
+            <div className="absolute right-14 top-3 sm:right-16 sm:top-5">
+              <WysiwygInlineText
+                as="span"
+                label="Sluiten"
+                value={closeLabel}
+                className="text-[10px] uppercase tracking-wider text-white/50"
+                target={{ kind: "custom", onCommit: onPatchCloseLabel }}
+              />
+            </div>
+          ) : null}
           <motion.p
             key={`${motionKey}-eyebrow`}
             initial={open ? { opacity: 0, x: 20 } : false}
@@ -109,16 +129,28 @@ export function ServiceDetailPanel({
             className="mt-4 h-0.5 w-16 origin-left rounded-full bg-primary"
           />
           <div className="mt-5 space-y-3 text-[14px] leading-relaxed text-white/75 sm:mt-6 sm:space-y-4 sm:text-[15px]">
-            {card.full.map((p, idx) => (
-              <motion.p
-                key={`${motionKey}-p-${idx}`}
-                initial={open ? { opacity: 0, y: 14 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: open ? 0.5 + idx * 0.08 : 0, duration: open ? 0.45 : 0 }}
-              >
-                {p}
-              </motion.p>
-            ))}
+            {onPatchDetailBody ? (
+              <p className="whitespace-pre-line">
+                <WysiwygInlineText
+                  as="span"
+                  multiline
+                  label="Detailtekst"
+                  value={detailBody}
+                  target={{ kind: "custom", onCommit: onPatchDetailBody }}
+                />
+              </p>
+            ) : (
+              card.full.map((p, idx) => (
+                <motion.p
+                  key={`${motionKey}-p-${idx}`}
+                  initial={open ? { opacity: 0, y: 14 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: open ? 0.5 + idx * 0.08 : 0, duration: open ? 0.45 : 0 }}
+                >
+                  {p}
+                </motion.p>
+              ))
+            )}
           </div>
           {card.cta ? (
             <motion.div

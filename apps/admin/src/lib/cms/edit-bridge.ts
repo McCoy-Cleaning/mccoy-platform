@@ -3,12 +3,22 @@ import {
   CMS_EDIT_CHANNEL,
   addTrustedMessageListener,
   canApplyPatch,
+  canRedo,
+  canUndo,
+  classifyCmsHistoryMutation,
+  createEmptyEditorHistory,
   createSessionId,
   ensureBuiltinSectionContent,
   parseCmsEditMessage,
+  pushEditorHistory,
+  redoEditorHistory,
+  undoEditorHistory,
+  type CmsDraftSnapshot,
   type CmsEditMessage,
+  type CmsEditorHistoryState,
+  type CmsEditorInteractionMode,
   type CmsMutation,
-  type CmsPage,
+  type CmsUiCommand,
   type EditableDraftSnapshot,
   type FixedSectionKey,
   type PageSectionContent,
@@ -25,6 +35,7 @@ type CmsE2EParentHook = {
   lastReject?: { mutationId: string; reason: string; currentRevision: number };
   lastDrop?: { reason: string; got?: string; expected?: string | null };
   lastInbound?: { origin: string; sourceOk: boolean; type?: string };
+  history?: { undo: number; redo: number };
 };
 
 export type AdminCmsSelection =
@@ -56,6 +67,7 @@ function buildDraftSnapshot(pageId: string): EditableDraftSnapshot | null {
 
 /**
  * Parent-side revisioned edit bridge for the Bewerken iframe.
+ * Owns ephemeral per-page undo/redo stacks (draft-only; never published).
  */
 export function useCmsEditParentBridge(
   pageId: string,
@@ -68,12 +80,47 @@ export function useCmsEditParentBridge(
   const selectionRef = React.useRef<AdminCmsSelection>(null);
   selectionRef.current = selection;
   const [revision, setRevision] = React.useState(0);
+  const [uiCommand, setUiCommand] = React.useState<CmsUiCommand | null>(null);
+  const [interactionMode, setInteractionMode] =
+    React.useState<CmsEditorInteractionMode>("edit");
+  const interactionModeRef = React.useRef<CmsEditorInteractionMode>("edit");
+  interactionModeRef.current = interactionMode;
+
+  const historyByPageRef = React.useRef<Map<string, CmsEditorHistoryState>>(new Map());
+  const recordingHistoryRef = React.useRef(true);
+  const [historyTick, setHistoryTick] = React.useState(0);
+
+  const getHistory = React.useCallback((id: string): CmsEditorHistoryState => {
+    let state = historyByPageRef.current.get(id);
+    if (!state) {
+      state = createEmptyEditorHistory();
+      historyByPageRef.current.set(id, state);
+    }
+    return state;
+  }, []);
+
+  const setHistory = React.useCallback((id: string, next: CmsEditorHistoryState) => {
+    historyByPageRef.current.set(id, next);
+    setHistoryTick((n) => n + 1);
+  }, []);
+
+  const clearHistoryForPage = React.useCallback((id: string) => {
+    historyByPageRef.current.set(id, createEmptyEditorHistory());
+    setHistoryTick((n) => n + 1);
+  }, []);
+
+  React.useEffect(() => {
+    void pageId;
+    setHistoryTick((n) => n + 1);
+  }, [pageId]);
 
   const pushDraft = React.useCallback(() => {
     const iframe = iframeRef.current;
     const draft = buildDraftSnapshot(pageId);
     const sessionId = sessionIdRef.current;
-    if (!iframe?.contentWindow || !draft || !sessionId) return;
+    if (!iframe?.contentWindow || !draft || !sessionId) {
+      return;
+    }
     revisionRef.current += 1;
     const nextRev = revisionRef.current;
     setRevision(nextRev);
@@ -88,7 +135,7 @@ export function useCmsEditParentBridge(
     iframe.contentWindow.postMessage(msg, storefrontOrigin);
   }, [iframeRef, pageId, storefrontOrigin]);
 
-  const applyMutation = React.useCallback(
+  const applyMutationRaw = React.useCallback(
     (mutation: CmsMutation): { ok: true } | { ok: false; reason: string } => {
       if (mutation.kind === "section") {
         return cms.patchSectionContent(pageId, mutation.sectionKey, mutation.patch);
@@ -101,19 +148,120 @@ export function useCmsEditParentBridge(
         cms.updatePage(pageId, mutation.patch);
         return { ok: true };
       }
-      // layout ops are applied via BuiltinLayoutEditor directly on parent
+      if (mutation.kind === "enField") {
+        cms.setEnFieldDrafts(pageId, { [mutation.path]: mutation.value });
+        return { ok: true };
+      }
+      if (mutation.kind === "layout") {
+        const normalize = (
+          result: { ok: true } | { ok: false; code?: string; reason?: string },
+        ): { ok: true } | { ok: false; reason: string } => {
+          if (result.ok) return { ok: true };
+          return {
+            ok: false,
+            reason: result.reason ?? result.code ?? "Layoutbewerking mislukt",
+          };
+        };
+        if (mutation.op === "move") {
+          return normalize(cms.moveLayoutItem(pageId, mutation.layoutItemId, mutation.direction));
+        }
+        if (mutation.op === "toggle") {
+          return normalize(cms.toggleLayoutItemHidden(pageId, mutation.layoutItemId));
+        }
+        if (mutation.op === "remove") {
+          if (mutation.blockId) {
+            return normalize(cms.removeLayoutBlock(pageId, mutation.blockId));
+          }
+          return normalize(cms.toggleLayoutItemHidden(pageId, mutation.layoutItemId));
+        }
+        if (mutation.op === "duplicate") {
+          return normalize(cms.duplicateLayoutBlock(pageId, mutation.blockId));
+        }
+        if (mutation.op === "add") {
+          return normalize(
+            cms.addLayoutBlock(
+              pageId,
+              mutation.blockType as Parameters<typeof cms.addLayoutBlock>[1],
+              mutation.atIndex,
+              mutation.templateId ? { templateId: mutation.templateId } : undefined,
+            ),
+          );
+        }
+        return { ok: false, reason: "Unsupported layout op" };
+      }
       return { ok: true };
     },
     [pageId],
   );
 
+  const applyMutation = React.useCallback(
+    (
+      mutation: CmsMutation,
+      options?: { recordHistory?: boolean },
+    ): { ok: true } | { ok: false; reason: string } => {
+      const record = options?.recordHistory !== false && recordingHistoryRef.current;
+      const before: CmsDraftSnapshot = record ? cms.captureDraftSnapshot(pageId) : null;
+      const result = applyMutationRaw(mutation);
+      if (!result.ok) return result;
+      if (record) {
+        const after = cms.captureDraftSnapshot(pageId);
+        const { kind, label } = classifyCmsHistoryMutation(mutation, { before, after });
+        setHistory(
+          pageId,
+          pushEditorHistory(getHistory(pageId), {
+            kind,
+            label,
+            mutation,
+            before,
+            after,
+          }),
+        );
+      }
+      return result;
+    },
+    [applyMutationRaw, getHistory, pageId, setHistory],
+  );
+
+  const restoreSnapshot = React.useCallback(
+    (snapshot: CmsDraftSnapshot) => {
+      recordingHistoryRef.current = false;
+      try {
+        const result = cms.restoreDraftSnapshot(pageId, snapshot);
+        if (!result.ok) return result;
+        pushDraft();
+        return { ok: true as const };
+      } finally {
+        recordingHistoryRef.current = true;
+      }
+    },
+    [pageId, pushDraft],
+  );
+
+  const undo = React.useCallback(() => {
+    const applied = undoEditorHistory(getHistory(pageId));
+    if (!applied.ok) return applied;
+    const restored = restoreSnapshot(applied.restore);
+    if (!restored.ok) return restored;
+    setHistory(pageId, applied.state);
+    return { ok: true as const };
+  }, [getHistory, pageId, restoreSnapshot, setHistory]);
+
+  const redo = React.useCallback(() => {
+    const applied = redoEditorHistory(getHistory(pageId));
+    if (!applied.ok) return applied;
+    const restored = restoreSnapshot(applied.restore);
+    if (!restored.ok) return restored;
+    setHistory(pageId, applied.state);
+    return { ok: true as const };
+  }, [getHistory, pageId, restoreSnapshot, setHistory]);
+
   const patchSection = React.useCallback(
     (sectionKey: FixedSectionKey, patch: Record<string, unknown>) => {
-      const result = cms.patchSectionContent(pageId, sectionKey, patch);
+      const result = applyMutation({ kind: "section", sectionKey, patch });
       if (result.ok) pushDraft();
       return result;
     },
-    [pageId, pushDraft],
+    [applyMutation, pushDraft],
   );
 
   React.useEffect(() => {
@@ -121,20 +269,9 @@ export function useCmsEditParentBridge(
       const iframeWin = iframeRef.current?.contentWindow;
 
       if (e2eHooksEnabled()) {
-        const w = window as Window & {
-          __cmsE2EParent?: {
-            sessionId: string | null;
-            revision: number;
-            lastInbound?: {
-              origin: string;
-              sourceOk: boolean;
-              type?: string;
-            };
-            lastDrop?: { reason: string; got?: string; expected?: string | null };
-            lastReject?: { mutationId: string; reason: string; currentRevision: number };
-          };
-        };
+        const w = window as Window & { __cmsE2EParent?: CmsE2EParentHook };
         const data = event.data as { type?: string } | null;
+        const hist = getHistory(pageId);
         w.__cmsE2EParent = {
           sessionId: sessionIdRef.current,
           revision: revisionRef.current,
@@ -145,20 +282,13 @@ export function useCmsEditParentBridge(
           },
           lastDrop: w.__cmsE2EParent?.lastDrop,
           lastReject: w.__cmsE2EParent?.lastReject,
+          history: { undo: hist.undoStack.length, redo: hist.redoStack.length },
         };
       }
 
       if (!iframeWin || event.source !== iframeWin) {
         if (e2eHooksEnabled()) {
-          const w = window as Window & {
-            __cmsE2EParent?: {
-              sessionId: string | null;
-              revision: number;
-              lastDrop?: { reason: string; got?: string; expected?: string | null };
-              lastReject?: { mutationId: string; reason: string; currentRevision: number };
-              lastInbound?: { origin: string; sourceOk: boolean; type?: string };
-            };
-          };
+          const w = window as Window & { __cmsE2EParent?: CmsE2EParentHook };
           w.__cmsE2EParent = {
             sessionId: sessionIdRef.current,
             revision: revisionRef.current,
@@ -169,6 +299,7 @@ export function useCmsEditParentBridge(
             },
             lastReject: w.__cmsE2EParent?.lastReject,
             lastInbound: w.__cmsE2EParent?.lastInbound,
+            history: w.__cmsE2EParent?.history,
           };
         }
         return;
@@ -181,7 +312,6 @@ export function useCmsEditParentBridge(
         if (msg.pageId !== pageId) return;
         sessionIdRef.current = msg.sessionId;
         pushDraft();
-        // Re-sync inspector selection after iframe reconnect (highlight + scroll).
         const currentSelection = selectionRef.current;
         if (currentSelection) {
           const sync: CmsEditMessage = {
@@ -193,6 +323,14 @@ export function useCmsEditParentBridge(
           };
           iframeWin.postMessage(sync, storefrontOrigin);
         }
+        const modeMsg: CmsEditMessage = {
+          channel: CMS_EDIT_CHANNEL,
+          type: "cms-editor-mode",
+          sessionId: msg.sessionId,
+          pageId,
+          interactionMode: interactionModeRef.current,
+        };
+        iframeWin.postMessage(modeMsg, storefrontOrigin);
         return;
       }
 
@@ -203,18 +341,11 @@ export function useCmsEditParentBridge(
         return;
       }
 
-        if (msg.type === "cms-draft-patch") {
+      if (msg.type === "cms-draft-patch") {
         if (msg.pageId !== pageId) return;
         if (!sessionIdRef.current || msg.sessionId !== sessionIdRef.current) {
           if (e2eHooksEnabled()) {
-            const w = window as Window & {
-              __cmsE2EParent?: {
-                sessionId: string | null;
-                revision: number;
-                lastDrop?: { reason: string; got?: string; expected?: string | null };
-                lastReject?: { mutationId: string; reason: string; currentRevision: number };
-              };
-            };
+            const w = window as Window & { __cmsE2EParent?: CmsE2EParentHook };
             w.__cmsE2EParent = {
               sessionId: sessionIdRef.current,
               revision: revisionRef.current,
@@ -224,6 +355,7 @@ export function useCmsEditParentBridge(
                 expected: sessionIdRef.current,
               },
               lastReject: w.__cmsE2EParent?.lastReject,
+              history: w.__cmsE2EParent?.history,
             };
           }
           return;
@@ -240,15 +372,7 @@ export function useCmsEditParentBridge(
           };
           iframeWin.postMessage(reject, storefrontOrigin);
           if (e2eHooksEnabled()) {
-            const w = window as Window & {
-              __cmsE2EParent?: {
-                sessionId: string | null;
-                revision: number;
-                lastReject?: { mutationId: string; reason: string; currentRevision: number };
-                lastDrop?: { reason: string; got?: string; expected?: string | null };
-                lastInbound?: { origin: string; sourceOk: boolean; type?: string };
-              };
-            };
+            const w = window as Window & { __cmsE2EParent?: CmsE2EParentHook };
             w.__cmsE2EParent = {
               sessionId: sessionIdRef.current,
               revision: revisionRef.current,
@@ -259,6 +383,7 @@ export function useCmsEditParentBridge(
               },
               lastDrop: w.__cmsE2EParent?.lastDrop,
               lastInbound: w.__cmsE2EParent?.lastInbound,
+              history: w.__cmsE2EParent?.history,
             };
           }
           pushDraft();
@@ -281,29 +406,43 @@ export function useCmsEditParentBridge(
         }
         pushDraft();
       }
+
+      if (msg.type === "cms-ui-command") {
+        if (msg.pageId !== pageId) return;
+        if (!sessionIdRef.current || msg.sessionId !== sessionIdRef.current) return;
+        if (msg.command.kind === "undo") {
+          undo();
+          return;
+        }
+        if (msg.command.kind === "redo") {
+          redo();
+          return;
+        }
+        setUiCommand(msg.command);
+      }
     };
 
     return addTrustedMessageListener(storefrontOrigin, onMessage);
-  }, [pageId, storefrontOrigin, iframeRef, pushDraft, applyMutation]);
+  }, [pageId, storefrontOrigin, iframeRef, pushDraft, applyMutation, getHistory, undo, redo]);
 
   React.useEffect(() => {
     if (!e2eHooksEnabled()) return;
     const w = window as Window & { __cmsE2EParent?: CmsE2EParentHook };
+    const hist = getHistory(pageId);
     w.__cmsE2EParent = {
       sessionId: sessionIdRef.current,
       revision: revisionRef.current,
       lastReject: w.__cmsE2EParent?.lastReject,
       lastDrop: w.__cmsE2EParent?.lastDrop,
       lastInbound: w.__cmsE2EParent?.lastInbound,
+      history: { undo: hist.undoStack.length, redo: hist.redoStack.length },
     };
-  }, [revision, selection]);
+  }, [revision, selection, historyTick, pageId, getHistory]);
 
-  // Re-push whenever local draft changes (layout ops from Secties drawer, inspector, etc.)
   const bump = React.useCallback(() => {
     if (sessionIdRef.current) pushDraft();
   }, [pushDraft]);
 
-  /** Push inspector selection into the Bewerken iframe (highlight + scroll). */
   const setSelectionAndSync = React.useCallback(
     (sel: AdminCmsSelection) => {
       setSelection(sel);
@@ -322,6 +461,29 @@ export function useCmsEditParentBridge(
     [iframeRef, pageId, storefrontOrigin],
   );
 
+  const setInteractionModeAndSync = React.useCallback(
+    (mode: CmsEditorInteractionMode) => {
+      setInteractionMode(mode);
+      const iframe = iframeRef.current;
+      const sessionId = sessionIdRef.current;
+      if (!iframe?.contentWindow || !sessionId) return;
+      const msg: CmsEditMessage = {
+        channel: CMS_EDIT_CHANNEL,
+        type: "cms-editor-mode",
+        sessionId,
+        pageId,
+        interactionMode: mode,
+      };
+      iframe.contentWindow.postMessage(msg, storefrontOrigin);
+    },
+    [iframeRef, pageId, storefrontOrigin],
+  );
+
+  const clearUiCommand = React.useCallback(() => setUiCommand(null), []);
+
+  const historyState = getHistory(pageId);
+  void historyTick;
+
   return {
     selection,
     setSelection: setSelectionAndSync,
@@ -329,10 +491,20 @@ export function useCmsEditParentBridge(
     pushDraft,
     bump,
     patchSection,
+    applyMutation,
     sessionId: sessionIdRef.current,
     ensureSession: () => {
       if (!sessionIdRef.current) sessionIdRef.current = createSessionId();
     },
+    uiCommand,
+    clearUiCommand,
+    interactionMode,
+    setInteractionMode: setInteractionModeAndSync,
+    undo,
+    redo,
+    canUndo: canUndo(historyState),
+    canRedo: canRedo(historyState),
+    clearHistory: () => clearHistoryForPage(pageId),
   };
 }
 

@@ -6,13 +6,14 @@ import {
   normalizeFormScopeSnapshot,
   type FormScopeSnapshot,
 } from "../form-scope";
-import type { BlockType } from "../types";
+import type { BlockType } from "../block-types";
 import type { CmsBlockDataDefinition } from "./definition";
 import {
   createFormFieldItem,
   createFormFieldOption,
   formFieldItemSchema,
   normalizeFormFields,
+  withFrozenPayloadKeys,
   type FormFieldItem,
 } from "./form-fields";
 import { normalizeCmsImage } from "./image-normalize";
@@ -419,39 +420,82 @@ export const quoteRequestFormSchema: z.ZodType<QuoteRequestFormBlockData> = z
     }
   });
 
-function optSelect(label: string, options: readonly string[]): FormFieldItem {
+function optSelect(
+  id: string,
+  label: string,
+  payloadKey: string,
+  options: readonly string[],
+): FormFieldItem {
   return createFormFieldItem(label, "select", {
+    id,
+    payloadKey,
     options: options.map((o) => createFormFieldOption(o, o)),
   });
 }
 
 /** Exact NL field labels/options from the live Offerteformulier (window tab). */
 export function seedDefaultGlassWashingFields(): FormFieldItem[] {
-  return [
-    createFormFieldItem("Telefoon", "phone"),
-    createFormFieldItem("Bedrijfsnaam", "company"),
-    createFormFieldItem("Aantal verdiepingen", "text"),
-    createFormFieldItem("Aantal ramen (indicatie)", "text"),
-    createFormFieldItem("Hoogste raam (meter)", "text"),
-    optSelect("Bereikbaarheid", [
+  return withFrozenPayloadKeys([
+    createFormFieldItem("Telefoon", "phone", {
+      id: "quote-glass-phone",
+      payloadKey: "phone",
+    }),
+    createFormFieldItem("Bedrijfsnaam", "company", {
+      id: "quote-glass-company",
+      payloadKey: "company",
+    }),
+    createFormFieldItem("Aantal verdiepingen", "text", {
+      id: "quote-glass-floors",
+      payloadKey: "aantal_verdiepingen",
+    }),
+    createFormFieldItem("Aantal ramen (indicatie)", "text", {
+      id: "quote-glass-windows",
+      payloadKey: "aantal_ramen_indicatie",
+    }),
+    createFormFieldItem("Hoogste raam (meter)", "text", {
+      id: "quote-glass-height",
+      payloadKey: "hoogste_raam_meter",
+    }),
+    optSelect("quote-glass-access", "Bereikbaarheid", "bereikbaarheid", [
       "Vanaf de grond",
       "Ladder",
       "Hoogwerker",
       "Gondel / glazenwasserslift",
     ]),
-    optSelect("Binnen, buiten of beide?", ["Alleen buiten", "Alleen binnen", "Binnen + buiten"]),
-    optSelect("Frequentie", ["4× per jaar", "6× per jaar", "Maandelijks", "Eenmalig"]),
-    createFormFieldItem("Foto's van de situatie (optioneel)", "file"),
-    createFormFieldItem("Uw bericht", "textarea"),
-  ];
+    optSelect("quote-glass-inside-out", "Binnen, buiten of beide?", "binnen_buiten_of_beide", [
+      "Alleen buiten",
+      "Alleen binnen",
+      "Binnen + buiten",
+    ]),
+    optSelect("quote-glass-frequency", "Frequentie", "frequentie", [
+      "4× per jaar",
+      "6× per jaar",
+      "Maandelijks",
+      "Eenmalig",
+    ]),
+    createFormFieldItem("Foto's van de situatie (optioneel)", "file", {
+      id: "quote-glass-photos",
+      payloadKey: "photos",
+    }),
+    createFormFieldItem("Uw bericht", "textarea", {
+      id: "quote-glass-message",
+      payloadKey: "message",
+    }),
+  ]);
 }
 
 /** Exact NL field labels/options from the live Offerteformulier (furniture tab). */
 export function seedDefaultFurnitureCleaningFields(): FormFieldItem[] {
-  return [
-    createFormFieldItem("Telefoon", "phone"),
-    createFormFieldItem("Bedrijfsnaam", "company"),
-    optSelect("Type meubel / vloer", [
+  return withFrozenPayloadKeys([
+    createFormFieldItem("Telefoon", "phone", {
+      id: "quote-furniture-phone",
+      payloadKey: "phone",
+    }),
+    createFormFieldItem("Bedrijfsnaam", "company", {
+      id: "quote-furniture-company",
+      payloadKey: "company",
+    }),
+    optSelect("quote-furniture-type", "Type meubel / vloer", "type_meubel_vloer", [
       "Stoffen bank / fauteuil",
       "Lederen meubilair",
       "Bureaustoelen",
@@ -461,12 +505,27 @@ export function seedDefaultFurnitureCleaningFields(): FormFieldItem[] {
       "Parket",
       "Matrassen",
     ]),
-    createFormFieldItem("Aantal stuks", "text"),
-    createFormFieldItem("Materiaal / stof (indien bekend)", "text"),
-    createFormFieldItem("Oppervlakte (m²)", "text"),
-    createFormFieldItem("Foto's van de situatie (optioneel)", "file"),
-    createFormFieldItem("Bijzondere vlekken of geuren", "textarea"),
-  ];
+    createFormFieldItem("Aantal stuks", "text", {
+      id: "quote-furniture-count",
+      payloadKey: "aantal_stuks",
+    }),
+    createFormFieldItem("Materiaal / stof (indien bekend)", "text", {
+      id: "quote-furniture-material",
+      payloadKey: "materiaal_stof_indien_bekend",
+    }),
+    createFormFieldItem("Oppervlakte (m²)", "text", {
+      id: "quote-furniture-area",
+      payloadKey: "oppervlakte_m",
+    }),
+    createFormFieldItem("Foto's van de situatie (optioneel)", "file", {
+      id: "quote-furniture-photos",
+      payloadKey: "photos",
+    }),
+    createFormFieldItem("Bijzondere vlekken of geuren", "textarea", {
+      id: "quote-furniture-notes",
+      payloadKey: "bijzondere_vlekken_of_geuren",
+    }),
+  ]);
 }
 
 export function createDefaultQuoteRequestForm(): QuoteRequestFormBlockData {
@@ -524,10 +583,12 @@ function normalizeQuoteTab(raw: unknown, index: number): QuoteRequestFormTab | n
     kind === "furniture_cleaning"
       ? createDefaultQuoteRequestForm().tabs[1]!
       : createDefaultQuoteRequestForm().tabs[0]!;
-  const fieldsRaw = normalizeFormFields(raw.fields).filter((field) => {
-    if (field.type === "name" || field.type === "email") return false;
-    return true;
-  });
+  const fieldsRaw = withFrozenPayloadKeys(
+    normalizeFormFields(raw.fields).filter((field) => {
+      if (field.type === "name" || field.type === "email") return false;
+      return true;
+    }),
+  );
   return {
     id: str(raw, "id") || (kind === "furniture_cleaning" ? "tab_furniture" : "tab_glass"),
     kind,
@@ -632,6 +693,8 @@ export type LegalArticlesBlockData = {
   eyebrow?: string;
   heading: string;
   updatedLabel?: string;
+  /** Accessible / visible label for the table-of-contents nav. */
+  tocLabel?: string;
   updatedAt?: string;
   articles: LegalArticleItem[];
 };
@@ -650,6 +713,8 @@ export const legalArticlesSchema: z.ZodType<LegalArticlesBlockData> = z.object({
   eyebrow: z.string().optional(),
   heading: z.string().min(1),
   updatedLabel: z.string().optional(),
+  /** Accessible label for the articles table-of-contents nav. */
+  tocLabel: z.string().optional(),
   updatedAt: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Gebruik ISO-datum YYYY-MM-DD")
@@ -672,6 +737,7 @@ export function createDefaultLegalArticles(): LegalArticlesBlockData {
   return {
     heading: "Juridische informatie",
     updatedLabel: "Laatst bijgewerkt",
+    tocLabel: "Inhoudsopgave",
     articles: [
       {
         id: createItemId("legal"),
@@ -710,10 +776,12 @@ export function normalizeLegalArticles(value: unknown): LegalArticlesBlockData {
   const updatedAtRaw = str(rec, "updatedAt");
   const updatedAt = /^\d{4}-\d{2}-\d{2}$/.test(updatedAtRaw) ? updatedAtRaw : undefined;
   const eyebrow = str(rec, "eyebrow") || undefined;
+  const tocLabel = str(rec, "tocLabel") || undefined;
   const data: LegalArticlesBlockData = {
     ...(eyebrow ? { eyebrow } : {}),
     heading: str(rec, "heading") || str(rec, "title") || "Juridische informatie",
     updatedLabel: str(rec, "updatedLabel") || undefined,
+    ...(tocLabel ? { tocLabel } : {}),
     updatedAt,
     articles: articles.length ? articles : createDefaultLegalArticles().articles,
   };

@@ -29,7 +29,7 @@ describe("jobs block v2", () => {
     expect(once.heading).toBe("Vacatures");
     expect(once.vacancies).toHaveLength(1);
     expect(once.vacancies[0]?.title).toBe("Schoonmaker");
-    expect(once.vacancies[0]?.employmentType).toBe("full-time");
+    expect(once.vacancies[0]?.employmentType).toBe("Fulltime");
     expect(once.vacancies[0]?.hourlyRate).toBeUndefined();
     expect(once.vacancies[0]?.shortDescription).toBe("");
     expect(twice).toEqual(once);
@@ -110,7 +110,41 @@ describe("jobs block v2", () => {
       title: "Jobs",
       jobs: [{ id: "a", title: "X", location: "Y", type: "Parttime" }],
     });
-    expect(data.vacancies[0]?.employmentType).toBe("part-time");
+    expect(data.vacancies[0]?.employmentType).toBe("Parttime");
+  });
+
+  it("preserves custom employment free text", () => {
+    const data = normalizeJobs({
+      heading: "Jobs",
+      vacancies: [
+        createDefaultVacancy({
+          id: "job_custom",
+          title: "Seizoen",
+          employmentType: "Weekendploeg",
+          shortDescription: "Tekst",
+        }),
+      ],
+    });
+    expect(data.vacancies[0]?.employmentType).toBe("Weekendploeg");
+  });
+
+  it("migrates legacy enum employmentType keys to Dutch labels", () => {
+    const data = normalizeJobs({
+      heading: "Jobs",
+      vacancies: [
+        {
+          id: "job_enum",
+          title: "Oud",
+          location: "Twente",
+          employmentType: "full-time",
+          shortDescription: "Tekst",
+          applicationLink: { type: "none" },
+          buttonLabel: "Solliciteer",
+          visible: true,
+        },
+      ],
+    });
+    expect(data.vacancies[0]?.employmentType).toBe("Fulltime");
   });
 
   it("allows publishing with zero visible vacancies", () => {
@@ -149,5 +183,94 @@ describe("jobs block v2", () => {
     });
     expect(data.vacancies[0]?.featured).toBe(true);
     expect(data.vacancies[1]?.featured).toBe(false);
+  });
+
+  it("seeds placeholder offer and looking-for lists for Nieuwe vacature", () => {
+    const vacancy = createDefaultVacancy();
+    expect(vacancy.title).toBe("Nieuwe vacature");
+    expect(vacancy.shortDescription).toBe("Beschrijf hier de functie en het werk.");
+    expect(vacancy.employmentType).toBe("Fulltime");
+    expect(vacancy.detailsHeading).toBe("Details");
+    expect(vacancy.benefitsHeading).toBe("Wat wij bieden");
+    expect(vacancy.requirementsHeading).toBe("Wat wij zoeken");
+    expect(vacancy.benefits).toEqual([
+      "Goede arbeidsvoorwaarden",
+      "Prettige werksfeer in een vast team",
+    ]);
+    expect(vacancy.requirements).toEqual([
+      "Motivatie en betrouwbaarheid",
+      "Flexibele inzetbaarheid",
+    ]);
+  });
+
+  it("preserves legacy responsibilities and maps fullDescription into details when short is empty", () => {
+    const data = normalizeJobs({
+      heading: "Jobs",
+      vacancies: [
+        {
+          id: "job_legacy",
+          title: "Oud",
+          location: "Twente",
+          employmentType: "full-time",
+          shortDescription: "",
+          fullDescription: "Lange legacy tekst",
+          responsibilities: ["Taken"],
+          requirements: ["Eis A"],
+          benefits: ["Voordeel A"],
+          applicationLink: { type: "none" },
+          buttonLabel: "Solliciteer",
+          visible: true,
+        },
+      ],
+    });
+    expect(data.vacancies[0]?.shortDescription).toBe("Lange legacy tekst");
+    expect(data.vacancies[0]?.fullDescription).toBe("Lange legacy tekst");
+    expect(data.vacancies[0]?.responsibilities).toEqual(["Taken"]);
+    expect(data.vacancies[0]?.requirements).toEqual(["Eis A"]);
+    expect(data.vacancies[0]?.benefits).toEqual(["Voordeel A"]);
+    expect(data.vacancies[0]?.employmentType).toBe("Fulltime");
+    // Legacy payloads without heading overrides must not invent stored headings.
+    expect(data.vacancies[0]?.detailsHeading).toBeUndefined();
+    expect(data.vacancies[0]?.benefitsHeading).toBeUndefined();
+    expect(data.vacancies[0]?.requirementsHeading).toBeUndefined();
+  });
+
+  it("preserves custom section headings through normalize", () => {
+    const data = normalizeJobs({
+      heading: "Jobs",
+      vacancies: [
+        createDefaultVacancy({
+          id: "job_headings",
+          title: "Kop",
+          shortDescription: "Tekst",
+          detailsHeading: "Over de functie",
+          benefitsHeading: "Voordelen",
+          requirementsHeading: "Eisen",
+        }),
+      ],
+    });
+    expect(data.vacancies[0]?.detailsHeading).toBe("Over de functie");
+    expect(data.vacancies[0]?.benefitsHeading).toBe("Voordelen");
+    expect(data.vacancies[0]?.requirementsHeading).toBe("Eisen");
+  });
+
+  it("does not invent offer/looking-for lists when normalizing vacancies without them", () => {
+    const data = normalizeJobs({
+      heading: "Jobs",
+      vacancies: [
+        {
+          id: "job_bare",
+          title: "Bare",
+          location: "Twente",
+          employmentType: "full-time",
+          shortDescription: "Tekst",
+          applicationLink: { type: "none" },
+          buttonLabel: "Solliciteer",
+          visible: true,
+        },
+      ],
+    });
+    expect(data.vacancies[0]?.benefits).toBeUndefined();
+    expect(data.vacancies[0]?.requirements).toBeUndefined();
   });
 });

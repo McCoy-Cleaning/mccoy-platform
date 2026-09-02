@@ -271,6 +271,25 @@ export async function appendWebsiteRequestReply(
   });
 }
 
+export async function updateWebsiteRequestSubmitterEmail(
+  id: string,
+  email: string,
+): Promise<WebsiteRequest | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  return withLock(async () => {
+    const store = await readStore();
+    const request = store.requests.find((r) => r.id === id);
+    if (!request) return null;
+    request.submitterEmail = normalized;
+    request.fields = { ...(request.fields ?? {}), email: normalized };
+    request.updatedAt = new Date().toISOString();
+    await writeStore(store);
+    return request;
+  });
+}
+
 export async function countWebsiteRequests(): Promise<number> {
   const store = await readStore();
   return store.requests.length;
@@ -336,6 +355,7 @@ export const jsonWebsiteRequestsStore: WebsiteRequestsStore = {
   getWebsiteRequest,
   setWebsiteRequestStatus,
   appendWebsiteRequestReply,
+  updateWebsiteRequestSubmitterEmail,
   countWebsiteRequests,
   countWebsiteRequestsCreatedBetween,
   clearOrphanWebsiteRequestScopes,

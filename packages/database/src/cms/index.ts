@@ -49,6 +49,10 @@ export {
   type SitemapEntry,
 } from "./sitemap-consistency";
 export {
+  STATIC_INDEXABLE_SITEMAP_PATHS,
+  staticIndexableSitemapEntries,
+} from "./sitemap-eligibility";
+export {
   processCmsOutbox,
   registerCmsPublishHook,
   type CmsOutboxConsumerResult,
