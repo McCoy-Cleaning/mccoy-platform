@@ -61,6 +61,10 @@ export const setWebsiteRequestStatus: WebsiteRequestsStore["setWebsiteRequestSta
   status,
 ) => getWebsiteRequestsStore().setWebsiteRequestStatus(id, status);
 
+export const setWebsiteRequestInquiryStatus: WebsiteRequestsStore["setWebsiteRequestInquiryStatus"] =
+  (id, inquiryStatus) =>
+    getWebsiteRequestsStore().setWebsiteRequestInquiryStatus(id, inquiryStatus);
+
 export const appendWebsiteRequestReply: WebsiteRequestsStore["appendWebsiteRequestReply"] = (
   id,
   reply,

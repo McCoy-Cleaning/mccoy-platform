@@ -1,5 +1,5 @@
 import type { FormKind } from "./forms";
-import type { RequestStatus } from "./requests";
+import type { InquiryStatus, RequestStatus } from "./requests";
 
 export const KIND_LABELS: Record<FormKind, string> = {
   inquiry: "Algemeen",
@@ -15,6 +15,13 @@ export const STATUS_LABELS: Record<RequestStatus, string> = {
   replied: "Beantwoord",
   closed: "Gesloten",
   spam: "Spam",
+};
+
+/** Dutch labels for the inquiry workflow status (staff triage label). */
+export const INQUIRY_STATUS_LABELS_NL: Record<InquiryStatus, string> = {
+  new: "Nieuw",
+  in_progress: "In behandeling",
+  invoiced: "Gefactureerd",
 };
 
 export const FIELD_LABELS_NL: Record<string, string> = {

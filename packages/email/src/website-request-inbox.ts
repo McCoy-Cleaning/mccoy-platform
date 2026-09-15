@@ -90,12 +90,18 @@ export function websiteRequestSummaryToInboxSummary(
       ? `${request.submitterName} <${request.submitterEmail}>`
       : request.submitterName,
     to: "info@mccoy.nl",
-    date: request.updatedAt || request.createdAt,
+    // "Ontvangen" must stay fixed at first submission time. `updated_at` is bumped
+    // by a DB trigger on every row change (status, scope, submitter-email edits,
+    // and — critically — when opening an inquiry syncs Graph replies and flips
+    // status to "open"). Using it here made the received time jump to "zojuist"
+    // whenever staff opened the conversation. `createdAt` never changes.
+    date: request.createdAt,
     snippet: snippetFrom(request),
     unread,
     submitterName: request.submitterName || null,
     submitterEmail: request.submitterEmail || null,
     requestNumber: request.number,
+    inquiryStatus: request.inquiryStatus,
     scopeKey: request.scopeKey,
     scopeLabel: request.scopeLabel,
   };

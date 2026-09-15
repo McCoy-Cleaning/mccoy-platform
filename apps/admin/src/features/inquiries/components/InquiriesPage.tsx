@@ -11,6 +11,7 @@ import { useInquiryMailboxWatch } from "../hooks/useInquiryMailboxWatch";
 import { useInquiryDetailQuery } from "../hooks/useInquiryDetailQuery";
 import { useInquiryListDeletes } from "../hooks/useInquiryListDeletes";
 import { useInquirySelection } from "../hooks/useInquirySelection";
+import { useInquiryStatusUpdate } from "../hooks/useInquiryStatusUpdate";
 import { KIND_FILTERS, SCOPE_TAB_LIMIT } from "../lib/filters";
 import { MAX_INQUIRY_PINS, sortInboxItemsByPins, useInquiryPins } from "../lib/pins";
 import type { KindFilter, ScopeFilter } from "../types/search";
@@ -111,6 +112,12 @@ export function InquiriesPage() {
     clearTombstones,
     selectedId,
     closeDetail: backToList,
+  });
+
+  const statusUpdate = useInquiryStatusUpdate({
+    setItems,
+    setDetail,
+    selectedId,
   });
 
   const applySearch = React.useCallback(() => {
@@ -262,6 +269,11 @@ export function InquiriesPage() {
           onRefreshDetail={() => {
             if (selectedId) softRefreshDetail(selectedId);
           }}
+          onUpdateStatus={
+            selectedId ? (next) => void statusUpdate.updateStatus(selectedId, next) : undefined
+          }
+          isStatusSaving={() => (selectedId ? statusUpdate.isSaving(selectedId) : false)}
+          statusErrorFor={() => (selectedId ? statusUpdate.errorFor(selectedId) : null)}
           onSubmitterEmailUpdated={(email) => {
             setDetail((prev) => {
               if (!prev || prev.id !== selectedId) return prev;
@@ -470,6 +482,7 @@ export function InquiriesPage() {
             listDeleteStatus={deletes.listDeleteStatus}
             retryFailedIds={deletes.retryFailedIds}
             pinStatus={pinStatus}
+            statusToast={statusUpdate.toast}
             allVisibleSelected={allVisibleSelected}
             someVisibleSelected={someVisibleSelected}
             isPinned={isPinned}
@@ -487,6 +500,10 @@ export function InquiriesPage() {
               deletes.setListDeleteError(null);
               deletes.setListDeleteTargetId(id);
             }}
+            onUpdateStatus={(id, next) => void statusUpdate.updateStatus(id, next)}
+            isStatusSaving={statusUpdate.isSaving}
+            statusErrorFor={statusUpdate.errorFor}
+            onDismissStatusToast={statusUpdate.dismissToast}
           />
         </>
       )}

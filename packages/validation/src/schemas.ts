@@ -3,6 +3,7 @@ import {
   FORM_KINDS,
   FORM_SCOPE_KEY_PATTERN,
   FORM_SCOPE_LABEL_MAX,
+  INQUIRY_STATUSES,
   REQUEST_STATUSES,
   STAFF_PASSWORD_MAX_LENGTH,
   staffPasswordStrengthError,
@@ -191,6 +192,12 @@ export const adminInboxReplySchema = z.object({
 export const adminInboxUpdateSubmitterEmailSchema = z.object({
   id: inboxMessageId,
   email: z.string().trim().email("Voer een geldig e-mailadres in.").max(320),
+});
+
+/** Staff triage label (Nieuw / In behandeling / Gefactureerd) for a website-request inquiry. */
+export const adminInquiryStatusSchema = z.object({
+  id: inboxMessageId,
+  inquiryStatus: z.enum(INQUIRY_STATUSES),
 });
 
 export const adminInboxAttachmentSchema = z.object({

@@ -21,6 +21,7 @@ export {
   adminInboxBulkDeleteSchema,
   adminInboxReplySchema,
   adminInboxUpdateSubmitterEmailSchema,
+  adminInquiryStatusSchema,
   adminInboxAttachmentSchema,
   notificationListSchema,
   notificationIdSchema,

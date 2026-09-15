@@ -14,6 +14,7 @@ import {
   notificationUnreadCount,
   processNotificationOutbox,
   requireAdminSession,
+  setWebsiteRequestInquiryStatus,
   setWebsiteRequestStatus,
   updateWebsiteRequestSubmitterEmail,
   upsertWebsiteRequestMailMessage,
@@ -40,7 +41,7 @@ import {
   extractSimpleReplyBody,
   isTemplatedWrapOf,
 } from "@mccoy/email/server";
-import { AdminAuthError, assertInboxFetchRateLimit, assertReplyRateLimit } from "@mccoy/security";
+import { AdminAuthError, assertInboxFetchRateLimit, assertInquiryStatusRateLimit, assertReplyRateLimit } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
   adminInboxAttachmentSchema,
@@ -49,6 +50,7 @@ import {
   adminInboxMessageIdSchema,
   adminInboxReplySchema,
   adminInboxUpdateSubmitterEmailSchema,
+  adminInquiryStatusSchema,
   adminRequestIdSchema,
   adminRequestListSchema,
   adminRequestReplySchema,
@@ -656,6 +658,95 @@ export const updateAdminFormInboxSubmitterEmail = createServerFn({ method: "POST
         requestId: updated.id,
       };
     } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+/**
+ * Set the staff triage label (Nieuw / In behandeling / Gefactureerd) for a
+ * website-request inquiry, directly from the Aanvragen list/detail.
+ *
+ * "invoiced" is a manual label ONLY — it never creates, links, or implies a
+ * legal invoice, order, payment, or financial record (see migration
+ * 20260915200000_website_request_inquiry_status.sql).
+ *
+ * Accepts the encoded inbox message id (`req:…` / `e2e:…`); mailbox-only
+ * messages have no persistent row and are rejected. Authorization is enforced
+ * server-side via requireAdminSession + service-role write; the change is
+ * audited with before/after values.
+ */
+export const updateAdminInquiryStatus = createServerFn({ method: "POST" })
+  .validator(adminInquiryStatusSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureInboxEnv();
+      const session = await requireAdminSession();
+      assertInquiryStatusRateLimit(session.username);
+
+      let requestId: string | null = null;
+      try {
+        const decoded = decodeInboxMessageId(data.id);
+        if (decoded.provider === "request" || decoded.provider === "e2e") {
+          requestId = decoded.requestId;
+        }
+      } catch {
+        /* invalid id handled below */
+      }
+
+      if (!requestId) {
+        return {
+          ok: false as const,
+          error:
+            "De status kan alleen worden ingesteld bij formulieraanvragen (niet bij losse mailboxberichten).",
+          code: "validation" as const,
+        };
+      }
+
+      const existing = await getWebsiteRequest(requestId);
+      if (!existing) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+
+      if (existing.inquiryStatus === data.inquiryStatus) {
+        return {
+          ok: true as const,
+          inquiryStatus: existing.inquiryStatus,
+          requestId: existing.id,
+        };
+      }
+
+      const updated = await setWebsiteRequestInquiryStatus(requestId, data.inquiryStatus);
+      if (!updated) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+
+      await writeStaffAudit({
+        actorUserId: session.userId ?? null,
+        action: "website_request.inquiry_status_updated",
+        targetType: "website_request",
+        targetId: updated.id,
+        before: { inquiryStatus: existing.inquiryStatus },
+        after: { inquiryStatus: updated.inquiryStatus },
+        metadata: { requestNumber: updated.number, inboxMessageId: data.id },
+      });
+
+      return {
+        ok: true as const,
+        inquiryStatus: updated.inquiryStatus,
+        requestId: updated.id,
+      };
+    } catch (error) {
+      if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
+        return { ok: false as const, error: error.message, code: "rate_limit" as const };
+      }
       return authErrorResult(error);
     }
   });

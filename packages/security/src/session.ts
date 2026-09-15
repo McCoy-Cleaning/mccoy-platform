@@ -308,6 +308,23 @@ export function assertInboxFetchRateLimit(username: string, limit = 30, windowMs
   }
 }
 
+/** Staff triage label changes (Nieuw / In behandeling / Gefactureerd) from Aanvragen. */
+export function assertInquiryStatusRateLimit(username: string, limit = 60, windowMs = 60_000): void {
+  try {
+    assertRateLimit(
+      `admin-inquiry-status:${username}`,
+      limit,
+      windowMs,
+      "Te veel statuswijzigingen. Wacht even en probeer opnieuw.",
+    );
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      throw new AdminAuthError(error.message);
+    }
+    throw error;
+  }
+}
+
 export function assertContentAiRateLimit(username: string, limit = 20, windowMs = 60_000): void {
   // Keep this distinguishable from authentication failures so callers can show
   // an accurate local-throttle status instead of asking an authenticated editor

@@ -10,6 +10,7 @@ function row(
     number: "A-1",
     kind: "inquiry",
     status: "new",
+    inquiryStatus: "new",
     submitterName: "Alex",
     submitterEmail: "alex@example.com",
     subject: "Vraag",

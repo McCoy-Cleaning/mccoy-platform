@@ -4,12 +4,13 @@ import { ErrorState } from "@/components/admin/ErrorState";
 import { InlineLoader } from "@/components/admin/InlineLoader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { KIND_LABELS } from "@/lib/requests/labels";
+import { KIND_LABELS, type InquiryStatus } from "@/lib/requests/labels";
 import type { FormInboxMessageSummary } from "@mccoy/email/contracts";
 import type { ListState } from "../hooks/useInquiriesListQuery";
 import { kindMeta } from "../lib/filters";
 import { relativeWhen } from "../lib/format";
 import type { ScopeFilter } from "../types/search";
+import { InquiryStatusControl } from "./InquiryStatusControl";
 import { InboxListSelectionToolbar } from "./InboxListSelectionToolbar";
 import { MailboxConfigHelp } from "./MailboxConfigHelp";
 
@@ -31,6 +32,7 @@ export function InquiriesList({
   listDeleteStatus,
   retryFailedIds = [],
   pinStatus,
+  statusToast,
   allVisibleSelected,
   someVisibleSelected,
   isPinned,
@@ -42,6 +44,10 @@ export function InquiriesList({
   onOpenDetail,
   onTogglePin,
   onRequestDelete,
+  onUpdateStatus,
+  isStatusSaving,
+  statusErrorFor,
+  onDismissStatusToast,
 }: {
   listState: ListState;
   refreshing?: boolean;
@@ -60,6 +66,7 @@ export function InquiriesList({
   listDeleteStatus: string | null;
   retryFailedIds?: string[];
   pinStatus: string | null;
+  statusToast: string | null;
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
   isPinned: (id: string) => boolean;
@@ -71,6 +78,10 @@ export function InquiriesList({
   onOpenDetail: (id: string) => void;
   onTogglePin: (id: string, label: string) => void;
   onRequestDelete: (id: string) => void;
+  onUpdateStatus: (id: string, status: InquiryStatus) => void;
+  isStatusSaving: (id: string) => boolean;
+  statusErrorFor: (id: string) => string | null;
+  onDismissStatusToast?: () => void;
 }) {
   const showInitialLoader = listState === "loading" && items.length === 0;
   const showFullError = listState === "error" && items.length === 0;
@@ -131,6 +142,23 @@ export function InquiriesList({
           className="border-b border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm text-cyan-100"
         >
           {pinStatus}
+        </div>
+      ) : null}
+      {statusToast ? (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-5 py-2.5 text-sm text-white/70"
+        >
+          <span>{statusToast}</span>
+          {onDismissStatusToast ? (
+            <button
+              type="button"
+              onClick={onDismissStatusToast}
+              className="text-xs text-white/45 underline-offset-2 hover:text-white/80 hover:underline"
+            >
+              Sluiten
+            </button>
+          ) : null}
         </div>
       ) : null}
       {listState === "ready" && displayItems.length > 0 ? (
@@ -255,6 +283,16 @@ export function InquiriesList({
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center gap-1 pr-3 sm:pr-5">
+                  {m.requestNumber ? (
+                    <InquiryStatusControl
+                      status={m.inquiryStatus}
+                      saving={isStatusSaving(m.id)}
+                      error={statusErrorFor(m.id)}
+                      disabled={listDeleteBusy}
+                      onUpdate={(next) => onUpdateStatus(m.id, next)}
+                      className="mr-1"
+                    />
+                  ) : null}
                   <button
                     type="button"
                     aria-label={pinned ? `${rowLabel} losmaken` : `${rowLabel} vastzetten`}

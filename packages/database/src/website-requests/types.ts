@@ -16,6 +16,8 @@ export type WebsiteRequestRow = {
   number: string;
   kind: string;
   status: string;
+  /** Staff triage label: new | in_progress | invoiced. */
+  inquiry_status: string;
   submitter_name: string;
   submitter_email: string;
   submitter_phone: string | null;

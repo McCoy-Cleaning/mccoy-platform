@@ -69,6 +69,7 @@ export const STAFF_AUDIT_ACTIONS = [
   "customer.company_portal_suspended",
   "customer.company_portal_reactivated",
   "website_request.submitter_email_updated",
+  "website_request.inquiry_status_updated",
 ] as const;
 export type StaffAuditAction = (typeof STAFF_AUDIT_ACTIONS)[number];
 

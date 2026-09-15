@@ -14,11 +14,13 @@ import { adminHydrateRealtimeAccessToken } from "@/lib/api/admin-auth.functions"
 import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
 
 import { ensurePlatformToastBridge } from "./toast-bridge";
-import type { AdminNotificationItem, NotificationServiceState } from "./types";
 import {
-  encodeWebsiteRequestInboxId,
-  resolveInquiryNotificationHref,
-} from "./destinations";
+  REALTIME_TOKEN_MIN_REMAINING_MS,
+  REALTIME_SETUP_RETRY_MS,
+  isAccessTokenUsable,
+} from "./realtime-token";
+import type { AdminNotificationItem, NotificationServiceState } from "./types";
+import { encodeWebsiteRequestInboxId, resolveInquiryNotificationHref } from "./destinations";
 
 ensurePlatformToastBridge();
 
@@ -88,6 +90,7 @@ class AdminNotificationService {
   private pollTimer: ReturnType<typeof setInterval> | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private realtimeAuthRenewTimer: ReturnType<typeof setTimeout> | undefined;
+  private realtimeSetupRetryTimer: ReturnType<typeof setTimeout> | undefined;
   private realtimeExpiresAt: number | null = null;
 
   constructor(userId: string) {
@@ -268,9 +271,7 @@ class AdminNotificationService {
       const recentCutoff = Date.now() - 15 * 60_000;
       const recentUnread = items.filter(
         (item) =>
-          !item.readAt &&
-          !item.dismissedAt &&
-          new Date(item.createdAt).getTime() >= recentCutoff,
+          !item.readAt && !item.dismissedAt && new Date(item.createdAt).getTime() >= recentCutoff,
       );
       for (const item of recentUnread.slice(0, MAX_TOASTED_PER_REFRESH)) {
         this.emitArrival(item, { preferInAppToast: true });
@@ -284,10 +285,7 @@ class AdminNotificationService {
     this.notify();
   }
 
-  private emitArrival(
-    item: AdminNotificationItem,
-    options?: { preferInAppToast?: boolean },
-  ): void {
+  private emitArrival(item: AdminNotificationItem, options?: { preferInAppToast?: boolean }): void {
     emitPlatformEvent({
       type: "notification-received",
       notificationId: item.notificationId,
@@ -298,9 +296,7 @@ class AdminNotificationService {
       refreshAdminRequestsUnreadBadge();
     }
     const useBrowserPopup =
-      !options?.preferInAppToast &&
-      typeof document !== "undefined" &&
-      document.hidden;
+      !options?.preferInAppToast && typeof document !== "undefined" && document.hidden;
     if (useBrowserPopup) {
       this.maybeShowBrowserNotification(item);
       return;
@@ -387,6 +383,13 @@ class AdminNotificationService {
     const hydrated = await adminHydrateRealtimeAccessToken();
     if (!hydrated.ok) return false;
     const { accessToken, expiresAt } = hydrated.hydration;
+    // realtime.setAuth() silently no-ops on tokens that are expired per the
+    // browser clock (clock skew or transit delay near expiry), leaving the
+    // anon publishable key in place. Refuse to subscribe as anon — the caller
+    // retries once a fresher token is available.
+    if (!isAccessTokenUsable(accessToken, REALTIME_TOKEN_MIN_REMAINING_MS)) {
+      return false;
+    }
     supabase.realtime.setAuth(accessToken);
     this.realtimeExpiresAt = expiresAt;
     this.scheduleRealtimeAuthRenewal();
@@ -412,7 +415,15 @@ class AdminNotificationService {
       const supabase = getAdminRealtimeSupabase();
       if (!supabase) return;
       const authed = await this.applyRealtimeAccessToken();
-      if (!authed || !this.started) return;
+      if (!this.started) return;
+      if (!authed) {
+        // No usable authenticated token yet (hydration pending, or the token is
+        // expired/near-expiry per the browser clock). Retry shortly instead of
+        // subscribing as anon — anon lacks SELECT on notification_recipients,
+        // so Realtime would reject the filter with `invalid column for filter`.
+        this.scheduleRealtimeSetupRetry();
+        return;
+      }
 
       this.teardownRealtimeChannelOnly();
       this.channel = supabase
@@ -433,11 +444,22 @@ class AdminNotificationService {
             this.channelDisconnected = false;
           } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             this.channelDisconnected = true;
-            // Re-auth via cookie session then resubscribe shortly.
-            void this.applyRealtimeAccessToken();
+            // Re-auth via cookie session AND re-subscribe so the channel uses
+            // the refreshed role (previously only re-authed, never re-joined).
+            this.scheduleRealtimeSetupRetry();
           }
         });
     })();
+  }
+
+  private scheduleRealtimeSetupRetry(): void {
+    if (this.realtimeSetupRetryTimer) {
+      clearTimeout(this.realtimeSetupRetryTimer);
+    }
+    this.realtimeSetupRetryTimer = setTimeout(() => {
+      this.realtimeSetupRetryTimer = undefined;
+      if (this.started) this.setupRealtime();
+    }, REALTIME_SETUP_RETRY_MS);
   }
 
   private teardownRealtimeChannelOnly(): void {
@@ -451,6 +473,10 @@ class AdminNotificationService {
     if (this.realtimeAuthRenewTimer) {
       clearTimeout(this.realtimeAuthRenewTimer);
       this.realtimeAuthRenewTimer = undefined;
+    }
+    if (this.realtimeSetupRetryTimer) {
+      clearTimeout(this.realtimeSetupRetryTimer);
+      this.realtimeSetupRetryTimer = undefined;
     }
     this.realtimeExpiresAt = null;
     this.teardownRealtimeChannelOnly();
@@ -520,7 +546,11 @@ class AdminNotificationService {
   private sendHeartbeat(): void {
     const ts = Date.now();
     this.peers.set(this.tabId, ts);
-    this.broadcast?.postMessage({ kind: "heartbeat", tabId: this.tabId, ts } satisfies BroadcastMessage);
+    this.broadcast?.postMessage({
+      kind: "heartbeat",
+      tabId: this.tabId,
+      ts,
+    } satisfies BroadcastMessage);
     for (const [id, lastSeen] of this.peers) {
       if (ts - lastSeen > HEARTBEAT_STALE_MS) this.peers.delete(id);
     }

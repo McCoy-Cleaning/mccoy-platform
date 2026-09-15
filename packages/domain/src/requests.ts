@@ -11,6 +11,15 @@ export const REQUEST_STATUSES = [
 
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
+/**
+ * Inquiry workflow status — a staff triage label, separate from the request
+ * lifecycle `status` above. "invoiced" is a manual label ONLY and never creates
+ * or implies a legal invoice / financial record.
+ */
+export const INQUIRY_STATUSES = ["new", "in_progress", "invoiced"] as const;
+
+export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
+
 export type AttachmentMeta = {
   filename: string;
   contentType: string;
@@ -36,6 +45,8 @@ export type WebsiteRequest = {
   number: string;
   kind: FormKind;
   status: RequestStatus;
+  /** Staff triage label (Nieuw / In behandeling / Gefactureerd). Manual only. */
+  inquiryStatus: InquiryStatus;
   submitterName: string;
   submitterEmail: string;
   submitterPhone: string | null;
@@ -64,6 +75,8 @@ export type WebsiteRequestSummary = {
   number: string;
   kind: FormKind;
   status: RequestStatus;
+  /** Staff triage label (Nieuw / In behandeling / Gefactureerd). Manual only. */
+  inquiryStatus: InquiryStatus;
   submitterName: string;
   submitterEmail: string;
   subject: string;

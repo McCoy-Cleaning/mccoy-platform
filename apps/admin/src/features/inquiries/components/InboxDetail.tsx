@@ -5,7 +5,7 @@ import { ErrorState } from "@/components/admin/ErrorState";
 import { InlineLoader } from "@/components/admin/InlineLoader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FIELD_LABELS_NL, KIND_LABELS } from "@/lib/requests/labels";
+import { FIELD_LABELS_NL, KIND_LABELS, type InquiryStatus } from "@/lib/requests/labels";
 import type { FormInboxMessage, FormInboxThreadItem } from "@mccoy/email/contracts";
 import type { DetailState } from "../hooks/useInquiryDetailQuery";
 import { useInquiryDetailDelete } from "../hooks/useInquiryDetailDelete";
@@ -23,6 +23,7 @@ import { AttachmentImageThumbs } from "./AttachmentImageThumbs";
 import { AttachmentsBlock } from "./AttachmentsBlock";
 import { ConversationThread } from "./ConversationThread";
 import { FormFieldValue } from "./FormFieldValue";
+import { InquiryStatusControl } from "./InquiryStatusControl";
 
 export function InboxDetail({
   detail,
@@ -36,6 +37,9 @@ export function InboxDetail({
   onSubmitterEmailUpdated,
   isPinned,
   onTogglePin,
+  onUpdateStatus,
+  isStatusSaving,
+  statusErrorFor,
 }: {
   detail: FormInboxMessage | null;
   state: DetailState;
@@ -48,6 +52,9 @@ export function InboxDetail({
   onSubmitterEmailUpdated: (email: string) => void;
   isPinned: boolean;
   onTogglePin?: () => void;
+  onUpdateStatus?: (status: InquiryStatus) => void;
+  isStatusSaving?: () => boolean;
+  statusErrorFor?: () => string | null;
 }) {
   const [reply, setReply] = React.useState("");
   const replyMutation = useInquiryReply({
@@ -77,6 +84,23 @@ export function InboxDetail({
     detail?.fields.find((f) => f.key === "name")?.value ??
     detail?.subject ??
     "Aanvraag";
+
+  // "Laatste bericht van klant" = the submitter's most recent reply in the
+  // conversation (direction "customer"). The original form (direction "form")
+  // is already shown as "Ontvangen" via detail.date, so we only surface this
+  // when the customer has actually replied since. Staff replies ("admin") and
+  // internal row updates never affect this value.
+  const lastCustomerMessageAt = (() => {
+    if (!detail?.thread?.length) return null;
+    let best: string | null = null;
+    for (const item of detail.thread) {
+      if (item.direction !== "customer") continue;
+      if (!best || new Date(item.date).getTime() > new Date(best).getTime()) {
+        best = item.date;
+      }
+    }
+    return best;
+  })();
 
   const bodyFieldsBase =
     detail?.fields.filter((field) => !isHeaderContactFormField(field.key)) ?? [];
@@ -205,10 +229,33 @@ export function InboxDetail({
                     </span>
                   ) : null}
                 </div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white break-words">
-                  {title}
-                </h2>
-                <p className="mt-1 text-sm text-white/45">{formatWhen(detail.date)}</p>
+                <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+                  <h2 className="text-2xl font-semibold tracking-tight text-white break-words">
+                    {title}
+                  </h2>
+                  {detail.requestNumber && onUpdateStatus ? (
+                    <InquiryStatusControl
+                      status={detail.inquiryStatus}
+                      saving={isStatusSaving?.() ?? false}
+                      error={statusErrorFor?.() ?? null}
+                      disabled={deleteMutation.deleteBusy || replyMutation.busy}
+                      onUpdate={onUpdateStatus}
+                      size="md"
+                    />
+                  ) : null}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-white/45">
+                  <p>
+                    <span className="text-white/35">Ontvangen · </span>
+                    {formatWhen(detail.date)}
+                  </p>
+                  {lastCustomerMessageAt ? (
+                    <p>
+                      <span className="text-white/35">Laatste bericht van klant · </span>
+                      {formatWhen(lastCustomerMessageAt)}
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               <div
