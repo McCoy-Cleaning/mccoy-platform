@@ -17,6 +17,7 @@ export {
   listWebsiteRequests,
   getWebsiteRequest,
   setWebsiteRequestStatus,
+  setWebsiteRequestInquiryStatus,
   appendWebsiteRequestReply,
   updateWebsiteRequestSubmitterEmail,
   countWebsiteRequests,

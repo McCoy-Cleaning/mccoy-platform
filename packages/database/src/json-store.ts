@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { FORM_SUBJECTS } from "@mccoy/domain";
 import type {
   AttachmentMeta,
+  InquiryStatus,
   NotificationState,
   RequestReply,
   RequestStatus,
@@ -133,6 +134,7 @@ function toSummary(request: WebsiteRequest): WebsiteRequestSummary {
     number: request.number,
     kind: request.kind,
     status: request.status,
+    inquiryStatus: request.inquiryStatus,
     submitterName: request.submitterName,
     submitterEmail: request.submitterEmail,
     subject: request.subject,
@@ -160,6 +162,7 @@ export async function createWebsiteRequest(
       number: nextNumber(store.sequence),
       kind: input.kind,
       status: "new",
+      inquiryStatus: "new",
       submitterName: input.fields.name?.trim() || "Onbekend",
       submitterEmail: input.fields.email?.trim().toLowerCase() || "",
       submitterPhone: input.fields.phone?.trim() || null,
@@ -246,6 +249,21 @@ export async function setWebsiteRequestStatus(
     const request = store.requests.find((r) => r.id === id);
     if (!request) return null;
     request.status = status;
+    request.updatedAt = new Date().toISOString();
+    await writeStore(store);
+    return request;
+  });
+}
+
+export async function setWebsiteRequestInquiryStatus(
+  id: string,
+  inquiryStatus: InquiryStatus,
+): Promise<WebsiteRequest | null> {
+  return withLock(async () => {
+    const store = await readStore();
+    const request = store.requests.find((r) => r.id === id);
+    if (!request) return null;
+    request.inquiryStatus = inquiryStatus;
     request.updatedAt = new Date().toISOString();
     await writeStore(store);
     return request;
@@ -354,6 +372,7 @@ export const jsonWebsiteRequestsStore: WebsiteRequestsStore = {
   listWebsiteRequests,
   getWebsiteRequest,
   setWebsiteRequestStatus,
+  setWebsiteRequestInquiryStatus,
   appendWebsiteRequestReply,
   updateWebsiteRequestSubmitterEmail,
   countWebsiteRequests,

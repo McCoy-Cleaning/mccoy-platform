@@ -1,4 +1,4 @@
-import type { FormKind } from "@mccoy/domain";
+import type { FormKind, InquiryStatus } from "@mccoy/domain";
 
 import type { ParsedFormField } from "./parse-form-fields";
 
@@ -33,6 +33,13 @@ export type FormInboxMessageSummary = {
   submitterName: string | null;
   submitterEmail: string | null;
   requestNumber: string | null;
+  /**
+   * Staff triage label (Nieuw / In behandeling / Gefactureerd).
+   * Present for website-request-backed inquiries; undefined for mailbox-only
+   * messages (no persistent row to store the label). UI gates the setter on
+   * `requestNumber` being set and defaults the display to "new".
+   */
+  inquiryStatus?: InquiryStatus | null;
   /** Stable scope filter key (null for historical / unscoped). */
   scopeKey: string | null;
   /** Display label when known from headers/body/request. */

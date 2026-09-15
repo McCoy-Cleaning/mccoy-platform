@@ -86,6 +86,7 @@ export {
   assertAdminLoginRateLimit,
   assertReplyRateLimit,
   assertInboxFetchRateLimit,
+  assertInquiryStatusRateLimit,
   assertContentAiRateLimit,
   assertStaffAccountChangeRateLimit,
   assertStaffInviteRateLimit,

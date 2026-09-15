@@ -59,6 +59,7 @@ const baseProps = {
   bulkDeleteOpen: false,
   listDeleteStatus: null as string | null,
   pinStatus: null as string | null,
+  statusToast: null as string | null,
   allVisibleSelected: false,
   someVisibleSelected: false,
   isPinned: () => false,
@@ -69,6 +70,9 @@ const baseProps = {
   onOpenDetail: vi.fn(),
   onTogglePin: vi.fn(),
   onRequestDelete: vi.fn(),
+  onUpdateStatus: vi.fn(),
+  isStatusSaving: () => false,
+  statusErrorFor: () => null,
 };
 
 describe("InquiriesList async states", () => {
@@ -122,5 +126,82 @@ describe("InquiriesList async states", () => {
       <InquiriesList {...baseProps} listState="ready" items={items} displayItems={items} />,
     );
     expect(container.textContent).toContain("Ada");
+  });
+});
+
+function keydown(target: Element, key: string) {
+  target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+}
+
+describe("InquiriesList inquiry status control", () => {
+  it("renders the status control for request-backed rows with the Dutch label", () => {
+    const items = [summary("1")];
+    (items[0] as FormInboxMessageSummary).requestNumber = "WR-2026-00074";
+    (items[0] as FormInboxMessageSummary).inquiryStatus = "in_progress";
+    const container = mount(
+      <InquiriesList {...baseProps} listState="ready" items={items} displayItems={items} />,
+    );
+    const trigger = container.querySelector('button[aria-haspopup="listbox"]');
+    expect(trigger).toBeTruthy();
+    expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).toContain("In behandeling");
+  });
+
+  it("hides the status control for mailbox-only rows (no requestNumber)", () => {
+    const items = [summary("1")]; // requestNumber: null
+    const container = mount(
+      <InquiriesList {...baseProps} listState="ready" items={items} displayItems={items} />,
+    );
+    expect(container.querySelector('button[aria-haspopup="listbox"]')).toBeNull();
+  });
+
+  it("opens a styled listbox and calls onUpdateStatus when staff selects a status", () => {
+    const items = [summary("1")];
+    (items[0] as FormInboxMessageSummary).requestNumber = "WR-2026-00074";
+    (items[0] as FormInboxMessageSummary).inquiryStatus = "new";
+    const onUpdateStatus = vi.fn();
+    const container = mount(
+      <InquiriesList
+        {...baseProps}
+        listState="ready"
+        items={items}
+        displayItems={items}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+    const trigger = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+
+    // Open the listbox.
+    act(() => {
+      trigger.click();
+    });
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    const listbox = document.body.querySelector('[role="listbox"]');
+    expect(listbox).toBeTruthy();
+    const options = document.body.querySelectorAll('[role="option"]');
+    expect(options.length).toBe(3);
+    expect(document.body.textContent).toContain("Gefactureerd");
+
+    // Keyboard-select the last option (End → Enter) and confirm the callback.
+    act(() => {
+      keydown(trigger, "End");
+    });
+    act(() => {
+      keydown(trigger, "Enter");
+    });
+    expect(onUpdateStatus).toHaveBeenCalledWith("1", "invoiced");
+  });
+
+  it("shows the status toast bar", () => {
+    const container = mount(
+      <InquiriesList
+        {...baseProps}
+        listState="ready"
+        items={[]}
+        displayItems={[]}
+        statusToast="Status ingesteld op Gefactureerd."
+      />,
+    );
+    expect(container.textContent).toContain("Status ingesteld op Gefactureerd.");
   });
 });

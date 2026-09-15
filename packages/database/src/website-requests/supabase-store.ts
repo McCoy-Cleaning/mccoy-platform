@@ -7,6 +7,7 @@
 import { FORM_SUBJECTS } from "@mccoy/domain";
 import type {
   AttachmentMeta,
+  InquiryStatus,
   NotificationState,
   RequestReply,
   RequestStatus,
@@ -54,6 +55,7 @@ function mapRequest(row: WebsiteRequestRow): WebsiteRequest {
     number: row.number,
     kind: row.kind as WebsiteRequest["kind"],
     status: row.status as RequestStatus,
+    inquiryStatus: (row.inquiry_status ?? "new") as InquiryStatus,
     submitterName: row.submitter_name,
     submitterEmail: row.submitter_email,
     submitterPhone: row.submitter_phone ?? null,
@@ -87,6 +89,7 @@ function mapSummary(row: WebsiteRequestRow): WebsiteRequestSummary {
     number: row.number,
     kind: row.kind as WebsiteRequestSummary["kind"],
     status: row.status as RequestStatus,
+    inquiryStatus: (row.inquiry_status ?? "new") as InquiryStatus,
     submitterName: row.submitter_name,
     submitterEmail: row.submitter_email,
     subject: row.subject,
@@ -161,7 +164,7 @@ export async function listWebsiteRequests(
   let query = supabase
     .from("website_requests")
     .select(
-      "id, number, kind, status, submitter_name, submitter_email, subject, attachments, form_id, source_page_id, scope_key, scope_label, created_at, updated_at, last_replied_at, website_request_replies(count)",
+      "id, number, kind, status, inquiry_status, submitter_name, submitter_email, subject, attachments, form_id, source_page_id, scope_key, scope_label, created_at, updated_at, last_replied_at, website_request_replies(count)",
     )
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
@@ -233,6 +236,30 @@ export async function setWebsiteRequestStatus(
 
   if (error) {
     throw new Error(`setWebsiteRequestStatus failed: ${error.message}`);
+  }
+  if (!data) return null;
+  return mapRequest(data as WebsiteRequestRow);
+}
+
+/**
+ * Set the staff triage label (Nieuw / In behandeling / Gefactureerd).
+ * Manual label only — never creates invoices or financial records.
+ * Service-role write; RLS denies authenticated updates by default.
+ */
+export async function setWebsiteRequestInquiryStatus(
+  id: string,
+  inquiryStatus: InquiryStatus,
+): Promise<WebsiteRequest | null> {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from("website_requests")
+    .update({ inquiry_status: inquiryStatus })
+    .eq("id", id)
+    .select("*, website_request_replies(*)")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`setWebsiteRequestInquiryStatus failed: ${error.message}`);
   }
   if (!data) return null;
   return mapRequest(data as WebsiteRequestRow);
@@ -371,6 +398,7 @@ export const supabaseWebsiteRequestsStore: WebsiteRequestsStore = {
   listWebsiteRequests,
   getWebsiteRequest,
   setWebsiteRequestStatus,
+  setWebsiteRequestInquiryStatus,
   appendWebsiteRequestReply,
   updateWebsiteRequestSubmitterEmail,
   countWebsiteRequests,

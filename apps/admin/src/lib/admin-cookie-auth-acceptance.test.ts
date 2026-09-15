@@ -63,6 +63,21 @@ describe("REALTIME path contracts", () => {
     expect(src).not.toContain("autoRefreshToken: true");
   });
 
+  it("never subscribes a Realtime channel before a usable authenticated token is applied", () => {
+    const src = readSrc("notifications/notification-service.ts");
+    // realtime.setAuth() silently no-ops on tokens expired per the browser
+    // clock, leaving the anon publishable key in place. The service must gate
+    // setAuth+subscribe on a browser-clock expiry check so the channel never
+    // joins as anon (which triggers `invalid column for filter user_id`).
+    expect(src).toContain("isAccessTokenUsable(accessToken, REALTIME_TOKEN_MIN_REMAINING_MS)");
+    // When no usable token is available yet, retry later instead of subscribing.
+    expect(src).toContain("if (!authed) {");
+    expect(src).toContain("scheduleRealtimeSetupRetry()");
+    // On channel error/closed, re-auth AND re-subscribe (not just re-auth).
+    const errorBranch = src.slice(src.indexOf("CLOSED"));
+    expect(errorBranch).toContain("scheduleRealtimeSetupRetry");
+  });
+
   it("realtime hydrate server fn documents no refreshToken", () => {
     const src = readSrc("api/admin-auth.functions.ts");
     expect(src).toContain("adminHydrateRealtimeAccessToken");

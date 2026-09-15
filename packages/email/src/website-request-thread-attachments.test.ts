@@ -225,6 +225,7 @@ function websiteRequestFixture() {
     number: "WR-2026-00021",
     kind: "inquiry" as const,
     status: "open" as const,
+    inquiryStatus: "new" as const,
     submitterName: "Klant",
     submitterEmail: "klant@example.com",
     submitterPhone: null,

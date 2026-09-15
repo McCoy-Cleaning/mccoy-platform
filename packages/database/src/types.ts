@@ -1,6 +1,7 @@
 import type {
   AttachmentMeta,
   FormKind,
+  InquiryStatus,
   NotificationState,
   RequestReply,
   RequestStatus,
@@ -42,6 +43,11 @@ export type WebsiteRequestsStore = {
   listWebsiteRequests(filter?: ListWebsiteRequestsFilter): Promise<WebsiteRequestSummary[]>;
   getWebsiteRequest(id: string): Promise<WebsiteRequest | null>;
   setWebsiteRequestStatus(id: string, status: RequestStatus): Promise<WebsiteRequest | null>;
+  /** Staff triage label (Nieuw / In behandeling / Gefactureerd). Manual only. */
+  setWebsiteRequestInquiryStatus(
+    id: string,
+    inquiryStatus: InquiryStatus,
+  ): Promise<WebsiteRequest | null>;
   appendWebsiteRequestReply(
     id: string,
     reply: Omit<RequestReply, "id">,

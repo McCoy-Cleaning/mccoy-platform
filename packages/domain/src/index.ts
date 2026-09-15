@@ -37,7 +37,9 @@ export {
 
 export {
   REQUEST_STATUSES,
+  INQUIRY_STATUSES,
   type RequestStatus,
+  type InquiryStatus,
   type AttachmentMeta,
   type RequestReply,
   type NotificationState,
@@ -45,7 +47,7 @@ export {
   type WebsiteRequestSummary,
 } from "./requests";
 
-export { KIND_LABELS, STATUS_LABELS, FIELD_LABELS_NL } from "./labels";
+export { KIND_LABELS, STATUS_LABELS, FIELD_LABELS_NL, INQUIRY_STATUS_LABELS_NL } from "./labels";
 
 export {
   INTERNAL_VACANCY_FIELD_KEYS,
