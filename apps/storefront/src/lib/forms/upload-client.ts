@@ -54,6 +54,8 @@ export async function uploadWebsiteFormAttachments(options: {
       contentType: slot.contentType,
       sizeBytes: slot.sizeBytes,
       storagePath: slot.storagePath,
+      uploadBatchId: slot.uploadBatchId,
+      uploadCapability: slot.uploadCapability,
     });
   }
   return uploaded;

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isWebsiteRequestUploadStoragePath,
+  isWebsiteRequestAttachmentPathOwnedByRequest,
+  reservedWebsiteFormUploadBytes,
   sanitizeAttachmentFilename,
   sanitizeStorageObjectName,
   uniqueStorageObjectName,
@@ -77,5 +79,31 @@ describe("website request attachment storage paths", () => {
         "uploads/11111111-1111-4111-8111-111111111111/01-Broker_side_1.pdf",
       ),
     ).toBe("Broker_side_1.pdf");
+  });
+
+  it("never accepts another request's durable storage path", () => {
+    const requestId = "11111111-1111-4111-8111-111111111111";
+    expect(isWebsiteRequestAttachmentPathOwnedByRequest(requestId, `${requestId}/photo.webp`)).toBe(
+      true,
+    );
+    expect(
+      isWebsiteRequestAttachmentPathOwnedByRequest(
+        requestId,
+        "22222222-2222-4222-8222-222222222222/photo.webp",
+      ),
+    ).toBe(false);
+    expect(
+      isWebsiteRequestAttachmentPathOwnedByRequest(
+        requestId,
+        "uploads/11111111-1111-4111-8111-111111111111/01-photo.webp",
+      ),
+    ).toBe(false);
+  });
+
+  it("reserves the full storage exposure instead of trusting claimed byte sizes", () => {
+    expect(reservedWebsiteFormUploadBytes(0)).toBe(0);
+    expect(reservedWebsiteFormUploadBytes(8)).toBe(200 * 1024 * 1024);
+    expect(() => reservedWebsiteFormUploadBytes(9)).toThrow(/count/i);
+    expect(() => reservedWebsiteFormUploadBytes(1.5)).toThrow(/count/i);
   });
 });

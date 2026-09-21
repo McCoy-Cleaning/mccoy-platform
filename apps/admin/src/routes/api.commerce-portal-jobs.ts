@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
+  cleanupExpiredWebsiteFormUploadBatches,
   processCommerceEmailOutbox,
   processExpiredCustomerInvitations,
 } from "@mccoy/database/server";
@@ -25,7 +26,8 @@ export const Route = createFileRoute("/api/commerce-portal-jobs")({
 
         const reminders = await processExpiredCustomerInvitations(25);
         const emails = await processCommerceEmailOutbox(25);
-        return Response.json({ ok: true, reminders, emails });
+        const websiteFormUploads = await cleanupExpiredWebsiteFormUploadBatches(250);
+        return Response.json({ ok: true, reminders, emails, websiteFormUploads });
       },
     },
   },

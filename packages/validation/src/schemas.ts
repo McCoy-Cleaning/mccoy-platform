@@ -46,6 +46,8 @@ export const uploadedFormAttachmentSchema = z.object({
     .positive()
     .max(25 * 1024 * 1024),
   storagePath: z.string().trim().min(1).max(500),
+  uploadBatchId: z.string().uuid(),
+  uploadCapability: z.string().trim().min(32).max(128),
 });
 
 export const formScopeSnapshotSchema = z.object({
@@ -67,17 +69,27 @@ const websiteFormFieldsSchema = z
     message: `Te veel formuliervelden (max ${WEBSITE_FORM_MAX_FIELDS}).`,
   });
 
-export const websiteFormPayloadSchema = z.object({
-  kind: z.enum(FORM_KINDS),
-  pageId: z.string().trim().min(1).max(120),
-  sourceId: z.string().trim().min(1).max(120),
-  fields: websiteFormFieldsSchema,
-  attachments: z.array(formAttachmentSchema).max(8).optional(),
-  uploadedAttachments: z.array(uploadedFormAttachmentSchema).max(8).optional(),
-  website: z.string().max(200).optional(),
-  /** Compatibility only — server overwrites from published CMS. */
-  scope: formScopeSnapshotSchema.optional(),
-});
+export const websiteFormPayloadSchema = z
+  .object({
+    kind: z.enum(FORM_KINDS),
+    pageId: z.string().trim().min(1).max(120),
+    sourceId: z.string().trim().min(1).max(120),
+    fields: websiteFormFieldsSchema,
+    attachments: z.array(formAttachmentSchema).max(8).optional(),
+    uploadedAttachments: z.array(uploadedFormAttachmentSchema).max(8).optional(),
+    website: z.string().max(200).optional(),
+    /** Compatibility only — server overwrites from published CMS. */
+    scope: formScopeSnapshotSchema.optional(),
+  })
+  .superRefine((payload, context) => {
+    if ((payload.attachments?.length ?? 0) > 0 && (payload.uploadedAttachments?.length ?? 0) > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Gebruik één beveiligde uploadmethode per formulier.",
+        path: ["attachments"],
+      });
+    }
+  });
 
 /** Metadata-only prepare step before the browser uploads bytes to private storage. */
 export const websiteFormPrepareAttachmentsSchema = z.object({

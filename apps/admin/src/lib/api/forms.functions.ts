@@ -10,11 +10,15 @@ import {
   MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES,
   MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
 } from "@mccoy/domain";
-import {
-  websiteFormPayloadSchema,
-  websiteFormPrepareAttachmentsSchema,
-} from "@mccoy/validation";
+import { websiteFormPayloadSchema, websiteFormPrepareAttachmentsSchema } from "@mccoy/validation";
 import { assertSafeWebsiteFormUpload, isHoneypotTriggered } from "@mccoy/security";
+import { getWebsiteFormClientKeyHash } from "@mccoy/security/website-form-client";
+
+function isRateLimitError(error: unknown): boolean {
+  return Boolean(
+    error && typeof error === "object" && "code" in error && error.code === "rate_limit",
+  );
+}
 
 export const prepareWebsiteFormAttachments = createServerFn({ method: "POST" })
   .validator(websiteFormPrepareAttachmentsSchema)
@@ -76,9 +80,19 @@ export const prepareWebsiteFormAttachments = createServerFn({ method: "POST" })
         };
       }
 
-      const slots = await createWebsiteRequestAttachmentUploadSlots(files);
+      const slots = await createWebsiteRequestAttachmentUploadSlots(
+        files,
+        getWebsiteFormClientKeyHash(),
+      );
       return { ok: true as const, slots };
     } catch (error) {
+      if (isRateLimitError(error)) {
+        return {
+          ok: false as const,
+          error: error instanceof Error ? error.message : "Te veel uploadverzoeken.",
+          code: "rate_limit" as const,
+        };
+      }
       console.error("[forms] prepare attachments failed", error);
       return {
         ok: false as const,
@@ -95,7 +109,13 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
   .validator(websiteFormPayloadSchema)
   .handler(async ({ data }) => {
     try {
-      const { loadCmsPageForWebsiteForm } = await import("@mccoy/database/server");
+      if (isHoneypotTriggered(data.website)) return { ok: true as const };
+      const { assertWebsiteFormSubmissionQuota, loadCmsPageForWebsiteForm } =
+        await import("@mccoy/database/server");
+      await assertWebsiteFormSubmissionQuota(
+        getWebsiteFormClientKeyHash(),
+        (data.uploadedAttachments?.length ?? 0) + (data.attachments?.length ?? 0),
+      );
       const page = await loadCmsPageForWebsiteForm(data.pageId);
 
       const resolvedForm = resolvePublishedFormScope(page, {
@@ -193,6 +213,13 @@ export const submitWebsiteForm = createServerFn({ method: "POST" })
         throw error;
       }
     } catch (error) {
+      if (isRateLimitError(error)) {
+        return {
+          ok: false as const,
+          error: error instanceof Error ? error.message : "Te veel verzoeken.",
+          code: "rate_limit" as const,
+        };
+      }
       const { FormSubmitError } = await import("@mccoy/email/server");
       if (error instanceof FormSubmitError) {
         return { ok: false as const, error: error.message, code: error.code };

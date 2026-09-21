@@ -24,9 +24,9 @@ vi.mock("./graph-config", () => ({
   isGraphMailConfigured: () =>
     Boolean(
       process.env.TENANT_ID &&
-        process.env.CLIENT_ID &&
-        process.env.CLIENT_SECRET &&
-        process.env.GRAPH_MAILBOX,
+      process.env.CLIENT_ID &&
+      process.env.CLIENT_SECRET &&
+      process.env.GRAPH_MAILBOX,
     ),
 }));
 
@@ -51,9 +51,14 @@ vi.mock("@mccoy/database/server", () => ({
   updateRequestNotification: (...args: unknown[]) => updateRequestNotification(...args),
 }));
 
-
-const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+const JPEG_BYTES = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+]);
 const PDF_BYTES = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n");
+const UPLOAD_BATCH = {
+  uploadBatchId: "11111111-1111-4111-8111-111111111111",
+  uploadCapability: "test-capability-123456789012345678901234567890",
+};
 const KEYS = [
   "MCCOY_E2E",
   "FORM_INBOX_PROVIDER",
@@ -224,18 +229,21 @@ describe("sendWebsiteFormEmail delivery channel", () => {
           contentType: "image/jpeg",
           sizeBytes: 1_200,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-foto1.jpg",
+          ...UPLOAD_BATCH,
         },
         {
           filename: "cv.pdf",
           contentType: "application/pdf",
           sizeBytes: 8_000,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/02-cv.pdf",
+          ...UPLOAD_BATCH,
         },
         {
           filename: "missing.webp",
           contentType: "image/webp",
           sizeBytes: 900,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/03-missing.webp",
+          ...UPLOAD_BATCH,
         },
       ],
     });
@@ -280,15 +288,14 @@ describe("sendWebsiteFormEmail delivery channel", () => {
       pageId: "page_offerte",
       sourceId: "fixed:quote:form",
       fields: { name: "Anna", email: "anna@example.com" },
-      attachments: [
-        { filename: "situatie.jpg", contentType: "image/jpeg", contentBase64: bytes },
-      ],
+      attachments: [{ filename: "situatie.jpg", contentType: "image/jpeg", contentBase64: bytes }],
       uploadedAttachments: [
         {
           filename: "situatie.jpg",
           contentType: "image/jpeg",
           sizeBytes: 12,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-situatie.jpg",
+          ...UPLOAD_BATCH,
         },
       ],
     });
@@ -322,7 +329,10 @@ describe("sendWebsiteFormEmail delivery channel", () => {
     });
     getStoredWebsiteRequestAttachment.mockImplementation(async (_id: string, filename: string) => {
       if (filename === "huge.jpg") {
-        return { contentBase64: JPEG_BYTES.toString("base64"), sizeBytes: MAILBOX_MAX_ATTACHMENT_BYTES - 100 };
+        return {
+          contentBase64: JPEG_BYTES.toString("base64"),
+          sizeBytes: MAILBOX_MAX_ATTACHMENT_BYTES - 100,
+        };
       }
       if (filename === "extra.pdf") {
         return { contentBase64: PDF_BYTES.toString("base64"), sizeBytes: 1_000 };
@@ -342,12 +352,14 @@ describe("sendWebsiteFormEmail delivery channel", () => {
           contentType: "image/jpeg",
           sizeBytes: MAILBOX_MAX_ATTACHMENT_BYTES - 100,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-huge.jpg",
+          ...UPLOAD_BATCH,
         },
         {
           filename: "extra.pdf",
           contentType: "application/pdf",
           sizeBytes: 1_000,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/02-extra.pdf",
+          ...UPLOAD_BATCH,
         },
       ],
     });

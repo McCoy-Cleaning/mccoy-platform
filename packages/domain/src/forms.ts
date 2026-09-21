@@ -37,6 +37,10 @@ export type UploadedFormAttachment = {
   contentType: string;
   sizeBytes: number;
   storagePath: string;
+  /** Server-issued one-time batch identity. */
+  uploadBatchId: string;
+  /** High-entropy capability; stored server-side only as SHA-256. */
+  uploadCapability: string;
 };
 
 /** Max files per website form submission (private storage path). */

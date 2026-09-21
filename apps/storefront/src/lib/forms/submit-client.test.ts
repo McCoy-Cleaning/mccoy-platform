@@ -20,11 +20,7 @@ vi.mock("@mccoy/cms-renderer", async () => {
   };
 });
 
-import {
-  attachExtraFileFieldNames,
-  fieldsFromForm,
-  submitSiteForm,
-} from "./submit-client";
+import { attachExtraFileFieldNames, fieldsFromForm, submitSiteForm } from "./submit-client";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,10 +31,12 @@ beforeEach(() => {
       contentType: "application/pdf",
       sizeBytes: 12,
       storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-cv.pdf",
+      uploadBatchId: "11111111-1111-4111-8111-111111111111",
+      uploadCapability: "capability-123456789012345678901234567890",
     },
   ]);
-  collectFormFileAttachments.mockImplementation(async (_form: HTMLFormElement, extra: File[] = []) =>
-    extra.filter((file) => file.size > 0),
+  collectFormFileAttachments.mockImplementation(
+    async (_form: HTMLFormElement, extra: File[] = []) => extra.filter((file) => file.size > 0),
   );
 });
 
@@ -127,6 +125,8 @@ describe("submitSiteForm", () => {
           contentType: "application/pdf",
           sizeBytes: 12,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-cv.pdf",
+          uploadBatchId: "11111111-1111-4111-8111-111111111111",
+          uploadCapability: "capability-123456789012345678901234567890",
         },
       ],
     });

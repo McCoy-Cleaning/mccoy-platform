@@ -52,6 +52,27 @@ describe("websiteFormPayloadSchema field-count bound", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("rejects mixed legacy bytes and direct-upload capabilities", () => {
+    const parsed = websiteFormPayloadSchema.safeParse({
+      ...basePayload,
+      fields: { name: "Jan", email: "jan@example.com" },
+      attachments: [
+        { filename: "legacy.pdf", contentType: "application/pdf", contentBase64: "AAAA" },
+      ],
+      uploadedAttachments: [
+        {
+          filename: "direct.pdf",
+          contentType: "application/pdf",
+          sizeBytes: 1024,
+          storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-direct.pdf",
+          uploadBatchId: "11111111-1111-4111-8111-111111111111",
+          uploadCapability: "capability-123456789012345678901234567890",
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe("websiteFormPrepareAttachmentsSchema field-count bound", () => {

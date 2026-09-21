@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
   MAX_WEBSITE_FORM_ATTACHMENT_COUNT,
@@ -10,13 +10,32 @@ import {
   type FormUploadFileIntent,
   type UploadedFormAttachment,
 } from "@mccoy/domain";
-import { assertSafeWebsiteFormUpload, canonicalWebsiteFormContentType } from "@mccoy/security";
+import {
+  assertSafeWebsiteFormUpload,
+  canonicalWebsiteFormContentType,
+  isProductionRuntime,
+} from "@mccoy/security";
 
 import { createSupabaseServiceClient, hasSupabaseServiceConfig } from "../supabase";
 
 export const WEBSITE_REQUEST_ATTACHMENTS_BUCKET = "website-request-attachments";
 export const WEBSITE_REQUEST_ATTACHMENT_MAX_BYTES = MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES;
 export const WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS = 5 * 60;
+const WEBSITE_FORM_UPLOAD_BATCH_TTL_MS = 2 * 60 * 60_000;
+const WEBSITE_FORM_UPLOAD_PREPARE_LIMIT = 4;
+const WEBSITE_FORM_UPLOAD_PREPARE_WINDOW_SECONDS = 15 * 60;
+const WEBSITE_FORM_UPLOAD_PREPARE_BYTE_LIMIT = 450 * 1024 * 1024;
+const WEBSITE_FORM_SUBMIT_LIMIT = 8;
+const WEBSITE_FORM_SUBMIT_WINDOW_SECONDS = 10 * 60;
+
+export class WebsiteFormAbuseLimitError extends Error {
+  readonly code = "rate_limit" as const;
+
+  constructor(message = "Te veel verzoeken. Wacht een paar minuten en probeer het opnieuw.") {
+    super(message);
+    this.name = "WebsiteFormAbuseLimitError";
+  }
+}
 
 export type WebsiteRequestAttachmentContent = {
   filename: string;
@@ -42,6 +61,21 @@ export type WebsiteRequestAttachmentAccess = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STAGED_PATH_RE = /^uploads\/[0-9a-f-]{36}\/\d{2}-[^/]+$/i;
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+export function reservedWebsiteFormUploadBytes(fileCount: number): number {
+  if (
+    !Number.isInteger(fileCount) ||
+    fileCount < 0 ||
+    fileCount > MAX_WEBSITE_FORM_ATTACHMENT_COUNT
+  ) {
+    throw new Error("Invalid website form attachment count.");
+  }
+  return fileCount * MAX_WEBSITE_FORM_ATTACHMENT_FILE_BYTES;
+}
 
 /**
  * Storage object names must never contain URL-encoding (`%20`) or other
@@ -145,24 +179,64 @@ function safeStorageError(message: string): string {
 /** Create one-use, path-scoped upload tokens. File bytes never pass through Vercel. */
 export async function createWebsiteRequestAttachmentUploadSlots(
   files: FormUploadFileIntent[],
+  clientKeyHash: string,
 ): Promise<WebsiteRequestAttachmentUploadSlot[]> {
   if (!hasSupabaseServiceConfig()) {
     throw new Error("Private attachment storage is not configured.");
   }
+  if (files.length < 1 || files.length > MAX_WEBSITE_FORM_ATTACHMENT_COUNT) {
+    throw new Error("Invalid website form attachment count.");
+  }
   const supabase = createSupabaseServiceClient();
   const batchId = randomUUID();
+  const uploadCapability = randomBytes(32).toString("base64url");
   const slots: WebsiteRequestAttachmentUploadSlot[] = [];
   const usedObjectNames = new Set<string>();
-
-  for (let index = 0; index < files.length; index += 1) {
-    const file = files[index]!;
+  const prepared = files.map((file, index) => {
     const prefix = String(index + 1).padStart(2, "0");
     const objectName = uniqueStorageObjectName(file.filename, usedObjectNames);
-    const storagePath = `uploads/${batchId}/${prefix}-${objectName}`;
+    return {
+      file,
+      storagePath: `uploads/${batchId}/${prefix}-${objectName}`,
+    };
+  });
+
+  const expiresAt = new Date(Date.now() + WEBSITE_FORM_UPLOAD_BATCH_TTL_MS).toISOString();
+  const { data: batchCreated, error: batchError } = await supabase
+    .schema("private")
+    .rpc("create_website_form_upload_batch", {
+      p_batch_id: batchId,
+      p_capability_hash: sha256(uploadCapability),
+      p_client_key_hash: clientKeyHash,
+      p_storage_paths: prepared.map((item) => item.storagePath),
+      // Reserve the maximum byte exposure of every signed slot. Browser size
+      // metadata is untrusted and may under-report what is uploaded.
+      p_total_bytes: reservedWebsiteFormUploadBytes(files.length),
+      p_expires_at: expiresAt,
+      p_request_limit: WEBSITE_FORM_UPLOAD_PREPARE_LIMIT,
+      p_byte_limit: WEBSITE_FORM_UPLOAD_PREPARE_BYTE_LIMIT,
+      p_window_seconds: WEBSITE_FORM_UPLOAD_PREPARE_WINDOW_SECONDS,
+    });
+  if (batchError) {
+    throw new Error(
+      `Uploadbeveiliging kon niet worden toegepast: ${safeStorageError(batchError.message)}`,
+    );
+  }
+  if (batchCreated !== true) {
+    throw new WebsiteFormAbuseLimitError();
+  }
+
+  for (const item of prepared) {
+    const { file, storagePath } = item;
     const { data, error } = await supabase.storage
       .from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET)
       .createSignedUploadUrl(storagePath, { upsert: false });
     if (error || !data?.token) {
+      await supabase
+        .schema("private")
+        .from("website_form_upload_batches")
+        .delete()
+        .eq("id", batchId);
       throw new Error(
         `Private attachment upload could not be prepared: ${safeStorageError(error?.message ?? "missing token")}`,
       );
@@ -172,6 +246,8 @@ export async function createWebsiteRequestAttachmentUploadSlots(
       contentType: file.contentType,
       sizeBytes: file.sizeBytes,
       storagePath,
+      uploadBatchId: batchId,
+      uploadCapability,
       token: data.token,
     });
   }
@@ -234,6 +310,57 @@ export async function storeWebsiteRequestAttachments(
   return { status: "stored", count: attachments.length };
 }
 
+export async function assertWebsiteFormSubmissionQuota(
+  clientKeyHash: string,
+  attachmentCount: number,
+): Promise<void> {
+  if (!hasSupabaseServiceConfig()) {
+    if (isProductionRuntime()) {
+      throw new Error("Formulierbeveiliging is tijdelijk niet beschikbaar.");
+    }
+    return;
+  }
+  const supabase = createSupabaseServiceClient();
+  const reservedBytes = reservedWebsiteFormUploadBytes(attachmentCount);
+  const { data, error } = await supabase.schema("private").rpc("consume_website_form_quota", {
+    p_scope: "submit",
+    p_client_key_hash: clientKeyHash,
+    p_request_limit: WEBSITE_FORM_SUBMIT_LIMIT,
+    p_byte_limit: MAX_WEBSITE_FORM_ATTACHMENT_TOTAL_BYTES,
+    // Reserve full exposure per capability; never trust declared browser bytes
+    // for abuse accounting.
+    p_cost_bytes: reservedBytes,
+    p_window_seconds: WEBSITE_FORM_SUBMIT_WINDOW_SECONDS,
+  });
+  if (error) {
+    throw new Error(
+      `Formulierbeveiliging kon niet worden toegepast: ${safeStorageError(error.message)}`,
+    );
+  }
+  if (data !== true) throw new WebsiteFormAbuseLimitError();
+}
+
+async function claimWebsiteFormUploadBatch(
+  requestId: string,
+  uploaded: UploadedFormAttachment[],
+): Promise<boolean> {
+  const batchIds = new Set(uploaded.map((file) => file.uploadBatchId));
+  const capabilities = new Set(uploaded.map((file) => file.uploadCapability));
+  if (batchIds.size !== 1 || capabilities.size !== 1) return false;
+  const batchId = uploaded[0]?.uploadBatchId ?? "";
+  const capability = uploaded[0]?.uploadCapability ?? "";
+  if (!UUID_RE.test(batchId) || capability.length < 32 || capability.length > 128) return false;
+
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase.schema("private").rpc("claim_website_form_upload_batch", {
+    p_batch_id: batchId,
+    p_capability_hash: sha256(capability),
+    p_storage_paths: uploaded.map((file) => file.storagePath),
+    p_request_id: requestId,
+  });
+  return !error && data === true;
+}
+
 /**
  * Move browser-staged uploads (`uploads/{batch}/…`) into the durable
  * `{requestId}/{filename}` prefix used by Admin Aanvragen downloads.
@@ -242,18 +369,17 @@ export async function finalizeWebsiteRequestUploadedAttachments(
   requestId: string,
   uploaded: UploadedFormAttachment[],
   kind: FormKind,
-): Promise<
-  | { ok: true; attachments: AttachmentMeta[] }
-  | { ok: false; error: string }
-> {
+): Promise<{ ok: true; attachments: AttachmentMeta[] } | { ok: false; error: string }> {
   if (!uploaded.length) return { ok: true, attachments: [] };
   if (!hasSupabaseServiceConfig()) {
     return { ok: false, error: "Private attachment storage is not configured." };
   }
   if (uploaded.length > MAX_WEBSITE_FORM_ATTACHMENT_COUNT) {
-    return { ok: false, error: `U kunt maximaal ${MAX_WEBSITE_FORM_ATTACHMENT_COUNT} bestanden toevoegen.` };
+    return {
+      ok: false,
+      error: `U kunt maximaal ${MAX_WEBSITE_FORM_ATTACHMENT_COUNT} bestanden toevoegen.`,
+    };
   }
-
   let totalBytes = 0;
   const prepared: Array<UploadedFormAttachment & { destPath: string }> = [];
   const usedNames = new Set<string>();
@@ -295,6 +421,13 @@ export async function finalizeWebsiteRequestUploadedAttachments(
     });
   }
 
+  // Claim only after all browser-controlled metadata has passed validation.
+  // Otherwise one malformed submission could burn an otherwise valid one-time
+  // capability and force the customer to upload every file again.
+  if (!(await claimWebsiteFormUploadBatch(requestId, uploaded))) {
+    return { ok: false, error: "Deze upload is verlopen of al aan een andere aanvraag gekoppeld." };
+  }
+
   const supabase = createSupabaseServiceClient();
   const bucket = supabase.storage.from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET);
   const moved: string[] = [];
@@ -328,6 +461,13 @@ export async function finalizeWebsiteRequestUploadedAttachments(
       await cleanupRejected([]);
       return { ok: false, error: gate.error };
     }
+    if (stored.sizeBytes !== file.sizeBytes) {
+      await cleanupRejected([]);
+      return {
+        ok: false,
+        error: `Bestand “${file.filename}” komt niet overeen met de opgegeven grootte.`,
+      };
+    }
 
     const { error } = await bucket.move(file.storagePath, file.destPath);
     if (error) {
@@ -351,10 +491,25 @@ export async function finalizeWebsiteRequestUploadedAttachments(
     });
   }
 
+  // Persist only durable, request-owned paths. Capabilities and staged paths
+  // never enter public.website_requests, and Admin downloads cannot be steered
+  // to another request's object through browser-controlled metadata.
+  const { error: metadataError } = await supabase
+    .from("website_requests")
+    .update({ attachments: finalized })
+    .eq("id", requestId);
+  if (metadataError) {
+    await cleanupRejected([]);
+    return {
+      ok: false,
+      error: `Bijlagemetadata kon niet worden opgeslagen: ${safeStorageError(metadataError.message)}`,
+    };
+  }
+
   return { ok: true, attachments: finalized };
 }
 
-export async function getStoredWebsiteRequestAttachmentByPath(
+async function getStoredWebsiteRequestAttachmentByPath(
   storagePath: string,
 ): Promise<{ bytes: Uint8Array; contentBase64: string; sizeBytes: number } | null> {
   if (!hasSupabaseServiceConfig()) return null;
@@ -373,14 +528,28 @@ export async function getStoredWebsiteRequestAttachmentByPath(
   };
 }
 
-function candidateStoragePaths(requestId: string, filename: string, storagePath?: string): string[] {
+export function isWebsiteRequestAttachmentPathOwnedByRequest(
+  requestId: string,
+  storagePath: string,
+): boolean {
+  const id = requestId.trim();
+  if (!UUID_RE.test(id)) return false;
+  try {
+    const path = assertReadableStoragePath(storagePath);
+    return !isWebsiteRequestUploadStoragePath(path) && path.startsWith(`${id}/`);
+  } catch {
+    return false;
+  }
+}
+
+function candidateStoragePaths(
+  requestId: string,
+  filename: string,
+  storagePath?: string,
+): string[] {
   const paths: string[] = [];
-  if (storagePath?.trim()) {
-    try {
-      paths.push(assertReadableStoragePath(storagePath));
-    } catch {
-      /* ignore invalid stored path and fall back */
-    }
+  if (storagePath?.trim() && isWebsiteRequestAttachmentPathOwnedByRequest(requestId, storagePath)) {
+    paths.push(assertReadableStoragePath(storagePath));
   }
   const sanitized = websiteRequestAttachmentStoragePath(requestId, filename);
   if (!paths.includes(sanitized)) paths.push(sanitized);
@@ -406,6 +575,76 @@ export async function getStoredWebsiteRequestAttachment(
     }
   }
   return null;
+}
+
+export async function cleanupExpiredWebsiteFormUploadBatches(limit = 100): Promise<{
+  batchesRemoved: number;
+  objectsRequestedForRemoval: number;
+  quotaRowsRemoved: number;
+}> {
+  if (!hasSupabaseServiceConfig()) {
+    return { batchesRemoved: 0, objectsRequestedForRemoval: 0, quotaRowsRemoved: 0 };
+  }
+  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 500);
+  const supabase = createSupabaseServiceClient();
+  const privateDb = supabase.schema("private");
+  const now = new Date().toISOString();
+  const { data, error } = await privateDb
+    .from("website_form_upload_batches")
+    .select("id, storage_paths, consumed_at")
+    .lt("expires_at", now)
+    .order("expires_at", { ascending: true })
+    .limit(safeLimit);
+  if (error)
+    throw new Error(`Uploadopschoning kon niet worden geladen: ${safeStorageError(error.message)}`);
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    storage_paths: string[] | null;
+    consumed_at: string | null;
+  }>;
+  // A consumed batch was already moved (or rolled back) during finalization.
+  // Only unconsumed batches can still own staged objects at these paths.
+  const paths = rows.flatMap((row) => (row.consumed_at ? [] : (row.storage_paths ?? [])));
+  if (paths.length > 0) {
+    const { error: removeError } = await supabase.storage
+      .from(WEBSITE_REQUEST_ATTACHMENTS_BUCKET)
+      .remove(paths);
+    if (removeError) {
+      throw new Error(
+        `Verlopen uploads konden niet worden verwijderd: ${safeStorageError(removeError.message)}`,
+      );
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error: deleteError } = await privateDb
+      .from("website_form_upload_batches")
+      .delete()
+      .in(
+        "id",
+        rows.map((row) => row.id),
+      );
+    if (deleteError) {
+      throw new Error(`Uploadbatch-opschoning mislukte: ${safeStorageError(deleteError.message)}`);
+    }
+  }
+
+  const quotaCutoff = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString();
+  const { data: deletedQuota, error: quotaError } = await privateDb
+    .from("website_form_rate_limits")
+    .delete()
+    .lt("updated_at", quotaCutoff)
+    .select("scope");
+  if (quotaError) {
+    throw new Error(`Formulierquota-opschoning mislukte: ${safeStorageError(quotaError.message)}`);
+  }
+
+  return {
+    batchesRemoved: rows.length,
+    objectsRequestedForRemoval: paths.length,
+    quotaRowsRemoved: deletedQuota?.length ?? 0,
+  };
 }
 
 /** Short-lived URLs are returned only after the Admin server has authorized the caller. */
@@ -439,7 +678,9 @@ export async function createStoredWebsiteRequestAttachmentAccess(input: {
     return {
       contentUrl: content.data.signedUrl,
       downloadUrl: download.data.signedUrl,
-      expiresAt: new Date(Date.now() + WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS * 1000).toISOString(),
+      expiresAt: new Date(
+        Date.now() + WEBSITE_REQUEST_ATTACHMENT_URL_TTL_SECONDS * 1000,
+      ).toISOString(),
       sizeBytes,
     };
   }
