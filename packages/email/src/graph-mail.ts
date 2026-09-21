@@ -1523,6 +1523,22 @@ export type GraphReplyParentContext = {
   parent: GraphConversationSyncMessage;
 };
 
+/** Fetch only RFC headers; list projections intentionally omit this Graph-only field. */
+export async function getGraphMessageInternetHeaders(
+  graphId: string,
+  mailbox?: string,
+): Promise<GraphInternetMessageHeader[]> {
+  const config = getGraphMailConfig();
+  if (!config || !graphId.trim()) return [];
+  const box = mailbox || config.mailbox;
+  const accessToken = await getGraphAccessToken(config);
+  const headerMessage = await graphFetch<GraphMessage>(
+    usersPath(box, `/messages/${encodeURIComponent(graphId)}?$select=internetMessageHeaders`),
+    { accessToken },
+  );
+  return headerMessage.internetMessageHeaders ?? [];
+}
+
 /**
  * Resolve the exact mailbox message an inbound Graph message replies to.
  * Headers are fetched separately because Graph does not reliably allow
@@ -1535,15 +1551,9 @@ export async function getGraphReplyParentContext(
   const config = getGraphMailConfig();
   if (!config || !graphId.trim()) return null;
   const box = mailbox || config.mailbox;
-  const accessToken = await getGraphAccessToken(config);
-
   let headers: GraphInternetMessageHeader[] = [];
   try {
-    const headerMessage = await graphFetch<GraphMessage>(
-      usersPath(box, `/messages/${encodeURIComponent(graphId)}?$select=internetMessageHeaders`),
-      { accessToken },
-    );
-    headers = headerMessage.internetMessageHeaders ?? [];
+    headers = await getGraphMessageInternetHeaders(graphId, box);
   } catch {
     return null;
   }

@@ -2,9 +2,50 @@ import { describe, expect, it } from "vitest";
 
 import {
   correlateInboundGraphMessage,
+  inboundSenderAuthenticationExplicitlyFails,
+  inboundSenderAuthenticationPasses,
   type KnownInquiryMailIdentity,
   verifiedReplyParentBelongsToWebsiteRequest,
 } from "./inquiry-thread-correlation";
+
+describe("inboundSenderAuthenticationPasses", () => {
+  it("requires an aligned DMARC pass", () => {
+    expect(
+      inboundSenderAuthenticationPasses(
+        [
+          {
+            name: "Authentication-Results",
+            value: "spf=pass; dkim=pass; dmarc=pass action=none header.from=example.com",
+          },
+        ],
+        "anna@example.com",
+      ),
+    ).toBe(true);
+    expect(
+      inboundSenderAuthenticationPasses(
+        [{ name: "Authentication-Results", value: "dmarc=pass header.from=attacker.test" }],
+        "anna@example.com",
+      ),
+    ).toBe(false);
+  });
+
+  it("fails closed when any receiver result reports DMARC failure", () => {
+    expect(
+      inboundSenderAuthenticationPasses(
+        [
+          { name: "Authentication-Results", value: "dmarc=pass header.from=example.com" },
+          { name: "Authentication-Results", value: "dmarc=fail header.from=example.com" },
+        ],
+        "anna@example.com",
+      ),
+    ).toBe(false);
+    expect(
+      inboundSenderAuthenticationExplicitlyFails([
+        { name: "Authentication-Results", value: "dmarc=fail header.from=example.com" },
+      ]),
+    ).toBe(true);
+  });
+});
 
 const known: KnownInquiryMailIdentity = {
   inquiryId: "req-1",

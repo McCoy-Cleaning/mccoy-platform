@@ -18,6 +18,8 @@ import { getGraphMailConfig } from "./graph-config";
 import {
   correlateInboundGraphMessage,
   extractWebsiteRequestNumberToken,
+  inboundSenderAuthenticationExplicitlyFails,
+  inboundSenderAuthenticationPasses,
   parseReferencesHeader,
   requestSubmitterIsParticipant,
   verifiedReplyParentBelongsToWebsiteRequest,
@@ -85,6 +87,7 @@ async function resolveByRequestNumber(options: {
   mailbox: string;
   fromAddress: string | null;
   toAddresses: string[];
+  senderAuthenticated: boolean;
 }): Promise<RequestNumberResolution> {
   const subject = options.msg.subject || "";
   const bodyPreview = options.msg.bodyPreview || "";
@@ -100,6 +103,7 @@ async function resolveByRequestNumber(options: {
   }
 
   if (
+    options.senderAuthenticated &&
     requestSubmitterIsParticipant(
       { fromAddress: options.fromAddress, toAddresses: options.toAddresses },
       request.submitterEmail,
@@ -185,15 +189,16 @@ export async function ingestGraphReplyCandidates(options: {
   for (const msg of options.messages) {
     if (!msg.id) continue;
     const subject = msg.subject || "";
-    const inReplyTo = readHeader(msg.internetMessageHeaders, "in-reply-to");
-    const references = parseReferencesHeader(readHeader(msg.internetMessageHeaders, "references"));
+    let headers = msg.internetMessageHeaders ?? [];
+    let inReplyTo = readHeader(headers, "in-reply-to");
+    let references = parseReferencesHeader(readHeader(headers, "references"));
     const fromAddress = msg.from?.emailAddress?.address ?? null;
     const toAddresses = recipientAddresses(msg.toRecipients);
     const direction =
       fromAddress && fromAddress.trim().toLowerCase() === mailbox ? "outbound" : "inbound";
     if (direction === "outbound") continue;
 
-    const result = correlateInboundGraphMessage(
+    let result = correlateInboundGraphMessage(
       {
         mailbox,
         graphMessageId: msg.id,
@@ -206,6 +211,37 @@ export async function ingestGraphReplyCandidates(options: {
       },
       known,
     );
+
+    const requestNumber = extractWebsiteRequestNumberToken(subject, msg.bodyPreview || "");
+    const requestAware = result.status !== "unmatched" || Boolean(requestNumber);
+    if (requestAware && headers.length === 0) {
+      try {
+        const { getGraphMessageInternetHeaders } = await import("./graph-mail");
+        headers = await getGraphMessageInternetHeaders(msg.id, mailbox);
+        inReplyTo = readHeader(headers, "in-reply-to");
+        references = parseReferencesHeader(readHeader(headers, "references"));
+        result = correlateInboundGraphMessage(
+          {
+            mailbox,
+            graphMessageId: msg.id,
+            internetMessageId: msg.internetMessageId ?? null,
+            conversationId: msg.conversationId ?? null,
+            inReplyTo,
+            references,
+            subject,
+            fromAddress,
+          },
+          known,
+        );
+      } catch (error) {
+        console.warn("[ingest-graph-replies] authentication headers unavailable", {
+          messageId: msg.id,
+          message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+        });
+      }
+    }
+    const senderAuthenticated = inboundSenderAuthenticationPasses(headers, fromAddress);
+    const senderAuthenticationFailed = inboundSenderAuthenticationExplicitlyFails(headers);
 
     // The shared mailbox contains ordinary business mail that is unrelated to
     // website requests. Only request-aware failures belong in the internal
@@ -221,10 +257,14 @@ export async function ingestGraphReplyCandidates(options: {
         )
       : false;
     const numberResolution =
-      result.status === "unmatched" ||
-      result.status === "ambiguous" ||
-      !correlatedParticipant
-        ? await resolveByRequestNumber({ msg, mailbox, fromAddress, toAddresses })
+      result.status === "unmatched" || result.status === "ambiguous" || !correlatedParticipant
+        ? await resolveByRequestNumber({
+            msg: { ...msg, internetMessageHeaders: headers },
+            mailbox,
+            fromAddress,
+            toAddresses,
+            senderAuthenticated,
+          })
         : null;
     if (numberResolution?.status === "inactive") continue;
 
@@ -270,15 +310,19 @@ export async function ingestGraphReplyCandidates(options: {
       numberResolution?.status === "matched" &&
       numberResolution.inquiryId === inquiryId &&
       numberResolution.verifiedReplyParent;
+    const exactIdentityReply =
+      (result.status === "appended" || result.status === "already_processed") &&
+      (result.match === "in_reply_to" || result.match === "references");
     // Stored Graph ids and conversation ids can themselves be contaminated by
     // an older bad match. Re-check participant ownership for both new and
     // already-processed mail before trusting that durable identity.
     if (
       !verifiedReplyParent &&
-      !requestSubmitterIsParticipant({ fromAddress, toAddresses }, submitterEmail)
+      (!requestSubmitterIsParticipant({ fromAddress, toAddresses }, submitterEmail) ||
+        senderAuthenticationFailed ||
+        (!senderAuthenticated && !exactIdentityReply))
     ) {
       participantRejected += 1;
-      const requestNumber = extractWebsiteRequestNumberToken(subject, msg.bodyPreview || "");
       if (requestNumber) {
         unmatched += 1;
         await recordUnmatchedInboundMail({
@@ -316,8 +360,7 @@ export async function ingestGraphReplyCandidates(options: {
       graphMessageId: msg.id,
       internetMessageId: msg.internetMessageId ?? null,
       conversationId: msg.conversationId ?? null,
-      inReplyTo:
-        numberResolution?.status === "matched" ? numberResolution.inReplyTo : inReplyTo,
+      inReplyTo: numberResolution?.status === "matched" ? numberResolution.inReplyTo : inReplyTo,
       referencesHeader:
         numberResolution?.status === "matched"
           ? numberResolution.references.join(" ")

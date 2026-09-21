@@ -2,10 +2,10 @@
 
 This repository is an **npm workspaces monorepo** with two independently deployable product surfaces:
 
-| Host | App | Package |
-|------|-----|---------|
-| `www.mccoy.nl` / `mccoy.nl` | Public website | `apps/storefront` (`@mccoy/storefront`) |
-| `admin.mccoy.nl` | Administration panel | `apps/admin` (`@mccoy/admin`) |
+| Host                        | App                  | Package                                 |
+| --------------------------- | -------------------- | --------------------------------------- |
+| `www.mccoy.nl` / `mccoy.nl` | Public website       | `apps/storefront` (`@mccoy/storefront`) |
+| `admin.mccoy.nl`            | Administration panel | `apps/admin` (`@mccoy/admin`)           |
 
 Shared logic lives under `packages/*`. CMS **authoring** (`@mccoy/cms-editor`, `@mccoy/content-ai`) is Admin-only. Storefront keeps shared **rendering** (`@mccoy/cms-renderer`) and iframe edit/preview protocol helpers from `@mccoy/cms-schema`.
 
@@ -99,18 +99,30 @@ Root `.env` / `.env.example` (both apps set `envDir` to the monorepo root):
 - `MCCOY_DATA_DIR` — optional override for local/file CMS and request stores
 - `MCCOY_ENVIRONMENT` — explicit deploy/operator label: `staging` | `production` | `development` (required for MG5 staging/production migrate)
 - `MCCOY_STAGING_SUPABASE_PROJECT_ID` / `MCCOY_PRODUCTION_SUPABASE_PROJECT_ID` — allowlisted Supabase project refs; must differ. MG5 derives the current ref from `SUPABASE_URL` / `VITE_SUPABASE_URL` and fail-closes on mismatch
+- `WEBSITE_FORM_ABUSE_SECRET` — server-only HMAC secret for pseudonymous, durable public-form upload/submission quotas. Use at least 32 random bytes and never expose it as `VITE_*`
+- `MCCOY_TRUST_PROXY_IP_HEADERS` — leave unset on Vercel. Enable only behind a trusted proxy that overwrites client-supplied forwarded-IP headers
 - `GROQ_*` — content AI (**Admin only**)
 - `VERCEL_TOKEN`, `VERCEL_WEB_ANALYTICS_PROJECT_ID` (alias `STOREFRONT_VERCEL_PROJECT_ID`), optional `VERCEL_TEAM_ID` / `VERCEL_ORG_ID` — admin overview visitor counts from Vercel Web Analytics API (**Admin only**, server-side). `VERCEL_ORG_ID` is auto-set on Vercel and used as `teamId` when `VERCEL_TEAM_ID` is unset. Enable Web Analytics on the storefront Vercel project; Hobby includes 50k events/month and a ~1 month reporting window. Never use `VERCEL_PROJECT_ID` (that is the admin project on the admin app). Do not put these on `VITE_*`.
 - `VITE_GA_MEASUREMENT_ID` or server aliases `GA_MEASUREMENT_ID` / `GOOGLE_ANALYTICS_MEASUREMENT_ID` (storefront) — Google Analytics 4 measurement ID (`G-…`). Loaded only after analytics cookie consent (Consent Mode v2). Production builds only unless `VITE_GA_ENABLE_DEV=1`. Server aliases are injected at SSR so production does not require the `VITE_` prefix. With `VITE_GA_ENABLE_DEV=1` and no ID, the banner is local preview only (never a fake production banner). Redeploy storefront after changing. Not a secret, but still prefer env over hardcoding.
 
 ### Branch → environment → Supabase (authoritative)
 
-| Git branch | Environment | Vercel | Supabase |
-|------------|-------------|--------|----------|
-| `development` (alias `dev`) | staging | development / preview | staging project (`MCCOY_STAGING_SUPABASE_PROJECT_ID`) |
-| `main` | production | production | production project (`MCCOY_PRODUCTION_SUPABASE_PROJECT_ID`) |
+| Git branch                  | Environment | Vercel                | Supabase                                                    |
+| --------------------------- | ----------- | --------------------- | ----------------------------------------------------------- |
+| `development` (alias `dev`) | staging     | development / preview | staging project (`MCCOY_STAGING_SUPABASE_PROJECT_ID`)       |
+| `main`                      | production  | production            | production project (`MCCOY_PRODUCTION_SUPABASE_PROJECT_ID`) |
 
 Do not point staging migrate tooling at the production Supabase project. A shared staging=production database blocks MG5 staging qualification.
+
+Before any linked Supabase migration, verify all four identities (declared environment, Git branch, runtime URL, and local CLI link):
+
+```sh
+npm run supabase:verify-target -- --environment staging
+npm run supabase:db:push -- --environment staging --dry-run
+npm run supabase:db:push -- --environment staging
+```
+
+Use `production` only from `main` with the production allowlist. Do not invoke `supabase db push --linked` directly: the guarded command refuses missing configuration, shared staging/production projects, branch mismatches, runtime/allowlist mismatches, and stale CLI links without printing full project refs.
 
 ## Website requests / Aanvragen
 

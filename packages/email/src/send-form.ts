@@ -44,10 +44,7 @@ const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i;
 
 function getFormEmailConfig() {
   return {
-    to:
-      readServerEnv("FORM_TO_EMAIL") ||
-      readServerEnv("SMTP_REPLY_TO") ||
-      DEFAULT_TO,
+    to: readServerEnv("FORM_TO_EMAIL") || readServerEnv("SMTP_REPLY_TO") || DEFAULT_TO,
     from: defaultTransactionalFrom(),
   };
 }
@@ -114,6 +111,8 @@ function filterUploadedAttachments(
       contentType: file.contentType || "application/octet-stream",
       sizeBytes: file.sizeBytes,
       storagePath: file.storagePath.trim(),
+      uploadBatchId: file.uploadBatchId,
+      uploadCapability: file.uploadCapability,
     };
   });
 }
@@ -137,7 +136,6 @@ function enrichFieldsWithAttachmentNames(
   }
   return next;
 }
-
 
 function scanFormAttachmentBytes(input: {
   kind: FormKind;
@@ -618,10 +616,7 @@ export async function sendWebsiteFormEmail(payload: WebsiteFormPayload): Promise
   }
 
   const confirmationReplyTo =
-    readServerEnv("FORM_TO_EMAIL") ||
-    readServerEnv("GRAPH_MAILBOX") ||
-    config.to ||
-    config.from;
+    readServerEnv("FORM_TO_EMAIL") || readServerEnv("GRAPH_MAILBOX") || config.to || config.from;
 
   await sendSubmitterConfirmationMail({
     to: fields.email,

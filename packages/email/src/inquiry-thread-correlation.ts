@@ -110,6 +110,54 @@ export function requestSubmitterIsParticipant(
   );
 }
 
+type InternetMessageHeader = { name?: string | null; value?: string | null };
+
+function emailDomain(address: string | null | undefined): string | null {
+  const value = address?.trim().toLowerCase() ?? "";
+  const at = value.lastIndexOf("@");
+  if (at <= 0 || at === value.length - 1) return null;
+  const domain = value.slice(at + 1).replace(/[^a-z0-9.-]/g, "");
+  return domain && !domain.startsWith(".") && !domain.endsWith(".") ? domain : null;
+}
+
+/**
+ * Trust a sender address only when Exchange recorded an aligned DMARC pass.
+ * Any explicit DMARC failure/none result fails closed; an exact reply-chain can
+ * still be accepted separately for forwarded or legacy mail.
+ */
+export function inboundSenderAuthenticationPasses(
+  headers: readonly InternetMessageHeader[] | null | undefined,
+  senderAddress: string | null | undefined,
+): boolean {
+  const senderDomain = emailDomain(senderAddress);
+  if (!senderDomain || !headers?.length) return false;
+  const values = headers
+    .filter((header) => (header.name ?? "").trim().toLowerCase() === "authentication-results")
+    .map((header) => header.value?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+  if (values.length === 0) return false;
+  if (values.some((value) => /\bdmarc=(?:fail|none|temperror|permerror|softfail)\b/.test(value))) {
+    return false;
+  }
+  return values.some((value) => {
+    if (!/\bdmarc=pass\b/.test(value)) return false;
+    const fromMatch = value.match(/\bheader\.from\s*=\s*([a-z0-9.-]+)/);
+    const authenticatedDomain = fromMatch?.[1]?.replace(/\.+$/, "") ?? "";
+    return authenticatedDomain === senderDomain;
+  });
+}
+
+/** Explicit provider authentication failures must never be bypassed by thread metadata. */
+export function inboundSenderAuthenticationExplicitlyFails(
+  headers: readonly InternetMessageHeader[] | null | undefined,
+): boolean {
+  return (headers ?? []).some((header) => {
+    if ((header.name ?? "").trim().toLowerCase() !== "authentication-results") return false;
+    const value = header.value?.trim().toLowerCase() ?? "";
+    return /\bdmarc=(?:fail|none|temperror|permerror|softfail)\b/.test(value);
+  });
+}
+
 /**
  * Prove an inbound message from an alternate address is still a real reply to
  * this request. This is deliberately stronger than sender matching:

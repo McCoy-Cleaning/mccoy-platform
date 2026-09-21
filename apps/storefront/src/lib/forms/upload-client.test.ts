@@ -38,6 +38,8 @@ describe("uploadWebsiteFormAttachments", () => {
           contentType: first.type,
           sizeBytes: first.size,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-front.jpg",
+          uploadBatchId: "11111111-1111-4111-8111-111111111111",
+          uploadCapability: "capability-123456789012345678901234567890",
           token: "token-1",
         },
         {
@@ -45,6 +47,8 @@ describe("uploadWebsiteFormAttachments", () => {
           contentType: second.type,
           sizeBytes: second.size,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/02-report.pdf",
+          uploadBatchId: "11111111-1111-4111-8111-111111111111",
+          uploadCapability: "capability-123456789012345678901234567890",
           token: "token-2",
         },
       ],
@@ -63,6 +67,10 @@ describe("uploadWebsiteFormAttachments", () => {
     expect(uploadToSignedUrl.mock.calls[1]?.[2]).toBe(second);
     expect(result).toHaveLength(2);
     expect(result[0]).not.toHaveProperty("token");
+    expect(result[0]).toMatchObject({
+      uploadBatchId: "11111111-1111-4111-8111-111111111111",
+      uploadCapability: "capability-123456789012345678901234567890",
+    });
   });
 
   it("surfaces storage failures instead of submitting without the file", async () => {
@@ -75,6 +83,8 @@ describe("uploadWebsiteFormAttachments", () => {
           contentType: file.type,
           sizeBytes: file.size,
           storagePath: "uploads/11111111-1111-4111-8111-111111111111/01-report.pdf",
+          uploadBatchId: "11111111-1111-4111-8111-111111111111",
+          uploadCapability: "capability-123456789012345678901234567890",
           token: "token-1",
         },
       ],

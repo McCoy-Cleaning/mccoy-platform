@@ -1,4 +1,5 @@
 /** Row shapes for public.website_requests / public.website_request_replies (snake_case as stored). */
+import type { AttachmentMeta } from "@mccoy/domain";
 
 export type WebsiteRequestReplyRow = {
   id: string;
@@ -24,7 +25,7 @@ export type WebsiteRequestRow = {
   submitter_company: string | null;
   subject: string;
   fields: Record<string, string>;
-  attachments: Array<{ filename: string; contentType: string; sizeBytes: number }>;
+  attachments: AttachmentMeta[];
   notification_state: string;
   notification_error: string | null;
   company_id: string | null;

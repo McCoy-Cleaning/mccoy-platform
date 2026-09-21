@@ -32,6 +32,7 @@ vi.mock("./persist-mail-graph-attachments", () => ({
 
 vi.mock("./graph-mail", () => ({
   getGraphReplyParentContext: (...args: unknown[]) => getGraphReplyParentContext(...args),
+  getGraphMessageInternetHeaders: vi.fn(async () => []),
 }));
 
 import { ingestGraphReplyCandidates } from "./ingest-graph-replies";
@@ -57,7 +58,12 @@ function graphMessage(extra: Record<string, unknown> = {}) {
     internetMessageId: "<in@example.com>",
     conversationId: "conv-1",
     from: { emailAddress: { address: "mike@example.com" } },
-    internetMessageHeaders: null,
+    internetMessageHeaders: [
+      {
+        name: "Authentication-Results",
+        value: "spf=pass smtp.mailfrom=example.com; dkim=pass; dmarc=pass header.from=example.com",
+      },
+    ],
     ...extra,
   };
 }
@@ -196,6 +202,73 @@ describe("ingestGraphReplyCandidates", () => {
     expect(result).toMatchObject({ appended: 1, unmatched: 0 });
     expect(upsertWebsiteRequestMailMessage).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: "req-1", direction: "inbound" }),
+    );
+  });
+
+  it("quarantines a same-address WR message when Exchange reports DMARC failure", async () => {
+    listKnownMailIdentitiesForMailbox.mockResolvedValue([]);
+    findWebsiteRequestIdByNumber.mockResolvedValue("req-1");
+    getWebsiteRequest.mockResolvedValue({
+      id: "req-1",
+      number: "WR-2026-00072",
+      status: "open",
+      submitterEmail: "mike@example.com",
+    });
+
+    const result = await ingestGraphReplyCandidates({
+      messages: [
+        graphMessage({
+          conversationId: "new-conversation",
+          internetMessageHeaders: [
+            {
+              name: "Authentication-Results",
+              value: "spf=fail; dkim=fail; dmarc=fail header.from=example.com",
+            },
+          ],
+        }),
+      ],
+      mailbox: "info@mccoy.nl",
+    });
+
+    expect(result).toMatchObject({ appended: 0, unmatched: 1, participantRejected: 0 });
+    expect(upsertWebsiteRequestMailMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not let an exact reply id bypass an explicit DMARC failure", async () => {
+    const result = await ingestGraphReplyCandidates({
+      messages: [
+        graphMessage({
+          conversationId: "new-conversation",
+          internetMessageHeaders: [
+            { name: "In-Reply-To", value: "<admin-reply@mccoy.nl>" },
+            {
+              name: "Authentication-Results",
+              value: "spf=fail; dkim=fail; dmarc=fail header.from=example.com",
+            },
+          ],
+        }),
+      ],
+      mailbox: "info@mccoy.nl",
+    });
+
+    expect(result).toMatchObject({ appended: 0, unmatched: 1, participantRejected: 1 });
+    expect(upsertWebsiteRequestMailMessage).not.toHaveBeenCalled();
+  });
+
+  it("accepts an exact known In-Reply-To chain when authentication headers are unavailable", async () => {
+    const result = await ingestGraphReplyCandidates({
+      messages: [
+        graphMessage({
+          conversationId: "other-conversation",
+          internetMessageHeaders: [{ name: "In-Reply-To", value: "<admin-reply@mccoy.nl>" }],
+        }),
+      ],
+      mailbox: "info@mccoy.nl",
+    });
+
+    expect(result).toMatchObject({ appended: 1, participantRejected: 0 });
+    expect(upsertWebsiteRequestMailMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "req-1", inReplyTo: "<admin-reply@mccoy.nl>" }),
     );
   });
 

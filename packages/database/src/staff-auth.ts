@@ -68,12 +68,7 @@ export type EstablishStaffSessionResult =
       ok: false;
       error: string;
       code?:
-        | "invalid_credentials"
-        | "not_staff"
-        | "blocked"
-        | "rate_limited"
-        | "config"
-        | "unknown";
+        "invalid_credentials" | "not_staff" | "blocked" | "rate_limited" | "config" | "unknown";
     };
 
 function isSupabaseStaffAuthReady(): boolean {
@@ -145,9 +140,7 @@ function createUserScopedClient(accessToken: string) {
 }
 
 /** Verified TOTP factor count for the given access token (0 when unavailable). */
-export async function countVerifiedTotpFactorsForAccessToken(
-  accessToken: string,
-): Promise<number> {
+export async function countVerifiedTotpFactorsForAccessToken(accessToken: string): Promise<number> {
   const client = createUserScopedClient(accessToken);
   const { data, error } = await client.auth.mfa.listFactors();
   if (error) return 0;
@@ -404,9 +397,7 @@ export async function reestablishStaffSessionAfterPasswordSet(input: {
   email: string;
   password: string;
   clientKey?: string;
-}): Promise<
-  EstablishStaffSessionResult & { browserHydration?: StaffSessionBrowserHydration }
-> {
+}): Promise<EstablishStaffSessionResult & { browserHydration?: StaffSessionBrowserHydration }> {
   if (!isSupabaseStaffAuthReady()) {
     return { ok: false, error: "Supabase is niet geconfigureerd.", code: "config" };
   }
@@ -462,12 +453,7 @@ export type EstablishStaffSessionFromCallbackResult =
       ok: false;
       error: string;
       code?:
-        | "invalid_credentials"
-        | "not_staff"
-        | "blocked"
-        | "rate_limited"
-        | "config"
-        | "unknown";
+        "invalid_credentials" | "not_staff" | "blocked" | "rate_limited" | "config" | "unknown";
     };
 
 /**
@@ -491,7 +477,10 @@ export async function establishStaffSessionFromEmailAuthCallback(input: {
     };
   }
 
-  const rateKey = (input.clientKey || input.tokenHash || input.code || "auth-callback").slice(0, 80);
+  const rateKey = (input.clientKey || input.tokenHash || input.code || "auth-callback").slice(
+    0,
+    80,
+  );
   try {
     assertAdminLoginRateLimit(rateKey);
   } catch (error) {
@@ -636,7 +625,9 @@ export async function hydrateRealtimeAccessToken(): Promise<
         code: "missing_session",
       };
     }
-    await resolveSupabasePrincipal(access, { allowMfaEnrollment: true });
+    // Realtime exposes RLS-protected admin metadata directly to the browser.
+    // Never issue its bearer token until the staff session has reached AAL2.
+    await resolveSupabasePrincipal(access, {});
     return { ok: true, hydration: buildRealtimeAccessHydration(access) };
   } catch (error) {
     if (error instanceof AdminAuthError) {
@@ -654,9 +645,7 @@ export async function hydrateRealtimeAccessToken(): Promise<
  * Begin a purpose-bound MFA browser flow (HttpOnly capability cookie).
  * Does not return Supabase tokens.
  */
-export async function startMfaBrowserFlow(input: {
-  purpose: AdminMfaBrowserPurpose;
-}): Promise<
+export async function startMfaBrowserFlow(input: { purpose: AdminMfaBrowserPurpose }): Promise<
   | { ok: true; purpose: AdminMfaBrowserPurpose; expiresAt: number }
   | {
       ok: false;
@@ -712,9 +701,7 @@ export async function startMfaBrowserFlow(input: {
 /**
  * Return access+refresh for temporary MFA `setSession` — requires active MFA-flow capability.
  */
-export async function ensureMfaBrowserSession(input: {
-  purpose: AdminMfaBrowserPurpose;
-}): Promise<
+export async function ensureMfaBrowserSession(input: { purpose: AdminMfaBrowserPurpose }): Promise<
   | { ok: true; hydration: MfaBrowserSessionHydration }
   | {
       ok: false;
@@ -899,7 +886,11 @@ export async function establishStaffSessionFromTokens(input: {
     }
     if (error instanceof Error) {
       const msg = error.message;
-      if (/getStaffUserById|Missing SUPABASE|SupabaseConfig|schema cache|relation .* does not exist/i.test(msg)) {
+      if (
+        /getStaffUserById|Missing SUPABASE|SupabaseConfig|schema cache|relation .* does not exist/i.test(
+          msg,
+        )
+      ) {
         return {
           ok: false,
           error:

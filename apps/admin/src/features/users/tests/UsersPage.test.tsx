@@ -93,6 +93,7 @@ function directoryOk(items: PortalUserRow[] = [anna, bram]) {
       activeCreatedLast7Days: 1,
       activeCreatedPrevious7Days: 0,
     },
+    truncation: null,
   };
 }
 
