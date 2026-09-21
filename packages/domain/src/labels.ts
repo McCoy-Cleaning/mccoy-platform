@@ -13,7 +13,8 @@ export const STATUS_LABELS: Record<RequestStatus, string> = {
   new: "Nieuw",
   open: "Open",
   replied: "Beantwoord",
-  closed: "Gesloten",
+  closed: "Afgerond",
+  deleted: "Verwijderd",
   spam: "Spam",
 };
 

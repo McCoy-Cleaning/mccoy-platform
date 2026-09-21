@@ -205,3 +205,59 @@ describe("InquiriesList inquiry status control", () => {
     expect(container.textContent).toContain("Status ingesteld op Gefactureerd.");
   });
 });
+
+describe("InquiriesList lifecycle visibility", () => {
+  it("makes a reopened customer reply stand out in the active list", () => {
+    const reopened = {
+      ...summary("reopened"),
+      lifecycleStatus: "open" as const,
+      unread: true,
+    };
+    const container = mount(
+      <InquiriesList
+        {...baseProps}
+        listState="ready"
+        items={[reopened]}
+        displayItems={[reopened]}
+      />,
+    );
+
+    expect(container.textContent).toContain("Nieuwe reactie");
+    expect(container.querySelector("li")?.className).toContain("bg-cyan-400");
+  });
+
+  it("removes unread decoration after an open request has been read", () => {
+    const readOpenRequest = {
+      ...summary("read-open"),
+      lifecycleStatus: "open" as const,
+      unread: false,
+    };
+    const container = mount(
+      <InquiriesList
+        {...baseProps}
+        listState="ready"
+        items={[readOpenRequest]}
+        displayItems={[readOpenRequest]}
+      />,
+    );
+
+    expect(container.textContent).not.toContain("Nieuwe reactie");
+    expect(container.querySelector("li")?.className).not.toContain("bg-cyan-400");
+    expect(container.querySelector('[aria-label="Ongelezen"]')).toBeNull();
+  });
+
+  it("labels resolved rows in the Afgerond section", () => {
+    const resolved = { ...summary("resolved"), lifecycleStatus: "closed" as const };
+    const container = mount(
+      <InquiriesList
+        {...baseProps}
+        lifecycle="resolved"
+        listState="ready"
+        items={[resolved]}
+        displayItems={[resolved]}
+      />,
+    );
+
+    expect(container.textContent).toContain("Afgerond");
+  });
+});

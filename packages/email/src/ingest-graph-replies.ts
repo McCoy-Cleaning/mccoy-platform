@@ -1,17 +1,30 @@
 /**
- * Bounded ingest of inbound Graph replies into website_request_mail_messages.
- * Called during inbox list so applicant replies append without becoming list rows.
+ * Bounded ingest of non-form messages from the Graph Inbox.
+ *
+ * A message is appended only when durable mail identity resolves exactly one
+ * inquiry, or an exact WR number is backed by per-request participant proof.
+ * Ordinary shared-mailbox traffic is outside the Aanvragen domain and ignored.
  */
 import {
+  findWebsiteRequestIdByNumber,
+  getWebsiteRequest,
   listKnownMailIdentitiesForMailbox,
+  recordUnmatchedInboundMail,
+  resolveUnmatchedInboundMail,
   upsertWebsiteRequestMailMessage,
 } from "@mccoy/database/server";
+import { isReplyOrForwardSubject } from "./form-mail-subject";
 import { getGraphMailConfig } from "./graph-config";
 import {
   correlateInboundGraphMessage,
+  extractWebsiteRequestNumberToken,
   parseReferencesHeader,
+  requestSubmitterIsParticipant,
+  verifiedReplyParentBelongsToWebsiteRequest,
 } from "./inquiry-thread-correlation";
-import { isReplyOrForwardSubject } from "./form-mail-subject";
+import { normaliseThreadMessageBody } from "./inquiry-thread-dedupe";
+
+type GraphRecipient = { emailAddress?: { address?: string | null } | null } | null;
 
 type LightweightGraphMessage = {
   id?: string;
@@ -22,9 +35,17 @@ type LightweightGraphMessage = {
   hasAttachments?: boolean;
   internetMessageId?: string | null;
   conversationId?: string | null;
-  from?: { emailAddress?: { address?: string | null } | null } | null;
+  from?: GraphRecipient;
+  toRecipients?: GraphRecipient[] | null;
   internetMessageHeaders?: Array<{ name?: string | null; value?: string | null }> | null;
 };
+
+function recipientAddresses(recipients: GraphRecipient[] | null | undefined): string[] {
+  if (!recipients?.length) return [];
+  return recipients
+    .map((recipient) => recipient?.emailAddress?.address?.trim().toLowerCase() || "")
+    .filter((address) => address.length > 0);
+}
 
 function readHeader(
   headers: LightweightGraphMessage["internetMessageHeaders"],
@@ -40,38 +61,137 @@ function readHeader(
   return null;
 }
 
+type RequestNumberResolution =
+  | {
+      status: "matched";
+      inquiryId: string;
+      submitterEmail: string | null;
+      verifiedReplyParent: boolean;
+      inReplyTo: string | null;
+      references: string[];
+    }
+  | { status: "inactive" }
+  | { status: "unresolved"; inquiryId: string | null }
+  | null;
+
+/**
+ * Recover a request-aware reply when the bounded identity index has no hit.
+ * An exact WR token is only a locator; request ownership still requires either
+ * the stored submitter as participant or an exact, independently verified
+ * outbound parent in Microsoft Graph.
+ */
+async function resolveByRequestNumber(options: {
+  msg: LightweightGraphMessage;
+  mailbox: string;
+  fromAddress: string | null;
+  toAddresses: string[];
+}): Promise<RequestNumberResolution> {
+  const subject = options.msg.subject || "";
+  const bodyPreview = options.msg.bodyPreview || "";
+  const requestNumber = extractWebsiteRequestNumberToken(subject, bodyPreview);
+  if (!requestNumber) return null;
+
+  const requestId = await findWebsiteRequestIdByNumber(requestNumber);
+  if (!requestId) return { status: "unresolved", inquiryId: null };
+  const request = await getWebsiteRequest(requestId);
+  if (!request) return { status: "unresolved", inquiryId: requestId };
+  if (request.status === "deleted" || request.status === "spam") {
+    return { status: "inactive" };
+  }
+
+  if (
+    requestSubmitterIsParticipant(
+      { fromAddress: options.fromAddress, toAddresses: options.toAddresses },
+      request.submitterEmail,
+    )
+  ) {
+    return {
+      status: "matched",
+      inquiryId: request.id,
+      submitterEmail: request.submitterEmail,
+      verifiedReplyParent: false,
+      inReplyTo: readHeader(options.msg.internetMessageHeaders, "in-reply-to"),
+      references: parseReferencesHeader(
+        readHeader(options.msg.internetMessageHeaders, "references"),
+      ),
+    };
+  }
+
+  if (!options.msg.id || !isReplyOrForwardSubject(subject)) {
+    return { status: "unresolved", inquiryId: request.id };
+  }
+
+  try {
+    const { getGraphReplyParentContext } = await import("./graph-mail");
+    const context = await getGraphReplyParentContext(options.msg.id, options.mailbox);
+    if (
+      context &&
+      verifiedReplyParentBelongsToWebsiteRequest({
+        mailbox: options.mailbox,
+        submitterEmail: request.submitterEmail,
+        requestNumber: request.number,
+        inReplyTo: context.inReplyTo,
+        reply: {
+          subject,
+          bodyPreview,
+          conversationId: options.msg.conversationId ?? null,
+          fromAddress: options.fromAddress,
+          toAddresses: options.toAddresses,
+        },
+        parent: context.parent,
+      })
+    ) {
+      return {
+        status: "matched",
+        inquiryId: request.id,
+        submitterEmail: request.submitterEmail,
+        verifiedReplyParent: true,
+        inReplyTo: context.inReplyTo,
+        references: context.references,
+      };
+    }
+  } catch (error) {
+    console.error("[ingest-graph-replies] parent verification failed", {
+      requestId,
+      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+
+  return { status: "unresolved", inquiryId: request.id };
+}
+
 export async function ingestGraphReplyCandidates(options: {
   messages: LightweightGraphMessage[];
   mailbox: string;
-}): Promise<{ appended: number; alreadyProcessed: number; unmatched: number }> {
+}): Promise<{
+  appended: number;
+  alreadyProcessed: number;
+  unmatched: number;
+  /** Mail dropped because the resolved request's submitter was not a participant. */
+  participantRejected: number;
+}> {
   const config = getGraphMailConfig();
   const mailbox = (options.mailbox || config?.mailbox || "").trim().toLowerCase();
-  if (!mailbox) {
-    return { appended: 0, alreadyProcessed: 0, unmatched: 0 };
-  }
+  const empty = { appended: 0, alreadyProcessed: 0, unmatched: 0, participantRejected: 0 };
+  if (!mailbox) return empty;
 
   const known = await listKnownMailIdentitiesForMailbox(mailbox);
-  if (known.length === 0) {
-    return { appended: 0, alreadyProcessed: 0, unmatched: 0 };
-  }
 
   let appended = 0;
   let alreadyProcessed = 0;
   let unmatched = 0;
+  let participantRejected = 0;
 
   for (const msg of options.messages) {
     if (!msg.id) continue;
     const subject = msg.subject || "";
-    // Only consider reply-shaped mail for append (form notifications stay list candidates).
-    if (!isReplyOrForwardSubject(subject) && !readHeader(msg.internetMessageHeaders, "in-reply-to")) {
-      continue;
-    }
-
     const inReplyTo = readHeader(msg.internetMessageHeaders, "in-reply-to");
-    const references = parseReferencesHeader(
-      readHeader(msg.internetMessageHeaders, "references"),
-    );
+    const references = parseReferencesHeader(readHeader(msg.internetMessageHeaders, "references"));
     const fromAddress = msg.from?.emailAddress?.address ?? null;
+    const toAddresses = recipientAddresses(msg.toRecipients);
+    const direction =
+      fromAddress && fromAddress.trim().toLowerCase() === mailbox ? "outbound" : "inbound";
+    if (direction === "outbound") continue;
 
     const result = correlateInboundGraphMessage(
       {
@@ -87,56 +207,165 @@ export async function ingestGraphReplyCandidates(options: {
       known,
     );
 
-    if (result.status === "unmatched" || result.status === "ambiguous") {
+    // The shared mailbox contains ordinary business mail that is unrelated to
+    // website requests. Only request-aware failures belong in the internal
+    // diagnostic table; ordinary mail stays in Outlook and is ignored here.
+    const correlatedIdentity =
+      result.status === "appended" || result.status === "already_processed"
+        ? (known.find((row) => row.inquiryId === result.inquiryId) ?? null)
+        : null;
+    const correlatedParticipant = correlatedIdentity
+      ? requestSubmitterIsParticipant(
+          { fromAddress, toAddresses },
+          correlatedIdentity.submitterEmail,
+        )
+      : false;
+    const numberResolution =
+      result.status === "unmatched" ||
+      result.status === "ambiguous" ||
+      !correlatedParticipant
+        ? await resolveByRequestNumber({ msg, mailbox, fromAddress, toAddresses })
+        : null;
+    if (numberResolution?.status === "inactive") continue;
+
+    const correlatedInquiryId =
+      result.status === "appended" || result.status === "already_processed"
+        ? result.inquiryId
+        : null;
+    const numberInquiryId =
+      numberResolution?.status === "matched" ? numberResolution.inquiryId : null;
+    const inquiryId = correlatedInquiryId ?? numberInquiryId;
+
+    if (!inquiryId) {
+      const diagnosticRequestIds = new Set<string>();
+      if (result.status === "ambiguous") {
+        for (const id of result.inquiryIds) diagnosticRequestIds.add(id);
+      }
+      if (numberResolution?.status === "unresolved" && numberResolution.inquiryId) {
+        diagnosticRequestIds.add(numberResolution.inquiryId);
+      }
+      if (diagnosticRequestIds.size === 0) continue;
+
       unmatched += 1;
+      await recordUnmatchedInboundMail({
+        mailbox,
+        provider: "microsoft_graph",
+        graphMessageId: msg.id,
+        internetMessageId: msg.internetMessageId ?? null,
+        conversationId: msg.conversationId ?? null,
+        senderAddress: fromAddress,
+        subject,
+        reason: result.status === "ambiguous" ? "ambiguous" : "unmatched",
+        candidateRequestIds: [...diagnosticRequestIds],
+        receivedAt: msg.receivedDateTime ?? null,
+      });
       continue;
     }
+
+    const resolved = correlatedIdentity;
+    const submitterEmail =
+      resolved?.submitterEmail ??
+      (numberResolution?.status === "matched" ? numberResolution.submitterEmail : null);
+    const verifiedReplyParent =
+      numberResolution?.status === "matched" &&
+      numberResolution.inquiryId === inquiryId &&
+      numberResolution.verifiedReplyParent;
+    // Stored Graph ids and conversation ids can themselves be contaminated by
+    // an older bad match. Re-check participant ownership for both new and
+    // already-processed mail before trusting that durable identity.
+    if (
+      !verifiedReplyParent &&
+      !requestSubmitterIsParticipant({ fromAddress, toAddresses }, submitterEmail)
+    ) {
+      participantRejected += 1;
+      const requestNumber = extractWebsiteRequestNumberToken(subject, msg.bodyPreview || "");
+      if (requestNumber) {
+        unmatched += 1;
+        await recordUnmatchedInboundMail({
+          mailbox,
+          provider: "microsoft_graph",
+          graphMessageId: msg.id,
+          internetMessageId: msg.internetMessageId ?? null,
+          conversationId: msg.conversationId ?? null,
+          senderAddress: fromAddress,
+          subject,
+          reason: "unmatched",
+          candidateRequestIds: [inquiryId],
+          receivedAt: msg.receivedDateTime ?? null,
+        });
+      }
+      continue;
+    }
+
     if (result.status === "already_processed") {
       alreadyProcessed += 1;
+      await resolveUnmatchedInboundMail({
+        mailbox,
+        graphMessageId: msg.id,
+        internetMessageId: msg.internetMessageId ?? null,
+        requestId: inquiryId,
+      });
       continue;
     }
 
     const upsert = await upsertWebsiteRequestMailMessage({
-      requestId: result.inquiryId,
-      direction: "inbound",
+      requestId: inquiryId,
+      direction,
       provider: "microsoft_graph",
       mailbox,
       graphMessageId: msg.id,
       internetMessageId: msg.internetMessageId ?? null,
       conversationId: msg.conversationId ?? null,
-      inReplyTo,
-      referencesHeader: references.join(" "),
+      inReplyTo:
+        numberResolution?.status === "matched" ? numberResolution.inReplyTo : inReplyTo,
+      referencesHeader:
+        numberResolution?.status === "matched"
+          ? numberResolution.references.join(" ")
+          : references.join(" "),
       senderAddress: fromAddress,
-      recipientAddresses: [mailbox],
+      recipientAddresses: toAddresses.length > 0 ? toAddresses : [mailbox],
       subject,
-      bodyText: msg.bodyPreview ?? null,
+      bodyText: normaliseThreadMessageBody(msg.bodyPreview ?? "", direction),
       occurredAt: msg.receivedDateTime ?? new Date().toISOString(),
       isRead: msg.isRead !== false,
     });
 
     if (upsert?.status === "appended") {
       appended += 1;
+      await resolveUnmatchedInboundMail({
+        mailbox,
+        graphMessageId: msg.id,
+        internetMessageId: msg.internetMessageId ?? null,
+        requestId: inquiryId,
+      });
       if (msg.hasAttachments !== false) {
-        const { persistMailMessageGraphAttachments } = await import(
-          "./persist-mail-graph-attachments"
-        );
+        const { persistMailMessageGraphAttachments } =
+          await import("./persist-mail-graph-attachments");
         await persistMailMessageGraphAttachments({
           mailMessageId: upsert.id,
           graphMessageId: msg.id,
           mailbox,
         });
       }
-      const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
-      await notifyApplicantReplyAppended({
-        requestId: result.inquiryId,
-        mailMessageId: upsert.id,
-        mailbox,
-        senderAddress: fromAddress,
-      });
+      if (direction === "inbound") {
+        const { notifyApplicantReplyAppended } = await import("./notify-applicant-reply");
+        await notifyApplicantReplyAppended({
+          requestId: inquiryId,
+          mailMessageId: upsert.id,
+          mailbox,
+          senderAddress: fromAddress,
+        });
+      }
     } else if (upsert?.status === "already_processed") {
       alreadyProcessed += 1;
+      await resolveUnmatchedInboundMail({
+        mailbox,
+        graphMessageId: msg.id,
+        internetMessageId: msg.internetMessageId ?? null,
+        requestId: inquiryId,
+      });
     }
   }
 
-  return { appended, alreadyProcessed, unmatched };
+  return { appended, alreadyProcessed, unmatched, participantRejected };
 }

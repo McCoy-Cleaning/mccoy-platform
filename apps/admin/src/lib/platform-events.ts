@@ -7,7 +7,13 @@ type PlatformEvent =
       /** Allowlisted category, e.g. requests */
       category: string;
     }
-  | { type: "notification-read"; notificationId: string }
+  | {
+      type: "notification-read";
+      notificationId: string;
+      category?: string;
+      entityType?: string | null;
+      entityId?: string | null;
+    }
   | { type: "notification-refresh-failed"; errorCode: string }
   | { type: "notification-connection-restored" }
   | {
@@ -42,9 +48,14 @@ export function subscribePlatformEvents(listener: Listener): () => void {
 
 /** True when Aanvragen list should refetch for this notification. */
 export function shouldRefreshInquiriesForNotification(event: PlatformEvent): boolean {
-  if (event.type !== "notification-received") return false;
-  if (event.category === "requests") return true;
-  return event.notificationType.startsWith("website_request.");
+  if (event.type === "notification-received") {
+    if (event.category === "requests") return true;
+    return event.notificationType.startsWith("website_request.");
+  }
+  if (event.type === "notification-read") {
+    return event.category === "requests" || event.entityType === "website_request";
+  }
+  return false;
 }
 
 export type { PlatformEvent };

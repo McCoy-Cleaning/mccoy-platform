@@ -2,10 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import * as React from "react";
-import {
-  emitPlatformEvent,
-  shouldRefreshInquiriesForNotification,
-} from "@/lib/platform-events";
+import { emitPlatformEvent, shouldRefreshInquiriesForNotification } from "@/lib/platform-events";
 import { useInquiriesRealtimeRefresh } from "../hooks/useInquiriesRealtimeRefresh";
 
 describe("shouldRefreshInquiriesForNotification", () => {
@@ -31,11 +28,26 @@ describe("shouldRefreshInquiriesForNotification", () => {
     ).toBe(false);
   });
 
-  it("ignores non-received events", () => {
+  it("refreshes when a request notification becomes read", () => {
     expect(
       shouldRefreshInquiriesForNotification({
         type: "notification-read",
         notificationId: "n3",
+        category: "requests",
+        entityType: "website_request",
+        entityId: "request-1",
+      }),
+    ).toBe(true);
+  });
+
+  it("ignores read events outside requests", () => {
+    expect(
+      shouldRefreshInquiriesForNotification({
+        type: "notification-read",
+        notificationId: "n4",
+        category: "cms",
+        entityType: "cms_page",
+        entityId: "page-1",
       }),
     ).toBe(false);
   });
@@ -101,5 +113,44 @@ describe("useInquiriesRealtimeRefresh", () => {
     expect(loadList).toHaveBeenCalledTimes(1);
     expect(softRefreshDetail).toHaveBeenCalledTimes(1);
     expect(softRefreshDetail).toHaveBeenCalledWith("req:website-requests:abc");
+  });
+
+  it("refreshes unread rows without re-syncing the open thread on a read event", async () => {
+    vi.useFakeTimers();
+    const loadList = vi.fn();
+    const softRefreshDetail = vi.fn();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function Harness() {
+      useInquiriesRealtimeRefresh({
+        loadList,
+        selectedId: "req:website-requests:abc",
+        softRefreshDetail,
+        debounceMs: 200,
+      });
+      return null;
+    }
+
+    act(() => {
+      root.render(<Harness />);
+    });
+    act(() => {
+      emitPlatformEvent({
+        type: "notification-read",
+        notificationId: "n-read",
+        category: "requests",
+        entityType: "website_request",
+        entityId: "abc",
+      });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(loadList).toHaveBeenCalledTimes(1);
+    expect(softRefreshDetail).not.toHaveBeenCalled();
   });
 });

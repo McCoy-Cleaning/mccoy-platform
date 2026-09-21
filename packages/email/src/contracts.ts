@@ -48,6 +48,7 @@ export {
   type FormInboxMessage,
   type FormInboxMessageSummary,
   type FormInboxThreadItem,
+  type InboxLifecycleView,
 } from "./form-inbox-contracts";
 export {
   decodeInboxMessageId,

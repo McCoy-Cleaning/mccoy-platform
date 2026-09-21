@@ -14,7 +14,6 @@ import { extractRequestNumber } from "./classify-form-email";
 import { getGraphMailConfig } from "./graph-config";
 import type { GraphInboxSyncCandidate } from "./graph-inbox-sync-types";
 import { ingestGraphReplyCandidates } from "./ingest-graph-replies";
-import { isReplyOrForwardSubject } from "./form-mail-subject";
 
 export type { GraphInboxSyncCandidate } from "./graph-inbox-sync-types";
 
@@ -61,14 +60,19 @@ export async function syncGraphInboxAfterList(options: {
   mailbox?: string;
 }): Promise<{
   rootsPersisted: number;
-  replies: { appended: number; alreadyProcessed: number; unmatched: number };
+  replies: {
+    appended: number;
+    alreadyProcessed: number;
+    unmatched: number;
+    participantRejected: number;
+  };
 }> {
   const config = getGraphMailConfig();
   const mailbox = (options.mailbox || config?.mailbox || "").trim().toLowerCase();
   if (!mailbox || options.candidates.length === 0) {
     return {
       rootsPersisted: 0,
-      replies: { appended: 0, alreadyProcessed: 0, unmatched: 0 },
+      replies: { appended: 0, alreadyProcessed: 0, unmatched: 0, participantRejected: 0 },
     };
   }
 
@@ -84,14 +88,15 @@ export async function syncGraphInboxAfterList(options: {
     });
   }
 
-  let replies = { appended: 0, alreadyProcessed: 0, unmatched: 0 };
+  let replies = { appended: 0, alreadyProcessed: 0, unmatched: 0, participantRejected: 0 };
   try {
-    const replyShaped = options.candidates.filter((msg) =>
-      isReplyOrForwardSubject(msg.subject),
-    );
-    if (replyShaped.length > 0) {
+    // Correlation decides whether a non-form Inbox message belongs to an
+    // inquiry. Ordinary mailbox traffic is ignored by the request pipeline;
+    // request-aware failures retain internal diagnostic metadata only.
+    const receivedMail = options.candidates.filter((msg) => !msg.isFormCandidate);
+    if (receivedMail.length > 0) {
       replies = await ingestGraphReplyCandidates({
-        messages: replyShaped.map((msg) => ({
+        messages: receivedMail.map((msg) => ({
           id: msg.id,
           subject: msg.subject,
           bodyPreview: msg.bodyPreview,
@@ -100,9 +105,11 @@ export async function syncGraphInboxAfterList(options: {
           hasAttachments: msg.hasAttachments,
           internetMessageId: msg.internetMessageId,
           conversationId: msg.conversationId,
-          from: msg.fromAddress
-            ? { emailAddress: { address: msg.fromAddress } }
-            : null,
+          from: msg.fromAddress ? { emailAddress: { address: msg.fromAddress } } : null,
+          toRecipients: (msg.toAddresses ?? []).map((address) => ({
+            emailAddress: { address },
+          })),
+          internetMessageHeaders: msg.internetMessageHeaders,
         })),
         mailbox,
       });
@@ -114,4 +121,33 @@ export async function syncGraphInboxAfterList(options: {
   }
 
   return { rootsPersisted, replies };
+}
+
+/**
+ * Refresh the bounded Graph Inbox routing window without making the normal
+ * Aanvragen list depend on Graph latency. Kept as a server-side operational
+ * hook for explicit mailbox reconciliation.
+ */
+export async function refreshGraphInboxRouting(options?: {
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<Awaited<ReturnType<typeof syncGraphInboxAfterList>>> {
+  const config = getGraphMailConfig();
+  if (!config) {
+    return {
+      rootsPersisted: 0,
+      replies: { appended: 0, alreadyProcessed: 0, unmatched: 0, participantRejected: 0 },
+    };
+  }
+
+  const { listGraphFormInboxMessages } = await import("./graph-mail");
+  const listed = await listGraphFormInboxMessages({
+    limit: Math.min(Math.max(options?.limit ?? 80, 1), 200),
+    scanLimit: Math.min(Math.max(options?.limit ?? 80, 1), 200),
+    signal: options?.signal,
+  });
+  return syncGraphInboxAfterList({
+    candidates: listed.syncCandidates ?? [],
+    mailbox: config.mailbox,
+  });
 }

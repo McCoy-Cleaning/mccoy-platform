@@ -1,25 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Building2,
-  Loader2,
-  Save,
-  UserPlus,
-  Users,
-} from "lucide-react";
-import {
-  partyTypeLabelNl,
-  portalStatusLabelNl,
-  type CompanyPartyType,
-  type CustomerPortalStatus,
-} from "@mccoy/domain";
+import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
+import type { CompanyPartyType, CustomerPortalStatus } from "@mccoy/domain";
 
-import { PageHeader } from "@/components/admin/AdminBits";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { AppDialog } from "@/components/admin/AppDialog";
+import { ConfirmationDialog } from "@/components/admin/ConfirmationDialog";
 import { Button } from "@/components/ui/button";
+import { useAdminSession } from "@/lib/admin-auth";
 import {
   getAdminCompanyPortalDetail,
   inviteAdminPortalAccountAdmin,
@@ -31,59 +20,30 @@ import {
   updateAdminCompany,
   updateAdminCustomer,
 } from "@/lib/api/admin-customers.functions";
-
-type CompanyDetail = {
-  id: string;
-  legalName: string;
-  displayName: string | null;
-  companyType: string;
-  partyType: CompanyPartyType;
-  status: string;
-  invoiceAllowed: boolean;
-  email: string | null;
-  phone: string | null;
-  kvkNumber: string | null;
-  vatNumber: string | null;
-  contactPersonName: string | null;
-  addressStreet: string | null;
-  addressHouseNumber: string | null;
-  addressHouseSuffix: string | null;
-  addressPostalCode: string | null;
-  addressCity: string | null;
-  addressCountry: string | null;
-  notes: string | null;
-  externalCustomerId: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type Member = {
-  userId: string;
-  email: string;
-  fullName: string | null;
-  phone: string | null;
-  role: string;
-  membershipStatus: string;
-  userStatus: string;
-};
-
-type Invitation = {
-  email: string;
-  intendedRole: string;
-  status: string;
-  expiresAt: string;
-  reminderCount: number;
-};
+import {
+  CompanyProfileLayout,
+  type CompanyProfileCompany,
+  type CompanyProfileInvitation,
+  type CompanyProfileMember,
+} from "./components/CompanyProfileLayout";
+import {
+  companyNoteIndex,
+  formatStaffNoteAuthor,
+  prependCompanyNote,
+  removeCompanyNote,
+  replaceCompanyNote,
+  type ProfileNote,
+} from "./lib/company-profile";
 
 type DetailState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | {
       status: "ok";
-      company: CompanyDetail;
+      company: CompanyProfileCompany;
       portalStatus: CustomerPortalStatus;
-      members: Member[];
-      invitations: Invitation[];
+      members: CompanyProfileMember[];
+      invitations: CompanyProfileInvitation[];
     };
 
 type CompanyForm = {
@@ -106,7 +66,7 @@ type CompanyForm = {
   status: "pending" | "active" | "blocked";
 };
 
-function companyToForm(company: CompanyDetail): CompanyForm {
+function companyToForm(company: CompanyProfileCompany): CompanyForm {
   return {
     legalName: company.legalName,
     displayName: company.displayName ?? "",
@@ -129,93 +89,110 @@ function companyToForm(company: CompanyDetail): CompanyForm {
   };
 }
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block text-sm text-white/80 ${className ?? ""}`}>
-      <span className="text-white/55">{label}</span>
-      <div className="mt-1">{children}</div>
-    </label>
-  );
+function mapCompany(res: {
+  id: string;
+  legalName: string;
+  displayName: string | null;
+  companyType: string;
+  partyType: string;
+  status: string;
+  invoiceAllowed: boolean;
+  email: string | null;
+  phone: string | null;
+  kvkNumber: string | null;
+  vatNumber: string | null;
+  contactPersonName: string | null;
+  addressStreet: string | null;
+  addressHouseNumber: string | null;
+  addressHouseSuffix: string | null;
+  addressPostalCode: string | null;
+  addressCity: string | null;
+  addressCountry: string | null;
+  notes: string | null;
+  externalCustomerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}): CompanyProfileCompany {
+  return {
+    id: res.id,
+    legalName: res.legalName,
+    displayName: res.displayName,
+    companyType: res.companyType,
+    partyType: res.partyType === "private_person" ? "private_person" : "company",
+    status: res.status,
+    invoiceAllowed: res.invoiceAllowed,
+    email: res.email,
+    phone: res.phone,
+    kvkNumber: res.kvkNumber,
+    vatNumber: res.vatNumber,
+    contactPersonName: res.contactPersonName,
+    addressStreet: res.addressStreet,
+    addressHouseNumber: res.addressHouseNumber,
+    addressHouseSuffix: res.addressHouseSuffix,
+    addressPostalCode: res.addressPostalCode,
+    addressCity: res.addressCity,
+    addressCountry: res.addressCountry,
+    notes: res.notes,
+    externalCustomerId: res.externalCustomerId ?? null,
+    createdAt: res.createdAt,
+    updatedAt: res.updatedAt,
+  };
 }
 
 export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
+  const navigate = useNavigate();
   const [state, setState] = useState<DetailState>({ status: "loading" });
   const [form, setForm] = useState<CompanyForm | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteRole, setInviteRole] = useState<"account_admin" | "account_user">("account_admin");
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [memberEdit, setMemberEdit] = useState<Member | null>(null);
+  const [inviteRole, setInviteRole] = useState<"account_admin" | "account_user">("account_user");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [editNote, setEditNote] = useState<ProfileNote | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [deleteNote, setDeleteNote] = useState<ProfileNote | null>(null);
+  const [portalConfirmOpen, setPortalConfirmOpen] = useState(false);
+  const [memberEdit, setMemberEdit] = useState<CompanyProfileMember | null>(null);
+  const [transferUserId, setTransferUserId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteFirstName, setInviteFirstName] = useState("");
   const [inviteLastName, setInviteLastName] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
-  const [transferUserId, setTransferUserId] = useState("");
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const { session } = useAdminSession();
 
-  const reload = (opts?: { keepForm?: boolean }) => {
+  const reload = () => {
     setState({ status: "loading" });
     void getAdminCompanyPortalDetail({ data: { companyId } }).then((res) => {
       if (!res.ok) {
         setState({ status: "error", message: res.error });
         return;
       }
-      const company: CompanyDetail = {
-        id: res.company.id,
-        legalName: res.company.legalName,
-        displayName: res.company.displayName,
-        companyType: res.company.companyType,
-        partyType: res.company.partyType === "private_person" ? "private_person" : "company",
-        status: res.company.status,
-        invoiceAllowed: res.company.invoiceAllowed,
-        email: res.company.email,
-        phone: res.company.phone,
-        kvkNumber: res.company.kvkNumber,
-        vatNumber: res.company.vatNumber,
-        contactPersonName: res.company.contactPersonName,
-        addressStreet: res.company.addressStreet,
-        addressHouseNumber: res.company.addressHouseNumber,
-        addressHouseSuffix: res.company.addressHouseSuffix,
-        addressPostalCode: res.company.addressPostalCode,
-        addressCity: res.company.addressCity,
-        addressCountry: res.company.addressCountry,
-        notes: res.company.notes,
-        externalCustomerId: res.company.externalCustomerId ?? null,
-        createdAt: res.company.createdAt,
-        updatedAt: res.company.updatedAt,
-      };
+      const company = mapCompany(res.company);
       setState({
         status: "ok",
         company,
         portalStatus: res.portalStatus,
-        members: res.members.map((m) => ({
-          userId: m.userId,
-          email: m.email,
-          fullName: m.fullName,
-          phone: m.phone,
-          role: m.role,
-          membershipStatus: m.membershipStatus,
-          userStatus: m.userStatus,
+        members: res.members.map((member) => ({
+          userId: member.userId,
+          email: member.email,
+          fullName: member.fullName,
+          phone: member.phone,
+          role: member.role,
+          membershipStatus: member.membershipStatus,
+          userStatus: member.userStatus,
         })),
-        invitations: res.invitations.map((i) => ({
-          email: i.email,
-          intendedRole: i.intendedRole,
-          status: i.status,
-          expiresAt: i.expiresAt,
-          reminderCount: i.reminderCount,
+        invitations: res.invitations.map((invite) => ({
+          email: invite.email,
+          intendedRole: invite.intendedRole,
+          status: invite.status,
+          expiresAt: invite.expiresAt,
+          reminderCount: invite.reminderCount,
         })),
       });
-      if (!opts?.keepForm) setForm(companyToForm(company));
+      setForm(companyToForm(company));
     });
   };
 
@@ -224,28 +201,22 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
-  const baseline = state.status === "ok" ? companyToForm(state.company) : null;
-  const dirty = useMemo(() => {
-    if (!form || !baseline) return false;
-    return JSON.stringify(form) !== JSON.stringify(baseline);
-  }, [form, baseline]);
-
-  if (state.status === "loading" || !form) {
+  if (state.status === "loading") {
     return (
       <div className="flex items-center gap-3 p-10 text-white/60" aria-busy="true">
-        <Loader2 className="h-5 w-5 animate-spin" /> Portaal laden…
+        <Loader2 className="h-5 w-5 animate-spin" />
+        Bedrijfsprofiel laden…
       </div>
     );
   }
   if (state.status === "error") {
-    return <ErrorState title="Klant niet geladen" message={state.message} />;
+    return <ErrorState title="Klant niet geladen" message={state.message} onRetry={reload} />;
+  }
+  if (!form) {
+    return <EmptyState title="Klantgegevens ontbreken" description="Probeer de pagina opnieuw te laden." />;
   }
 
   const { company, portalStatus, members, invitations } = state;
-  const admin = members.find((m) => m.role === "account_admin" && m.membershipStatus === "active");
-  const accountUsers = members.filter((m) => m.role === "account_user");
-  const pendingInvites = invitations.filter((i) => i.status === "pending");
-  const selectedMember = members.find((m) => m.userId === selectedMemberId) ?? null;
   const isPrivate = form.partyType === "private_person";
 
   function patchForm<K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) {
@@ -253,639 +224,435 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
     setSaveError(null);
   }
 
-  async function saveCompany() {
-    if (!form) return;
+  async function saveCompany(next?: Partial<CompanyForm>) {
+    if (!form) return false;
+    const payload = { ...form, ...next };
     setBusy(true);
     setSaveError(null);
     const res = await updateAdminCompany({
       data: {
         companyId: company.id,
-        legalName: form.legalName.trim(),
-        displayName: form.displayName.trim() || null,
-        partyType: form.partyType,
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        kvkNumber:
-          form.partyType === "private_person" ? null : (form.kvkNumber.trim() || null),
+        legalName: payload.legalName.trim(),
+        displayName: payload.displayName.trim() || null,
+        partyType: payload.partyType,
+        email: payload.email.trim() || null,
+        phone: payload.phone.trim() || null,
+        kvkNumber: payload.partyType === "private_person" ? null : payload.kvkNumber.trim() || null,
         vatNumber:
-          form.partyType === "private_person"
+          payload.partyType === "private_person"
             ? null
-            : form.vatNumber.trim()
-              ? form.vatNumber.trim().toUpperCase()
+            : payload.vatNumber.trim()
+              ? payload.vatNumber.trim().toUpperCase()
               : null,
-        contactPersonName: form.contactPersonName.trim() || null,
-        addressStreet: form.addressStreet.trim() || null,
-        addressHouseNumber: form.addressHouseNumber.trim() || null,
-        addressHouseSuffix: form.addressHouseSuffix.trim() || null,
-        addressPostalCode: form.addressPostalCode.trim() || null,
-        addressCity: form.addressCity.trim() || null,
-        addressCountry: form.addressCountry.trim() || null,
-        invoiceAllowed: form.invoiceAllowed,
-        notes: form.notes.trim() || null,
-        status: form.status,
+        contactPersonName: payload.contactPersonName.trim() || null,
+        addressStreet: payload.addressStreet.trim() || null,
+        addressHouseNumber: payload.addressHouseNumber.trim() || null,
+        addressHouseSuffix: payload.addressHouseSuffix.trim() || null,
+        addressPostalCode: payload.addressPostalCode.trim() || null,
+        addressCity: payload.addressCity.trim() || null,
+        addressCountry: payload.addressCountry.trim() || null,
+        invoiceAllowed: payload.invoiceAllowed,
+        notes: payload.notes.trim() || null,
+        status: payload.status,
       },
     });
     setBusy(false);
     if (!res.ok) {
       setSaveError(res.error);
       setFlash(res.error);
-      return;
+      return false;
     }
-    setFlash("Klantgegevens opgeslagen.");
-    reload();
+    return true;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Link
-        to="/customers"
-        search={{ tab: "portal", q: "", status: "all", portalStatus: "all", page: 1 }}
-        className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white"
-      >
-        <ArrowLeft className="h-4 w-4" /> Terug naar serviceklanten
-      </Link>
-
-      <PageHeader
-        icon={Building2}
-        accent="#22c55e"
-        title={company.displayName || company.legalName}
-        subtitle={`${partyTypeLabelNl(company.partyType)} · ${portalStatusLabelNl(portalStatus)}`}
-        actions={[
-          {
-            label: "Gebruiker uitnodigen",
-            icon: UserPlus,
-            onClick: () => {
-              setInviteRole("account_user");
-              setInviteOpen(true);
-            },
-          },
-          {
-            label: "Accountbeheerder uitnodigen",
-            icon: Building2,
-            onClick: () => {
-              setInviteRole("account_admin");
-              setInviteOpen(true);
-            },
-          },
-        ]}
+    <>
+      <CompanyProfileLayout
+        company={company}
+        portalStatus={portalStatus}
+        members={members}
+        invitations={invitations}
+        flash={flash}
+        busy={busy}
+        onInviteUser={() => {
+          setInviteRole("account_user");
+          setInviteOpen(true);
+        }}
+        onEditCompany={() => {
+          setForm(companyToForm(company));
+          setSaveError(null);
+          setEditOpen(true);
+        }}
+        onChangePortalStatus={() => setPortalConfirmOpen(true)}
+        onAddNote={() => {
+          setNoteDraft("");
+          setNoteOpen(true);
+        }}
+        onEditNote={(note) => {
+          setEditNote(note);
+          setEditDraft(note.body);
+          setSaveError(null);
+        }}
+        onDeleteNote={setDeleteNote}
+        onViewMember={(member) => {
+          void navigate({
+            to: "/users/$userId",
+            // Composite directory id keeps the company scope; a bare user id would let the
+            // detail page resolve a different company for multi-company members.
+            params: { userId: `m:${companyId}:${member.userId}` },
+            search: { q: "", companyId: undefined, userId: undefined, page: 1 },
+          });
+        }}
+        onEditMember={setMemberEdit}
+        onToggleMembership={(member) => {
+          void (async () => {
+            setBusy(true);
+            const next = member.membershipStatus === "active" ? "suspended" : "active";
+            const res = await setAdminPortalMembershipStatus({
+              data: { companyId: company.id, userId: member.userId, status: next },
+            });
+            setBusy(false);
+            if (!res.ok) setFlash(res.error);
+            else {
+              setFlash(next === "suspended" ? "Lidmaatschap opgeschort." : "Lidmaatschap hersteld.");
+              reload();
+            }
+          })();
+        }}
+        onToggleBlock={(member) => {
+          void (async () => {
+            setBusy(true);
+            const blocked = member.userStatus !== "blocked";
+            const res = await setAdminCustomerBlocked({
+              data: { customerId: member.userId, blocked },
+            });
+            setBusy(false);
+            if (!res.ok) setFlash(res.error);
+            else {
+              setFlash(blocked ? "Gebruikersaccount geblokkeerd." : "Gebruikersaccount gedeblokkeerd.");
+              reload();
+            }
+          })();
+        }}
+        onTransferAdmin={(member) => setTransferUserId(member.userId)}
+        onResendInvite={(invite) => {
+          void (async () => {
+            setBusy(true);
+            const res = await resendAdminPortalInvitation({
+              data: {
+                companyId: company.id,
+                email: invite.email,
+                intendedRole: invite.intendedRole === "account_admin" ? "account_admin" : "account_user",
+              },
+            });
+            setBusy(false);
+            if (!res.ok) setFlash(res.error);
+            else {
+              setFlash("Uitnodiging opnieuw verstuurd.");
+              reload();
+            }
+          })();
+        }}
       />
 
-      {flash ? (
-        <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm" role="status">
-          {flash}
-        </p>
-      ) : null}
-
-      {dirty ? (
-        <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-[#0b1a12]/95 px-4 py-3 shadow-lg backdrop-blur">
-          <p className="text-sm text-emerald-100/90">Je hebt niet-opgeslagen wijzigingen.</p>
-          <div className="flex gap-2">
+      <AppDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        title="Bedrijf bewerken"
+        description="Wijzigingen worden server-side opgeslagen. Facturatie toegestaan blijft alleen een weergave- en beleidsvlag."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={busy}>
+              Annuleren
+            </Button>
             <Button
               type="button"
-              variant="outline"
-              disabled={busy}
+              loading={busy}
               onClick={() => {
-                setForm(companyToForm(company));
-                setSaveError(null);
+                void saveCompany().then((ok) => {
+                  if (!ok) return;
+                  setEditOpen(false);
+                  setFlash("Klantgegevens opgeslagen.");
+                  reload();
+                });
               }}
             >
-              Ongedaan maken
-            </Button>
-            <Button type="button" loading={busy} onClick={() => void saveCompany()}>
-              <Save className="mr-2 h-4 w-4" aria-hidden />
               Opslaan
             </Button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.9fr)]">
-        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Klantgegevens</h2>
-              <p className="mt-1 text-sm text-white/50">
-                Bewerk alle velden hieronder. Extern klantnummer blijft vast (import-identiteit).
-              </p>
-            </div>
-            <Button type="button" loading={busy} disabled={!dirty} onClick={() => void saveCompany()}>
-              <Save className="mr-2 h-4 w-4" aria-hidden />
-              Opslaan
-            </Button>
-          </div>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <Field label="Klantsoort">
-              <select
-                className="a-input w-full"
-                value={form.partyType}
-                onChange={(e) =>
-                  patchForm("partyType", e.target.value as CompanyPartyType)
-                }
-              >
-                <option value="company">Bedrijf</option>
-                <option value="private_person">Particulier</option>
-              </select>
-            </Field>
-            <Field label="Operationele status">
-              <select
-                className="a-input w-full"
-                value={form.status}
-                onChange={(e) =>
-                  patchForm("status", e.target.value as CompanyForm["status"])
-                }
-              >
-                <option value="active">Actief</option>
-                <option value="pending">In afwachting</option>
-                <option value="blocked">Geblokkeerd / portaal opgeschort</option>
-              </select>
-            </Field>
-            <Field label={isPrivate ? "Naam (juridisch / volledig)" : "Bedrijfsnaam (juridisch)"} className="sm:col-span-2">
-              <input
-                className="a-input w-full"
-                value={form.legalName}
-                onChange={(e) => patchForm("legalName", e.target.value)}
-              />
-            </Field>
-            <Field label={isPrivate ? "Weergavenaam (optioneel)" : "Handelsnaam"}>
-              <input
-                className="a-input w-full"
-                value={form.displayName}
-                onChange={(e) => patchForm("displayName", e.target.value)}
-              />
-            </Field>
-            <Field label="Contactpersoon">
-              <input
-                className="a-input w-full"
-                value={form.contactPersonName}
-                onChange={(e) => patchForm("contactPersonName", e.target.value)}
-              />
-            </Field>
-            <Field label="E-mail">
-              <input
-                className="a-input w-full"
-                type="email"
-                value={form.email}
-                onChange={(e) => patchForm("email", e.target.value)}
-              />
-            </Field>
-            <Field label="Telefoon">
-              <input
-                className="a-input w-full"
-                value={form.phone}
-                onChange={(e) => patchForm("phone", e.target.value)}
-              />
-            </Field>
-            <Field label="KVK (8 cijfers)">
-              <input
-                className="a-input w-full"
-                inputMode="numeric"
-                maxLength={8}
-                value={form.kvkNumber}
-                onChange={(e) => patchForm("kvkNumber", e.target.value.replace(/\D/g, "").slice(0, 8))}
-                disabled={isPrivate}
-                placeholder={isPrivate ? "N.v.t. voor particulier" : ""}
-              />
-            </Field>
-            <Field label="BTW-nummer">
-              <input
-                className="a-input w-full"
-                value={form.vatNumber}
-                onChange={(e) => patchForm("vatNumber", e.target.value)}
-                disabled={isPrivate}
-                placeholder={isPrivate ? "N.v.t. voor particulier" : ""}
-              />
-            </Field>
-            <Field label="Straat">
-              <input
-                className="a-input w-full"
-                value={form.addressStreet}
-                onChange={(e) => patchForm("addressStreet", e.target.value)}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Huisnr.">
-                <input
-                  className="a-input w-full"
-                  value={form.addressHouseNumber}
-                  onChange={(e) => patchForm("addressHouseNumber", e.target.value)}
-                />
-              </Field>
-              <Field label="Toev.">
-                <input
-                  className="a-input w-full"
-                  value={form.addressHouseSuffix}
-                  onChange={(e) => patchForm("addressHouseSuffix", e.target.value)}
-                />
-              </Field>
-            </div>
-            <Field label="Postcode">
-              <input
-                className="a-input w-full"
-                value={form.addressPostalCode}
-                onChange={(e) => patchForm("addressPostalCode", e.target.value)}
-              />
-            </Field>
-            <Field label="Plaats">
-              <input
-                className="a-input w-full"
-                value={form.addressCity}
-                onChange={(e) => patchForm("addressCity", e.target.value)}
-              />
-            </Field>
-            <Field label="Land">
-              <input
-                className="a-input w-full"
-                value={form.addressCountry}
-                onChange={(e) => patchForm("addressCountry", e.target.value)}
-              />
-            </Field>
-            <Field label="Factuur toegestaan">
-              <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-white/20"
-                  checked={form.invoiceAllowed}
-                  onChange={(e) => patchForm("invoiceAllowed", e.target.checked)}
-                />
-                <span className="text-sm text-white/75">Server-side factuurrechten</span>
-              </label>
-            </Field>
-            <Field label="Notities (intern)" className="sm:col-span-2">
-              <textarea
-                className="a-input min-h-[96px] w-full"
-                value={form.notes}
-                onChange={(e) => patchForm("notes", e.target.value)}
-              />
-            </Field>
-          </div>
-          {saveError ? <p className="mt-3 text-sm text-red-300">{saveError}</p> : null}
-        </section>
-
-        <aside className="space-y-4">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm">
-            <h2 className="text-lg font-semibold">Portaal</h2>
-            <dl className="mt-4 space-y-3">
-              <div>
-                <dt className="text-white/45">Portaalstatus</dt>
-                <dd className="mt-1">
-                  <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/80">
-                    {portalStatusLabelNl(portalStatus)}
-                  </span>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-white/45">Extern klantnummer</dt>
-                <dd className="mt-1 font-mono text-white/85">{company.externalCustomerId || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-white/45">Accountbeheerder</dt>
-                <dd className="mt-1 text-white/85">
-                  {admin ? `${admin.fullName || admin.email} (${admin.email})` : "Nog geen"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-white/45">Aangemaakt</dt>
-                <dd className="mt-1 text-white/70">
-                  {new Date(company.createdAt).toLocaleString("nl-NL")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-white/45">Laatst bijgewerkt</dt>
-                <dd className="mt-1 text-white/70">
-                  {new Date(company.updatedAt).toLocaleString("nl-NL")}
-                </dd>
-              </div>
-            </dl>
-            <div className="mt-4 flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  void (async () => {
-                    setBusy(true);
-                    const blocked = company.status !== "blocked";
-                    const res = await updateAdminCompany({
-                      data: {
-                        companyId: company.id,
-                        status: blocked ? "blocked" : "active",
-                      },
-                    });
-                    setBusy(false);
-                    if (!res.ok) setFlash(res.error);
-                    else {
-                      setFlash(blocked ? "Portaaltoegang opgeschort." : "Portaaltoegang hersteld.");
-                      reload();
-                    }
-                  })();
-                }}
-              >
-                {portalStatus === "suspended" || company.status === "blocked"
-                  ? "Portaal heropenen"
-                  : "Portaal opschorten"}
-              </Button>
-              {admin && accountUsers.some((u) => u.membershipStatus === "active") ? (
-                <Button type="button" variant="outline" onClick={() => setTransferOpen(true)}>
-                  Beheer overdragen
-                </Button>
-              ) : null}
-            </div>
-          </section>
-        </aside>
-      </div>
-
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Gebruikers onder deze klant</h2>
-            <p className="mt-1 text-sm text-white/50">
-              Portaalaccounts die bij dit {isPrivate ? "particulier profiel" : "bedrijf"} horen.
-              Klik een rij voor details en acties.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setInviteRole("account_user");
-              setInviteOpen(true);
-            }}
-          >
-            <UserPlus className="mr-2 h-4 w-4" aria-hidden />
-            Uitnodigen
-          </Button>
-        </div>
-
-        {members.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              icon={Users}
-              title="Nog geen geregistreerde gebruikers"
-              description="Nodig een accountbeheerder of gebruiker uit. Na activatie verschijnen ze hier."
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Klantsoort">
+            <select
+              className="a-input w-full"
+              value={form.partyType}
+              onChange={(event) => patchForm("partyType", event.target.value as CompanyPartyType)}
+            >
+              <option value="company">Bedrijf</option>
+              <option value="private_person">Particulier</option>
+            </select>
+          </Field>
+          <Field label="Registratiestatus">
+            <select
+              className="a-input w-full"
+              value={form.status}
+              onChange={(event) => patchForm("status", event.target.value as CompanyForm["status"])}
+            >
+              <option value="active">Actief</option>
+              <option value="pending">In afwachting</option>
+              <option value="blocked">Geblokkeerd / portaal opgeschort</option>
+            </select>
+          </Field>
+          <Field label="Bedrijfsnaam (juridisch)" className="sm:col-span-2">
+            <input
+              className="a-input w-full"
+              value={form.legalName}
+              onChange={(event) => patchForm("legalName", event.target.value)}
             />
+          </Field>
+          <Field label="Handelsnaam">
+            <input
+              className="a-input w-full"
+              value={form.displayName}
+              onChange={(event) => patchForm("displayName", event.target.value)}
+            />
+          </Field>
+          <Field label="Contactpersoon">
+            <input
+              className="a-input w-full"
+              value={form.contactPersonName}
+              onChange={(event) => patchForm("contactPersonName", event.target.value)}
+            />
+          </Field>
+          <Field label="Contact e-mail">
+            <input
+              className="a-input w-full"
+              type="email"
+              value={form.email}
+              onChange={(event) => patchForm("email", event.target.value)}
+            />
+          </Field>
+          <Field label="Telefoonnummer">
+            <input
+              className="a-input w-full"
+              value={form.phone}
+              onChange={(event) => patchForm("phone", event.target.value)}
+            />
+          </Field>
+          <Field label="KvK-nummer">
+            <input
+              className="a-input w-full"
+              inputMode="numeric"
+              maxLength={8}
+              value={form.kvkNumber}
+              onChange={(event) =>
+                patchForm("kvkNumber", event.target.value.replace(/\D/g, "").slice(0, 8))
+              }
+              disabled={isPrivate}
+            />
+          </Field>
+          <Field label="BTW-nummer">
+            <input
+              className="a-input w-full"
+              value={form.vatNumber}
+              onChange={(event) => patchForm("vatNumber", event.target.value)}
+              disabled={isPrivate}
+            />
+          </Field>
+          <Field label="Straat">
+            <input
+              className="a-input w-full"
+              value={form.addressStreet}
+              onChange={(event) => patchForm("addressStreet", event.target.value)}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Huisnr.">
+              <input
+                className="a-input w-full"
+                value={form.addressHouseNumber}
+                onChange={(event) => patchForm("addressHouseNumber", event.target.value)}
+              />
+            </Field>
+            <Field label="Toev.">
+              <input
+                className="a-input w-full"
+                value={form.addressHouseSuffix}
+                onChange={(event) => patchForm("addressHouseSuffix", event.target.value)}
+              />
+            </Field>
           </div>
-        ) : (
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
-                  <tr>
-                    <th className="px-3 py-2.5 font-medium">Naam</th>
-                    <th className="px-3 py-2.5 font-medium">E-mail</th>
-                    <th className="px-3 py-2.5 font-medium">Rol</th>
-                    <th className="px-3 py-2.5 font-medium">Lidmaatschap</th>
-                    <th className="px-3 py-2.5 font-medium">Account</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {members.map((m) => {
-                    const selected = selectedMemberId === m.userId;
-                    return (
-                      <tr
-                        key={m.userId}
-                        className={
-                          selected
-                            ? "cursor-pointer bg-emerald-500/10"
-                            : "cursor-pointer hover:bg-white/[0.03]"
-                        }
-                        onClick={() => setSelectedMemberId(m.userId)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setSelectedMemberId(m.userId);
-                          }
-                        }}
-                        tabIndex={0}
-                        aria-selected={selected}
-                      >
-                        <td className="px-3 py-3 font-medium text-white/90">
-                          {m.fullName || "—"}
-                        </td>
-                        <td className="px-3 py-3 text-white/70">{m.email}</td>
-                        <td className="px-3 py-3 text-white/70">
-                          {m.role === "account_admin" ? "Accountbeheerder" : "Gebruiker"}
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/75">
-                            {m.membershipStatus === "active" ? "Actief" : "Opgeschort"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/75">
-                            {m.userStatus === "blocked" ? "Geblokkeerd" : "Actief"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <Field label="Postcode">
+            <input
+              className="a-input w-full"
+              value={form.addressPostalCode}
+              onChange={(event) => patchForm("addressPostalCode", event.target.value)}
+            />
+          </Field>
+          <Field label="Plaats">
+            <input
+              className="a-input w-full"
+              value={form.addressCity}
+              onChange={(event) => patchForm("addressCity", event.target.value)}
+            />
+          </Field>
+          <Field label="Land">
+            <input
+              className="a-input w-full"
+              value={form.addressCountry}
+              onChange={(event) => patchForm("addressCountry", event.target.value)}
+            />
+          </Field>
+          <Field label="Facturatie toegestaan">
+            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-white/20"
+                checked={form.invoiceAllowed}
+                onChange={(event) => patchForm("invoiceAllowed", event.target.checked)}
+              />
+              <span className="text-sm text-white/75">Bestaande invoice_allowed vlag</span>
+            </label>
+          </Field>
+        </div>
+        {saveError ? <p className="mt-3 text-sm text-red-300">{saveError}</p> : null}
+      </AppDialog>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-              {selectedMember ? (
-                <div className="space-y-3 text-sm">
-                  <h3 className="text-base font-semibold text-white/90">
-                    {selectedMember.fullName || selectedMember.email}
-                  </h3>
-                  <dl className="space-y-2">
-                    <div>
-                      <dt className="text-white/45">E-mail</dt>
-                      <dd className="text-white/85">{selectedMember.email}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-white/45">Telefoon</dt>
-                      <dd className="text-white/85">{selectedMember.phone || "—"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-white/45">Rol</dt>
-                      <dd className="text-white/85">
-                        {selectedMember.role === "account_admin"
-                          ? "Accountbeheerder"
-                          : "Gebruiker"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-white/45">Lidmaatschap</dt>
-                      <dd className="text-white/85">
-                        {selectedMember.membershipStatus === "active" ? "Actief" : "Opgeschort"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-white/45">Accountstatus</dt>
-                      <dd className="text-white/85">
-                        {selectedMember.userStatus === "blocked" ? "Geblokkeerd" : "Actief"}
-                      </dd>
-                    </div>
-                  </dl>
-                  <div className="flex flex-col gap-2 pt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMemberEdit(selectedMember)}
-                    >
-                      Profiel bewerken
-                    </Button>
-                    {selectedMember.role !== "account_admin" ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => {
-                          void (async () => {
-                            setBusy(true);
-                            const next =
-                              selectedMember.membershipStatus === "active"
-                                ? "suspended"
-                                : "active";
-                            const res = await setAdminPortalMembershipStatus({
-                              data: {
-                                companyId: company.id,
-                                userId: selectedMember.userId,
-                                status: next,
-                              },
-                            });
-                            setBusy(false);
-                            if (!res.ok) setFlash(res.error);
-                            else {
-                              setFlash(
-                                next === "suspended"
-                                  ? "Lidmaatschap opgeschort."
-                                  : "Lidmaatschap hersteld.",
-                              );
-                              reload({ keepForm: true });
-                            }
-                          })();
-                        }}
-                      >
-                        {selectedMember.membershipStatus === "active"
-                          ? "Lidmaatschap opschorten"
-                          : "Lidmaatschap heractiveren"}
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-red-500/30 text-red-200 hover:bg-red-500/10"
-                      disabled={busy}
-                      onClick={() => {
-                        void (async () => {
-                          setBusy(true);
-                          const blocked = selectedMember.userStatus !== "blocked";
-                          const res = await setAdminCustomerBlocked({
-                            data: {
-                              customerId: selectedMember.userId,
-                              blocked,
-                            },
-                          });
-                          setBusy(false);
-                          if (!res.ok) setFlash(res.error);
-                          else {
-                            setFlash(blocked ? "Gebruikersaccount geblokkeerd." : "Gebruikersaccount gedeblokkeerd.");
-                            reload({ keepForm: true });
-                          }
-                        })();
-                      }}
-                    >
-                      {selectedMember.userStatus === "blocked"
-                        ? "Account deblokkeren"
-                        : "Account blokkeren"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-white/55">
-                  Selecteer een gebruiker in de tabel om details en acties te zien.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
+      <AppDialog
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        title="Notitie toevoegen"
+        description="De notitie wordt toegevoegd aan het bestaande interne notitieveld van dit bedrijf."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setNoteOpen(false)} disabled={busy}>
+              Annuleren
+            </Button>
+            <Button
+              type="button"
+              loading={busy}
+              onClick={() => {
+                void saveCompany({
+                  notes: prependCompanyNote(company.notes, noteDraft, {
+                    author: formatStaffNoteAuthor(session?.username ?? ""),
+                  }),
+                }).then((ok) => {
+                  if (!ok) return;
+                  setNoteOpen(false);
+                  setFlash("Notitie toegevoegd.");
+                  reload();
+                });
+              }}
+            >
+              Toevoegen
+            </Button>
+          </>
+        }
+      >
+        <label className="block text-sm text-white/80">
+          Notitie
+          <textarea
+            className="a-input mt-1 min-h-[120px] w-full"
+            value={noteDraft}
+            onChange={(event) => setNoteDraft(event.target.value)}
+          />
+        </label>
+      </AppDialog>
 
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <h2 className="text-lg font-semibold">Uitnodigingen</h2>
-        {pendingInvites.length === 0 ? (
-          <p className="mt-3 text-sm text-white/55">Geen openstaande uitnodigingen.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-white/5 text-sm">
-            {pendingInvites.map((inv) => (
-              <li
-                key={`${inv.email}-${inv.intendedRole}`}
-                className="flex flex-wrap items-center justify-between gap-2 py-3"
-              >
-                <div>
-                  <span className="text-white/85">{inv.email}</span>
-                  <span className="ml-2 text-white/45">
-                    {inv.intendedRole === "account_admin" ? "Accountbeheerder" : "Gebruiker"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/50">
-                    Verloopt {new Date(inv.expiresAt).toLocaleString("nl-NL")}
-                    {inv.reminderCount > 0 ? ` · ${inv.reminderCount} herinnering(en)` : ""}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => {
-                      void (async () => {
-                        setBusy(true);
-                        const res = await resendAdminPortalInvitation({
-                          data: {
-                            companyId: company.id,
-                            email: inv.email,
-                            intendedRole:
-                              inv.intendedRole === "account_admin"
-                                ? "account_admin"
-                                : "account_user",
-                          },
-                        });
-                        setBusy(false);
-                        if (!res.ok) setFlash(res.error);
-                        else {
-                          setFlash("Uitnodiging opnieuw verstuurd.");
-                          reload({ keepForm: true });
-                        }
-                      })();
-                    }}
-                  >
-                    Opnieuw versturen
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <AppDialog
+        open={Boolean(editNote)}
+        onOpenChange={(open) => {
+          if (!open && !busy) setEditNote(null);
+        }}
+        title="Notitie bewerken"
+        description="Alleen de tekst van deze notitie wordt aangepast. Datum en auteur blijven hetzelfde."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setEditNote(null)} disabled={busy}>
+              Annuleren
+            </Button>
+            <Button
+              type="button"
+              loading={busy}
+              disabled={busy || !editDraft.trim()}
+              onClick={() => {
+                if (!editNote || busy) return;
+                void saveCompany({
+                  notes: replaceCompanyNote(company.notes, companyNoteIndex(editNote.id), editDraft),
+                }).then((ok) => {
+                  if (!ok) return;
+                  setEditNote(null);
+                  setFlash("Notitie bijgewerkt.");
+                  reload();
+                });
+              }}
+            >
+              Opslaan
+            </Button>
+          </>
+        }
+      >
+        <label className="block text-sm text-white/80">
+          Notitie
+          <textarea
+            className="a-input mt-1 min-h-[120px] w-full"
+            value={editDraft}
+            onChange={(event) => setEditDraft(event.target.value)}
+            disabled={busy}
+          />
+        </label>
+      </AppDialog>
+
+      <ConfirmationDialog
+        open={Boolean(deleteNote)}
+        title="Notitie verwijderen?"
+        description={
+          deleteNote
+            ? `Deze notitie wordt verwijderd van het bedrijfsprofiel.\n\n${
+                deleteNote.body.length > 200 ? `${deleteNote.body.slice(0, 200)}…` : deleteNote.body
+              }`
+            : "Deze notitie wordt verwijderd van het bedrijfsprofiel."
+        }
+        confirmLabel="Verwijderen"
+        tone="destructive"
+        pending={busy}
+        onCancel={() => {
+          if (!busy) setDeleteNote(null);
+        }}
+        onConfirm={async () => {
+          if (!deleteNote || busy) return;
+          const ok = await saveCompany({
+            notes: removeCompanyNote(company.notes, companyNoteIndex(deleteNote.id)),
+          });
+          if (!ok) return;
+          setDeleteNote(null);
+          setFlash("Notitie verwijderd.");
+          reload();
+        }}
+      />
 
       <AppDialog
         open={inviteOpen}
-        onOpenChange={(v) => {
-          if (!v) setInviteOpen(false);
-        }}
-        title={
-          inviteRole === "account_admin"
-            ? "Accountbeheerder uitnodigen"
-            : "Gebruiker uitnodigen"
-        }
+        onOpenChange={setInviteOpen}
+        title={inviteRole === "account_admin" ? "Accountbeheerder uitnodigen" : "Gebruiker uitnodigen"}
         description="De uitgenodigde activeert het account en stelt zelf een wachtwoord in."
         footer={
           <>
+            <Button type="button" variant="outline" onClick={() => setInviteOpen(false)} disabled={busy}>
+              Annuleren
+            </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setInviteOpen(false)}
               disabled={busy}
+              onClick={() =>
+                setInviteRole((current) =>
+                  current === "account_admin" ? "account_user" : "account_admin",
+                )
+              }
             >
-              Annuleren
+              {inviteRole === "account_admin" ? "Wissel naar gebruiker" : "Wissel naar accountbeheerder"}
             </Button>
             <Button
               type="button"
@@ -914,7 +681,7 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
                     setInviteLastName("");
                     setInvitePhone("");
                     setFlash("Uitnodiging verstuurd.");
-                    reload({ keepForm: true });
+                    reload();
                   }
                 })();
               }}
@@ -931,7 +698,7 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
               className="a-input mt-1 w-full"
               type="email"
               value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              onChange={(event) => setInviteEmail(event.target.value)}
             />
           </label>
           <label className="block text-sm text-white/80">
@@ -939,7 +706,7 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
             <input
               className="a-input mt-1 w-full"
               value={inviteFirstName}
-              onChange={(e) => setInviteFirstName(e.target.value)}
+              onChange={(event) => setInviteFirstName(event.target.value)}
             />
           </label>
           <label className="block text-sm text-white/80">
@@ -947,7 +714,7 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
             <input
               className="a-input mt-1 w-full"
               value={inviteLastName}
-              onChange={(e) => setInviteLastName(e.target.value)}
+              onChange={(event) => setInviteLastName(event.target.value)}
             />
           </label>
           {inviteRole === "account_user" ? (
@@ -956,26 +723,58 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
               <input
                 className="a-input mt-1 w-full"
                 value={invitePhone}
-                onChange={(e) => setInvitePhone(e.target.value)}
+                onChange={(event) => setInvitePhone(event.target.value)}
               />
             </label>
           ) : null}
         </div>
       </AppDialog>
 
+      <ConfirmationDialog
+        open={portalConfirmOpen}
+        title={
+          portalStatus === "suspended" || company.status === "blocked"
+            ? "Portaal heropenen?"
+            : "Portaalstatus wijzigen?"
+        }
+        description={
+          portalStatus === "suspended" || company.status === "blocked"
+            ? "Het bedrijf krijgt weer portaaltoegang wanneer de status actief is."
+            : "Opschorten zet de bedrijfsstatus op geblokkeerd. Gebruikers kunnen het portaal dan niet gebruiken."
+        }
+        confirmLabel={
+          portalStatus === "suspended" || company.status === "blocked" ? "Portaal heropenen" : "Portaal opschorten"
+        }
+        tone={portalStatus === "suspended" || company.status === "blocked" ? "default" : "warning"}
+        pending={busy}
+        onCancel={() => setPortalConfirmOpen(false)}
+        onConfirm={async () => {
+          const blocked = company.status !== "blocked";
+          const res = await updateAdminCompany({
+            data: { companyId: company.id, status: blocked ? "blocked" : "active" },
+          });
+          setPortalConfirmOpen(false);
+          if (!res.ok) setFlash(res.error);
+          else {
+            setFlash(blocked ? "Portaaltoegang opgeschort." : "Portaaltoegang hersteld.");
+            reload();
+          }
+        }}
+      />
+
       <AppDialog
-        open={transferOpen}
-        onOpenChange={(v) => {
-          if (!v) setTransferOpen(false);
+        open={Boolean(transferUserId)}
+        onOpenChange={(open) => {
+          if (!open) setTransferUserId(null);
         }}
         title="Accountbeheer overdragen"
-        description="Selecteer een actieve gebruiker die accountbeheerder wordt."
+        description="Deze gebruiker wordt accountbeheerder van het bedrijf."
         footer={
           <>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setTransferOpen(false)}
+              onClick={() => setTransferUserId(null)}
               disabled={busy}
             >
               Annuleren
@@ -984,6 +783,7 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
               type="button"
               loading={busy}
               onClick={() => {
+                if (!transferUserId) return;
                 void (async () => {
                   setBusy(true);
                   const res = await transferAdminAccountAdmin({
@@ -992,9 +792,9 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
                   setBusy(false);
                   if (!res.ok) setFlash(res.error);
                   else {
-                    setTransferOpen(false);
+                    setTransferUserId(null);
                     setFlash("Accountbeheer overgedragen.");
-                    reload({ keepForm: true });
+                    reload();
                   }
                 })();
               }}
@@ -1004,31 +804,20 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
           </>
         }
       >
-        <label className="block text-sm text-white/80">
-          Nieuwe accountbeheerder
-          <select
-            className="a-input mt-1 w-full"
-            value={transferUserId}
-            onChange={(e) => setTransferUserId(e.target.value)}
-          >
-            <option value="">Selecteer…</option>
-            {accountUsers
-              .filter((u) => u.membershipStatus === "active")
-              .map((u) => (
-                <option key={u.userId} value={u.userId}>
-                  {u.fullName || u.email}
-                </option>
-              ))}
-          </select>
-        </label>
+        <p className="text-sm text-white/70">
+          {members.find((member) => member.userId === transferUserId)?.fullName ||
+            members.find((member) => member.userId === transferUserId)?.email ||
+            "Geselecteerde gebruiker"}{" "}
+          wordt de nieuwe accountbeheerder.
+        </p>
       </AppDialog>
 
       <AppDialog
         open={Boolean(memberEdit)}
-        onOpenChange={(v) => {
-          if (!v) setMemberEdit(null);
+        onOpenChange={(open) => {
+          if (!open) setMemberEdit(null);
         }}
-        title="Gebruikersprofiel bewerken"
+        title="Gebruiker bewerken"
         description="E-mail wijzigen gebeurt via Auth, niet via dit formulier."
         footer={
           memberEdit ? (
@@ -1038,19 +827,34 @@ export function CompanyPortalDetailPage({ companyId }: { companyId: string }) {
               onDone={() => {
                 setMemberEdit(null);
                 setFlash("Gebruikersprofiel bijgewerkt.");
-                reload({ keepForm: true });
+                reload();
               }}
             />
           ) : null
         }
       >
         {memberEdit ? (
-          <p className="text-sm text-white/55">
-            Pas naam en telefoon aan. E-mail blijft {memberEdit.email}.
-          </p>
+          <p className="text-sm text-white/55">Pas naam en telefoon aan. E-mail blijft {memberEdit.email}.</p>
         ) : null}
       </AppDialog>
-    </div>
+    </>
+  );
+}
+
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`block text-sm text-white/80 ${className ?? ""}`}>
+      <span className="text-white/55">{label}</span>
+      <div className="mt-1">{children}</div>
+    </label>
   );
 }
 
@@ -1059,7 +863,7 @@ function EditMemberFooter({
   onDone,
   onCancel,
 }: {
-  member: Member;
+  member: CompanyProfileMember;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -1076,7 +880,7 @@ function EditMemberFooter({
           <input
             className="a-input mt-1 w-full"
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(event) => setFullName(event.target.value)}
           />
         </label>
         <label className="block text-sm">
@@ -1084,7 +888,7 @@ function EditMemberFooter({
           <input
             className="a-input mt-1 w-full"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(event) => setPhone(event.target.value)}
           />
         </label>
         {error ? <p className="text-sm text-red-300">{error}</p> : null}

@@ -1,26 +1,16 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import * as React from "react";
-import {
-  LayoutDashboard,
-  Globe2,
-  Inbox,
-  Users,
-  Package,
-  LogOut,
-  Menu,
-  X,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-} from "lucide-react";
+import { LogOut, Menu, X, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { signOutAdmin, useAdminSession } from "@/lib/admin-auth";
+import { ADMIN_MOBILE_DOCK, ADMIN_NAV, isAdminNavActive } from "@/lib/admin-nav";
 import { getAdminRequestsUnreadCount } from "@/lib/api/admin-requests.functions";
 import { NotificationCentre } from "@/components/admin/NotificationCentre";
 import { subscribeAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
 import logoUrl from "@/assets/logo-mccoy.png";
+
+export { ADMIN_NAV } from "@/lib/admin-nav";
 
 export const Route = createFileRoute("/_app")({
   head: () => ({
@@ -28,22 +18,6 @@ export const Route = createFileRoute("/_app")({
   }),
   component: AdminLayout,
 });
-
-type NavItem = {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  hint: string;
-};
-
-export const ADMIN_NAV: NavItem[] = [
-  { to: "/", label: "Overzicht", icon: LayoutDashboard, hint: "Start — wat er speelt" },
-  { to: "/website", label: "Website", icon: Globe2, hint: "Pagina's, teksten & foto's" },
-  { to: "/inquiries", label: "Aanvragen", icon: Inbox, hint: "Berichten van klanten" },
-  { to: "/customers", label: "Klanten", icon: Building2, hint: "Geregistreerd en gastkopers" },
-  { to: "/users", label: "Gebruikers", icon: Users, hint: "Wie mag er in het beheer" },
-  { to: "/products", label: "Producten", icon: Package, hint: "Uw catalogus" },
-];
 
 const SIDEBAR_COLLAPSED_KEY = "mccoy-admin-sidebar-collapsed";
 
@@ -277,8 +251,8 @@ function AdminLayout() {
       {/* Mobile bottom dock — always visible for out-of-the-box mobile UX */}
       <nav className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-white/10 bg-black/80 p-2 backdrop-blur-xl lg:hidden">
         <ul className="grid grid-cols-5 gap-1">
-          {ADMIN_NAV.map((item) => {
-            const active = pathname === item.to;
+          {ADMIN_MOBILE_DOCK.map((item) => {
+            const active = isAdminNavActive(pathname, item.to);
             const Icon = item.icon;
             const badge = item.to === "/inquiries" ? requestsUnread : 0;
             return (
@@ -391,15 +365,17 @@ function NavList({
   return (
     <ul className="flex flex-col gap-1.5">
       {ADMIN_NAV.map((item) => {
-        const active = pathname === item.to;
+        const active = isAdminNavActive(pathname, item.to);
         const Icon = item.icon;
         const badge = item.to === "/inquiries" ? requestsUnread : 0;
+        const badgeLabel = `${badge} ongelezen aanvragen`;
 
         const link = (
           <Link
             to={item.to}
             onClick={onNavigate}
             title={collapsed ? item.label : undefined}
+            aria-current={active ? "page" : undefined}
             aria-label={collapsed ? `${item.label} — ${item.hint}` : undefined}
             className={cn(
               "group relative flex items-center rounded-2xl transition-all",
@@ -438,16 +414,14 @@ function NavList({
                 {badge > 0 && (
                   <span
                     className="ml-auto inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[#ef4444] px-1.5 text-xs font-bold text-white"
-                    aria-label={`${badge} ongelezen aanvragen`}
+                    aria-label={badgeLabel}
                   >
                     {badge > 99 ? "99+" : badge}
                   </span>
                 )}
               </>
             )}
-            {collapsed && badge > 0 && (
-              <span className="sr-only">{badge} ongelezen aanvragen</span>
-            )}
+            {collapsed && badge > 0 && <span className="sr-only">{badgeLabel}</span>}
           </Link>
         );
 

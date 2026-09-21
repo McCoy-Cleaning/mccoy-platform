@@ -24,6 +24,14 @@ export function readServerEnv(name: string): string {
 }
 
 /**
+ * True only for a real production runtime. Dev-only fallbacks (default admin
+ * password, default session secret) must fail closed when this is true.
+ */
+export function isProductionRuntime(): boolean {
+  return readServerEnv("NODE_ENV") === "production";
+}
+
+/**
  * Resolve the monorepo root from a process cwd.
  *
  * Critical: admin (:5174) and storefront (:5173) each run with cwd `apps/<name>`.

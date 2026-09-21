@@ -24,8 +24,11 @@ export type CreateWebsiteRequestInput = {
 export type ListWebsiteRequestsFilter = {
   kind?: FormKind | "all";
   status?: RequestStatus | "all";
+  /** Multi-status allowlist; takes precedence over `status` when non-empty. */
+  statuses?: RequestStatus[];
   scopeKey?: string | "all";
   q?: string;
+  orderBy?: "created_at" | "updated_at";
 };
 
 /**

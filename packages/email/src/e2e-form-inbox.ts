@@ -16,6 +16,7 @@ import type {
   FormInboxMessage,
   FormInboxMessageSummary,
   FormInboxThreadItem,
+  InboxLifecycleView,
 } from "./form-inbox-contracts";
 
 export { websiteRequestToSummary };
@@ -25,7 +26,7 @@ export function isE2eFormInboxEnabled(): boolean {
 }
 
 export async function listE2eFormInboxMessages(
-  options?: InboxListFilters & { limit?: number },
+  options?: InboxListFilters & { limit?: number; lifecycle?: InboxLifecycleView },
 ): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   return listWebsiteRequestFormInboxMessages(options);
 }

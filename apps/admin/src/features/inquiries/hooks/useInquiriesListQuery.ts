@@ -2,6 +2,7 @@ import * as React from "react";
 import { listAdminFormInbox } from "@/lib/api/admin-requests.functions";
 import type { FormInboxMessageSummary, InboxScopeFacet } from "@mccoy/email/contracts";
 import type { KindFilter, ScopeFilter } from "../types/search";
+import type { LifecycleFilter } from "../types/search";
 import {
   filterTombstonedItems,
   pruneTombstonesAfterRefresh,
@@ -18,7 +19,9 @@ export function useInquiriesListQuery(_params: {
   kind: KindFilter;
   scopeKey: ScopeFilter;
   debouncedQ: string;
+  lifecycle?: LifecycleFilter;
 }) {
+  const lifecycle = _params.lifecycle ?? "active";
   const [items, setItems] = React.useState<FormInboxMessageSummary[]>([]);
   const [scopeFacets, setScopeFacets] = React.useState<InboxScopeFacet[]>([]);
   const [listState, setListState] = React.useState<ListState>("loading");
@@ -46,85 +49,95 @@ export function useInquiriesListQuery(_params: {
     bumpTombstones((n) => n + 1);
   }, []);
 
-  const loadList = React.useCallback(async (opts?: { fresh?: boolean }) => {
-    const generation = ++requestGenerationRef.current;
-    const hadData = hasSuccessfulDataRef.current;
-    const explicitRefresh = opts?.fresh === true;
+  const loadList = React.useCallback(
+    async (opts?: { fresh?: boolean }) => {
+      const generation = ++requestGenerationRef.current;
+      const hadData = hasSuccessfulDataRef.current;
+      const explicitRefresh = opts?.fresh === true;
 
-    if (explicitRefresh && hadData) {
-      setRefreshing(true);
-    } else if (!hadData) {
-      setInitialLoading(true);
-      setListState("loading");
-    }
-    if (explicitRefresh || !hadData) {
-      setListError(null);
-      setListErrorCode(null);
-    }
+      if (explicitRefresh && hadData) {
+        setRefreshing(true);
+      } else if (!hadData) {
+        setInitialLoading(true);
+        setListState("loading");
+      }
+      if (explicitRefresh || !hadData) {
+        setListError(null);
+        setListErrorCode(null);
+      }
 
-    try {
-      const result = await listAdminFormInbox({
-        data: {
-          kind: "all",
-          scopeKey: "all",
-          fresh: opts?.fresh,
-        },
-      });
+      try {
+        const result = await listAdminFormInbox({
+          data: {
+            kind: "all",
+            lifecycle,
+            scopeKey: "all",
+            fresh: opts?.fresh,
+          },
+        });
 
-      if (generation !== requestGenerationRef.current) return;
+        if (generation !== requestGenerationRef.current) return;
 
-      if (!result.ok) {
+        if (!result.ok) {
+          if (!hasSuccessfulDataRef.current) {
+            setListState("error");
+            setListError(result.error);
+            setListErrorCode("code" in result ? String(result.code) : null);
+            setItems([]);
+            setScopeFacets([]);
+            setShowAllMailbox(false);
+          } else {
+            setListError(result.error);
+            setListErrorCode("code" in result ? String(result.code) : null);
+          }
+          return;
+        }
+
+        const filtered = filterTombstonedItems(result.items, tombstonesRef.current);
+        setItems(filtered);
+        setScopeFacets(result.facets?.scopes ?? []);
+        setShowAllMailbox(Boolean(result.showAll));
+        setListState("ready");
+        hasSuccessfulDataRef.current = true;
+        setLastSuccessfulLoadAt(new Date().toISOString());
+        setListError(null);
+        setListErrorCode(null);
+
+        tombstonesRef.current = pruneTombstonesAfterRefresh(
+          tombstonesRef.current,
+          new Set(result.items.map((item) => item.id)),
+        );
+        bumpTombstones((n) => n + 1);
+        // Do not mark all `requests` notifications read on list load — that cleared
+        // the bell badge for applicant replies. Mark read when opening an inquiry.
+      } catch {
+        if (generation !== requestGenerationRef.current) return;
         if (!hasSuccessfulDataRef.current) {
           setListState("error");
-          setListError(result.error);
-          setListErrorCode("code" in result ? String(result.code) : null);
+          setListError("Kon mailbox niet laden.");
           setItems([]);
           setScopeFacets([]);
           setShowAllMailbox(false);
         } else {
-          setListError(result.error);
-          setListErrorCode("code" in result ? String(result.code) : null);
+          setListError("Vernieuwen mislukt. Bestaande berichten blijven zichtbaar.");
         }
-        return;
+      } finally {
+        if (generation === requestGenerationRef.current) {
+          setInitialLoading(false);
+          setRefreshing(false);
+        }
       }
-
-      const filtered = filterTombstonedItems(result.items, tombstonesRef.current);
-      setItems(filtered);
-      setScopeFacets(result.facets?.scopes ?? []);
-      setShowAllMailbox(Boolean(result.showAll));
-      setListState("ready");
-      hasSuccessfulDataRef.current = true;
-      setLastSuccessfulLoadAt(new Date().toISOString());
-      setListError(null);
-      setListErrorCode(null);
-
-      tombstonesRef.current = pruneTombstonesAfterRefresh(
-        tombstonesRef.current,
-        new Set(result.items.map((item) => item.id)),
-      );
-      bumpTombstones((n) => n + 1);
-      // Do not mark all `requests` notifications read on list load — that cleared
-      // the bell badge for applicant replies. Mark read when opening an inquiry.
-    } catch {
-      if (generation !== requestGenerationRef.current) return;
-      if (!hasSuccessfulDataRef.current) {
-        setListState("error");
-        setListError("Kon mailbox niet laden.");
-        setItems([]);
-        setScopeFacets([]);
-        setShowAllMailbox(false);
-      } else {
-        setListError("Vernieuwen mislukt. Bestaande berichten blijven zichtbaar.");
-      }
-    } finally {
-      if (generation === requestGenerationRef.current) {
-        setInitialLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, []);
+    },
+    [lifecycle],
+  );
 
   React.useEffect(() => {
+    hasSuccessfulDataRef.current = false;
+    tombstonesRef.current.clear();
+    setItems([]);
+    setScopeFacets([]);
+    setListState("loading");
+    setInitialLoading(true);
     void loadList();
   }, [loadList]);
 

@@ -12,6 +12,34 @@ const MCCOY_TEMPLATE_FOOTER =
 const MCCOY_TEMPLATE_BRAND = /mccoy cleaning/i;
 const MCCOY_TEMPLATE_REF = /referentie:\s*wr-[a-z0-9-]+/i;
 
+const EMAIL_ADDRESS_SOURCE =
+  "[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\\.[a-z]{2,63}";
+const MICROSOFT_SENDER_SAFETY_BANNERS = [
+  new RegExp(
+    `^You don['’]t often get email from\\s+${EMAIL_ADDRESS_SOURCE}\\.\\s+Learn why this is important\\.?(?=\\s|$)`,
+    "i",
+  ),
+  new RegExp(
+    `^U ontvangt niet vaak e-?mail van\\s+${EMAIL_ADDRESS_SOURCE}\\.\\s+Meer informatie over waarom dit belangrijk is\\.?(?=\\s|$)`,
+    "i",
+  ),
+];
+
+/**
+ * Remove Microsoft's first-contact safety tip from the start of an inbound
+ * Graph body. The banner is mailbox UI metadata, not text written by the
+ * customer. Keep matching deliberately strict and start-anchored so ordinary
+ * customer content is never removed.
+ */
+function stripMicrosoftSenderSafetyBanner(text: string): string {
+  for (const banner of MICROSOFT_SENDER_SAFETY_BANNERS) {
+    const match = banner.exec(text);
+    if (!match) continue;
+    return text.slice(match[0].length).trimStart();
+  }
+  return text;
+}
+
 export function looksLikeMcCoyAdminEmailTemplate(text: string): boolean {
   const body = text.trim();
   if (!body) return false;
@@ -126,7 +154,8 @@ function isQuotedHistoryStartLine(line: string): boolean {
  * Handles iPhone/Apple Mail "On … wrote:", BOM prefixes, and lone \\r newlines.
  */
 export function stripQuotedReplyBody(text: string): string {
-  const trimmed = prepareReplyBodyText(text);
+  const prepared = prepareReplyBodyText(text);
+  const trimmed = stripMicrosoftSenderSafetyBanner(prepared);
   if (!trimmed) return trimmed;
 
   const lines = trimmed.split("\n");

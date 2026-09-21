@@ -1,13 +1,7 @@
 import type { FormKind } from "./forms";
 
 /** Website-request status — separate from order/payment/fulfilment statuses. */
-export const REQUEST_STATUSES = [
-  "new",
-  "open",
-  "replied",
-  "closed",
-  "spam",
-] as const;
+export const REQUEST_STATUSES = ["new", "open", "replied", "closed", "deleted", "spam"] as const;
 
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 

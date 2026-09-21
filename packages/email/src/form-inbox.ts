@@ -40,10 +40,7 @@ import {
   encodeImapMessageId,
   type DecodedInboxMessageId,
 } from "./inbox-message-id";
-import {
-  isMicrosoft365ImapHost,
-  microsoft365ImapBasicAuthBlockedMessage,
-} from "./m365-imap";
+import { isMicrosoft365ImapHost, microsoft365ImapBasicAuthBlockedMessage } from "./m365-imap";
 import {
   parseAttachmentNamesFromBody,
   parseFormFieldsFromHtml,
@@ -320,24 +317,15 @@ function makeSnippet(text: string, max = 160): string {
   return `${oneLine.slice(0, max - 1)}…`;
 }
 
-function resolveSubmitterName(
-  subject: string,
-  fields?: ParsedFormField[],
-): string | null {
+function resolveSubmitterName(subject: string, fields?: ParsedFormField[]): string | null {
   const fromFields = fields?.find((f) => f.key === "name")?.value.trim();
   if (fromFields && fromFields.length <= 120) return fromFields;
   return extractSubmitterNameFromSubject(subject);
 }
 
 /** Prefer message body for list/snippet; never the branded email chrome. */
-function formMessageSnippet(
-  fields: ParsedFormField[],
-  textBody: string,
-  subject: string,
-): string {
-  const message = fields
-    .find((f) => f.key === "message" || f.key === "motivation")
-    ?.value.trim();
+function formMessageSnippet(fields: ParsedFormField[], textBody: string, subject: string): string {
+  const message = fields.find((f) => f.key === "message" || f.key === "motivation")?.value.trim();
   if (message) return makeSnippet(message);
   const useful = fields
     .filter((f) => f.key !== "name" && f.key !== "email")
@@ -363,18 +351,9 @@ function mapAttachments(
     const contentType = att.contentType || "application/octet-stream";
     const content = att.content;
     const size =
-      typeof att.size === "number"
-        ? att.size
-        : Buffer.isBuffer(content)
-          ? content.length
-          : 0;
+      typeof att.size === "number" ? att.size : Buffer.isBuffer(content) ? content.length : 0;
 
-    if (
-      !includeContent ||
-      !Buffer.isBuffer(content) ||
-      size <= 0 ||
-      size > MAX_ATTACHMENT_BYTES
-    ) {
+    if (!includeContent || !Buffer.isBuffer(content) || size <= 0 || size > MAX_ATTACHMENT_BYTES) {
       out.push({
         filename,
         contentType,
@@ -400,8 +379,7 @@ function sanitizeParsedFields(fields: ParsedFormField[]): ParsedFormField[] {
     if (!label) continue;
     const value = field.value.replace(/\s+/g, " ").trim();
     if (!value) continue;
-    const key =
-      Object.entries(FIELD_LABELS_NL).find(([, v]) => v === label)?.[0] ?? field.key;
+    const key = Object.entries(FIELD_LABELS_NL).find(([, v]) => v === label)?.[0] ?? field.key;
     if (out.some((f) => f.key === key)) continue;
     out.push({ key, label, value });
   }
@@ -425,14 +403,9 @@ function parseFieldsFromParts(text: string, html: string): ParsedFormField[] {
  * Prefer Reply-To (notifications set this to the form submitter), then labeled body email,
  * then From when it is not our notification mailbox / configured sender.
  */
-export function resolveSubmitterEmail(
-  parsed: ParsedMail,
-  inboxUser: string,
-): string | null {
+export function resolveSubmitterEmail(parsed: ParsedMail, inboxUser: string): string | null {
   const inbox = inboxUser.trim().toLowerCase();
-  const ourAddresses = new Set(
-    [...configuredSenderAddresses(), inbox].filter(Boolean),
-  );
+  const ourAddresses = new Set([...configuredSenderAddresses(), inbox].filter(Boolean));
   const isExternal = (addr: string | null | undefined): addr is string =>
     Boolean(addr && EMAIL_RE.test(addr) && !ourAddresses.has(addr.toLowerCase()));
 
@@ -453,7 +426,9 @@ export function resolveSubmitterEmail(
   return null;
 }
 
-async function withImapClient<T>(fn: (client: ImapFlow, config: InboxConfig) => Promise<T>): Promise<T> {
+async function withImapClient<T>(
+  fn: (client: ImapFlow, config: InboxConfig) => Promise<T>,
+): Promise<T> {
   let config: InboxConfig | null;
   try {
     config = getInboxConfig();
@@ -547,7 +522,11 @@ async function withImapClient<T>(fn: (client: ImapFlow, config: InboxConfig) => 
   } catch (error) {
     if (error instanceof FormInboxError || error instanceof FormInboxConfigError) throw error;
     const code = (error as { code?: string }).code;
-    if (code === "ETIMEOUT" || socketError || (error instanceof Error && /timeout/i.test(error.message))) {
+    if (
+      code === "ETIMEOUT" ||
+      socketError ||
+      (error instanceof Error && /timeout/i.test(error.message))
+    ) {
       throw new FormInboxError(
         "Mailboxverbinding time-out bij het laden van het bericht. Probeer opnieuw.",
       );
@@ -608,7 +587,10 @@ function nodeFilename(node: StructureNode): string | null {
 }
 
 /** Collect text/html part paths from BODYSTRUCTURE (skip attachments). */
-function collectTextPartPaths(node: StructureNode | null | undefined, out: string[] = []): string[] {
+function collectTextPartPaths(
+  node: StructureNode | null | undefined,
+  out: string[] = [],
+): string[] {
   if (!node) return out;
   const disposition = (node.disposition || "").toLowerCase();
   const { type, subtype, full } = nodeMime(node);
@@ -843,7 +825,10 @@ function messageFromTextParts(
   const flagSet = flags instanceof Set ? flags : new Set(flags ?? []);
   const submitterEmail =
     envelopeFirstAddress(envelope?.replyTo) ||
-    fields.find((f) => f.key === "email")?.value.trim().toLowerCase() ||
+    fields
+      .find((f) => f.key === "email")
+      ?.value.trim()
+      .toLowerCase() ||
     null;
 
   const attachments = mergeAttachmentLists(
@@ -942,9 +927,7 @@ function envelopeFirstAddress(
   return null;
 }
 
-function envelopeFirstName(
-  list: MessageEnvelopeObject["from"] | undefined,
-): string {
+function envelopeFirstName(list: MessageEnvelopeObject["from"] | undefined): string {
   if (!list?.length) return "";
   return list[0]?.name?.trim() || "";
 }
@@ -1096,7 +1079,10 @@ function normalizeMsgId(id: string | undefined | null): string {
 }
 
 function subjectCore(subject: string): string {
-  return subject.replace(/^(re|fw|fwd)\s*:\s*/gi, "").trim().toLowerCase();
+  return subject
+    .replace(/^(re|fw|fwd)\s*:\s*/gi, "")
+    .trim()
+    .toLowerCase();
 }
 
 function lookbackDate(): Date {
@@ -1141,11 +1127,7 @@ async function buildThread(
   const recent = [...candidateUids].sort((a, b) => b - a).slice(0, MAX_THREAD_CANDIDATES);
   const matchedUids: number[] = [root.uid];
 
-  for await (const msg of client.fetch(
-    recent,
-    { uid: true, envelope: true },
-    { uid: true },
-  )) {
+  for await (const msg of client.fetch(recent, { uid: true, envelope: true }, { uid: true })) {
     if (typeof msg.uid !== "number" || !msg.envelope) continue;
     if (msg.uid === root.uid) continue;
 
@@ -1155,33 +1137,21 @@ async function buildThread(
     const msgId = normalizeMsgId(msg.envelope.messageId);
     const inReplyTo = normalizeMsgId(msg.envelope.inReplyTo);
 
-    const refsRoot =
-      !!rootMsgId && (inReplyTo === rootMsgId || msgId === rootMsgId);
+    const refsRoot = !!rootMsgId && (inReplyTo === rootMsgId || msgId === rootMsgId);
     const sameSubject = !!coreSubject && (subj === coreSubject || subj.includes(coreSubject));
-    const involvesSubmitter =
-      !!submitter && (from === submitter || to === submitter);
+    const involvesSubmitter = !!submitter && (from === submitter || to === submitter);
     const sameWr = !!wr && (msg.envelope.subject || "").toLowerCase().includes(wr);
 
-    if (
-      refsRoot ||
-      (sameSubject && involvesSubmitter) ||
-      (sameWr && involvesSubmitter)
-    ) {
+    if (refsRoot || (sameSubject && involvesSubmitter) || (sameWr && involvesSubmitter)) {
       matchedUids.push(msg.uid);
     }
   }
 
-  const fetchUids = [...new Set(matchedUids)]
-    .sort((a, b) => a - b)
-    .slice(-MAX_THREAD_MESSAGES);
+  const fetchUids = [...new Set(matchedUids)].sort((a, b) => a - b).slice(-MAX_THREAD_MESSAGES);
 
   const thread: FormInboxThreadItem[] = [];
 
-  for await (const msg of client.fetch(
-    fetchUids,
-    { uid: true, source: true },
-    { uid: true },
-  )) {
+  for await (const msg of client.fetch(fetchUids, { uid: true, source: true }, { uid: true })) {
     if (!msg.source || typeof msg.uid !== "number") continue;
     let parsed: ParsedMail;
     try {
@@ -1234,8 +1204,7 @@ async function listMailboxFormInboxMessages(options?: {
       }
       const imapConfig =
         shouldFallbackFromGraph() && shouldAllowImapInbox() ? getInboxConfig() : null;
-      const canFallback =
-        imapConfig !== null && !isMicrosoft365ImapHost(imapConfig.host);
+      const canFallback = imapConfig !== null && !isMicrosoft365ImapHost(imapConfig.host);
       if (!canFallback) throw error;
       const message = error instanceof Error ? error.message.slice(0, 160) : "unknown";
       console.error("[form-inbox] Graph list failed; falling back to IMAP", { message });
@@ -1297,6 +1266,7 @@ export async function listFormInboxMessages(options?: {
   q?: string;
   limit?: number;
   fresh?: boolean;
+  lifecycle?: import("./form-inbox-contracts").InboxLifecycleView;
 }): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   if (process.env.MCCOY_E2E === "1") {
     const { listE2eFormInboxMessages } = await import("./e2e-form-inbox");
@@ -1305,6 +1275,7 @@ export async function listFormInboxMessages(options?: {
 
   const limit = Math.min(Math.max(options?.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
   const fresh = options?.fresh === true;
+  const lifecycle = options?.lifecycle ?? "active";
   const { getOrLoadInboxListSnapshot, graphListBudgetMs } = await import("./form-inbox-list-cache");
 
   type InboxListSnapshot = {
@@ -1313,85 +1284,93 @@ export async function listFormInboxMessages(options?: {
     hiddenRequestNumbers: string[];
   };
 
-  const snapshot = await getOrLoadInboxListSnapshot<InboxListSnapshot>(async () => {
-    // Default list (fresh !== true): website_requests + hidden numbers only.
-    // Never call Graph/IMAP here — Vercel memory cache is usually empty, so a
-    // cache miss must not wait on mailbox I/O. Graph only on Vernieuwen.
-    const controller = new AbortController();
-    const timer = fresh
-      ? setTimeout(() => controller.abort(), graphListBudgetMs(true))
-      : undefined;
-    try {
-      const mailboxPromise = fresh
-        ? listMailboxFormInboxMessages({
-            kind: "all",
-            scopeKey: "all",
-            limit: MAX_LIMIT,
-            signal: controller.signal,
-            skipSync: true,
-          })
-        : Promise.resolve({
-            items: [] as FormInboxMessageSummary[],
-            facets: { kinds: [], scopes: [] },
+  const snapshot = await getOrLoadInboxListSnapshot<InboxListSnapshot>(
+    async () => {
+      // Default list (fresh !== true): website_requests + hidden numbers only.
+      // Never call Graph/IMAP here — Vercel memory cache is usually empty, so a
+      // cache miss must not wait on mailbox I/O. Graph only on Vernieuwen.
+      const controller = new AbortController();
+      const timer = fresh
+        ? setTimeout(() => controller.abort(), graphListBudgetMs(true))
+        : undefined;
+      try {
+        const emptyMailbox = {
+          items: [] as FormInboxMessageSummary[],
+          facets: { kinds: [], scopes: [] },
+        };
+        const mailboxPromise = fresh
+          ? lifecycle === "active"
+            ? listMailboxFormInboxMessages({
+                kind: "all",
+                scopeKey: "all",
+                limit: MAX_LIMIT,
+                signal: controller.signal,
+                skipSync: true,
+              })
+            : Promise.resolve(emptyMailbox)
+          : Promise.resolve(emptyMailbox);
+
+        const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
+          mailboxPromise,
+          (async () => {
+            const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
+            return listWebsiteRequestInboxSummaries({
+              kind: "all",
+              scopeKey: "all",
+              limit: 200,
+              lifecycle,
+            });
+          })(),
+          (async () => {
+            if (lifecycle === "resolved") return [];
+            const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
+            return listHiddenWebsiteRequestNumbers();
+          })(),
+        ]);
+
+        let mailboxItems: FormInboxMessageSummary[] = [];
+        if (mailboxSettled.status === "fulfilled") {
+          mailboxItems = mailboxSettled.value.items;
+        } else if (!controller.signal.aborted) {
+          console.error("[form-inbox] mailbox list failed; continuing with website requests", {
+            message:
+              mailboxSettled.reason instanceof Error
+                ? mailboxSettled.reason.message.slice(0, 160)
+                : "unknown",
           });
+        }
 
-      const [mailboxSettled, requestSettled, hiddenSettled] = await Promise.allSettled([
-        mailboxPromise,
-        (async () => {
-          const { listWebsiteRequestInboxSummaries } = await import("./website-request-inbox");
-          return listWebsiteRequestInboxSummaries({
-            kind: "all",
-            scopeKey: "all",
-            limit: 200,
+        let requestItems: FormInboxMessageSummary[] = [];
+        if (requestSettled.status === "fulfilled") {
+          requestItems = requestSettled.value;
+        } else {
+          console.error("[form-inbox] website request list failed", {
+            message:
+              requestSettled.reason instanceof Error
+                ? requestSettled.reason.message.slice(0, 160)
+                : "unknown",
           });
-        })(),
-        (async () => {
-          const { listHiddenWebsiteRequestNumbers } = await import("@mccoy/database/server");
-          return listHiddenWebsiteRequestNumbers();
-        })(),
-      ]);
+        }
 
-      let mailboxItems: FormInboxMessageSummary[] = [];
-      if (mailboxSettled.status === "fulfilled") {
-        mailboxItems = mailboxSettled.value.items;
-      } else if (!controller.signal.aborted) {
-        console.error("[form-inbox] mailbox list failed; continuing with website requests", {
-          message:
-            mailboxSettled.reason instanceof Error
-              ? mailboxSettled.reason.message.slice(0, 160)
-              : "unknown",
-        });
+        let hiddenRequestNumbers: string[] = [];
+        if (hiddenSettled.status === "fulfilled") {
+          hiddenRequestNumbers = hiddenSettled.value;
+        } else {
+          console.error("[form-inbox] hidden-request suppress list failed", {
+            message:
+              hiddenSettled.reason instanceof Error
+                ? hiddenSettled.reason.message.slice(0, 160)
+                : "unknown",
+          });
+        }
+
+        return { mailboxItems, requestItems, hiddenRequestNumbers };
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
       }
-
-      let requestItems: FormInboxMessageSummary[] = [];
-      if (requestSettled.status === "fulfilled") {
-        requestItems = requestSettled.value;
-      } else {
-        console.error("[form-inbox] website request list failed", {
-          message:
-            requestSettled.reason instanceof Error
-              ? requestSettled.reason.message.slice(0, 160)
-              : "unknown",
-        });
-      }
-
-      let hiddenRequestNumbers: string[] = [];
-      if (hiddenSettled.status === "fulfilled") {
-        hiddenRequestNumbers = hiddenSettled.value;
-      } else {
-        console.error("[form-inbox] closed-request suppress list failed", {
-          message:
-            hiddenSettled.reason instanceof Error
-              ? hiddenSettled.reason.message.slice(0, 160)
-              : "unknown",
-        });
-      }
-
-      return { mailboxItems, requestItems, hiddenRequestNumbers };
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
-    }
-  }, { fresh });
+    },
+    { fresh, key: `lifecycle:${lifecycle}` },
+  );
 
   const mailboxItems = snapshot.mailboxItems;
   const requestItems = snapshot.requestItems;
@@ -1519,16 +1498,14 @@ export async function getFormInboxThread(id: string): Promise<FormInboxThreadIte
             date: (parsed.date ?? new Date()).toISOString(),
             snippet: "",
             unread: false,
-            submitterName: resolveSubmitterName(
-              parsed.subject?.trim() || "",
-              parseFields(parsed),
-            ),
+            submitterName: resolveSubmitterName(parsed.subject?.trim() || "", parseFields(parsed)),
             submitterEmail: resolveSubmitterEmail(parsed, config.user),
             requestNumber: extractRequestNumber(parsed.subject || "", bodyPlain(parsed)),
             scopeKey: extractFormScopeKeyFromSubject(parsed.subject),
             scopeLabel:
-              parseFields(parsed).find((f) => f.label.toLowerCase() === "scope")?.value?.trim() ||
-              null,
+              parseFields(parsed)
+                .find((f) => f.label.toLowerCase() === "scope")
+                ?.value?.trim() || null,
             textBody: bodyPlain(parsed),
             htmlSafePreview: "",
             replyToHeader: firstAddress(parsed.replyTo),
@@ -1675,7 +1652,7 @@ export async function getFormInboxAttachment(
 /**
  * Delete a website-form notification from Aanvragen.
  * Graph: move to Deleted Items (fallback hard-delete). IMAP: flag+expunge.
- * E2E: marks the website request closed so it leaves the inbox list.
+ * Request-backed rows are soft-deleted; mailbox-only rows are removed at source.
  */
 export async function deleteFormInboxMessage(id: string): Promise<void> {
   const decoded: DecodedInboxMessageId = decodeInboxMessageId(id);
@@ -1692,10 +1669,10 @@ export async function deleteFormInboxMessage(id: string): Promise<void> {
         "Dit bericht komt van Microsoft Graph, maar Graph is uitgeschakeld (FORM_INBOX_PROVIDER=imap). Vernieuw de Aanvragen-lijst.",
       );
     }
-    const { closeWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
-    // Close matching website request first so list suppress hides the WR even if
+    const { deleteWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
+    // Delete the matching website request first so list suppression hides the WR even if
     // the mailbox move fails (permissions / already deleted).
-    const requestClosed = await closeWebsiteRequestForGraphMessage(
+    const requestDeleted = await deleteWebsiteRequestForGraphMessage(
       decoded.graphId,
       decoded.mailbox,
     );
@@ -1705,13 +1682,13 @@ export async function deleteFormInboxMessage(id: string): Promise<void> {
       await deleteGraphFormInboxMessage(decoded.graphId, decoded.mailbox);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Already gone from mailbox — request close above is enough for Aanvragen.
+      // Already gone from mailbox — request deletion above is enough for Aanvragen.
       if (/niet gevonden|not found|404|ErrorItemNotFound/i.test(message)) {
         return;
       }
-      // Request closed → Aanvragen list will suppress; treat as success for UI.
-      if (requestClosed) {
-        console.warn("[form-inbox] Graph mailbox delete failed after request close", {
+      // Request deleted → Aanvragen list suppression is authoritative.
+      if (requestDeleted) {
+        console.warn("[form-inbox] Graph mailbox delete failed after request delete", {
           message: message.slice(0, 160),
         });
         return;
@@ -1744,8 +1721,8 @@ export async function deleteFormInboxMessage(id: string): Promise<void> {
         throw new FormInboxError("Bericht niet gevonden of geen McCoy-formulier-e-mail.");
       }
       if (summary.requestNumber) {
-        const { closeWebsiteRequestByNumber } = await import("./website-request-inbox");
-        await closeWebsiteRequestByNumber(summary.requestNumber);
+        const { deleteWebsiteRequestByNumber } = await import("./website-request-inbox");
+        await deleteWebsiteRequestByNumber(summary.requestNumber);
       }
       await client.messageDelete(String(uid), { uid: true });
     } finally {
@@ -1826,14 +1803,14 @@ export async function bulkDeleteFormInboxMessages(
         });
       }
     } else {
-      const { closeWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
-      // Close correlated website requests before Graph $batch so Aanvragen
+      const { deleteWebsiteRequestForGraphMessage } = await import("./website-request-inbox");
+      // Delete correlated website requests before Graph $batch so Aanvragen
       // suppress works even when a mailbox move fails.
-      const closedByMessageId = new Map<string, boolean>();
+      const deletedByMessageId = new Map<string, boolean>();
       await Promise.all(
         graphTargets.map(async (t) => {
-          const closed = await closeWebsiteRequestForGraphMessage(t.graphId, t.mailbox);
-          closedByMessageId.set(t.messageId, closed);
+          const deleted = await deleteWebsiteRequestForGraphMessage(t.graphId, t.mailbox);
+          deletedByMessageId.set(t.messageId, deleted);
         }),
       );
 
@@ -1859,8 +1836,8 @@ export async function bulkDeleteFormInboxMessages(
         durationMs += batch.durationMs;
         for (const r of batch.results) {
           let status = r.status;
-          if (status === "failed" && closedByMessageId.get(r.messageId)) {
-            // Website request already closed — Aanvragen suppress is authoritative.
+          if (status === "failed" && deletedByMessageId.get(r.messageId)) {
+            // Website request already deleted — Aanvragen suppression is authoritative.
             status = "deleted";
           }
           results.set(r.messageId, {

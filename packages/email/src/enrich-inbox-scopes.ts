@@ -8,8 +8,8 @@ export type InboxScopeEnrichmentSource = {
 
 export type MergeInboxSummariesOptions = {
   /**
-   * WR- numbers for closed/spam website requests. Mailbox copies of those
-   * inquiries must not reappear as graph:/imap: rows after Aanvragen delete.
+   * WR- numbers excluded from the active list. Closed requests live in the
+   * resolved view; deleted/spam requests must never reappear as mailbox rows.
    */
   hiddenRequestNumbers?: ReadonlySet<string>;
 };
@@ -71,6 +71,8 @@ export function mergeMailboxAndWebsiteRequestSummaries(
       submitterEmail: existing.submitterEmail ?? item.submitterEmail,
       submitterName: existing.submitterName ?? item.submitterName,
       unread: existing.unread || item.unread,
+      lifecycleStatus: item.lifecycleStatus,
+      activityAt: item.activityAt ?? existing.activityAt,
       date:
         new Date(existing.date).getTime() >= new Date(item.date).getTime()
           ? existing.date
@@ -79,7 +81,8 @@ export function mergeMailboxAndWebsiteRequestSummaries(
   }
 
   return [...byNumber.values(), ...withoutNumber].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    (a, b) =>
+      new Date(b.activityAt ?? b.date).getTime() - new Date(a.activityAt ?? a.date).getTime(),
   );
 }
 

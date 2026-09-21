@@ -1,6 +1,8 @@
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { FormInboxThreadItem } from "@mccoy/email/contracts";
+import type { ThreadSyncState } from "../hooks/useInquiryDetailQuery";
 import { formatWhen } from "../lib/format";
 import { AttachmentsBlock } from "./AttachmentsBlock";
 
@@ -8,11 +10,17 @@ export function ConversationThread({
   thread,
   rootId,
   hideRoot,
+  syncState = "idle",
+  syncError = null,
+  onRefresh,
 }: {
   thread: FormInboxThreadItem[];
   rootId: string;
   /** When structured fields are shown above, omit the form root to avoid duplication. */
   hideRoot: boolean;
+  syncState?: ThreadSyncState;
+  syncError?: string | null;
+  onRefresh?: () => void;
 }) {
   const items = thread.filter((item) => {
     if (item.direction === "form") return false;
@@ -25,6 +33,8 @@ export function ConversationThread({
     customer: "Klant",
     admin: "McCoy",
   };
+  const customerCount = items.filter((item) => item.direction === "customer").length;
+  const adminCount = items.filter((item) => item.direction === "admin").length;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-[#0c1220]">
@@ -33,14 +43,54 @@ export function ConversationThread({
           <MessageSquare className="h-4 w-4 text-white/50" />
           Gesprek
         </h3>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-xs text-white/50">
-          {items.length}
-        </span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-100/80">
+            Klant {customerCount}
+          </span>
+          <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-2.5 py-0.5 text-xs text-sky-100/80">
+            McCoy {adminCount}
+          </span>
+          {onRefresh ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 rounded-lg px-2.5 text-white/60 hover:bg-white/10 hover:text-white"
+              onClick={onRefresh}
+              disabled={syncState === "syncing"}
+              aria-label="Klantreacties uit de mailbox bijwerken"
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", syncState === "syncing" && "animate-spin")}
+                aria-hidden
+              />
+              {syncState === "syncing" ? "Ophalen…" : "Bijwerken"}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      {syncState === "syncing" ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="border-b border-white/10 bg-cyan-400/[0.06] px-6 py-2.5 text-xs text-cyan-100/75"
+        >
+          Klantreacties worden veilig uit Microsoft Graph opgehaald…
+        </p>
+      ) : syncError ? (
+        <p
+          role="alert"
+          className="border-b border-red-400/20 bg-red-500/[0.07] px-6 py-2.5 text-xs text-red-200"
+        >
+          {syncError}
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
         <div className="px-6 py-8 text-sm leading-relaxed text-white/45">
-          Nog geen antwoorden in dit gesprek. Zodra u een bericht verstuurt, verschijnt het hier.
+          Nog geen reacties in dit gesprek. Antwoorden van de klant en McCoy verschijnen hier in
+          tijdsvolgorde.
         </div>
       ) : (
         <ol className="space-y-0 divide-y divide-white/10 px-3 py-3">

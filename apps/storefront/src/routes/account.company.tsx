@@ -8,7 +8,7 @@ export const Route = createFileRoute("/account/company")({
 
 function AccountCompanyPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isUsersRoute = pathname.endsWith("/users");
+  const isUsersRoute = pathname.includes("/users");
 
   if (isUsersRoute) {
     return <Outlet />;

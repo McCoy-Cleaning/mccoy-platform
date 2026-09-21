@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AdminAuthError } from "@mccoy/security";
+import { AdminAuthError, RateLimitError } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
   adminConvertGuestSchema,
@@ -12,6 +12,11 @@ import {
   adminCustomerListSchema,
   adminGuestIdSchema,
   adminInviteCustomerSchema,
+  adminCustomersDirectorySchema,
+  adminCustomersDirectoryExportSchema,
+  adminCompanyFavouriteListSchema,
+  adminCompanyFavouriteMutateSchema,
+  adminProductSearchSchema,
   adminSeedCommerceFixturesSchema,
   adminSetCustomerBlockedSchema,
   adminUpdateCompanySchema,
@@ -42,6 +47,10 @@ import {
   updateCustomerProfile,
   writeStaffAudit,
   listPortalCompanies,
+  listAdminCustomersDirectory,
+  exportAdminCustomersDirectoryCsv,
+  seedAdminCustomersDirectoryDemo,
+  recordAdminCustomerImportRun,
   staffInviteAccountAdmin,
   staffInviteAccountUser,
   getCompanyById,
@@ -55,17 +64,32 @@ import {
   resendPortalInvitation,
   staffSuspendCompanyMembership,
   staffReactivateCompanyMembership,
+  assertFavouriteAdminAccess,
+  listCompanyFavouriteProducts,
+  addCompanyFavouriteProduct,
+  removeCompanyFavouriteProduct,
+  searchActiveProducts,
+  FavouriteProductsError,
+  CustomerPortalError,
 } from "@mccoy/database/server";
 
 const adminOrderIdSchema = z.object({ orderId: z.string().uuid() });
 
+/**
+ * Only deliberate domain messages reach the browser. Data-layer errors wrap raw
+ * Postgres / PostgREST / Supabase Auth text (`"<fn> failed: <provider text>"`),
+ * which must not be rendered in the admin UI.
+ */
 function authErrorResult(error: unknown): { ok: false; error: string } {
-  if (error instanceof AdminAuthError) {
+  if (
+    error instanceof AdminAuthError ||
+    error instanceof CustomerPortalError ||
+    error instanceof FavouriteProductsError ||
+    error instanceof RateLimitError
+  ) {
     return { ok: false, error: error.message };
   }
-  if (error instanceof Error && error.message.trim()) {
-    return { ok: false, error: error.message };
-  }
+  console.error("[admin-customers] unexpected server function error", error);
   return { ok: false, error: "Er ging iets mis. Probeer het opnieuw." };
 }
 
@@ -342,6 +366,14 @@ export const importAdminExistingServiceClients = createServerFn({ method: "POST"
         Awaited<ReturnType<typeof commitExistingCustomerImport>>,
         { ok: false }
       >;
+      await recordAdminCustomerImportRun({
+        fileName: committed.fileName,
+        createdCount: committed.sync.created,
+        updatedCount: committed.sync.updated,
+        skippedCount: committed.skippedInvalid + committed.skippedConflict,
+        actorUserId: session.userId,
+        source: "import",
+      }).catch(() => undefined);
       return {
         ok: true as const,
         mode: "commit" as const,
@@ -373,7 +405,14 @@ export const seedAdminCommerceFixtures = createServerFn({ method: "POST" })
       }
       const result = await seedCommerceFixtures(session.userId ?? null);
       await syncExistingServiceClients({ actorUserId: session.userId ?? null });
-      return { ok: true as const, emails: result.emails };
+      let demoCompanyCount = 0;
+      try {
+        const demo = await seedAdminCustomersDirectoryDemo();
+        demoCompanyCount = demo.companyIds.length;
+      } catch {
+        demoCompanyCount = 0;
+      }
+      return { ok: true as const, emails: result.emails, demoCompanyCount };
     } catch (error) {
       return authErrorResult(error);
     }
@@ -392,6 +431,55 @@ const portalInviteSchema = z.object({
   firstName: z.string().max(120).optional().nullable(),
   lastName: z.string().max(120).optional().nullable(),
 });
+
+export const getAdminCustomersDirectory = createServerFn({ method: "POST" })
+  .validator(adminCustomersDirectorySchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      const portalStatus =
+        data.portalStatus && data.portalStatus !== "all"
+          ? (data.portalStatus as import("@mccoy/domain").CustomerPortalStatus)
+          : "all";
+      const result = await listAdminCustomersDirectory({
+        q: data.q,
+        tab: data.tab,
+        portalStatus,
+        page: data.page,
+        pageSize: data.pageSize,
+        companyId: data.companyId,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
+
+/**
+ * Full filtered set, built server-side. The browser never receives the unfiltered
+ * directory, and the export honours the same tab/search/portal-status scope and the
+ * same staff session check as the list.
+ */
+export const exportAdminCustomersDirectory = createServerFn({ method: "POST" })
+  .validator(adminCustomersDirectoryExportSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      const result = await exportAdminCustomersDirectoryCsv({
+        q: data.q,
+        tab: data.tab,
+        portalStatus:
+          data.portalStatus && data.portalStatus !== "all"
+            ? (data.portalStatus as import("@mccoy/domain").CustomerPortalStatus)
+            : "all",
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return authErrorResult(error);
+    }
+  });
 
 export const listAdminPortalCompanies = createServerFn({ method: "POST" })
   .validator(portalCompanyListSchema)
@@ -605,5 +693,82 @@ export const transferAdminAccountAdmin = createServerFn({ method: "POST" })
       return { ok: true as const };
     } catch (error) {
       return authErrorResult(error);
+    }
+  });
+
+function favouriteErrorResult(error: unknown): { ok: false; error: string } {
+  if (error instanceof FavouriteProductsError) {
+    return { ok: false, error: error.message };
+  }
+  return authErrorResult(error);
+}
+
+/** Staff: list a company's shared favourite products. */
+export const listAdminCompanyFavouriteProducts = createServerFn({ method: "POST" })
+  .validator(adminCompanyFavouriteListSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      assertFavouriteAdminAccess("staff");
+      const items = await listCompanyFavouriteProducts(data.companyId);
+      return { ok: true as const, items };
+    } catch (error) {
+      return favouriteErrorResult(error);
+    }
+  });
+
+/** Staff: add an active product to a company's shared favourites. */
+export const addAdminCompanyFavouriteProduct = createServerFn({ method: "POST" })
+  .validator(adminCompanyFavouriteMutateSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      assertFavouriteAdminAccess("staff");
+      const item = await addCompanyFavouriteProduct({
+        companyId: data.companyId,
+        productId: data.productId,
+        actorUserId: session.userId ?? null,
+        actorKind: "staff",
+      });
+      return { ok: true as const, item };
+    } catch (error) {
+      return favouriteErrorResult(error);
+    }
+  });
+
+/** Staff: remove a product from a company's shared favourites. */
+export const removeAdminCompanyFavouriteProduct = createServerFn({ method: "POST" })
+  .validator(adminCompanyFavouriteMutateSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireAdminSession();
+      assertFavouriteAdminAccess("staff");
+      const result = await removeCompanyFavouriteProduct({
+        companyId: data.companyId,
+        productId: data.productId,
+        actorUserId: session.userId ?? null,
+        actorKind: "staff",
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return favouriteErrorResult(error);
+    }
+  });
+
+/** Staff: search active catalogue products for the favourite picker. */
+export const searchAdminActiveProducts = createServerFn({ method: "POST" })
+  .validator(adminProductSearchSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      await requireAdminSession();
+      assertFavouriteAdminAccess("staff");
+      const items = await searchActiveProducts({ q: data.q, limit: data.limit });
+      return { ok: true as const, items };
+    } catch (error) {
+      return favouriteErrorResult(error);
     }
   });

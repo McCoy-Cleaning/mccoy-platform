@@ -107,11 +107,7 @@ describe("getGraphFormInboxAttachment", () => {
     );
 
     const { getGraphFormInboxAttachment } = await import("./graph-mail");
-    const result = await getGraphFormInboxAttachment(
-      "msg-1",
-      "sollicitatie.pdf",
-      "info@mccoy.nl",
-    );
+    const result = await getGraphFormInboxAttachment("msg-1", "sollicitatie.pdf", "info@mccoy.nl");
     expect(result?.contentBase64).toBe(bytes);
   });
 
@@ -134,11 +130,7 @@ describe("getGraphFormInboxAttachment", () => {
     );
 
     const { getGraphFormInboxAttachment } = await import("./graph-mail");
-    const result = await getGraphFormInboxAttachment(
-      "msg-1",
-      "situatie.jpg",
-      "info@mccoy.nl",
-    );
+    const result = await getGraphFormInboxAttachment("msg-1", "situatie.jpg", "info@mccoy.nl");
     expect(result?.contentBase64).toBe(bytes);
   });
 
@@ -162,19 +154,13 @@ describe("getGraphFormInboxAttachment", () => {
       .mockResolvedValueOnce(binaryOk(raw, "application/pdf"));
 
     const { getGraphFormInboxAttachment } = await import("./graph-mail");
-    const result = await getGraphFormInboxAttachment(
-      "msg-1",
-      "sollicitatie.pdf",
-      "info@mccoy.nl",
-    );
+    const result = await getGraphFormInboxAttachment("msg-1", "sollicitatie.pdf", "info@mccoy.nl");
 
     expect(result?.contentBase64).toBe(raw.toString("base64"));
     expect(result?.omitted).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/attachments$/);
-    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(
-      /\/attachments\/att-value\/\$value$/,
-    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/attachments\/att-value\/\$value$/);
   });
 
   it("downloads a 5MB PDF via $value when maxBytes is 25MB", async () => {
@@ -241,8 +227,92 @@ describe("getGraphFormInboxAttachment", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.headers?.Prefer).toBe('IdType="ImmutableId"');
     expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/attachments$/);
     expect(fetchMock.mock.calls[1]?.[1]?.headers?.Prefer).toBeUndefined();
-    expect(String(fetchMock.mock.calls[2]?.[0])).toMatch(
-      /\/attachments\/att-retry\/\$value$/,
+    expect(String(fetchMock.mock.calls[2]?.[0])).toMatch(/\/attachments\/att-retry\/\$value$/);
+  });
+});
+
+describe("listGraphSenderSyncMessages", () => {
+  it("queries all mailbox folders for the exact sender from the request date", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonOk({
+        value: [
+          {
+            id: "reply-1",
+            subject: "Re: aanvraag (WR-2026-00081)",
+            bodyPreview: "Klantreactie",
+            receivedDateTime: "2026-09-21T09:00:00.000Z",
+            internetMessageId: "<reply-1@example.com>",
+            conversationId: "conv-1",
+            from: { emailAddress: { address: "client@example.com" } },
+            toRecipients: [{ emailAddress: { address: "info@mccoy.nl" } }],
+          },
+        ],
+      }),
+    );
+
+    const { listGraphSenderSyncMessages } = await import("./graph-mail");
+    const result = await listGraphSenderSyncMessages({
+      senderAddress: "CLIENT@example.com",
+      receivedSince: "2026-09-20T08:00:00.000Z",
+      mailbox: "info@mccoy.nl",
+      top: 40,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.fromAddress).toBe("client@example.com");
+    const url = decodeURIComponent(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url).toContain("/users/info@mccoy.nl/messages?");
+    expect(url).toContain("receivedDateTime ge 2026-09-20T08:00:00.000Z");
+    expect(url).toContain("from/emailAddress/address eq 'client@example.com'");
+    expect(url).toContain("$orderby=receivedDateTime desc");
+  });
+});
+
+describe("getGraphReplyParentContext", () => {
+  it("resolves the exact RFC parent across mailbox folders", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonOk({
+          internetMessageHeaders: [
+            { name: "In-Reply-To", value: "<parent@mccoy.nl>" },
+            { name: "References", value: "<root@mccoy.nl> <parent@mccoy.nl>" },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonOk({
+          value: [
+            {
+              id: "graph-parent",
+              subject: "Antwoord (WR-2026-00082)",
+              bodyPreview: "Antwoord voor WR-2026-00082",
+              receivedDateTime: "2026-09-21T11:20:00.000Z",
+              isRead: true,
+              hasAttachments: false,
+              internetMessageId: "<parent@mccoy.nl>",
+              conversationId: "conversation-82",
+              from: { emailAddress: { address: "info@mccoy.nl", name: "McCoy" } },
+              toRecipients: [{ emailAddress: { address: "client@example.com" } }],
+            },
+          ],
+        }),
+      );
+
+    const { getGraphReplyParentContext } = await import("./graph-mail");
+    const result = await getGraphReplyParentContext("graph-client-reply", "info@mccoy.nl");
+
+    expect(result).toMatchObject({
+      inReplyTo: "<parent@mccoy.nl>",
+      references: ["<root@mccoy.nl>", "<parent@mccoy.nl>"],
+      parent: {
+        id: "graph-parent",
+        fromAddress: "info@mccoy.nl",
+        toAddresses: ["client@example.com"],
+      },
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("$select=internetMessageHeaders");
+    expect(decodeURIComponent(String(fetchMock.mock.calls[1]?.[0]))).toContain(
+      "internetMessageId eq '<parent@mccoy.nl>'",
     );
   });
 });
@@ -294,15 +364,9 @@ describe("findGraphFormNotificationByRequestNumber", () => {
     expect(urls.some((url) => /subject:/i.test(decodeURIComponent(url)))).toBe(false);
     expect(urls.some((url) => /body:/i.test(decodeURIComponent(url)))).toBe(false);
     expect(urls.filter((url) => url.includes("$search="))).toHaveLength(1);
-    expect(urls.some((url) => url.includes("$search=") && url.includes("$filter="))).toBe(
-      false,
-    );
-    expect(urls.some((url) => url.includes("$search=") && url.includes("$select="))).toBe(
-      false,
-    );
-    expect(urls.some((url) => url.includes("$search=") && url.includes("$orderby="))).toBe(
-      false,
-    );
+    expect(urls.some((url) => url.includes("$search=") && url.includes("$filter="))).toBe(false);
+    expect(urls.some((url) => url.includes("$search=") && url.includes("$select="))).toBe(false);
+    expect(urls.some((url) => url.includes("$search=") && url.includes("$orderby="))).toBe(false);
   });
 
   it("does not retry a 400 $search in a storm", async () => {
@@ -323,9 +387,7 @@ describe("findGraphFormNotificationByRequestNumber", () => {
     });
     const afterSecond = fetchMock.mock.calls.length;
     expect(afterSecond - afterFirst).toBeLessThan(afterFirst);
-    const searchCalls = fetchMock.mock.calls.filter((call) =>
-      String(call[0]).includes("$search="),
-    );
+    const searchCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes("$search="));
     expect(searchCalls).toHaveLength(1);
   });
 

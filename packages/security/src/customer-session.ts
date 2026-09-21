@@ -88,3 +88,10 @@ export const CUSTOMER_INVITE_RATE = {
   maxAttempts: 20,
   keyPrefix: "customer-invite",
 } as const;
+
+/** Typeahead product search runs a service-role query per keystroke batch. */
+export const CUSTOMER_PRODUCT_SEARCH_RATE = {
+  windowMs: 60 * 1000,
+  maxAttempts: 60,
+  keyPrefix: "customer-product-search",
+} as const;

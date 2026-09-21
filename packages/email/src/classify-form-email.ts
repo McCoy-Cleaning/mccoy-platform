@@ -7,6 +7,8 @@ import {
   type FormKind,
 } from "@mccoy/domain";
 
+import { extractWebsiteRequestNumberToken } from "./inquiry-thread-correlation";
+
 /**
  * Subject patterns for McCoy website form notification emails.
  * More specific kinds are matched first. Includes Dutch templates and English aliases.
@@ -80,12 +82,7 @@ export { extractFormScopeKeyFromSubject };
 
 /** Extract human-readable request number (WR-…) when present in subject or body. */
 export function extractRequestNumber(...parts: Array<string | undefined | null>): string | null {
-  for (const part of parts) {
-    if (!part) continue;
-    const match = part.match(/\b(WR-[A-Z0-9-]+)\b/i);
-    if (match?.[1]) return match[1].toUpperCase();
-  }
-  return null;
+  return extractWebsiteRequestNumberToken(...parts);
 }
 
 /**

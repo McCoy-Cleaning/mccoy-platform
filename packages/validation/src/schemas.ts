@@ -30,31 +30,48 @@ export const formAttachmentSchema = z.object({
 export const formUploadFileIntentSchema = z.object({
   filename: z.string().min(1).max(180),
   contentType: z.string().min(1).max(120),
-  sizeBytes: z.number().int().positive().max(25 * 1024 * 1024),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(25 * 1024 * 1024),
 });
 
 export const uploadedFormAttachmentSchema = z.object({
   filename: z.string().min(1).max(180),
   contentType: z.string().min(1).max(120),
-  sizeBytes: z.number().int().positive().max(25 * 1024 * 1024),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(25 * 1024 * 1024),
   storagePath: z.string().trim().min(1).max(500),
 });
 
 export const formScopeSnapshotSchema = z.object({
-  key: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(FORM_SCOPE_KEY_PATTERN)
-    .max(64),
+  key: z.string().trim().toLowerCase().regex(FORM_SCOPE_KEY_PATTERN).max(64),
   label: z.string().trim().min(1).max(FORM_SCOPE_LABEL_MAX),
 });
+
+/**
+ * Public forms are anonymous, so the field map needs a key cap: `z.record` alone
+ * bounds each value but not how many keys a submitter can send. Published CMS
+ * forms use far fewer fields than this.
+ */
+export const WEBSITE_FORM_MAX_FIELDS = 100;
+
+const websiteFormFieldsSchema = z
+  .record(z.string().max(2000))
+  .default({})
+  .refine((fields) => Object.keys(fields).length <= WEBSITE_FORM_MAX_FIELDS, {
+    message: `Te veel formuliervelden (max ${WEBSITE_FORM_MAX_FIELDS}).`,
+  });
 
 export const websiteFormPayloadSchema = z.object({
   kind: z.enum(FORM_KINDS),
   pageId: z.string().trim().min(1).max(120),
   sourceId: z.string().trim().min(1).max(120),
-  fields: z.record(z.string().max(2000)).default({}),
+  fields: websiteFormFieldsSchema,
   attachments: z.array(formAttachmentSchema).max(8).optional(),
   uploadedAttachments: z.array(uploadedFormAttachmentSchema).max(8).optional(),
   website: z.string().max(200).optional(),
@@ -67,7 +84,7 @@ export const websiteFormPrepareAttachmentsSchema = z.object({
   kind: z.enum(FORM_KINDS),
   pageId: z.string().trim().min(1).max(120),
   sourceId: z.string().trim().min(1).max(120),
-  fields: z.record(z.string().max(2000)).default({}),
+  fields: websiteFormFieldsSchema,
   files: z.array(formUploadFileIntentSchema).min(1).max(8),
   website: z.string().max(200).optional(),
 });
@@ -153,6 +170,7 @@ export const adminRequestReplySchema = z.object({
 /** Mailbox-backed Aanvragen (Microsoft Graph or IMAP) */
 export const adminInboxListSchema = z.object({
   kind: z.enum([...FORM_KINDS, "all"]).default("all"),
+  lifecycle: z.enum(["active", "resolved"]).default("active"),
   /** Filter by stable scope key; omit or "all" = any scope. */
   scopeKey: z
     .union([z.literal("all"), z.string().trim().toLowerCase().regex(FORM_SCOPE_KEY_PATTERN)])
@@ -172,6 +190,11 @@ const inboxMessageId = z
 
 export const adminInboxMessageIdSchema = z.object({
   id: inboxMessageId,
+});
+
+export const adminInboxLifecycleStatusSchema = z.object({
+  id: inboxMessageId,
+  status: z.enum(["open", "closed"]),
 });
 
 /** Bulk delete for Admin → Aanvragen (deduped server-side). */
@@ -397,7 +420,14 @@ export const adminUpdateCompanySchema = z.object({
     .optional()
     .transform((v) => (v === "" ? null : v)),
   kvkNumber: z
-    .union([z.string().trim().regex(/^[0-9]{8}$/), z.literal(""), z.null()])
+    .union([
+      z
+        .string()
+        .trim()
+        .regex(/^[0-9]{8}$/),
+      z.literal(""),
+      z.null(),
+    ])
     .optional()
     .transform((v) => (v === "" ? null : v)),
   vatNumber: z.string().trim().max(32).nullable().optional(),
@@ -476,4 +506,70 @@ export const adminDeletePortalCompaniesSchema = z.object({
 
 export const adminSeedCommerceFixturesSchema = z.object({
   confirm: z.literal(true),
+});
+
+export const adminCustomersDirectorySchema = z.object({
+  q: z.string().max(200).optional(),
+  tab: z
+    .enum(["all", "service", "enrolled", "awaiting", "portal", "guests", "registered"])
+    .optional(),
+  portalStatus: z
+    .enum([
+      "all",
+      "active",
+      "registration_required",
+      "invited",
+      "reminder_sent",
+      "invite_expired",
+      "suspended",
+    ])
+    .optional(),
+  page: z.number().int().min(1).max(10_000).optional(),
+  pageSize: z.number().int().min(1).max(100).optional(),
+  companyId: z.string().uuid().optional(),
+});
+
+/**
+ * CSV export of the Klanten directory. Deliberately has no page/pageSize: the export
+ * always covers the full filtered set, bounded server-side.
+ */
+export const adminCustomersDirectoryExportSchema = adminCustomersDirectorySchema.pick({
+  q: true,
+  tab: true,
+  portalStatus: true,
+});
+
+export const adminPortalUsersDirectorySchema = z.object({
+  q: z.string().max(200).optional(),
+  companyId: z.string().uuid().optional(),
+  userId: z.string().trim().max(160).optional(),
+  page: z.number().int().min(1).max(10_000).optional(),
+  pageSize: z.number().int().min(1).max(100).optional(),
+});
+
+export const portalUserDetailKeySchema = z.object({
+  userId: z.string().trim().min(1).max(160),
+});
+
+export const adminCompanyFavouriteListSchema = z.object({
+  companyId: z.string().uuid(),
+});
+
+export const adminCompanyFavouriteMutateSchema = z.object({
+  companyId: z.string().uuid(),
+  productId: z.string().uuid(),
+});
+
+export const adminProductSearchSchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+export const portalFavouriteProductSchema = z.object({
+  productId: z.string().uuid(),
+});
+
+export const portalProductSearchSchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
 });

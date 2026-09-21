@@ -8,6 +8,7 @@ import "./admin-auth.functions";
 import "./admin-overview.functions";
 import "./admin-requests.functions";
 import "./admin-customers.functions";
+import "./admin-users.functions";
 import "./cms-publish.functions";
 import "./cms-media.functions";
 import "./content-ai.functions";

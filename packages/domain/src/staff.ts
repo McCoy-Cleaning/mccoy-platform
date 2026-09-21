@@ -68,8 +68,12 @@ export const STAFF_AUDIT_ACTIONS = [
   "customer.account_admin_transferred",
   "customer.company_portal_suspended",
   "customer.company_portal_reactivated",
+  "company.favourite_product_added",
+  "company.favourite_product_removed",
   "website_request.submitter_email_updated",
   "website_request.inquiry_status_updated",
+  "website_request.resolved",
+  "website_request.reopened",
 ] as const;
 export type StaffAuditAction = (typeof STAFF_AUDIT_ACTIONS)[number];
 

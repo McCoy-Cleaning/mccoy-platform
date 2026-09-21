@@ -27,6 +27,7 @@ export { processNotificationOutbox } from "./worker";
 export {
   listForUser,
   unreadCount,
+  listUnreadEntityIdsForUser,
   markRead,
   markAllRead,
   markReadForEntity,
@@ -34,7 +35,4 @@ export {
   markOpened,
 } from "./queries";
 
-export {
-  listNotificationPreferencesForUser,
-  setNotificationPreference,
-} from "./preferences";
+export { listNotificationPreferencesForUser, setNotificationPreference } from "./preferences";

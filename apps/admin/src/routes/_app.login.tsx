@@ -269,7 +269,8 @@ function AdminLoginPage() {
             </div>
           )}
 
-          {authMode && !authMode.supabaseEnabled && authMode.legacyEnabled && (
+          {/* Dev builds only: a production bundle must never publish the default password. */}
+          {import.meta.env.DEV && authMode && !authMode.supabaseEnabled && authMode.legacyEnabled && (
             <div className="mt-6 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm leading-relaxed text-white/55">
               <span className="font-semibold text-white/75">Demo credentials:</span>{" "}
               <code className="rounded bg-white/10 px-1.5 py-0.5 text-white/85">

@@ -15,13 +15,13 @@ import {
 describe("notification registry allowlist", () => {
   it("covers every NOTIFICATION_TYPES entry exactly once", () => {
     expect(() => assertNotificationRegistryComplete()).not.toThrow();
-    expect(Object.keys(NOTIFICATION_REGISTRY).sort()).toEqual(
-      [...NOTIFICATION_TYPES].sort(),
-    );
+    expect(Object.keys(NOTIFICATION_REGISTRY).sort()).toEqual([...NOTIFICATION_TYPES].sort());
   });
 
   it("marks only Stage C–D types as active", () => {
-    const active = listActiveNotificationDefinitions().map((d) => d.type).sort();
+    const active = listActiveNotificationDefinitions()
+      .map((d) => d.type)
+      .sort();
     expect(active).toEqual([...ACTIVE_NOTIFICATION_TYPES].sort());
 
     for (const type of ACTIVE_NOTIFICATION_TYPES) {
@@ -36,9 +36,7 @@ describe("notification registry allowlist", () => {
   it("uses allowlisted recipient resolvers and categories", () => {
     for (const type of NOTIFICATION_TYPES) {
       const def = getNotificationDefinition(type);
-      expect(def.recipientResolver).toMatch(
-        /^(active_staff|actor_only|future_)/,
-      );
+      expect(def.recipientResolver).toMatch(/^(active_staff|actor_only|future_)/);
       expect(def.defaultChannels.length).toBeGreaterThan(0);
       expect(["none", "dedupe_key"]).toContain(def.dedupeStrategy);
     }
@@ -60,10 +58,20 @@ describe("notification metadata validation", () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.metadata.requestId).toBe(
-        "a0000000-0000-4000-8000-000000000101",
-      );
+      expect(result.metadata.requestId).toBe("a0000000-0000-4000-8000-000000000101");
     }
+  });
+
+  it("accepts the resolved-reopen marker for applicant replies", () => {
+    const result = parseNotificationMetadata("website_request.applicant_replied", {
+      requestId: "3f651b65-65c8-48e4-99f2-4514dc53f475",
+      requestNumber: "WR-2026-00082",
+      submitterName: "Klant",
+      inboxMessageId: "req:website-requests:3f651b65-65c8-48e4-99f2-4514dc53f475",
+      reopenedFromResolved: true,
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it("rejects unknown metadata keys (strict allowlist)", () => {

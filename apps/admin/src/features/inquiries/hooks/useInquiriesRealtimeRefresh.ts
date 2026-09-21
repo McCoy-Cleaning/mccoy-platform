@@ -7,9 +7,10 @@ import {
 const DEFAULT_DEBOUNCE_MS = 600;
 
 /**
- * When a `requests` / website_request notification arrives (Realtime → toast),
- * refresh the Aanvragen list so new form submissions appear without a manual Vernieuwen.
- * Also soft-refreshes an open Gesprek so applicant replies appear in the thread.
+ * When a `requests` / website_request notification arrives or becomes read,
+ * refresh the Aanvragen list so new submissions and per-user unread state stay
+ * current without a manual Vernieuwen. Also soft-refreshes an open Gesprek for
+ * newly arrived applicant replies.
  */
 export function useInquiriesRealtimeRefresh(options: {
   loadList: () => void | Promise<void>;
@@ -39,6 +40,7 @@ export function useInquiriesRealtimeRefresh(options: {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         void loadListRef.current();
+        if (event.type === "notification-read") return;
         const id = selectedIdRef.current;
         if (id && softRefreshDetailRef.current) {
           softRefreshDetailRef.current(id);

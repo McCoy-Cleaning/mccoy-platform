@@ -1,8 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { CUSTOMER_ACTIVATION_RATE, assertAdminSameOriginMutation } from "@mccoy/security";
+import {
+  CUSTOMER_ACTIVATION_RATE,
+  CUSTOMER_PRODUCT_SEARCH_RATE,
+  assertAdminSameOriginMutation,
+} from "@mccoy/security";
 import { assertRateLimit, RateLimitError } from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
+import {
+  portalFavouriteProductSchema,
+  portalProductSearchSchema,
+  portalUserDetailKeySchema,
+} from "@mccoy/validation";
 import {
   activateCustomerAccount,
   customerRequestPasswordReset,
@@ -18,7 +27,14 @@ import {
   listPendingInvitationsForCompany,
   suspendCompanyMembership,
   reactivateCompanyMembership,
+  resendPortalInvitation,
+  getPortalUserDetail,
   CustomerPortalError,
+  listPortalFavouriteProducts,
+  addPortalFavouriteProduct,
+  removePortalFavouriteProduct,
+  searchActiveProducts,
+  FavouriteProductsError,
 } from "@mccoy/database/server";
 
 const loginSchema = z.object({
@@ -61,13 +77,22 @@ const membershipActionSchema = z.object({
   userId: z.string().uuid(),
 });
 
+/**
+ * Only deliberate domain messages reach the browser. Unexpected errors (Postgres,
+ * PostgREST, Supabase Auth) are logged server-side and replaced with generic copy
+ * so schema and provider internals never leak to an untrusted portal user.
+ */
 function portalError(error: unknown): { ok: false; error: string; code?: string } {
   if (error instanceof CustomerPortalError) {
     return { ok: false, error: error.message, code: error.code };
   }
-  if (error instanceof Error && error.message.trim()) {
-    return { ok: false, error: error.message };
+  if (error instanceof FavouriteProductsError) {
+    return { ok: false, error: error.message, code: error.code };
   }
+  if (error instanceof RateLimitError) {
+    return { ok: false, error: error.message, code: "rate_limit" };
+  }
+  console.error("[account] unexpected server function error", error);
   return { ok: false, error: "Er ging iets mis. Probeer het opnieuw." };
 }
 
@@ -189,6 +214,87 @@ export const getAccountCompanyUsers = createServerFn({ method: "POST" }).handler
   }
 });
 
+export const getAccountTeammateDetail = createServerFn({ method: "POST" })
+  .validator(portalUserDetailKeySchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireCustomerSession();
+      const result = await getPortalUserDetail(data.userId, {
+        kind: "customer",
+        companyId: session.membership.companyId,
+      });
+      if (!result.ok) {
+        return {
+          ok: false as const,
+          error:
+            result.error === "forbidden"
+              ? "Deze gebruiker hoort niet bij uw bedrijf."
+              : "Gebruiker niet gevonden.",
+          code: result.error === "forbidden" ? "CUSTOMER_CROSS_TENANT_DENIED" : "NOT_FOUND",
+        };
+      }
+      return { ok: true as const, detail: result.detail, role: session.membership.role };
+    } catch (error) {
+      return portalError(error);
+    }
+  });
+
+export const accountResendInvitation = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      email: z.string().email(),
+      intendedRole: z.enum(["account_admin", "account_user"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      assertAdminSameOriginMutation();
+      const session = await requireAccountAdmin();
+      const result = await resendPortalInvitation({
+        companyId: session.membership.companyId,
+        email: data.email,
+        intendedRole: data.intendedRole,
+        invitedByType: "account_admin",
+        actorUserId: session.userId,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return portalError(error);
+    }
+  });
+
+export const accountRequestTeammatePasswordReset = createServerFn({ method: "POST" })
+  .validator(portalUserDetailKeySchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      assertAdminSameOriginMutation();
+      const session = await requireAccountAdmin();
+      const result = await getPortalUserDetail(data.userId, {
+        kind: "customer",
+        companyId: session.membership.companyId,
+      });
+      if (!result.ok || !result.detail.email) {
+        return {
+          ok: false as const,
+          error:
+            result.ok === false && result.error === "forbidden"
+              ? "Deze gebruiker hoort niet bij uw bedrijf."
+              : "Gebruiker niet gevonden.",
+        };
+      }
+      await customerRequestPasswordReset({
+        email: result.detail.email,
+        clientKey: `portal-admin:${session.userId}:${result.detail.email}`,
+      });
+      return { ok: true as const };
+    } catch (error) {
+      return portalError(error);
+    }
+  });
+
 export const accountInviteUser = createServerFn({ method: "POST" })
   .validator(inviteUserSchema)
   .handler(async ({ data }) => {
@@ -255,3 +361,70 @@ export const getAccountDashboard = createServerFn({ method: "POST" }).handler(as
     return portalError(error);
   }
 });
+
+/** Portal: list the authenticated member's company favourites. Company is resolved from membership. */
+export const listAccountFavouriteProducts = createServerFn({ method: "POST" }).handler(async () => {
+  try {
+    ensureMonorepoEnvLoaded();
+    const session = await requireCustomerSession();
+    const items = await listPortalFavouriteProducts(session.userId);
+    return { ok: true as const, items, companyId: session.membership.companyId };
+  } catch (error) {
+    return portalError(error);
+  }
+});
+
+/** Portal: add an active product to the member's company list. Never accepts a client company_id. */
+export const addAccountFavouriteProduct = createServerFn({ method: "POST" })
+  .validator(portalFavouriteProductSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      assertAdminSameOriginMutation();
+      const session = await requireCustomerSession();
+      const item = await addPortalFavouriteProduct({
+        userId: session.userId,
+        productId: data.productId,
+      });
+      return { ok: true as const, item };
+    } catch (error) {
+      return portalError(error);
+    }
+  });
+
+/** Portal: remove a product from the member's company list. Never accepts a client company_id. */
+export const removeAccountFavouriteProduct = createServerFn({ method: "POST" })
+  .validator(portalFavouriteProductSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      assertAdminSameOriginMutation();
+      const session = await requireCustomerSession();
+      const result = await removePortalFavouriteProduct({
+        userId: session.userId,
+        productId: data.productId,
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return portalError(error);
+    }
+  });
+
+export const searchAccountActiveProducts = createServerFn({ method: "POST" })
+  .validator(portalProductSearchSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureMonorepoEnvLoaded();
+      const session = await requireCustomerSession();
+      assertRateLimit(
+        `${CUSTOMER_PRODUCT_SEARCH_RATE.keyPrefix}:${session.userId}`,
+        CUSTOMER_PRODUCT_SEARCH_RATE.maxAttempts,
+        CUSTOMER_PRODUCT_SEARCH_RATE.windowMs,
+        "Te veel zoekopdrachten. Wacht even en probeer opnieuw.",
+      );
+      const items = await searchActiveProducts({ q: data.q, limit: data.limit });
+      return { ok: true as const, items };
+    } catch (error) {
+      return portalError(error);
+    }
+  });

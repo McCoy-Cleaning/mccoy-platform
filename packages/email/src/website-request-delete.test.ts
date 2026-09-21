@@ -13,12 +13,10 @@ const peekGraphMessageRequestNumber = vi.fn();
 vi.mock("@mccoy/database/server", () => ({
   getWebsiteRequest: (...args: unknown[]) => getWebsiteRequest(...args),
   setWebsiteRequestStatus: (...args: unknown[]) => setWebsiteRequestStatus(...args),
-  listWebsiteRequestMailMessages: (...args: unknown[]) =>
-    listWebsiteRequestMailMessages(...args),
+  listWebsiteRequestMailMessages: (...args: unknown[]) => listWebsiteRequestMailMessages(...args),
   findWebsiteRequestIdByGraphMessageId: (...args: unknown[]) =>
     findWebsiteRequestIdByGraphMessageId(...args),
-  findWebsiteRequestIdByNumber: (...args: unknown[]) =>
-    findWebsiteRequestIdByNumber(...args),
+  findWebsiteRequestIdByNumber: (...args: unknown[]) => findWebsiteRequestIdByNumber(...args),
 }));
 
 vi.mock("./form-inbox-provider", () => ({
@@ -35,7 +33,7 @@ vi.mock("./graph-mail", () => ({
 }));
 
 import {
-  closeWebsiteRequestForGraphMessage,
+  deleteWebsiteRequestForGraphMessage,
   deleteWebsiteRequestFormInboxMessage,
 } from "./website-request-inbox";
 
@@ -50,7 +48,7 @@ describe("deleteWebsiteRequestFormInboxMessage", () => {
     setWebsiteRequestStatus.mockResolvedValue({
       id: "req-1",
       number: "WR-2026-00001",
-      status: "closed",
+      status: "deleted",
     });
     shouldAttemptGraphMail.mockReturnValue(true);
     getGraphMailConfig.mockReturnValue({ mailbox: "info@mccoy.nl" });
@@ -62,13 +60,13 @@ describe("deleteWebsiteRequestFormInboxMessage", () => {
     deleteGraphFormInboxMessage.mockResolvedValue(undefined);
   });
 
-  it("closes the website request and deletes unique Graph copies", async () => {
+  it("marks the website request deleted and deletes unique Graph copies", async () => {
     await deleteWebsiteRequestFormInboxMessage(
       "req:website-requests:11111111-1111-1111-1111-111111111111",
     );
 
     expect(getWebsiteRequest).toHaveBeenCalledWith("11111111-1111-1111-1111-111111111111");
-    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "closed");
+    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "deleted");
     expect(deleteGraphFormInboxMessage).toHaveBeenCalledTimes(2);
     expect(deleteGraphFormInboxMessage).toHaveBeenCalledWith("g1", "info@mccoy.nl");
     expect(deleteGraphFormInboxMessage).toHaveBeenCalledWith("g2", "info@mccoy.nl");
@@ -81,11 +79,11 @@ describe("deleteWebsiteRequestFormInboxMessage", () => {
         "req:website-requests:11111111-1111-1111-1111-111111111111",
       ),
     ).resolves.toBeUndefined();
-    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "closed");
+    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "deleted");
   });
 });
 
-describe("closeWebsiteRequestForGraphMessage", () => {
+describe("deleteWebsiteRequestForGraphMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findWebsiteRequestIdByGraphMessageId.mockResolvedValue("req-1");
@@ -96,14 +94,14 @@ describe("closeWebsiteRequestForGraphMessage", () => {
     });
     setWebsiteRequestStatus.mockResolvedValue({
       id: "req-1",
-      status: "closed",
+      status: "deleted",
     });
   });
 
-  it("closes by graph message id lookup", async () => {
-    const closed = await closeWebsiteRequestForGraphMessage("graph-abc");
-    expect(closed).toBe(true);
-    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "closed");
+  it("deletes by graph message id lookup", async () => {
+    const deleted = await deleteWebsiteRequestForGraphMessage("graph-abc");
+    expect(deleted).toBe(true);
+    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-1", "deleted");
   });
 
   it("falls back to WR number from Graph subject", async () => {
@@ -115,22 +113,22 @@ describe("closeWebsiteRequestForGraphMessage", () => {
       number: "WR-99",
       status: "new",
     });
-    setWebsiteRequestStatus.mockResolvedValue({ id: "req-99", status: "closed" });
+    setWebsiteRequestStatus.mockResolvedValue({ id: "req-99", status: "deleted" });
 
-    const closed = await closeWebsiteRequestForGraphMessage("graph-xyz", "info@mccoy.nl");
-    expect(closed).toBe(true);
+    const deleted = await deleteWebsiteRequestForGraphMessage("graph-xyz", "info@mccoy.nl");
+    expect(deleted).toBe(true);
     expect(peekGraphMessageRequestNumber).toHaveBeenCalledWith("graph-xyz", "info@mccoy.nl");
     expect(findWebsiteRequestIdByNumber).toHaveBeenCalledWith("WR-99");
-    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-99", "closed");
+    expect(setWebsiteRequestStatus).toHaveBeenCalledWith("req-99", "deleted");
   });
 
-  it("returns true when already closed", async () => {
+  it("returns true when already deleted", async () => {
     getWebsiteRequest.mockResolvedValue({
       id: "req-1",
-      status: "closed",
+      status: "deleted",
     });
-    const closed = await closeWebsiteRequestForGraphMessage("graph-abc");
-    expect(closed).toBe(true);
+    const deleted = await deleteWebsiteRequestForGraphMessage("graph-abc");
+    expect(deleted).toBe(true);
     expect(setWebsiteRequestStatus).not.toHaveBeenCalled();
   });
 });

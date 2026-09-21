@@ -1,6 +1,7 @@
 import type { CompanyPartyType, CompanyType, CustomerPortalStatus } from "@mccoy/domain";
 import { partyTypeLabelNl, portalStatusLabelNl } from "@mccoy/domain";
 
+import { sanitizePostgrestSearchTerm } from "../postgrest-search";
 import { createSupabaseServiceClient } from "../supabase";
 import { resolveCustomerPortalStatus } from "./portal-status";
 
@@ -44,7 +45,7 @@ export async function listPortalCompanies(
     })
     .eq("company_type", "service_client");
 
-  const q = query.q?.trim();
+  const q = sanitizePostgrestSearchTerm(query.q ?? "");
   if (q) {
     req = req.or(`legal_name.ilike.%${q}%,display_name.ilike.%${q}%`);
   }

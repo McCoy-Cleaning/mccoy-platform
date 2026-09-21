@@ -41,6 +41,7 @@ export const websiteRequestApplicantRepliedMetadataSchema = z
       .min(1)
       .max(500)
       .regex(/^(imap:[^:]+:\d+|graph:[^:]+:.+|req:[^:]+:.+|e2e:[^:]+:.+)$/),
+    reopenedFromResolved: z.boolean().optional(),
   })
   .strict();
 
@@ -95,14 +96,11 @@ export const ACTIVE_NOTIFICATION_METADATA_SCHEMAS = {
 } as const satisfies Record<ActiveNotificationType, z.ZodTypeAny>;
 
 export type NotificationMetadataByType = {
-  [K in ActiveNotificationType]: z.infer<
-    (typeof ACTIVE_NOTIFICATION_METADATA_SCHEMAS)[K]
-  >;
+  [K in ActiveNotificationType]: z.infer<(typeof ACTIVE_NOTIFICATION_METADATA_SCHEMAS)[K]>;
 };
 
 export type ParseNotificationMetadataResult =
-  | { ok: true; metadata: Record<string, unknown> }
-  | { ok: false; error: string };
+  { ok: true; metadata: Record<string, unknown> } | { ok: false; error: string };
 
 /**
  * Validate metadata against the active-type allowlist.

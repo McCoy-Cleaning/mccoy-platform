@@ -69,16 +69,19 @@ Server `bulkDeleteAdminFormInboxMessages` / `bulkDeleteFormInboxMessages` always
 - `adminInboxBulkDeleteSchema` max remains 50 IDs per request
 - Measured wall-clock Graph timings require a seeded non-prod mailbox (not fabricated here)
 
-## Delete semantics (2026-08-06 repair)
+## Delete and resolved semantics (updated 2026-09-21)
 
 Aanvragen delete is **request-authoritative**:
 
-1. `req:` / `e2e:` → set `website_requests.status = closed`, best-effort Graph copy removal
-2. `graph:` → close correlated website request (mail_messages / root id / WR- from subject), then mailbox move/delete
-3. List merge suppresses mailbox rows whose WR- number is closed or spam (`hiddenRequestNumbers`)
-4. Graph mailbox permission failures after a successful request close still count as deleted for Aanvragen UI
+1. `closed` means resolved and remains available under **Aanvragen → Afgerond**
+2. `deleted` is a recoverable database soft-delete retained for audit/reference integrity and hidden from Admin lists
+3. `req:` / `e2e:` delete → set `website_requests.status = deleted`, then attempt Graph copy removal
+4. `graph:` delete → soft-delete the correlated request (mail_messages / root id / WR- from subject), then mailbox move/delete
+5. The active-list merge suppresses mailbox rows whose WR- number is closed, deleted, or spam
+6. Graph mailbox permission failures after a successful request soft-delete still count as deleted for Aanvragen UI
+7. A newly correlated applicant Graph reply changes `closed → open`; `deleted` and `spam` never reopen and route to **Niet-gekoppeld**
 
-Without (3), Vernieuwen resurrected leftover Graph form copies as new `graph:` rows after a successful `req:` close — which felt like “delete does nothing”.
+Without (5), Vernieuwen resurrected leftover Graph form copies as new `graph:` rows after a successful `req:` delete — which felt like “delete does nothing”.
 
 ## Phase 14 — Manual Graph acceptance (operator)
 

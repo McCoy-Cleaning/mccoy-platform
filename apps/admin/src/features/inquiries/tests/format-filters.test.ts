@@ -75,18 +75,26 @@ describe("form-field helpers", () => {
 
 describe("validateInquiriesSearch", () => {
   it("defaults and clamps search params", () => {
-    expect(validateInquiriesSearch({})).toEqual({ kind: "all", scope: "all", q: "" });
+    expect(validateInquiriesSearch({})).toEqual({
+      kind: "all",
+      scope: "all",
+      q: "",
+      view: "active",
+    });
     expect(validateInquiriesSearch({ kind: "inquiry", scope: "test", q: "hello" })).toEqual({
       kind: "inquiry",
       scope: "test",
       q: "hello",
+      view: "active",
     });
-    expect(validateInquiriesSearch({ kind: "nope", scope: "BAD SCOPE!", q: "x".repeat(300) })).toEqual(
-      {
-        kind: "all",
-        scope: "all",
-        q: "x".repeat(200),
-      },
-    );
+    expect(
+      validateInquiriesSearch({ kind: "nope", scope: "BAD SCOPE!", q: "x".repeat(300) }),
+    ).toEqual({
+      kind: "all",
+      scope: "all",
+      q: "x".repeat(200),
+      view: "active",
+    });
+    expect(validateInquiriesSearch({ view: "resolved" }).view).toBe("resolved");
   });
 });

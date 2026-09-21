@@ -46,6 +46,7 @@ describe("resolveInquiryNotificationHref", () => {
 
   it("allowlists current paths and rewrites legacy /admin destinations", () => {
     expect(resolveAdminNotificationDestination("/inquiries")).toBe("/inquiries");
+    expect(resolveAdminNotificationDestination("/customers")).toBe("/customers");
     expect(resolveAdminNotificationDestination("/admin/inquiries")).toBe("/inquiries");
     expect(resolveAdminNotificationDestination("/admin")).toBe("/");
     expect(resolveAdminNotificationDestination("/evil")).toBe("/");

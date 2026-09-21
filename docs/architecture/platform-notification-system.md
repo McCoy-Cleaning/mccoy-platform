@@ -4,13 +4,13 @@ Durable, multi-recipient, Realtime-capable notifications for McCoy Admin (custom
 
 ## Separation of concerns
 
-| State | Meaning |
-|-------|---------|
-| Domain | Order pending, request new, etc. |
-| Workflow | Staff has / has not processed |
-| Provider | Graph/IMAP unread |
+| State        | Meaning                                    |
+| ------------ | ------------------------------------------ |
+| Domain       | Order pending, request new, etc.           |
+| Workflow     | Staff has / has not processed              |
+| Provider     | Graph/IMAP unread                          |
 | Notification | This user has not opened the in-app notice |
-| Delivery | Browser/email channel emitted |
+| Delivery     | Browser/email channel emitted              |
 
 Do **not** use notification read state to mutate domain workflow.
 
@@ -29,6 +29,7 @@ Active now / Stage C–D:
 
 - `website_request.received`
 - `website_request.reply_failed`
+- `website_request.applicant_replied`
 - `cms.publish_failed`
 - `mailbox.connection_failed`
 - `mailbox.connection_restored`
@@ -65,6 +66,12 @@ Future resolvers: role sets, company users — registered but unused until domai
 - Realtime on `notification_recipients` for `user_id=eq.{auth.uid}`; **always refetch on reconnect / visibility**.
 - Notification centre (bell) in admin shell.
 - Aanvragen badge = unread notifications category `requests` (not Graph unread count).
+- Aanvragen row unread state = unread `notification_recipients` for the current
+  staff user and `website_request` entity. Request lifecycle status is never an
+  unread proxy.
+- Opening an Aanvraag marks every unread notification for that request read for
+  the current staff user before returning the detail. Other staff retain their
+  own unread state; a later applicant reply creates a new unread notification.
 - Browser notifications: opt-in; only when tab hidden; BroadcastChannel so one tab emits.
 
 ## Dedupe keys

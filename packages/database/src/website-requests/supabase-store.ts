@@ -166,13 +166,15 @@ export async function listWebsiteRequests(
     .select(
       "id, number, kind, status, inquiry_status, submitter_name, submitter_email, subject, attachments, form_id, source_page_id, scope_key, scope_label, created_at, updated_at, last_replied_at, website_request_replies(count)",
     )
-    .order("created_at", { ascending: false })
+    .order(filter.orderBy ?? "created_at", { ascending: false })
     .limit(LIST_LIMIT);
 
   if (filter.kind && filter.kind !== "all") {
     query = query.eq("kind", filter.kind);
   }
-  if (filter.status && filter.status !== "all") {
+  if (filter.statuses && filter.statuses.length > 0) {
+    query = query.in("status", filter.statuses);
+  } else if (filter.status && filter.status !== "all") {
     query = query.eq("status", filter.status);
   }
   if (filter.scopeKey && filter.scopeKey !== "all") {

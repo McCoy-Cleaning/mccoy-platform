@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { CmsImage } from "@mccoy/cms-schema";
+import { sanitizePostgrestSearchTerm } from "../postgrest-search";
 import { createSupabaseServiceClient, getSupabasePublicConfig } from "../supabase";
 import { writeStaffAudit } from "../staff";
 import { DEFAULT_CMS_SITE_ID } from "./types";
@@ -255,8 +256,9 @@ export async function listCmsMediaAssets(input: {
 
   if (input.profile) query = query.eq("profile", input.profile);
   if (input.tags && input.tags.length > 0) query = query.contains("tags", input.tags);
-  if (input.q?.trim()) {
-    const q = `%${input.q.trim().replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+  const safeQ = sanitizePostgrestSearchTerm(input.q ?? "");
+  if (safeQ) {
+    const q = `%${safeQ}%`;
     query = query.or(`original_filename.ilike.${q},alt_default.ilike.${q}`);
   }
   if (input.cursor) {

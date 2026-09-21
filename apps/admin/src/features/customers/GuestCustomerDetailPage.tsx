@@ -7,10 +7,7 @@ import { PageHeader } from "@/components/admin/AdminBits";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { ConfirmationDialog } from "@/components/admin/ConfirmationDialog";
-import {
-  convertAdminGuest,
-  getAdminGuestDetail,
-} from "@/lib/api/admin-customers.functions";
+import { convertAdminGuest, getAdminGuestDetail } from "@/lib/api/admin-customers.functions";
 
 export function GuestCustomerDetailPage({ guestId }: { guestId: string }) {
   const [state, setState] = useState<
@@ -80,7 +77,14 @@ export function GuestCustomerDetailPage({ guestId }: { guestId: string }) {
     <div className="space-y-6 animate-fade-in">
       <Link
         to="/customers"
-        search={{ tab: "guests", q: "", status: "all", portalStatus: "all", page: 1 }}
+        search={{
+          tab: "all",
+          q: "",
+          status: "all",
+          portalStatus: "all",
+          page: 1,
+          companyId: undefined,
+        }}
         className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Terug naar gastkopers

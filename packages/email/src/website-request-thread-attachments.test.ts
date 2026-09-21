@@ -167,6 +167,85 @@ describe("hydrateWebsiteRequestThreadAttachments", () => {
     expect(result[0]?.id).toBe(encodeGraphMessageId("g-out", "info@mccoy.nl"));
   });
 
+  it("keeps each message's files on its own bubble and never guesses by body text", async () => {
+    const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const rootId = encodeRequestMessageId(requestId, "website-requests");
+    listGraphFormInboxAttachments.mockImplementation(async (graphId: string) =>
+      graphId === "g-in"
+        ? [{ filename: "image001.png", contentType: "image/png", size: 4_000, omitted: false, part: "i1" }]
+        : [],
+    );
+
+    const thread = [
+      {
+        id: `${rootId}:mail:mail-in`,
+        uid: 2,
+        direction: "customer" as const,
+        from: "klant@example.com",
+        to: "info@mccoy.nl",
+        date: "2026-09-18T15:11:00.000Z",
+        subject: "Re: Aanvraag",
+        textBody: "Zelfde tekst",
+        messageId: "<in@example.com>",
+        attachments: [],
+      },
+      {
+        // Staff bubble from website_request_replies: same body, no RFC id yet.
+        id: "persisted-reply:req-1:r1",
+        uid: 3,
+        direction: "admin" as const,
+        from: "mauro",
+        to: "klant@example.com",
+        date: "2026-09-21T09:09:00.000Z",
+        subject: "Re: Aanvraag",
+        textBody: "Zelfde tekst",
+        messageId: null,
+        attachments: [],
+      },
+    ];
+
+    const result = await hydrateWebsiteRequestThreadAttachments(
+      thread,
+      [
+        {
+          id: "mail-in",
+          direction: "inbound",
+          provider: "microsoft_graph",
+          mailbox: "info@mccoy.nl",
+          sender_address: "klant@example.com",
+          recipient_addresses: ["info@mccoy.nl"],
+          subject: "Re: Aanvraag",
+          body_text: "Zelfde tekst",
+          occurred_at: "2026-09-18T15:11:00.000Z",
+          internet_message_id: "<in@example.com>",
+          graph_message_id: "g-in",
+        },
+        {
+          id: "mail-out",
+          direction: "outbound",
+          provider: "microsoft_graph",
+          mailbox: "info@mccoy.nl",
+          sender_address: "info@mccoy.nl",
+          recipient_addresses: ["klant@example.com"],
+          subject: "Re: Aanvraag",
+          body_text: "Zelfde tekst",
+          occurred_at: "2026-09-21T09:09:00.000Z",
+          internet_message_id: null,
+          graph_message_id: "g-out",
+        },
+      ],
+      "info@mccoy.nl",
+    );
+
+    expect(
+      result.find((item) => item.direction === "customer")?.attachments.map((a) => a.filename),
+    ).toEqual(["image001.png"]);
+    // The staff bubble cannot be tied to mail-out by identity, so it stays empty
+    // instead of borrowing the inbound message's file.
+    expect(result.find((item) => item.direction === "admin")?.attachments).toEqual([]);
+    expect(listGraphFormInboxAttachments).not.toHaveBeenCalledWith("g-out", expect.anything());
+  });
+
   it("collapses a leftover empty req: mail bubble after rewriting the Graph id", async () => {
     const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const rootId = encodeRequestMessageId(requestId, "website-requests");

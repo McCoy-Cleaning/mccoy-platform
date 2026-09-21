@@ -3,7 +3,7 @@ import process from "node:process";
 
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 
-import { readServerEnv } from "./env";
+import { isProductionRuntime, readServerEnv } from "./env";
 import { ensureMonorepoEnvLoaded } from "./load-monorepo-env.server";
 
 /** Explicit MFA browser purposes — never accept arbitrary strings. */
@@ -30,6 +30,10 @@ function getSessionSecret(): string {
   ensureMonorepoEnvLoaded();
   const secret = readServerEnv("ADMIN_SESSION_SECRET");
   if (secret) return secret;
+  if (isProductionRuntime()) {
+    // Publicly known dev fallback would let anyone forge an MFA-flow capability.
+    throw new Error("ADMIN_SESSION_SECRET is required in production.");
+  }
   return "mccoy-dev-admin-session-secret-change-me";
 }
 
@@ -64,7 +68,13 @@ function encodeFlow(capability: AdminMfaFlowCapability): string {
 function decodeFlow(token: string): AdminMfaFlowCapability | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = sign(body);
+  let expected: string;
+  try {
+    expected = sign(body);
+  } catch {
+    // No usable signing secret in production: fail closed.
+    return null;
+  }
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);

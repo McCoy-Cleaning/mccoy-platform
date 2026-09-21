@@ -1,5 +1,16 @@
 import * as React from "react";
-import { ArrowLeft, Check, Pencil, Pin, PinOff, Send, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  Pencil,
+  Pin,
+  PinOff,
+  RotateCcw,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 import { ConfirmationDialog } from "@/components/admin/ConfirmationDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { InlineLoader } from "@/components/admin/InlineLoader";
@@ -7,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FIELD_LABELS_NL, KIND_LABELS, type InquiryStatus } from "@/lib/requests/labels";
 import type { FormInboxMessage, FormInboxThreadItem } from "@mccoy/email/contracts";
-import type { DetailState } from "../hooks/useInquiryDetailQuery";
+import type { DetailState, ThreadSyncState } from "../hooks/useInquiryDetailQuery";
 import { useInquiryDetailDelete } from "../hooks/useInquiryDetailDelete";
 import { useInquiryReply } from "../hooks/useInquiryReply";
 import { useInquirySubmitterEmailEdit } from "../hooks/useInquirySubmitterEmailEdit";
@@ -34,12 +45,17 @@ export function InboxDetail({
   onAppendReply,
   onRemoveReply,
   onRefreshDetail,
+  threadSyncState = "idle",
+  threadSyncError = null,
   onSubmitterEmailUpdated,
   isPinned,
   onTogglePin,
   onUpdateStatus,
   isStatusSaving,
   statusErrorFor,
+  onUpdateLifecycle,
+  lifecycleSaving = false,
+  lifecycleError = null,
 }: {
   detail: FormInboxMessage | null;
   state: DetailState;
@@ -49,12 +65,17 @@ export function InboxDetail({
   onAppendReply: (item: FormInboxThreadItem) => void;
   onRemoveReply?: (id: string) => void;
   onRefreshDetail: () => void;
+  threadSyncState?: ThreadSyncState;
+  threadSyncError?: string | null;
   onSubmitterEmailUpdated: (email: string) => void;
   isPinned: boolean;
   onTogglePin?: () => void;
   onUpdateStatus?: (status: InquiryStatus) => void;
   isStatusSaving?: () => boolean;
   statusErrorFor?: () => string | null;
+  onUpdateLifecycle?: (status: "open" | "closed") => void;
+  lifecycleSaving?: boolean;
+  lifecycleError?: string | null;
 }) {
   const [reply, setReply] = React.useState("");
   const replyMutation = useInquiryReply({
@@ -134,8 +155,7 @@ export function InboxDetail({
     }
     return fields;
   })();
-  const submitterPhone =
-    detail?.fields.find((f) => f.key === "phone")?.value?.trim() || null;
+  const submitterPhone = detail?.fields.find((f) => f.key === "phone")?.value?.trim() || null;
 
   return (
     <div className="space-y-5">
@@ -164,6 +184,33 @@ export function InboxDetail({
                 {isPinned ? "Losmaken" : "Vastzetten"}
               </Button>
             ) : null}
+            {onUpdateLifecycle && detail.lifecycleStatus ? (
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "min-h-11 rounded-xl",
+                  detail.lifecycleStatus === "closed"
+                    ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20 hover:text-white"
+                    : "border-emerald-400/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20 hover:text-white",
+                )}
+                onClick={() =>
+                  onUpdateLifecycle(detail.lifecycleStatus === "closed" ? "open" : "closed")
+                }
+                disabled={lifecycleSaving || deleteMutation.deleteBusy || replyMutation.busy}
+              >
+                {detail.lifecycleStatus === "closed" ? (
+                  <RotateCcw className="h-4 w-4" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                {lifecycleSaving
+                  ? "Opslaan…"
+                  : detail.lifecycleStatus === "closed"
+                    ? "Heropenen"
+                    : "Afronden"}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -181,10 +228,19 @@ export function InboxDetail({
         ) : null}
       </div>
 
+      {lifecycleError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
+          {lifecycleError}
+        </div>
+      ) : null}
+
       <ConfirmationDialog
         open={deleteMutation.deleteOpen}
-        title="E-mail verwijderen"
-        description="Dit verwijdert het formulierbericht uit de mailbox (Verwijderde items). Dit kan niet eenvoudig ongedaan worden gemaakt vanuit Aanvragen."
+        title="Aanvraag verwijderen"
+        description="Dit verwijdert de aanvraag uit Aanvragen en verwijdert waar mogelijk ook de mailboxkopie. Gebruik Afronden als u de aanvraag later wilt terugvinden."
         confirmLabel="Verwijderen"
         tone="destructive"
         pending={deleteMutation.deleteBusy}
@@ -212,309 +268,344 @@ export function InboxDetail({
       )}
 
       {detail && state !== "loading" && (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.85fr)]">
-          <div className="space-y-5">
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c1220]">
-              <div className="border-b border-white/10 px-6 py-5">
-                <div className="flex flex-wrap items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-white/40">
-                  <span className="text-cyan-200/80">{KIND_LABELS[detail.kind]}</span>
-                  {(detail.scopeLabel || detail.scopeKey) && (
-                    <span className="rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-0.5 text-[11px] normal-case tracking-normal text-cyan-100">
-                      {detail.scopeLabel || detail.scopeKey}
-                    </span>
-                  )}
-                  {detail.requestNumber ? (
-                    <span className="font-mono normal-case tracking-normal text-white/45">
-                      {detail.requestNumber}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-                  <h2 className="text-2xl font-semibold tracking-tight text-white break-words">
-                    {title}
-                  </h2>
-                  {detail.requestNumber && onUpdateStatus ? (
-                    <InquiryStatusControl
-                      status={detail.inquiryStatus}
-                      saving={isStatusSaving?.() ?? false}
-                      error={statusErrorFor?.() ?? null}
-                      disabled={deleteMutation.deleteBusy || replyMutation.busy}
-                      onUpdate={onUpdateStatus}
-                      size="md"
-                    />
-                  ) : null}
-                </div>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-white/45">
-                  <p>
-                    <span className="text-white/35">Ontvangen · </span>
-                    {formatWhen(detail.date)}
-                  </p>
-                  {lastCustomerMessageAt ? (
-                    <p>
-                      <span className="text-white/35">Laatste bericht van klant · </span>
-                      {formatWhen(lastCustomerMessageAt)}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div
-                className={cn(
-                  "grid gap-px bg-white/10 sm:grid-cols-2",
-                  submitterPhone ? "lg:grid-cols-3" : null,
-                )}
-              >
-                <div className="bg-[#0c1220] px-6 py-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                      Antwoord naar
-                    </p>
-                    {emailEdit.canEdit && !emailEdit.editing ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 shrink-0 px-2 text-white/55 hover:bg-white/10 hover:text-white"
-                        onClick={emailEdit.startEdit}
-                        disabled={deleteMutation.deleteBusy || replyMutation.busy}
-                        aria-label="E-mailadres bewerken"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Bewerken
-                      </Button>
+        <>
+          {detail.lifecycleStatus === "open" && detail.unread ? (
+            <div
+              role="status"
+              className="rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-5 py-4 text-sm text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
+            >
+              <span className="font-semibold">Nieuwe reactie van de klant.</span> Deze aanvraag
+              staat opnieuw open en vraagt aandacht.
+            </div>
+          ) : detail.lifecycleStatus === "closed" ? (
+            <div
+              role="status"
+              className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-100"
+            >
+              Deze aanvraag is afgerond. Een nieuwe, gekoppelde reactie van de klant heropent haar
+              automatisch.
+            </div>
+          ) : null}
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.85fr)]">
+            <div className="space-y-5">
+              <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c1220]">
+                <div className="border-b border-white/10 px-6 py-5">
+                  <div className="flex flex-wrap items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-white/40">
+                    <span className="text-cyan-200/80">{KIND_LABELS[detail.kind]}</span>
+                    {(detail.scopeLabel || detail.scopeKey) && (
+                      <span className="rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-0.5 text-[11px] normal-case tracking-normal text-cyan-100">
+                        {detail.scopeLabel || detail.scopeKey}
+                      </span>
+                    )}
+                    {detail.requestNumber ? (
+                      <span className="font-mono normal-case tracking-normal text-white/45">
+                        {detail.requestNumber}
+                      </span>
                     ) : null}
                   </div>
-                  {emailEdit.editing ? (
-                    <div className="mt-2 space-y-2">
-                      <label className="sr-only" htmlFor="inquiry-submitter-email">
-                        E-mailadres voor antwoorden
-                      </label>
-                      <input
-                        id="inquiry-submitter-email"
-                        type="email"
-                        autoComplete="email"
-                        value={emailEdit.draft}
-                        onChange={(e) => emailEdit.setDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            emailEdit.cancelEdit();
-                          }
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void emailEdit.save();
-                          }
-                        }}
-                        disabled={emailEdit.busy}
-                        className="w-full rounded-lg border border-white/20 bg-white/[0.04] px-3 py-2 text-[15px] text-white outline-none focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 disabled:opacity-60"
+                  <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+                    <h2 className="text-2xl font-semibold tracking-tight text-white break-words">
+                      {title}
+                    </h2>
+                    {detail.requestNumber && onUpdateStatus ? (
+                      <InquiryStatusControl
+                        status={detail.inquiryStatus}
+                        saving={isStatusSaving?.() ?? false}
+                        error={statusErrorFor?.() ?? null}
+                        disabled={deleteMutation.deleteBusy || replyMutation.busy}
+                        onUpdate={onUpdateStatus}
+                        size="md"
                       />
-                      {emailEdit.error ? (
-                        <p className="text-sm text-red-300" role="alert">
-                          {emailEdit.error}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-white/45">
-                          Antwoorden gaan naar dit adres. Corrigeer het als de bezoeker een typefout
-                          maakte.
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="min-h-9 rounded-lg"
-                          onClick={() => void emailEdit.save()}
-                          disabled={emailEdit.busy || emailEdit.draft.trim().length < 3}
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {emailEdit.busy ? "Opslaan…" : "Opslaan"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="min-h-9 rounded-lg border-white/20 bg-white/5 text-white/85 hover:bg-white/10 hover:text-white"
-                          onClick={emailEdit.cancelEdit}
-                          disabled={emailEdit.busy}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Annuleren
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-1 break-all text-[15px] text-white/90">
-                      {detail.submitterEmail ?? "Niet gevonden"}
+                    ) : null}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-white/45">
+                    <p>
+                      <span className="text-white/35">Ontvangen · </span>
+                      {formatWhen(detail.date)}
                     </p>
-                  )}
+                    {lastCustomerMessageAt ? (
+                      <p>
+                        <span className="text-white/35">Laatste bericht van klant · </span>
+                        {formatWhen(lastCustomerMessageAt)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                {submitterPhone ? (
+
+                <div
+                  className={cn(
+                    "grid gap-px bg-white/10 sm:grid-cols-2",
+                    submitterPhone ? "lg:grid-cols-3" : null,
+                  )}
+                >
+                  <div className="bg-[#0c1220] px-6 py-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                        Antwoord naar
+                      </p>
+                      {emailEdit.canEdit && !emailEdit.editing ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 shrink-0 px-2 text-white/55 hover:bg-white/10 hover:text-white"
+                          onClick={emailEdit.startEdit}
+                          disabled={deleteMutation.deleteBusy || replyMutation.busy}
+                          aria-label="E-mailadres bewerken"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Bewerken
+                        </Button>
+                      ) : null}
+                    </div>
+                    {emailEdit.editing ? (
+                      <div className="mt-2 space-y-2">
+                        <label className="sr-only" htmlFor="inquiry-submitter-email">
+                          E-mailadres voor antwoorden
+                        </label>
+                        <input
+                          id="inquiry-submitter-email"
+                          type="email"
+                          autoComplete="email"
+                          value={emailEdit.draft}
+                          onChange={(e) => emailEdit.setDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              emailEdit.cancelEdit();
+                            }
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void emailEdit.save();
+                            }
+                          }}
+                          disabled={emailEdit.busy}
+                          className="w-full rounded-lg border border-white/20 bg-white/[0.04] px-3 py-2 text-[15px] text-white outline-none focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/30 disabled:opacity-60"
+                        />
+                        {emailEdit.error ? (
+                          <p className="text-sm text-red-300" role="alert">
+                            {emailEdit.error}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-white/45">
+                            Antwoorden gaan naar dit adres. Corrigeer het als de bezoeker een
+                            typefout maakte.
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="min-h-9 rounded-lg"
+                            onClick={() => void emailEdit.save()}
+                            disabled={emailEdit.busy || emailEdit.draft.trim().length < 3}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            {emailEdit.busy ? "Opslaan…" : "Opslaan"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-9 rounded-lg border-white/20 bg-white/5 text-white/85 hover:bg-white/10 hover:text-white"
+                            onClick={emailEdit.cancelEdit}
+                            disabled={emailEdit.busy}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Annuleren
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-1 break-all text-[15px] text-white/90">
+                        {detail.submitterEmail ?? "Niet gevonden"}
+                      </p>
+                    )}
+                  </div>
+                  {submitterPhone ? (
+                    <div className="bg-[#0c1220] px-6 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                        Telefoon
+                      </p>
+                      <p className="mt-1 break-all text-[15px] text-white/90">{submitterPhone}</p>
+                    </div>
+                  ) : null}
                   <div className="bg-[#0c1220] px-6 py-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                      Telefoon
+                      Mailbox
                     </p>
-                    <p className="mt-1 break-all text-[15px] text-white/90">{submitterPhone}</p>
+                    <p className="mt-1 break-all text-[15px] text-white/70">{detail.to}</p>
                   </div>
-                ) : null}
-                <div className="bg-[#0c1220] px-6 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                    Mailbox
-                  </p>
-                  <p className="mt-1 break-all text-[15px] text-white/70">{detail.to}</p>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            <section className="rounded-2xl border border-white/10 bg-[#0c1220]">
-              <div className="border-b border-white/10 px-6 py-4">
-                <h3 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/45">
-                  {bodyFields.length > 0 ? "Ingevulde gegevens" : "Inhoud"}
-                </h3>
-              </div>
-              {bodyFields.length > 0 ? (
-                <dl className="grid grid-cols-1 gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
-                  {bodyFields.map((field) => {
-                    const label = FIELD_LABELS_NL[field.key] ?? field.label;
-                    const fullWidth = isFullWidthFormField(field.key);
-                    const fieldImages =
-                      attachmentPartition.imagesByFieldKey.get(field.key) ?? [];
-                    const hideText = shouldHideAttachmentFieldText(field.value, fieldImages);
+              <section className="rounded-2xl border border-white/10 bg-[#0c1220]">
+                <div className="border-b border-white/10 px-6 py-4">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                    {bodyFields.length > 0 ? "Ingevulde gegevens" : "Inhoud"}
+                  </h3>
+                </div>
+                {bodyFields.length > 0 ? (
+                  <dl className="grid grid-cols-1 gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+                    {bodyFields.map((field) => {
+                      const label = FIELD_LABELS_NL[field.key] ?? field.label;
+                      const fullWidth = isFullWidthFormField(field.key);
+                      const fieldImages = attachmentPartition.imagesByFieldKey.get(field.key) ?? [];
+                      const hideText = shouldHideAttachmentFieldText(field.value, fieldImages);
 
-                    return (
-                      <div
-                        key={`${field.key}-${field.label}`}
-                        className={cn(
-                          "bg-[#0c1220]",
-                          fullWidth || fieldImages.length > 0
-                            ? "col-span-full grid gap-1 px-5 py-4 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:gap-6 sm:px-6"
-                            : "px-4 py-2.5 sm:px-5 sm:py-3",
-                        )}
-                      >
-                        <dt
+                      return (
+                        <div
+                          key={`${field.key}-${field.label}`}
                           className={cn(
-                            "text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40",
-                            !fullWidth && fieldImages.length === 0 && "leading-snug",
+                            "bg-[#0c1220]",
+                            fullWidth || fieldImages.length > 0
+                              ? "col-span-full grid gap-1 px-5 py-4 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:gap-6 sm:px-6"
+                              : "px-4 py-2.5 sm:px-5 sm:py-3",
                           )}
                         >
-                          {label}
-                        </dt>
-                        <dd className={cn("min-w-0", !fullWidth && fieldImages.length === 0 && "mt-0.5")}>
-                          {fieldImages.length > 0 ? (
-                            <div className="space-y-3">
-                              <AttachmentImageThumbs
-                                messageId={detail?.id}
-                                attachments={fieldImages}
-                              />
-                              {!hideText ? (
-                                <FormFieldValue
-                                  fieldKey={field.key}
-                                  label={label}
-                                  value={field.value}
+                          <dt
+                            className={cn(
+                              "text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40",
+                              !fullWidth && fieldImages.length === 0 && "leading-snug",
+                            )}
+                          >
+                            {label}
+                          </dt>
+                          <dd
+                            className={cn(
+                              "min-w-0",
+                              !fullWidth && fieldImages.length === 0 && "mt-0.5",
+                            )}
+                          >
+                            {fieldImages.length > 0 ? (
+                              <div className="space-y-3">
+                                <AttachmentImageThumbs
+                                  messageId={detail?.id}
+                                  attachments={fieldImages}
                                 />
-                              ) : null}
-                            </div>
-                          ) : (
-                            <FormFieldValue fieldKey={field.key} label={label} value={field.value} />
-                          )}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              ) : (
-                <div className="max-h-[22rem] overflow-auto px-6 py-5">
-                  <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-relaxed text-white/85">
-                    {detail.textBody || "(geen tekstinhoud)"}
-                  </pre>
-                </div>
-              )}
-            </section>
+                                {!hideText ? (
+                                  <FormFieldValue
+                                    fieldKey={field.key}
+                                    label={label}
+                                    value={field.value}
+                                  />
+                                ) : null}
+                              </div>
+                            ) : (
+                              <FormFieldValue
+                                fieldKey={field.key}
+                                label={label}
+                                value={field.value}
+                              />
+                            )}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                ) : (
+                  <div className="max-h-[22rem] overflow-auto px-6 py-5">
+                    <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-relaxed text-white/85">
+                      {detail.textBody || "(geen tekstinhoud)"}
+                    </pre>
+                  </div>
+                )}
+              </section>
 
-            <AttachmentsBlock
-              messageId={detail.id}
-              attachments={attachmentPartition.fileAttachments}
-            />
+              <AttachmentsBlock
+                messageId={detail.id}
+                attachments={attachmentPartition.fileAttachments}
+              />
 
-            <ConversationThread
-              thread={detail.thread}
-              rootId={detail.id}
-              hideRoot={detail.fields.length > 0}
-            />
-          </div>
-
-          <section className="h-fit rounded-2xl border border-white/10 bg-[#0c1220] p-6 xl:sticky xl:top-6">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl border border-[#1e88e5]/30 bg-[#1e88e5]/10">
-                <Send className="h-4 w-4 text-[#90caf9]" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight text-white">Antwoorden</h3>
-                <p className="mt-1 text-sm leading-relaxed text-white/50">
-                  {detail.submitterEmail
-                    ? `Verstuur een e-mail naar ${detail.submitterEmail}. Het antwoord verschijnt in het gesprek.`
-                    : "Geen submitter-e-mail gevonden — antwoorden is niet mogelijk."}
-                </p>
-              </div>
+              <ConversationThread
+                thread={detail.thread}
+                rootId={detail.id}
+                hideRoot={detail.fields.length > 0}
+                syncState={threadSyncState}
+                syncError={threadSyncError}
+                onRefresh={onRefreshDetail}
+              />
             </div>
 
-            <label className="mt-6 block">
-              <span className="a-label">Uw bericht</span>
-              <textarea
-                value={reply}
-                onChange={(e) => {
-                  setReply(e.target.value);
-                  replyMutation.setReplySuccess(null);
-                }}
-                rows={9}
-                maxLength={8000}
-                disabled={!detail.submitterEmail}
-                placeholder="Typ hier uw antwoord…"
-                className="mt-1.5 w-full resize-y rounded-xl border border-white/12 bg-black/25 px-4 py-3 text-base outline-none transition placeholder:text-white/30 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/25 disabled:opacity-50"
-              />
-            </label>
-
-            {replyMutation.replySuccess && (
-              <div
-                role="status"
-                className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
-              >
-                {replyMutation.replySuccess}
+            <section className="h-fit rounded-2xl border border-white/10 bg-[#0c1220] p-6 xl:sticky xl:top-6">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl border border-[#1e88e5]/30 bg-[#1e88e5]/10">
+                  <Send className="h-4 w-4 text-[#90caf9]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold tracking-tight text-white">Antwoorden</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-white/50">
+                    {detail.lifecycleStatus === "closed"
+                      ? "Deze aanvraag is afgerond. Heropen haar voordat u een nieuw antwoord verstuurt."
+                      : detail.submitterEmail
+                        ? `Verstuur een e-mail naar ${detail.submitterEmail}. Het antwoord verschijnt in het gesprek.`
+                        : "Geen submitter-e-mail gevonden — antwoorden is niet mogelijk."}
+                  </p>
+                </div>
               </div>
-            )}
 
-            <Button
-              type="button"
-              size="lg"
-              className="mt-4 min-h-12 w-full rounded-xl text-base font-semibold"
-              onClick={() => replyMutation.setConfirmOpen(true)}
-              disabled={
-                replyMutation.busy || !detail.submitterEmail || reply.trim().length < 2
-              }
-            >
-              <Send className="h-4 w-4" />
-              Verstuur antwoord
-            </Button>
+              <label className="mt-6 block">
+                <span className="a-label">Uw bericht</span>
+                <textarea
+                  value={reply}
+                  onChange={(e) => {
+                    setReply(e.target.value);
+                    replyMutation.setReplySuccess(null);
+                  }}
+                  rows={9}
+                  maxLength={8000}
+                  disabled={!detail.submitterEmail || detail.lifecycleStatus === "closed"}
+                  placeholder="Typ hier uw antwoord…"
+                  className="mt-1.5 w-full resize-y rounded-xl border border-white/12 bg-black/25 px-4 py-3 text-base outline-none transition placeholder:text-white/30 focus:border-[#1e88e5] focus:ring-2 focus:ring-[#1e88e5]/25 disabled:opacity-50"
+                />
+              </label>
 
-            <ConfirmationDialog
-              open={replyMutation.confirmOpen}
-              title="Antwoord versturen"
-              description={
-                detail.submitterEmail
-                  ? `Verstuur dit antwoord naar ${detail.submitterEmail}? Dit kan niet ongedaan worden gemaakt.`
-                  : "Geen afzender-e-mail gevonden — antwoorden is niet mogelijk."
-              }
-              confirmLabel="Versturen"
-              pending={replyMutation.busy}
-              error={replyMutation.replyError}
-              onConfirm={replyMutation.performSend}
-              onCancel={() => {
-                if (replyMutation.busy) return;
-                replyMutation.setConfirmOpen(false);
-                replyMutation.setReplyError(null);
-              }}
-            />
-          </section>
-        </div>
+              {replyMutation.replySuccess && (
+                <div
+                  role="status"
+                  className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+                >
+                  {replyMutation.replySuccess}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                size="lg"
+                className="mt-4 min-h-12 w-full rounded-xl text-base font-semibold"
+                onClick={() => replyMutation.setConfirmOpen(true)}
+                disabled={
+                  replyMutation.busy ||
+                  !detail.submitterEmail ||
+                  detail.lifecycleStatus === "closed" ||
+                  reply.trim().length < 2
+                }
+              >
+                <Send className="h-4 w-4" />
+                Verstuur antwoord
+              </Button>
+
+              <ConfirmationDialog
+                open={replyMutation.confirmOpen}
+                title="Antwoord versturen"
+                description={
+                  detail.submitterEmail
+                    ? `Verstuur dit antwoord naar ${detail.submitterEmail}? Dit kan niet ongedaan worden gemaakt.`
+                    : "Geen afzender-e-mail gevonden — antwoorden is niet mogelijk."
+                }
+                confirmLabel="Versturen"
+                pending={replyMutation.busy}
+                error={replyMutation.replyError}
+                onConfirm={replyMutation.performSend}
+                onCancel={() => {
+                  if (replyMutation.busy) return;
+                  replyMutation.setConfirmOpen(false);
+                  replyMutation.setReplyError(null);
+                }}
+              />
+            </section>
+          </div>
+        </>
       )}
     </div>
   );

@@ -30,7 +30,12 @@ export function RegisteredCustomerDetailPage({ customerId }: { customerId: strin
           status: string;
           createdAt: string;
         };
-        companies: Array<{ id: string; legalName: string; status: string; invoiceAllowed: boolean }>;
+        companies: Array<{
+          id: string;
+          legalName: string;
+          status: string;
+          invoiceAllowed: boolean;
+        }>;
         orders: Array<{
           id: string;
           number: string;
@@ -98,7 +103,18 @@ export function RegisteredCustomerDetailPage({ customerId }: { customerId: strin
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Link to="/customers" search={{ tab: "portal", q: "", status: "all", portalStatus: "all", page: 1 }} className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white">
+      <Link
+        to="/customers"
+        search={{
+          tab: "service",
+          q: "",
+          status: "all",
+          portalStatus: "all",
+          page: 1,
+          companyId: undefined,
+        }}
+        className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white"
+      >
         <ArrowLeft className="h-4 w-4" /> Terug naar klanten
       </Link>
       <PageHeader
@@ -138,7 +154,9 @@ export function RegisteredCustomerDetailPage({ customerId }: { customerId: strin
           </div>
           <div>
             <dt className="text-white/45">Aangemaakt</dt>
-            <dd className="text-white/85">{new Date(customer.createdAt).toLocaleString("nl-NL")}</dd>
+            <dd className="text-white/85">
+              {new Date(customer.createdAt).toLocaleString("nl-NL")}
+            </dd>
           </div>
         </dl>
       </section>
@@ -217,7 +235,9 @@ export function RegisteredCustomerDetailPage({ customerId }: { customerId: strin
           />
         }
       >
-        <p className="text-sm text-white/55">Pas naam en telefoon aan. E-mail blijft {customer.email}.</p>
+        <p className="text-sm text-white/55">
+          Pas naam en telefoon aan. E-mail blijft {customer.email}.
+        </p>
       </AppDialog>
 
       <ConfirmationDialog
@@ -270,11 +290,19 @@ function EditCustomerFooter({
       <div className="mb-4 w-full space-y-3 text-left">
         <label className="block text-sm">
           Naam
-          <input className="a-input mt-1 w-full" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <input
+            className="a-input mt-1 w-full"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
         </label>
         <label className="block text-sm">
           Telefoon
-          <input className="a-input mt-1 w-full" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input
+            className="a-input mt-1 w-full"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </label>
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </div>

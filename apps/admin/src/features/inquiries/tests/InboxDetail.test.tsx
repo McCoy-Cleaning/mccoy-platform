@@ -127,6 +127,62 @@ describe("InboxDetail received / last customer message", () => {
     // earlier customer reply date is not the one shown for "last message".
     expect(container.textContent).toMatch(/2026/);
   });
+
+  it("renders customer replies distinctly and exposes mailbox refresh state", () => {
+    const onRefreshDetail = vi.fn();
+    const detail = message({
+      thread: [
+        threadItem({ id: "root", direction: "form" }),
+        threadItem({
+          id: "customer-1",
+          direction: "customer",
+          textBody: "Dit is het antwoord van de klant",
+        }),
+        threadItem({
+          id: "admin-1",
+          direction: "admin",
+          textBody: "Dit is het antwoord van McCoy",
+        }),
+      ],
+    });
+    const container = mount(
+      <InboxDetail
+        {...baseProps}
+        detail={detail}
+        onRefreshDetail={onRefreshDetail}
+        threadSyncState="syncing"
+      />,
+    );
+
+    expect(container.textContent).toContain("Klant 1");
+    expect(container.textContent).toContain("McCoy 1");
+    expect(container.textContent).toContain("Dit is het antwoord van de klant");
+    expect(container.textContent).toContain("Klantreacties worden veilig");
+    const refresh = container.querySelector(
+      'button[aria-label="Klantreacties uit de mailbox bijwerken"]',
+    ) as HTMLButtonElement;
+    expect(refresh.disabled).toBe(true);
+  });
+
+  it("lets staff retry a failed customer-reply synchronization", () => {
+    const onRefreshDetail = vi.fn();
+    const container = mount(
+      <InboxDetail
+        {...baseProps}
+        detail={message({})}
+        onRefreshDetail={onRefreshDetail}
+        threadSyncState="error"
+        threadSyncError="Mailbox tijdelijk niet bereikbaar."
+      />,
+    );
+
+    expect(container.textContent).toContain("Mailbox tijdelijk niet bereikbaar.");
+    const refresh = container.querySelector(
+      'button[aria-label="Klantreacties uit de mailbox bijwerken"]',
+    ) as HTMLButtonElement;
+    act(() => refresh.click());
+    expect(onRefreshDetail).toHaveBeenCalledTimes(1);
+  });
 });
 
 function keydown(target: Element, key: string) {
@@ -196,5 +252,48 @@ describe("InboxDetail inquiry status control", () => {
       keydown(trigger, "Enter");
     });
     expect(onUpdateStatus).toHaveBeenCalledWith("invoiced");
+  });
+});
+
+describe("InboxDetail lifecycle controls", () => {
+  it("shows a prominent customer-reply state and resolves an open request", () => {
+    const onUpdateLifecycle = vi.fn();
+    const detail = message({ lifecycleStatus: "open", unread: true });
+    const container = mount(
+      <InboxDetail {...baseProps} detail={detail} onUpdateLifecycle={onUpdateLifecycle} />,
+    );
+
+    expect(container.textContent).toContain("Nieuwe reactie van de klant");
+    const resolve = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Afronden",
+    ) as HTMLButtonElement;
+    expect(resolve).toBeTruthy();
+    act(() => resolve.click());
+    expect(onUpdateLifecycle).toHaveBeenCalledWith("closed");
+  });
+
+  it("does not keep the new-reply banner after the inquiry is read", () => {
+    const detail = message({ lifecycleStatus: "open", unread: false });
+    const container = mount(<InboxDetail {...baseProps} detail={detail} />);
+
+    expect(container.textContent).not.toContain("Nieuwe reactie van de klant");
+  });
+
+  it("explains automatic reopening and allows manual reopen for a resolved request", () => {
+    const onUpdateLifecycle = vi.fn();
+    const detail = message({ lifecycleStatus: "closed" });
+    const container = mount(
+      <InboxDetail {...baseProps} detail={detail} onUpdateLifecycle={onUpdateLifecycle} />,
+    );
+
+    expect(container.textContent).toContain("Een nieuwe, gekoppelde reactie");
+    expect(container.textContent).toContain("Heropen haar voordat u een nieuw antwoord");
+    expect(container.querySelector("textarea")?.hasAttribute("disabled")).toBe(true);
+    const reopen = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Heropenen",
+    ) as HTMLButtonElement;
+    expect(reopen).toBeTruthy();
+    act(() => reopen.click());
+    expect(onUpdateLifecycle).toHaveBeenCalledWith("open");
   });
 });

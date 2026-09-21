@@ -66,4 +66,25 @@ describe("websiteRequestSummaryToInboxSummary — received time", () => {
     expect(inBehandeling.inquiryStatus).toBe("in_progress");
     expect(gefactureerd.inquiryStatus).toBe("invoiced");
   });
+
+  it("preserves lifecycle status and uses updatedAt only as the activity sort key", () => {
+    const reopened = websiteRequestSummaryToInboxSummary(
+      baseSummary({
+        status: "open",
+        updatedAt: "2026-09-21T11:30:00.000Z",
+      }),
+    );
+    const resolved = websiteRequestSummaryToInboxSummary(
+      baseSummary({
+        status: "closed",
+        updatedAt: "2026-09-20T08:15:00.000Z",
+      }),
+    );
+
+    expect(reopened.lifecycleStatus).toBe("open");
+    expect(reopened.activityAt).toBe("2026-09-21T11:30:00.000Z");
+    expect(reopened.date).toBe("2026-08-01T10:00:00.000Z");
+    expect(resolved.lifecycleStatus).toBe("closed");
+    expect(resolved.activityAt).toBe("2026-09-20T08:15:00.000Z");
+  });
 });

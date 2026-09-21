@@ -81,6 +81,31 @@ export type FulfilmentStatus = (typeof FULFILMENT_STATUSES)[number];
 export const ORDER_SOURCES = ["storefront", "admin", "import", "fixture"] as const;
 export type OrderSource = (typeof ORDER_SOURCES)[number];
 
+/** Catalogue identity lifecycle. Favourites may add only `active` products. */
+export const PRODUCT_STATUSES = ["draft", "active", "archived"] as const;
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+
+export type CatalogueProduct = {
+  id: string;
+  name: string;
+  sku: string | null;
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Company-shared favourite reference. No prices or quantities. */
+export type CompanyFavouriteProduct = {
+  id: string;
+  companyId: string;
+  productId: string;
+  productName: string;
+  productSku: string | null;
+  productStatus: ProductStatus;
+  createdBy: string | null;
+  createdAt: string;
+};
+
 /** Audit actions for commerce / customer administration. */
 export const COMMERCE_AUDIT_ACTIONS = [
   "customer.invited",
@@ -108,6 +133,8 @@ export const COMMERCE_AUDIT_ACTIONS = [
   "customer.account_admin_transferred",
   "customer.company_portal_suspended",
   "customer.company_portal_reactivated",
+  "company.favourite_product_added",
+  "company.favourite_product_removed",
 ] as const;
 export type CommerceAuditAction = (typeof COMMERCE_AUDIT_ACTIONS)[number];
 

@@ -3,7 +3,7 @@ import process from "node:process";
 
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 
-import { readServerEnv } from "./env";
+import { isProductionRuntime, readServerEnv } from "./env";
 import { ensureMonorepoEnvLoaded } from "./load-monorepo-env.server";
 import { clearAdminMfaFlowCookie } from "./mfa-flow";
 import { assertRateLimit, RateLimitError } from "./rate-limit";
@@ -30,17 +30,35 @@ export type AdminPrincipal = {
   mfaRequired?: boolean;
 };
 
+/**
+ * Dev-only fallback secret. Publicly known, so a production runtime must never
+ * sign or accept session cookies with it — anyone could mint an admin session.
+ */
+export const DEV_FALLBACK_SESSION_SECRET = "mccoy-dev-admin-session-secret-change-me";
+
 function getSessionSecret(): string {
   const secret = readServerEnv("ADMIN_SESSION_SECRET");
   if (secret) return secret;
-  // Dev-only fallback — set ADMIN_SESSION_SECRET in every real environment.
-  return "mccoy-dev-admin-session-secret-change-me";
+  if (isProductionRuntime()) {
+    throw new AdminAuthError(
+      "Adminsessies zijn niet geconfigureerd. Neem contact op met de beheerder.",
+    );
+  }
+  return DEV_FALLBACK_SESSION_SECRET;
 }
 
 export function getAdminCredentials(): { username: string; password: string } {
+  const username = readServerEnv("ADMIN_USERNAME");
+  const password = readServerEnv("ADMIN_PASSWORD");
+  if (isProductionRuntime() && !password) {
+    // Never accept the well-known default password on a production host.
+    throw new AdminAuthError(
+      "Legacy adminlogin is niet geconfigureerd. Neem contact op met de beheerder.",
+    );
+  }
   return {
-    username: (readServerEnv("ADMIN_USERNAME") || "admin").toLowerCase(),
-    password: readServerEnv("ADMIN_PASSWORD") || "mccoy2026",
+    username: (username || "admin").toLowerCase(),
+    password: password || "mccoy2026",
   };
 }
 
@@ -58,9 +76,17 @@ export function hasSupabaseAdminEnvHints(): boolean {
   return Boolean(url && publishable && secret);
 }
 
-/** Legacy env login when Supabase staff auth is not fully configured, or ADMIN_LEGACY_AUTH=true. */
+/**
+ * Legacy env login when Supabase staff auth is not fully configured, or ADMIN_LEGACY_AUTH=true.
+ *
+ * In production the "Supabase env incomplete" fallback is deliberately NOT honoured:
+ * a missing SUPABASE_SECRET_KEY would otherwise silently downgrade a deployed admin
+ * to username/password with no MFA. Production must opt in explicitly.
+ */
 export function isLegacyAdminAuthEnabled(): boolean {
-  return readServerEnv("ADMIN_LEGACY_AUTH") === "true" || !hasSupabaseAdminEnvHints();
+  if (readServerEnv("ADMIN_LEGACY_AUTH") === "true") return true;
+  if (isProductionRuntime()) return false;
+  return !hasSupabaseAdminEnvHints();
 }
 
 /** Prefer Supabase staff auth when fully configured (URL + publishable + secret). */
@@ -114,7 +140,13 @@ function encodeSession(principal: AdminPrincipal): string {
 function decodeSession(token: string): AdminPrincipal | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = sign(body);
+  let expected: string;
+  try {
+    expected = sign(body);
+  } catch {
+    // No usable signing secret (production without ADMIN_SESSION_SECRET): fail closed.
+    return null;
+  }
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);

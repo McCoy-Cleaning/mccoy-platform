@@ -37,7 +37,15 @@ type BroadcastMutationOp = "read" | "read-all" | "dismiss" | "open";
 type BroadcastMessage =
   | { kind: "heartbeat"; tabId: string; ts: number }
   | { kind: "bye"; tabId: string }
-  | { kind: "mutated"; op: BroadcastMutationOp; notificationId?: string; ts: number };
+  | { kind: "mutated"; op: BroadcastMutationOp; notificationId?: string; ts: number }
+  | {
+      kind: "read-persisted";
+      notificationId: string;
+      category?: string;
+      entityType?: string | null;
+      entityId?: string | null;
+      ts: number;
+    };
 
 type Listener = (state: NotificationServiceState) => void;
 
@@ -199,12 +207,14 @@ class AdminNotificationService {
   }
 
   async markRead(notificationId: string): Promise<void> {
+    const context = this.notificationContext(notificationId);
     this.applyLocalMutation("read", notificationId);
     this.broadcastMutation("read", notificationId);
     try {
       const result = await markAdminNotificationRead({ data: { notificationId } });
       if (result.ok) {
-        emitPlatformEvent({ type: "notification-read", notificationId });
+        this.emitReadEvent(notificationId, context);
+        this.broadcastReadPersisted(notificationId, context);
       }
     } catch {
       // Best-effort optimistic update — next refresh() reconciles any drift.
@@ -233,12 +243,14 @@ class AdminNotificationService {
 
   /** Marks opened (implies read) and resolves the allowlisted destination to navigate to. */
   async open(notificationId: string): Promise<string> {
+    const context = this.notificationContext(notificationId);
     this.applyLocalMutation("open", notificationId);
     this.broadcastMutation("open", notificationId);
     try {
       const result = await openAdminNotification({ data: { notificationId } });
       if (result.ok) {
-        emitPlatformEvent({ type: "notification-read", notificationId });
+        this.emitReadEvent(notificationId, context);
+        this.broadcastReadPersisted(notificationId, context);
         return result.destinationPath;
       }
     } catch {
@@ -257,6 +269,11 @@ class AdminNotificationService {
     unreadCount: number,
     isInitial: boolean,
   ): void {
+    const previousUnread = new Map(
+      this.items
+        .filter((item) => !item.readAt && !item.dismissedAt)
+        .map((item) => [item.notificationId, item]),
+    );
     if (!isInitial) {
       const previousIds = new Set(this.items.map((item) => item.recipientId));
       const newlyArrived = items.filter(
@@ -283,6 +300,30 @@ class AdminNotificationService {
     this.status = "ready";
     this.error = null;
     this.notify();
+
+    if (!isInitial) {
+      for (const item of items) {
+        if (!item.readAt || !previousUnread.has(item.notificationId)) continue;
+        this.emitReadEvent(item.notificationId, item);
+      }
+    }
+  }
+
+  private notificationContext(notificationId: string): AdminNotificationItem | undefined {
+    return this.items.find((item) => item.notificationId === notificationId);
+  }
+
+  private emitReadEvent(
+    notificationId: string,
+    item?: Pick<AdminNotificationItem, "category" | "entityType" | "entityId">,
+  ): void {
+    emitPlatformEvent({
+      type: "notification-read",
+      notificationId,
+      category: item?.category,
+      entityType: item?.entityType,
+      entityId: item?.entityId,
+    });
   }
 
   private emitArrival(item: AdminNotificationItem, options?: { preferInAppToast?: boolean }): void {
@@ -520,6 +561,16 @@ class AdminNotificationService {
         this.peers.delete(message.tabId);
         return;
       }
+      if (message.kind === "read-persisted") {
+        emitPlatformEvent({
+          type: "notification-read",
+          notificationId: message.notificationId,
+          category: message.category,
+          entityType: message.entityType,
+          entityId: message.entityId,
+        });
+        return;
+      }
       if (message.kind === "mutated") {
         this.applyLocalMutation(message.op, message.notificationId);
       }
@@ -573,6 +624,21 @@ class AdminNotificationService {
       kind: "mutated",
       op,
       notificationId,
+      ts: Date.now(),
+    } satisfies BroadcastMessage);
+  }
+
+  /** Broadcast only after the server confirms the read, avoiding a list refetch race. */
+  private broadcastReadPersisted(
+    notificationId: string,
+    item?: Pick<AdminNotificationItem, "category" | "entityType" | "entityId">,
+  ): void {
+    this.broadcast?.postMessage({
+      kind: "read-persisted",
+      notificationId,
+      category: item?.category,
+      entityType: item?.entityType,
+      entityId: item?.entityId,
       ts: Date.now(),
     } satisfies BroadcastMessage);
   }

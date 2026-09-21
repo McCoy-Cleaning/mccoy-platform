@@ -9,7 +9,7 @@ import type { FormInboxMessageSummary } from "@mccoy/email/contracts";
 import type { ListState } from "../hooks/useInquiriesListQuery";
 import { kindMeta } from "../lib/filters";
 import { relativeWhen } from "../lib/format";
-import type { ScopeFilter } from "../types/search";
+import type { LifecycleFilter, ScopeFilter } from "../types/search";
 import { InquiryStatusControl } from "./InquiryStatusControl";
 import { InboxListSelectionToolbar } from "./InboxListSelectionToolbar";
 import { MailboxConfigHelp } from "./MailboxConfigHelp";
@@ -33,6 +33,8 @@ export function InquiriesList({
   retryFailedIds = [],
   pinStatus,
   statusToast,
+  lifecycle = "active",
+  lifecycleToast = null,
   allVisibleSelected,
   someVisibleSelected,
   isPinned,
@@ -48,6 +50,7 @@ export function InquiriesList({
   isStatusSaving,
   statusErrorFor,
   onDismissStatusToast,
+  onDismissLifecycleToast,
 }: {
   listState: ListState;
   refreshing?: boolean;
@@ -67,6 +70,8 @@ export function InquiriesList({
   retryFailedIds?: string[];
   pinStatus: string | null;
   statusToast: string | null;
+  lifecycle?: LifecycleFilter;
+  lifecycleToast?: string | null;
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
   isPinned: (id: string) => boolean;
@@ -82,6 +87,7 @@ export function InquiriesList({
   isStatusSaving: (id: string) => boolean;
   statusErrorFor: (id: string) => string | null;
   onDismissStatusToast?: () => void;
+  onDismissLifecycleToast?: () => void;
 }) {
   const showInitialLoader = listState === "loading" && items.length === 0;
   const showFullError = listState === "error" && items.length === 0;
@@ -161,6 +167,23 @@ export function InquiriesList({
           ) : null}
         </div>
       ) : null}
+      {lifecycleToast ? (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 border-b border-emerald-400/20 bg-emerald-500/10 px-5 py-2.5 text-sm text-emerald-100"
+        >
+          <span>{lifecycleToast}</span>
+          {onDismissLifecycleToast ? (
+            <button
+              type="button"
+              onClick={onDismissLifecycleToast}
+              className="text-xs text-emerald-100/65 underline-offset-2 hover:text-white hover:underline"
+            >
+              Sluiten
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {listState === "ready" && displayItems.length > 0 ? (
         <InboxListSelectionToolbar
           allVisibleSelected={allVisibleSelected}
@@ -193,13 +216,15 @@ export function InquiriesList({
       {listState === "ready" && items.length === 0 && !showInitialLoader && (
         <EmptyState
           icon={Mail}
-          title="Geen berichten gevonden"
+          title={lifecycle === "resolved" ? "Geen afgeronde aanvragen" : "Geen berichten gevonden"}
           description={
             debouncedQ
               ? "Geen berichten komen overeen met deze zoekopdracht. Pas de filters of zoekterm aan."
-              : scopeKey !== "all"
-                ? "Geen openstaande aanvragen voor deze scope. Gesloten of verwijderde items verschijnen hier niet meer."
-                : "Zodra een klant een formulier op de website invult, verschijnt het hier."
+              : lifecycle === "resolved"
+                ? "Aanvragen die u afrondt, blijven hier beschikbaar. Een nieuwe reactie heropent de aanvraag automatisch."
+                : scopeKey !== "all"
+                  ? "Geen openstaande aanvragen voor deze scope. Afgeronde aanvragen vindt u onder Afgerond; verwijderde items blijven verborgen."
+                  : "Zodra een klant een formulier op de website invult, verschijnt het hier."
           }
         />
       )}
@@ -218,6 +243,7 @@ export function InquiriesList({
                 className={cn(
                   "group flex items-stretch",
                   pinned && "bg-amber-400/[0.04]",
+                  m.unread && "bg-cyan-400/[0.07] shadow-[inset_3px_0_0_rgba(34,211,238,0.9)]",
                   isDeleting && "opacity-50",
                 )}
               >
@@ -257,6 +283,15 @@ export function InquiriesList({
                           aria-label="Ongelezen"
                         />
                       )}
+                      {m.lifecycleStatus === "open" && m.unread ? (
+                        <span className="rounded-full border border-cyan-300/35 bg-cyan-400/15 px-2.5 py-0.5 text-xs font-semibold text-cyan-50">
+                          Nieuwe reactie
+                        </span>
+                      ) : m.lifecycleStatus === "closed" ? (
+                        <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-medium text-emerald-100">
+                          Afgerond
+                        </span>
+                      ) : null}
                       <span className="hidden rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/55 sm:inline">
                         {KIND_LABELS[m.kind]}
                       </span>

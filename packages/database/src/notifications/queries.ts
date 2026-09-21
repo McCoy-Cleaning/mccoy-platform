@@ -144,6 +144,53 @@ export async function unreadCount(userId: string, category?: string): Promise<nu
   return count ?? 0;
 }
 
+type NotificationEntityRelation =
+  { entity_id?: string | null } | Array<{ entity_id?: string | null }> | null;
+
+/**
+ * Per-user unread state for a bounded set of domain entities.
+ *
+ * The inquiry list uses this instead of deriving "unread" from a shared
+ * workflow status. Requests are chunked to keep PostgREST URLs bounded.
+ */
+export async function listUnreadEntityIdsForUser(
+  userId: string,
+  entityType: string,
+  entityIds: string[],
+): Promise<string[]> {
+  const type = entityType.trim();
+  const ids = [...new Set(entityIds.map((id) => id.trim()).filter(Boolean))];
+  if (!userId.trim() || !type || ids.length === 0) return [];
+
+  const supabase = createSupabaseServiceClient();
+  const unread = new Set<string>();
+  const chunkSize = 50;
+
+  for (let offset = 0; offset < ids.length; offset += chunkSize) {
+    const chunk = ids.slice(offset, offset + chunkSize);
+    const { data, error } = await supabase
+      .from("notification_recipients")
+      .select("notifications!inner(entity_id)")
+      .eq("user_id", userId)
+      .is("read_at", null)
+      .is("dismissed_at", null)
+      .eq("notifications.entity_type", type)
+      .in("notifications.entity_id", chunk);
+
+    if (error) {
+      throw new Error(`listUnreadEntityIdsForUser failed: ${error.message}`);
+    }
+
+    for (const row of (data as Array<{ notifications: NotificationEntityRelation }> | null) ?? []) {
+      const relation = Array.isArray(row.notifications) ? row.notifications[0] : row.notifications;
+      const entityId = relation?.entity_id?.trim();
+      if (entityId) unread.add(entityId);
+    }
+  }
+
+  return [...unread];
+}
+
 export async function markRead(userId: string, notificationId: string): Promise<void> {
   const supabase = createSupabaseServiceClient();
   const now = new Date().toISOString();
@@ -205,6 +252,28 @@ export async function markReadForEntity(
   const id = entityId.trim();
   if (!type || !id) return 0;
 
+  // Resolve notification ids first. Filtering a related table directly on a
+  // mutation is provider-version-sensitive and previously allowed this update
+  // to fail silently behind the detail screen's best-effort catch.
+  const { data: notifications, error: notificationError } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("entity_type", type)
+    .eq("entity_id", id);
+
+  if (notificationError) {
+    throw new Error(`markReadForEntity lookup failed: ${notificationError.message}`);
+  }
+
+  const notificationIds = [
+    ...new Set(
+      ((notifications as Array<{ id?: string }> | null) ?? [])
+        .map((row) => row.id?.trim())
+        .filter((notificationId): notificationId is string => Boolean(notificationId)),
+    ),
+  ];
+  if (notificationIds.length === 0) return 0;
+
   const { data, error } = await supabase
     .from("notification_recipients")
     .update({
@@ -214,9 +283,8 @@ export async function markReadForEntity(
     .eq("user_id", userId)
     .is("read_at", null)
     .is("dismissed_at", null)
-    .eq("notifications.entity_type", type)
-    .eq("notifications.entity_id", id)
-    .select("id, notifications!inner(entity_type, entity_id)");
+    .in("notification_id", notificationIds)
+    .select("id");
 
   if (error) {
     throw new Error(`markReadForEntity failed: ${error.message}`);

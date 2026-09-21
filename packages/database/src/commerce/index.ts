@@ -22,6 +22,8 @@ export {
   markGuestConverted,
   listRegisteredCustomers,
   listGuestPurchasers,
+  getCustomerLifetimeOrderStats,
+  type CustomerLifetimeOrderStats,
   type CommerceOrder,
   type CommerceOrderItem,
   type CustomerProfile,
@@ -41,4 +43,98 @@ export {
 
 export { seedCommerceFixtures, commerceFixturesAllowed } from "./fixtures";
 
-export { exportCustomersCsv, parseCustomerImportCsv, importCustomersPreview, commitCustomerImport } from "./import-export";
+export {
+  listAdminCustomersDirectory,
+  exportAdminCustomersDirectoryCsv,
+  adminCustomersExportRow,
+  ADMIN_CUSTOMERS_EXPORT_MAX_ROWS,
+  ADMIN_CUSTOMERS_EXPORT_HEADER,
+  type AdminCustomersDirectoryExport,
+  getAdminCustomersDirectoryDetail,
+  listAdminCustomerImportRuns,
+  recordAdminCustomerImportRun,
+  upsertCompanyDisplaySnapshot,
+  normalizeDirectoryTab,
+  directoryAccessDecision,
+  assertDirectoryStaffAccess,
+  companyTypeBadge,
+  directoryPortalPill,
+  matchesDirectoryTab,
+  companyInitials,
+  computeDirectoryKpis,
+  ADMIN_CUSTOMERS_DIRECTORY_TABS,
+  type AdminCustomersDirectoryTab,
+  type AdminCustomersDirectoryItem,
+  type AdminCustomersDirectoryKpis,
+  type AdminCustomersDirectoryDetail,
+  type AdminCustomersDirectoryPage,
+  type AdminCustomerImportRun,
+  type DirectoryActorKind,
+} from "./admin-customers-directory";
+
+export { seedAdminCustomersDirectoryDemo } from "./admin-customers-directory-seed";
+
+export {
+  listAdminPortalUsersDirectory,
+  computePortalUsersKpis,
+  portalUserStatusPill,
+  portalUserAccountTypeLabel,
+  buildRegistrationTimeline,
+  selectedPortalUser,
+  resolveLastLogin,
+  dummyLastLoginAt,
+  assertPortalUsersStaffAccess,
+  portalUsersAccessDecision,
+  type AdminPortalUserDirectoryItem,
+  type AdminPortalUsersKpis,
+  type AdminPortalUsersDirectoryPage,
+  type AdminPortalUsersTruncation,
+  type DirectoryScanBound,
+  ADMIN_PORTAL_USERS_SCAN_LIMIT,
+  type AdminPortalUserTimelineStep,
+  type PortalUserStatusId,
+  type PortalUserAccountType,
+} from "./admin-users-directory";
+
+export {
+  getPortalUserDetail,
+  parseUserDetailKey,
+  portalUserDetailAccess,
+  assertPortalUserDetailAccess,
+  splitPersonName,
+  roleLabelNl,
+  rightsFromRole,
+  invitationStatusLabelNl,
+  orderStatusLabelNl,
+  averageOrderMinor,
+  DUMMY_FAVOURITE_LISTS,
+  DUMMY_TEAM_NOTE,
+  type PortalUserDetail,
+  type PortalUserDetailActor,
+  type PortalUserDetailError,
+  type PortalUserDetailKey,
+  type PortalUserLifetimeActivity,
+} from "./portal-user-detail";
+
+export {
+  favouriteAdminAccessDecision,
+  assertFavouriteAdminAccess,
+  isProductEligibleToFavourite,
+  insertCatalogueProduct,
+  searchActiveProducts,
+  listCompanyFavouriteProducts,
+  addCompanyFavouriteProduct,
+  removeCompanyFavouriteProduct,
+  listPortalFavouriteProducts,
+  addPortalFavouriteProduct,
+  removePortalFavouriteProduct,
+  FavouriteProductsError,
+  type FavouriteActorKind,
+} from "./company-favourite-products";
+
+export {
+  exportCustomersCsv,
+  parseCustomerImportCsv,
+  importCustomersPreview,
+  commitCustomerImport,
+} from "./import-export";

@@ -91,13 +91,21 @@ export async function markCommerceEmailProcessed(id: string): Promise<void> {
 
 export async function markCommerceEmailFailed(id: string, message: string): Promise<void> {
   const supabase = createSupabaseServiceClient();
+  const { data: current, error: readError } = await supabase
+    .schema("private")
+    .from("commerce_email_outbox")
+    .select("attempts")
+    .eq("id", id)
+    .maybeSingle();
+  if (readError) throw new Error(`markCommerceEmailFailed read: ${readError.message}`);
+
   const { error } = await supabase
     .schema("private")
     .from("commerce_email_outbox")
     .update({
       failed_at: new Date().toISOString(),
       last_error: message.slice(0, 500),
-      attempts: 1,
+      attempts: Number(current?.attempts ?? 0) + 1,
     })
     .eq("id", id);
   if (error) throw new Error(`markCommerceEmailFailed: ${error.message}`);

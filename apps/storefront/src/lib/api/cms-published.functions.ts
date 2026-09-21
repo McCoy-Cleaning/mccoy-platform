@@ -27,29 +27,6 @@ async function getStoreForRead() {
   }
 }
 
-async function ensureSeeded() {
-  const db = await import("@mccoy/database/server");
-  try {
-    const store = db.getCmsStore();
-    await store.seedBuiltinsIfEmpty(db.builtinCmsSeedPages());
-    return store;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[cms] ensureSeeded: primary store failed", message);
-    if (db.isSupabaseConnectivityError(error)) {
-      db.markSupabaseCmsUnreachable(message);
-    }
-    const store = db.getFileCmsStore();
-    await store.seedBuiltinsIfEmpty(db.builtinCmsSeedPages());
-    return store;
-  }
-}
-
-export const ensurePublishedCmsSeeded = createServerFn({ method: "POST" }).handler(async () => {
-  await ensureSeeded();
-  return { ok: true as const };
-});
-
 /**
  * Returns JSON string payloads so TanStack Start serializability accepts CMS pages
  * (block.data is Record&lt;string, unknown&gt;).
@@ -142,11 +119,12 @@ ${urls}
   }
 });
 
-export const processCmsPublishOutbox = createServerFn({ method: "POST" }).handler(async () => {
-  const { processCmsOutbox } = await import("@mccoy/database/server");
-  const result = await processCmsOutbox();
-  return { ok: true as const, ...result };
-});
+/**
+ * CMS seeding and outbox draining are privileged maintenance operations and must
+ * never be reachable from the unauthenticated storefront: every createServerFn in
+ * this file is registered as a public RPC endpoint. Seeding runs at deploy/E2E
+ * setup; the outbox is drained by the staff-authorized admin publish handlers.
+ */
 
 /**
  * Trusted published-page loader for route SSR/navigation.

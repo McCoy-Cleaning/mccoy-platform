@@ -209,10 +209,14 @@ export async function listWebsiteRequests(
 ): Promise<WebsiteRequestSummary[]> {
   const store = await readStore();
   const q = filter.q?.trim().toLowerCase() ?? "";
-  return store.requests
+  const statuses = filter.statuses?.length ? new Set(filter.statuses) : null;
+  return [...store.requests]
     .filter((r) => {
       if (filter.kind && filter.kind !== "all" && r.kind !== filter.kind) return false;
-      if (filter.status && filter.status !== "all" && r.status !== filter.status) return false;
+      if (statuses && !statuses.has(r.status)) return false;
+      if (!statuses && filter.status && filter.status !== "all" && r.status !== filter.status) {
+        return false;
+      }
       if (filter.scopeKey && filter.scopeKey !== "all") {
         if ((r.scopeKey ?? null) !== filter.scopeKey) return false;
       }
@@ -231,6 +235,10 @@ export async function listWebsiteRequests(
         .join(" ")
         .toLowerCase();
       return hay.includes(q);
+    })
+    .sort((a, b) => {
+      const key = filter.orderBy === "updated_at" ? "updatedAt" : "createdAt";
+      return new Date(b[key]).getTime() - new Date(a[key]).getTime();
     })
     .map(toSummary);
 }

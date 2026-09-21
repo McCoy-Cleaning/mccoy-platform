@@ -1,6 +1,6 @@
 import * as React from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { Inbox, RefreshCw, Search } from "lucide-react";
+import { CheckCircle2, Inbox, RefreshCw, Search } from "lucide-react";
 import { PageHeader } from "@/components/admin/AdminBits";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,12 @@ import { useInquiriesRealtimeRefresh } from "../hooks/useInquiriesRealtimeRefres
 import { useInquiryMailboxWatch } from "../hooks/useInquiryMailboxWatch";
 import { useInquiryDetailQuery } from "../hooks/useInquiryDetailQuery";
 import { useInquiryListDeletes } from "../hooks/useInquiryListDeletes";
+import { useInquiryLifecycleStatus } from "../hooks/useInquiryLifecycleStatus";
 import { useInquirySelection } from "../hooks/useInquirySelection";
 import { useInquiryStatusUpdate } from "../hooks/useInquiryStatusUpdate";
 import { KIND_FILTERS, SCOPE_TAB_LIMIT } from "../lib/filters";
 import { MAX_INQUIRY_PINS, sortInboxItemsByPins, useInquiryPins } from "../lib/pins";
-import type { KindFilter, ScopeFilter } from "../types/search";
+import type { KindFilter, LifecycleFilter, ScopeFilter } from "../types/search";
 import { InboxDetail } from "./InboxDetail";
 import { InquiriesList } from "./InquiriesList";
 import { InquiryListDeleteDialogs } from "./InquiryListDeleteDialogs";
@@ -25,6 +26,7 @@ export function InquiriesPage() {
   const navigate = inquiriesRouteApi.useNavigate();
   const search = inquiriesRouteApi.useSearch();
   const kind = search.kind;
+  const lifecycle = search.view;
   const scopeKey = search.scope as ScopeFilter;
   const [q, setQ] = React.useState(search.q);
   const [debouncedQ, setDebouncedQ] = React.useState(search.q);
@@ -43,10 +45,21 @@ export function InquiriesPage() {
     loadList,
     registerTombstones,
     clearTombstones,
-  } = useInquiriesListQuery({ kind, scopeKey, debouncedQ });
+  } = useInquiriesListQuery({ kind, scopeKey, debouncedQ, lifecycle });
 
-  const { selectedId, detail, setDetail, detailState, detailError, loadDetail, softRefreshDetail, closeDetail } =
-    useInquiryDetailQuery({ setItems });
+  const {
+    selectedId,
+    detail,
+    setDetail,
+    detailState,
+    detailError,
+    threadSyncState,
+    threadSyncError,
+    loadDetail,
+    softRefreshDetail,
+    refreshDetail,
+    closeDetail,
+  } = useInquiryDetailQuery({ setItems });
 
   useInquiriesRealtimeRefresh({ loadList, selectedId, softRefreshDetail });
   useInquiryMailboxWatch({ selectedId, softRefreshDetail });
@@ -120,6 +133,18 @@ export function InquiriesPage() {
     selectedId,
   });
 
+  const handleLifecycleMoved = React.useCallback(
+    (id: string) => {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      if (selectedId === id) backToList();
+    },
+    [backToList, selectedId, setItems],
+  );
+
+  const lifecycleUpdate = useInquiryLifecycleStatus({
+    onMoved: handleLifecycleMoved,
+  });
+
   const applySearch = React.useCallback(() => {
     const trimmed = q.trim();
     setDebouncedQ(trimmed);
@@ -149,7 +174,7 @@ export function InquiriesPage() {
     deletes.resetDeleteUiOnFilterChange();
     // Mirror original: clear delete UI when filters/search change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- kind/scope/q gate
-  }, [kind, scopeKey, debouncedQ]);
+  }, [kind, scopeKey, debouncedQ, lifecycle]);
 
   React.useEffect(() => {
     setQ(search.q);
@@ -177,6 +202,17 @@ export function InquiriesPage() {
     void navigate({ search: (prev) => ({ ...prev, scope: next }) });
   };
 
+  const setLifecycle = (next: LifecycleFilter) => {
+    if (next === lifecycle) return;
+    closeDetail();
+    void navigate({
+      search: (prev) => {
+        const { id: _removed, ...rest } = prev;
+        return { ...rest, view: next };
+      },
+    });
+  };
+
   const useScopeSelect = scopeFacets.length > SCOPE_TAB_LIMIT;
   const allVisibleSelected =
     displayItems.length > 0 && displayItems.every((item) => selectedIds.has(item.id));
@@ -188,14 +224,14 @@ export function InquiriesPage() {
         icon={Inbox}
         accent="#22d3ee"
         title="Aanvragen"
-        subtitle="Websiteformulieren (inclusief aangepaste formulieren). Open een bericht om te lezen, te antwoorden of te verwijderen."
+        subtitle="Websiteformulieren (inclusief aangepaste formulieren). Beantwoord, rond af of verwijder een aanvraag met een duidelijke status."
         actions={[
           {
             label: "Vernieuwen",
             icon: RefreshCw,
             onClick: () => {
               void loadList({ fresh: true });
-              if (selectedId) softRefreshDetail(selectedId);
+              if (selectedId) refreshDetail(selectedId);
             },
           },
         ]}
@@ -212,6 +248,43 @@ export function InquiriesPage() {
           website-formulieren.
         </div>
       ) : null}
+
+      <div
+        role="tablist"
+        aria-label="Aanvraagstatus"
+        className="inline-flex w-full rounded-2xl border border-white/10 bg-white/[0.035] p-1 sm:w-auto"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={lifecycle === "active"}
+          onClick={() => setLifecycle("active")}
+          className={cn(
+            "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition sm:flex-none",
+            lifecycle === "active"
+              ? "bg-[#1e88e5] text-white shadow-lg shadow-[#1e88e5]/15"
+              : "text-white/60 hover:bg-white/[0.06] hover:text-white",
+          )}
+        >
+          <Inbox className="h-4 w-4" aria-hidden />
+          Openstaand
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={lifecycle === "resolved"}
+          onClick={() => setLifecycle("resolved")}
+          className={cn(
+            "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition sm:flex-none",
+            lifecycle === "resolved"
+              ? "bg-emerald-500/90 text-white shadow-lg shadow-emerald-500/10"
+              : "text-white/60 hover:bg-white/[0.06] hover:text-white",
+          )}
+        >
+          <CheckCircle2 className="h-4 w-4" aria-hidden />
+          Afgerond
+        </button>
+      </div>
 
       {selectedId ? (
         <InboxDetail
@@ -267,13 +340,22 @@ export function InquiriesPage() {
             );
           }}
           onRefreshDetail={() => {
-            if (selectedId) softRefreshDetail(selectedId);
+            if (selectedId) refreshDetail(selectedId);
           }}
+          threadSyncState={threadSyncState}
+          threadSyncError={threadSyncError}
           onUpdateStatus={
             selectedId ? (next) => void statusUpdate.updateStatus(selectedId, next) : undefined
           }
           isStatusSaving={() => (selectedId ? statusUpdate.isSaving(selectedId) : false)}
           statusErrorFor={() => (selectedId ? statusUpdate.errorFor(selectedId) : null)}
+          onUpdateLifecycle={
+            selectedId
+              ? (next) => void lifecycleUpdate.updateLifecycle(selectedId, next)
+              : undefined
+          }
+          lifecycleSaving={lifecycleUpdate.savingId === selectedId}
+          lifecycleError={selectedId ? lifecycleUpdate.errorFor(selectedId) : null}
           onSubmitterEmailUpdated={(email) => {
             setDetail((prev) => {
               if (!prev || prev.id !== selectedId) return prev;
@@ -483,6 +565,8 @@ export function InquiriesPage() {
             retryFailedIds={deletes.retryFailedIds}
             pinStatus={pinStatus}
             statusToast={statusUpdate.toast}
+            lifecycle={lifecycle}
+            lifecycleToast={lifecycleUpdate.toast}
             allVisibleSelected={allVisibleSelected}
             someVisibleSelected={someVisibleSelected}
             isPinned={isPinned}
@@ -504,6 +588,7 @@ export function InquiriesPage() {
             isStatusSaving={statusUpdate.isSaving}
             statusErrorFor={statusUpdate.errorFor}
             onDismissStatusToast={statusUpdate.dismissToast}
+            onDismissLifecycleToast={lifecycleUpdate.dismissToast}
           />
         </>
       )}

@@ -85,6 +85,7 @@ export {
   PAYMENT_STATUSES,
   FULFILMENT_STATUSES,
   ORDER_SOURCES,
+  PRODUCT_STATUSES,
   COMMERCE_AUDIT_ACTIONS,
   orderCountsTowardSpend,
   formatMoneyMinor,
@@ -101,6 +102,9 @@ export {
   type PaymentStatus,
   type FulfilmentStatus,
   type OrderSource,
+  type ProductStatus,
+  type CatalogueProduct,
+  type CompanyFavouriteProduct,
   type CommerceAuditAction,
   type MoneyMinor,
   type AddressSnapshot,
@@ -110,6 +114,27 @@ export {
   type GuestConversionEligibility,
   type GuestConversionCollision,
 } from "./commerce";
+
+export {
+  OPTIMISTIC_FAVOURITE_ID_PREFIX,
+  EMPTY_FAVOURITES_VIEW,
+  optimisticFavouriteId,
+  isOptimisticFavouriteId,
+  buildOptimisticFavourite,
+  isFavouritePending,
+  favouriteProductIds,
+  beginFavouriteAdd,
+  settleFavouriteAddConfirmed,
+  settleFavouriteAddFailed,
+  beginFavouriteRemove,
+  settleFavouriteRemoveConfirmed,
+  settleFavouriteRemoveFailed,
+  mergeServerFavourites,
+  resetFavouritesView,
+  type OptimisticFavourite,
+  type PendingFavouriteRemoval,
+  type OptimisticFavouritesView,
+} from "./favourites-optimistic";
 
 export {
   STAFF_PASSWORD_MIN_LENGTH,

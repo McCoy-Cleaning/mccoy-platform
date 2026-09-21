@@ -31,8 +31,7 @@ export type WebsiteRequestMailAttachmentMeta = {
 };
 
 export type UpsertMailMessageResult =
-  | { status: "appended"; id: string }
-  | { status: "already_processed"; id: string };
+  { status: "appended"; id: string } | { status: "already_processed"; id: string };
 
 export type WebsiteRequestMailMessageRow = {
   id: string;
@@ -90,7 +89,15 @@ export async function upsertWebsiteRequestMailMessage(
     return null;
   }
 
-  const row = data as { status?: string; id?: string } | null;
+  const row = data as { status?: string; id?: string; reason?: string } | null;
+  if (row?.status === "conflict") {
+    console.error("[website-request-mail] identity conflict rejected", {
+      requestId: input.requestId,
+      reason: row.reason ?? "unknown",
+    });
+    return null;
+  }
+  if (row?.status === "ignored") return null;
   if (!row?.id || (row.status !== "appended" && row.status !== "already_processed")) {
     return null;
   }
@@ -130,6 +137,7 @@ export async function listKnownMailIdentitiesForMailbox(
     inquiryId: string;
     requestNumber: string | null;
     mailbox: string;
+    submitterEmail: string | null;
     internetMessageIds: string[];
     graphMessageIds: string[];
     conversationIds: string[];
@@ -142,9 +150,7 @@ export async function listKnownMailIdentitiesForMailbox(
 
   const { data: messages, error } = await supabase
     .from("website_request_mail_messages")
-    .select(
-      "request_id, mailbox, graph_message_id, internet_message_id, conversation_id",
-    )
+    .select("request_id, mailbox, graph_message_id, internet_message_id, conversation_id")
     .eq("mailbox", box)
     .order("occurred_at", { ascending: false })
     .limit(limit);
@@ -156,20 +162,24 @@ export async function listKnownMailIdentitiesForMailbox(
     return [];
   }
 
-  const rows = (messages as Array<{
-    request_id: string;
-    graph_message_id: string | null;
-    internet_message_id: string | null;
-    conversation_id: string | null;
-  }> | null) ?? [];
+  const rows =
+    (messages as Array<{
+      request_id: string;
+      graph_message_id: string | null;
+      internet_message_id: string | null;
+      conversation_id: string | null;
+    }> | null) ?? [];
 
   const requestIds = [...new Set(rows.map((r) => r.request_id))];
   if (requestIds.length === 0) return [];
 
   const { data: requests, error: reqError } = await supabase
     .from("website_requests")
-    .select("id, number, root_internet_message_id, root_graph_message_id, graph_conversation_id")
-    .in("id", requestIds);
+    .select(
+      "id, number, submitter_email, root_internet_message_id, root_graph_message_id, graph_conversation_id",
+    )
+    .in("id", requestIds)
+    .in("status", ["new", "open", "replied", "closed"]);
 
   if (reqError) {
     console.error("[website-request-mail] request lookup failed", {
@@ -178,13 +188,16 @@ export async function listKnownMailIdentitiesForMailbox(
   }
 
   const requestMeta = new Map(
-    ((requests as Array<{
+    (
+      (requests as Array<{
       id: string;
       number: string;
-      root_internet_message_id: string | null;
-      root_graph_message_id: string | null;
-      graph_conversation_id: string | null;
-    }> | null) ?? []).map((r) => [r.id, r]),
+        submitter_email: string | null;
+        root_internet_message_id: string | null;
+        root_graph_message_id: string | null;
+        graph_conversation_id: string | null;
+      }> | null) ?? []
+    ).map((r) => [r.id, r]),
   );
 
   const byRequest = new Map<
@@ -193,6 +206,7 @@ export async function listKnownMailIdentitiesForMailbox(
       inquiryId: string;
       requestNumber: string | null;
       mailbox: string;
+      submitterEmail: string | null;
       internetMessageIds: Set<string>;
       graphMessageIds: Set<string>;
       conversationIds: Set<string>;
@@ -201,21 +215,25 @@ export async function listKnownMailIdentitiesForMailbox(
 
   for (const requestId of requestIds) {
     const meta = requestMeta.get(requestId);
+    // Deleted/spam requests are deliberately absent from requestMeta. Their
+    // later replies must route to Niet-gekoppeld, never resurrect the request.
+    if (!meta) continue;
     const entry = {
       inquiryId: requestId,
-      requestNumber: meta?.number ?? null,
+      requestNumber: meta.number,
       mailbox: box,
+      submitterEmail: meta.submitter_email?.trim().toLowerCase() || null,
       internetMessageIds: new Set<string>(),
       graphMessageIds: new Set<string>(),
       conversationIds: new Set<string>(),
     };
-    if (meta?.root_internet_message_id) {
+    if (meta.root_internet_message_id) {
       entry.internetMessageIds.add(meta.root_internet_message_id);
     }
-    if (meta?.root_graph_message_id) {
+    if (meta.root_graph_message_id) {
       entry.graphMessageIds.add(meta.root_graph_message_id);
     }
-    if (meta?.graph_conversation_id) {
+    if (meta.graph_conversation_id) {
       entry.conversationIds.add(meta.graph_conversation_id);
     }
     byRequest.set(requestId, entry);
@@ -233,6 +251,7 @@ export async function listKnownMailIdentitiesForMailbox(
     inquiryId: entry.inquiryId,
     requestNumber: entry.requestNumber,
     mailbox: entry.mailbox,
+    submitterEmail: entry.submitterEmail,
     internetMessageIds: [...entry.internetMessageIds],
     graphMessageIds: [...entry.graphMessageIds],
     conversationIds: [...entry.conversationIds],

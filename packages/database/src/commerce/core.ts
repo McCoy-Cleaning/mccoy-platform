@@ -19,6 +19,7 @@ import {
   type UserStatus,
 } from "@mccoy/domain";
 
+import { sanitizePostgrestSearchTerm } from "../postgrest-search";
 import { createSupabaseServiceClient } from "../supabase";
 import { writeStaffAudit } from "../staff";
 
@@ -732,13 +733,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CommerceOrde
   return order;
 }
 
-export async function listOrdersForCustomer(userId: string): Promise<CommerceOrder[]> {
+/**
+ * Pass `companyId` for any company-scoped view: a user may have order history under
+ * more than one company, and those rows must never cross the company boundary.
+ */
+export async function listOrdersForCustomer(
+  userId: string,
+  options?: { companyId?: string },
+): Promise<CommerceOrder[]> {
   const supabase = createSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("customer_user_id", userId)
-    .order("placed_at", { ascending: false });
+  let req = supabase.from("orders").select("*").eq("customer_user_id", userId);
+  if (options?.companyId) req = req.eq("company_id", options.companyId);
+  const { data, error } = await req.order("placed_at", { ascending: false });
   if (error) throw new Error(`listOrdersForCustomer failed: ${error.message}`);
   return (data as OrderRow[]).map(mapOrder);
 }
@@ -812,6 +818,12 @@ export async function markGuestConverted(input: {
 // Admin list read models
 // ---------------------------------------------------------------------------
 
+/**
+ * `orderCount`, `totalSpendMinor` and `lastOrderAt` describe this row's `companyId`
+ * only — never the user's lifetime activity across every company they ordered for.
+ * A row shows one company, so the figures beside it must describe that same company.
+ * Lifetime totals live on the user detail view and are labelled as such.
+ */
 export type RegisteredCustomerListItem = {
   id: string;
   email: string;
@@ -849,6 +861,11 @@ export type CustomerListQuery = {
   pageSize?: number;
 };
 
+/** Orders with no company are their own bucket; they must not fall into a company's totals. */
+function customerCompanyStatsKey(userId: string, companyId: string | null): string {
+  return `${userId}\u0000${companyId ?? ""}`;
+}
+
 function pageBounds(page = 1, pageSize = 25): { from: number; to: number; page: number; pageSize: number } {
   const safePage = Math.max(1, Math.trunc(page));
   const safeSize = Math.min(100, Math.max(1, Math.trunc(pageSize)));
@@ -861,7 +878,7 @@ export async function listRegisteredCustomers(
 ): Promise<{ items: RegisteredCustomerListItem[]; total: number; page: number; pageSize: number }> {
   const supabase = createSupabaseServiceClient();
   const { from, to, page, pageSize } = pageBounds(query.page, query.pageSize);
-  const q = query.q?.trim() ?? "";
+  const q = sanitizePostgrestSearchTerm(query.q ?? "");
 
   let req = supabase
     .from("users")
@@ -896,16 +913,20 @@ export async function listRegisteredCustomers(
   const ids = users.map((u) => u.id);
 
   const membershipsByUser = new Map<string, { companyId: string; companyName: string }>();
+  /** Keyed by `customerCompanyStatsKey`, never by user id alone. */
   const statsByUser = new Map<
     string,
     { orderCount: number; totalSpendMinor: number; lastOrderAt: string | null }
   >();
 
   if (ids.length) {
+    // Oldest membership wins, so the company shown for a multi-company user is
+    // stable between reads instead of whatever Postgres returns first.
     const { data: memberships, error: mErr } = await supabase
       .from("company_users")
-      .select("user_id, company_id, companies(legal_name, display_name)")
-      .in("user_id", ids);
+      .select("user_id, company_id, created_at, companies(legal_name, display_name)")
+      .in("user_id", ids)
+      .order("created_at", { ascending: true });
     if (mErr) throw new Error(`listRegisteredCustomers memberships failed: ${mErr.message}`);
     for (const m of memberships ?? []) {
       const uid = m.user_id as string;
@@ -921,22 +942,30 @@ export async function listRegisteredCustomers(
       } as { companyId: string; companyName: string });
     }
 
+    // Grouped by (user, company): aggregating by user alone would show company A's
+    // row with spend this user earned under company B.
     const { data: stats, error: sErr } = await supabase
       .schema("private")
-      .rpc("admin_order_stats_for_users", { p_user_ids: ids });
+      .rpc("admin_order_stats_for_user_companies", { p_user_ids: ids });
     if (sErr) throw new Error(`listRegisteredCustomers stats failed: ${sErr.message}`);
     for (const s of stats ?? []) {
-      statsByUser.set(s.customer_user_id as string, {
-        orderCount: Number(s.order_count ?? 0),
-        totalSpendMinor: Number(s.total_spend_minor ?? 0),
-        lastOrderAt: (s.last_order_at as string | null) ?? null,
-      });
+      statsByUser.set(
+        customerCompanyStatsKey(
+          s.customer_user_id as string,
+          (s.company_id as string | null) ?? null,
+        ),
+        {
+          orderCount: Number(s.order_count ?? 0),
+          totalSpendMinor: Number(s.total_spend_minor ?? 0),
+          lastOrderAt: (s.last_order_at as string | null) ?? null,
+        },
+      );
     }
   }
 
   let items: RegisteredCustomerListItem[] = users.map((u) => {
     const m = membershipsByUser.get(u.id);
-    const s = statsByUser.get(u.id);
+    const s = statsByUser.get(customerCompanyStatsKey(u.id, m?.companyId ?? null));
     return {
       id: u.id,
       email: u.email,
@@ -967,12 +996,42 @@ export async function listRegisteredCustomers(
   return { items, total: count ?? items.length, page, pageSize };
 }
 
+export type CustomerLifetimeOrderStats = {
+  orderCount: number;
+  totalSpendMinor: number;
+  lastOrderAt: string | null;
+  currency: string;
+};
+
+/**
+ * Deliberately NOT company-scoped: every order this user ever placed, for any company.
+ * Staff-only analytics. Never render it next to a single company's figures without an
+ * explicit "across all companies" label, and never expose it to a customer actor — it
+ * would reveal that a colleague ordered for another company.
+ */
+export async function getCustomerLifetimeOrderStats(
+  userId: string,
+): Promise<CustomerLifetimeOrderStats> {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .schema("private")
+    .rpc("admin_order_stats_for_users", { p_user_ids: [userId] });
+  if (error) throw new Error(`getCustomerLifetimeOrderStats failed: ${error.message}`);
+  const row = data?.[0];
+  return {
+    orderCount: Number(row?.order_count ?? 0),
+    totalSpendMinor: Number(row?.total_spend_minor ?? 0),
+    lastOrderAt: (row?.last_order_at as string | null) ?? null,
+    currency: "EUR",
+  };
+}
+
 export async function listGuestPurchasers(
   query: CustomerListQuery = {},
 ): Promise<{ items: GuestCustomerListItem[]; total: number; page: number; pageSize: number }> {
   const supabase = createSupabaseServiceClient();
   const { from, to, page, pageSize } = pageBounds(query.page, query.pageSize);
-  const q = query.q?.trim() ?? "";
+  const q = sanitizePostgrestSearchTerm(query.q ?? "");
 
   let req = supabase
     .from("guest_purchasers")

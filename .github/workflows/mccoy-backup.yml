@@ -1,0 +1,57 @@
+# Optional local backup on a runner YOU operate.
+#
+# Customer / commercial dumps must NEVER be uploaded to github.com
+# (no actions/upload-artifact, no public buckets, no new SaaS).
+#
+# The job is a no-op unless:
+#   1. runs-on is a self-hosted runner (do not change to ubuntu-latest), and
+#   2. MCCOY_BACKUP_DIR is set on that runner (machine / runner env).
+#
+# Preferred free scheduler: Windows Task Scheduler via
+#   scripts/backup/schedule-windows.ps1
+# See docs/operations/data-backup.md
+
+name: McCoy local backup (self-hosted only)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 1 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    # Do not change to ubuntu-latest / windows-latest — those are GitHub-hosted
+    # and must never receive production dumps.
+    runs-on: self-hosted
+    timeout-minutes: 120
+    steps:
+      - name: Refuse GitHub-hosted runners
+        if: runner.environment == 'github-hosted'
+        run: |
+          echo "Refusing to run on a GitHub-hosted runner (customer data must stay local)."
+          exit 1
+
+      - name: Skip unless MCCOY_BACKUP_DIR is set
+        if: env.MCCOY_BACKUP_DIR == ''
+        run: echo "MCCOY_BACKUP_DIR unset — skipping. Will not dump customer data without a local destination."
+
+      - uses: actions/checkout@v4
+        if: env.MCCOY_BACKUP_DIR != ''
+
+      - uses: actions/setup-node@v4
+        if: env.MCCOY_BACKUP_DIR != ''
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        if: env.MCCOY_BACKUP_DIR != ''
+        run: npm ci
+
+      - name: Run local backup
+        if: env.MCCOY_BACKUP_DIR != ''
+        run: npm run backup:mccoy
+        # Intentionally no upload-artifact / release / remote copy.

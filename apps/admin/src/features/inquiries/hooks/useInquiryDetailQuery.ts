@@ -2,26 +2,13 @@ import * as React from "react";
 import {
   getAdminFormInboxMessage,
   getAdminFormInboxThread,
-  markAdminRequestNotificationsReadForEntity,
 } from "@/lib/api/admin-requests.functions";
 import { refreshAdminRequestsUnreadBadge } from "@/lib/requests/unread-badge";
-import { decodeInboxMessageId } from "@mccoy/email/contracts";
 import type { FormInboxMessage, FormInboxMessageSummary } from "@mccoy/email/contracts";
 import { mergeInquiryThreads } from "../lib/merge-thread";
 
 export type DetailState = "idle" | "loading" | "error";
-
-function websiteRequestIdFromInboxId(id: string): string | null {
-  try {
-    const decoded = decodeInboxMessageId(id);
-    if (decoded.provider === "request" || decoded.provider === "e2e") {
-      return decoded.requestId;
-    }
-  } catch {
-    /* ignore malformed ids */
-  }
-  return null;
-}
+export type ThreadSyncState = "idle" | "syncing" | "error";
 
 /**
  * Detail is loaded by `selectedInquiryId` via getAdminFormInboxMessage.
@@ -35,31 +22,76 @@ export function useInquiryDetailQuery(options: {
   const [detail, setDetail] = React.useState<FormInboxMessage | null>(null);
   const [detailState, setDetailState] = React.useState<DetailState>("idle");
   const [detailError, setDetailError] = React.useState<string | null>(null);
+  const [threadSyncState, setThreadSyncState] = React.useState<ThreadSyncState>("idle");
+  const [threadSyncError, setThreadSyncError] = React.useState<string | null>(null);
+  const selectedIdRef = React.useRef<string | null>(null);
+  const threadSyncInFlight = React.useRef<{
+    id: string;
+    promise: Promise<void>;
+  } | null>(null);
 
-  const applyThreadInBackground = React.useCallback((id: string) => {
-    // Root getAdminFormInboxMessage already hydrates reply files; this only
-    // syncs newly arrived Graph conversation messages without replacing chips.
-    void getAdminFormInboxThread({ data: { id } })
-      .then((threadResult) => {
-        if (!threadResult.ok) return;
-        setDetail((prev) =>
-          prev && prev.id === id
-            ? { ...prev, thread: mergeInquiryThreads(threadResult.thread, prev.thread) }
-            : prev,
-        );
-      })
-      .catch(() => {
-        /* keep root-only thread */
-      });
-  }, []);
+  const applyThreadInBackground = React.useCallback(
+    (id: string, options?: { silent?: boolean }): Promise<void> => {
+      const existing = threadSyncInFlight.current;
+      if (existing?.id === id) return existing.promise;
+      const silent = options?.silent === true;
+      if (!silent && selectedIdRef.current === id) {
+        setThreadSyncState("syncing");
+        setThreadSyncError(null);
+      }
+
+      // Root getAdminFormInboxMessage already hydrates reply files; this only
+      // syncs newly arrived Graph conversation messages without replacing chips.
+      const promise = getAdminFormInboxThread({ data: { id } })
+        .then((threadResult) => {
+          if (!threadResult.ok) {
+            if (!silent && selectedIdRef.current === id) {
+              setThreadSyncState("error");
+              setThreadSyncError(threadResult.error);
+            }
+            return;
+          }
+          setDetail((prev) =>
+            prev && prev.id === id
+              ? { ...prev, thread: mergeInquiryThreads(threadResult.thread, prev.thread) }
+              : prev,
+          );
+          if (!silent && selectedIdRef.current === id) {
+            setThreadSyncState("idle");
+            setThreadSyncError(null);
+          }
+        })
+        .catch(() => {
+          if (!silent && selectedIdRef.current === id) {
+            setThreadSyncState("error");
+            setThreadSyncError(
+              "Klantreacties konden niet uit de mailbox worden bijgewerkt. Probeer het opnieuw.",
+            );
+          }
+          /* keep the already persisted thread */
+        })
+        .finally(() => {
+          if (threadSyncInFlight.current?.promise === promise) {
+            threadSyncInFlight.current = null;
+          }
+        });
+
+      threadSyncInFlight.current = { id, promise };
+      return promise;
+    },
+    [],
+  );
 
   const loadDetail = React.useCallback(
     async (id: string, options?: { soft?: boolean }) => {
       const soft = options?.soft === true;
+      selectedIdRef.current = id;
       setSelectedId(id);
       if (!soft) {
         setDetailState("loading");
         setDetailError(null);
+        setThreadSyncState("idle");
+        setThreadSyncError(null);
       }
       try {
         const result = await getAdminFormInboxMessage({ data: { id } });
@@ -83,19 +115,10 @@ export function useInquiryDetailQuery(options: {
         setDetailState("idle");
         setDetailError(null);
         setItems((prev) => prev.map((m) => (m.id === id ? { ...m, unread: false } : m)));
-        applyThreadInBackground(id);
+        void applyThreadInBackground(id, { silent: soft });
 
-        if (!soft) {
-          const requestId = websiteRequestIdFromInboxId(id);
-          if (requestId) {
-            void markAdminRequestNotificationsReadForEntity({ data: { entityId: requestId } })
-              .then((res) => {
-                if (res.ok && res.count > 0) refreshAdminRequestsUnreadBadge();
-              })
-              .catch(() => {
-                /* non-fatal */
-              });
-          }
+        if (!soft && result.notificationReadCount > 0) {
+          refreshAdminRequestsUnreadBadge();
         }
       } catch {
         if (!soft) {
@@ -112,16 +135,26 @@ export function useInquiryDetailQuery(options: {
     (id: string) => {
       // Thread-only soft refresh — avoids remounting the root message and
       // briefly pairing optimistic local-reply with the persisted Graph copy.
-      applyThreadInBackground(id);
+      void applyThreadInBackground(id, { silent: true });
+    },
+    [applyThreadInBackground],
+  );
+
+  const refreshDetail = React.useCallback(
+    (id: string) => {
+      void applyThreadInBackground(id);
     },
     [applyThreadInBackground],
   );
 
   const closeDetail = React.useCallback(() => {
+    selectedIdRef.current = null;
     setSelectedId(null);
     setDetail(null);
     setDetailState("idle");
     setDetailError(null);
+    setThreadSyncState("idle");
+    setThreadSyncError(null);
   }, []);
 
   return {
@@ -130,8 +163,11 @@ export function useInquiryDetailQuery(options: {
     setDetail,
     detailState,
     detailError,
+    threadSyncState,
+    threadSyncError,
     loadDetail,
     softRefreshDetail,
+    refreshDetail,
     closeDetail,
   };
 }

@@ -139,10 +139,8 @@ export {
   type GraphBulkDeleteItemResult,
   type GraphBulkDeleteResult,
 } from "./graph-bulk-delete";
-export type {
-  FormInboxBulkDeleteResult,
-  FormInboxDeleteItemResult,
-} from "./form-inbox";
+export type { FormInboxBulkDeleteResult, FormInboxDeleteItemResult } from "./form-inbox";
+export { clearInboxListSnapshotCache } from "./form-inbox-list-cache";
 export type { InboxLoadMetrics } from "./graph-mail";
 /** Re-export pure helpers so server consumers can import one entry when needed. */
 export { buildFormEmail, buildSubmitterConfirmationEmail, escapeHtml } from "./templates";

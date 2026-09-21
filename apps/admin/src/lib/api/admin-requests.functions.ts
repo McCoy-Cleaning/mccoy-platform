@@ -8,6 +8,7 @@ import {
   isNotificationOutboxUnavailableMessage,
   listWebsiteRequestMailMessages,
   listWebsiteRequests,
+  listUnreadNotificationEntityIds,
   markAllNotificationsRead,
   markNotificationsReadForEntity,
   NotificationOutboxUnavailableError,
@@ -34,6 +35,7 @@ import {
   getFormInboxThread,
   isFormInboxConfigured,
   listFormInboxMessages,
+  clearInboxListSnapshotCache,
   getGraphMailConfig,
   sendAdminReplyEmail,
   shouldAttemptGraphMail,
@@ -41,12 +43,18 @@ import {
   extractSimpleReplyBody,
   isTemplatedWrapOf,
 } from "@mccoy/email/server";
-import { AdminAuthError, assertInboxFetchRateLimit, assertInquiryStatusRateLimit, assertReplyRateLimit } from "@mccoy/security";
+import {
+  AdminAuthError,
+  assertInboxFetchRateLimit,
+  assertInquiryStatusRateLimit,
+  assertReplyRateLimit,
+} from "@mccoy/security";
 import { ensureMonorepoEnvLoaded } from "@mccoy/security/load-monorepo-env";
 import {
   adminInboxAttachmentSchema,
   adminInboxBulkDeleteSchema,
   adminInboxListSchema,
+  adminInboxLifecycleStatusSchema,
   adminInboxMessageIdSchema,
   adminInboxReplySchema,
   adminInboxUpdateSubmitterEmailSchema,
@@ -56,6 +64,11 @@ import {
   adminRequestReplySchema,
   adminRequestStatusSchema,
 } from "@mccoy/validation";
+import {
+  applyRequestNotificationUnreadState,
+  websiteRequestIdFromInboxId,
+  websiteRequestIdsFromInboxItems,
+} from "@/lib/requests/inquiry-unread";
 
 function ensureInboxEnv(): void {
   ensureMonorepoEnvLoaded();
@@ -186,8 +199,7 @@ async function reportMailboxConnectionOk(): Promise<void> {
   } catch (notifyError) {
     if (
       notifyError instanceof NotificationOutboxUnavailableError ||
-      (notifyError instanceof Error &&
-        isNotificationOutboxUnavailableMessage(notifyError.message))
+      (notifyError instanceof Error && isNotificationOutboxUnavailableMessage(notifyError.message))
     ) {
       console.warn(
         "[admin-requests] mailbox-restored notification skipped — notification_outbox missing; apply migration 20260725120000_platform_notifications.sql",
@@ -223,8 +235,7 @@ async function reportMailboxConnectionFailed(error: unknown): Promise<void> {
   } catch (notifyError) {
     if (
       notifyError instanceof NotificationOutboxUnavailableError ||
-      (notifyError instanceof Error &&
-        isNotificationOutboxUnavailableMessage(notifyError.message))
+      (notifyError instanceof Error && isNotificationOutboxUnavailableMessage(notifyError.message))
     ) {
       console.warn(
         "[admin-requests] mailbox-failed notification skipped — notification_outbox missing; apply migration 20260725120000_platform_notifications.sql",
@@ -425,9 +436,7 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
 
       // Safety net: persist-clear orphan scopes — do not block inbox paint.
       void import("@mccoy/database/server")
-        .then(({ reconcileOrphanWebsiteRequestScopes }) =>
-          reconcileOrphanWebsiteRequestScopes(),
-        )
+        .then(({ reconcileOrphanWebsiteRequestScopes }) => reconcileOrphanWebsiteRequestScopes())
         .catch(() => {
           /* display-time clear in listFormInboxMessages still applies */
         });
@@ -436,6 +445,7 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
       try {
         result = await listFormInboxMessages({
           kind: data.kind,
+          lifecycle: data.lifecycle,
           scopeKey: data.scopeKey,
           q: data.q,
           limit: data.limit,
@@ -465,9 +475,26 @@ export const listAdminFormInbox = createServerFn({ method: "POST" })
         storeLabels: result.facets.scopes,
       });
 
+      let items = result.items;
+      if (session.userId && hasSupabaseServiceConfig()) {
+        const requestIds = websiteRequestIdsFromInboxItems(items);
+        try {
+          const unreadRequestIds = await listUnreadNotificationEntityIds(
+            session.userId,
+            "website_request",
+            requestIds,
+          );
+          items = applyRequestNotificationUnreadState(items, new Set(unreadRequestIds));
+        } catch (unreadError) {
+          console.error("[admin-requests] request unread overlay failed", {
+            message: unreadError instanceof Error ? unreadError.message.slice(0, 160) : "unknown",
+          });
+        }
+      }
+
       return {
         ok: true as const,
-        items: result.items,
+        items,
         facets: { kinds: result.facets.kinds, scopes },
         showAll: showAllGraphInboxMessages(),
       };
@@ -494,7 +521,7 @@ export const getAdminFormInboxMessage = createServerFn({ method: "POST" })
         };
       }
 
-      const message = await getFormInboxMessage(data.id);
+      let message = await getFormInboxMessage(data.id);
       if (!message) {
         return {
           ok: false as const,
@@ -502,7 +529,30 @@ export const getAdminFormInboxMessage = createServerFn({ method: "POST" })
           code: "not_found" as const,
         };
       }
-      return { ok: true as const, message };
+
+      let notificationReadCount = 0;
+      const requestId = websiteRequestIdFromInboxId(data.id);
+      if (requestId && session.userId && hasSupabaseServiceConfig()) {
+        try {
+          notificationReadCount = await markNotificationsReadForEntity(
+            session.userId,
+            "website_request",
+            requestId,
+          );
+        } catch (readError) {
+          // Reading the request must remain available during a transient
+          // notification failure. The next list refresh will reconcile state.
+          console.error("[admin-requests] request notification read failed", {
+            requestId,
+            message: readError instanceof Error ? readError.message.slice(0, 160) : "unknown",
+          });
+        }
+      }
+
+      // Opening the detail is the read action. Workflow remains untouched;
+      // notification_recipients is the durable per-admin source of truth.
+      message = { ...message, unread: false };
+      return { ok: true as const, message, notificationReadCount };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
         return { ok: false as const, error: error.message, code: "rate_limit" as const };
@@ -534,10 +584,7 @@ export const getAdminFormInboxThread = createServerFn({ method: "POST" })
       } catch {
         thread = message?.thread ?? [];
       }
-      const merged = await mergePersistedRepliesIntoThread(
-        thread,
-        message?.requestNumber ?? null,
-      );
+      const merged = await mergePersistedRepliesIntoThread(thread, message?.requestNumber ?? null);
       return { ok: true as const, thread: merged };
     } catch (error) {
       if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
@@ -567,7 +614,8 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       if (!attachment) {
         return {
           ok: false as const,
-          error: "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
+          error:
+            "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
           code: "not_found" as const,
         };
       }
@@ -576,7 +624,8 @@ export const getAdminFormInboxAttachment = createServerFn({ method: "POST" })
       if (!hasBytes && !hasSignedUrl) {
         return {
           ok: false as const,
-          error: "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
+          error:
+            "Bijlage staat in de mailbox maar kon niet worden gekoppeld. Probeer Vernieuwen, of open het bericht opnieuw.",
           code: "not_found" as const,
         };
       }
@@ -751,6 +800,100 @@ export const updateAdminInquiryStatus = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Resolve or manually reopen a persisted website request. This is deliberately
+ * separate from the triage label: `closed` means resolved; `open` means the
+ * request needs attention. Deleted/spam requests cannot be reopened here.
+ */
+export const updateAdminRequestLifecycleStatus = createServerFn({ method: "POST" })
+  .validator(adminInboxLifecycleStatusSchema)
+  .handler(async ({ data }) => {
+    try {
+      ensureInboxEnv();
+      const session = await requireAdminSession();
+      assertInquiryStatusRateLimit(session.username);
+
+      let requestId: string | null = null;
+      try {
+        const decoded = decodeInboxMessageId(data.id);
+        if (decoded.provider === "request" || decoded.provider === "e2e") {
+          requestId = decoded.requestId;
+        }
+      } catch {
+        /* invalid id handled below */
+      }
+
+      if (!requestId) {
+        return {
+          ok: false as const,
+          error: "Alleen opgeslagen formulieraanvragen kunnen worden afgerond.",
+          code: "validation" as const,
+        };
+      }
+
+      const existing = await getWebsiteRequest(requestId);
+      if (!existing) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+      if (existing.status === "deleted" || existing.status === "spam") {
+        return {
+          ok: false as const,
+          error: "Een verwijderde of als spam gemarkeerde aanvraag kan niet worden heropend.",
+          code: "validation" as const,
+        };
+      }
+      if (existing.status === data.status) {
+        return {
+          ok: true as const,
+          lifecycleStatus: existing.status,
+          requestId: existing.id,
+        };
+      }
+      if (data.status === "open" && existing.status !== "closed") {
+        return {
+          ok: false as const,
+          error: "Alleen een afgeronde aanvraag kan handmatig worden heropend.",
+          code: "validation" as const,
+        };
+      }
+
+      const updated = await setWebsiteRequestStatus(requestId, data.status);
+      if (!updated) {
+        return {
+          ok: false as const,
+          error: "Aanvraag niet gevonden.",
+          code: "not_found" as const,
+        };
+      }
+
+      clearInboxListSnapshotCache();
+      await writeStaffAudit({
+        actorUserId: session.userId ?? null,
+        action: data.status === "closed" ? "website_request.resolved" : "website_request.reopened",
+        targetType: "website_request",
+        targetId: updated.id,
+        before: { status: existing.status },
+        after: { status: updated.status },
+        metadata: { requestNumber: updated.number, inboxMessageId: data.id },
+      });
+
+      return {
+        ok: true as const,
+        lifecycleStatus: updated.status,
+        requestId: updated.id,
+      };
+    } catch (error) {
+      if (error instanceof AdminAuthError && error.message.includes("Te veel")) {
+        return { ok: false as const, error: error.message, code: "rate_limit" as const };
+      }
+      return authErrorResult(error);
+    }
+  });
+
 export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
   .validator(adminInboxReplySchema)
   .handler(async ({ data }) => {
@@ -774,6 +917,13 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
           code: "not_found" as const,
         };
       }
+      if (message.lifecycleStatus === "closed") {
+        return {
+          ok: false as const,
+          error: "Heropen de afgeronde aanvraag voordat u een nieuw antwoord verstuurt.",
+          code: "validation" as const,
+        };
+      }
       if (!message.submitterEmail) {
         return {
           ok: false as const,
@@ -789,14 +939,28 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         : `Re: ${message.subject}`;
 
       // Prefer Graph createReply against the latest inbound / root Graph message.
+      // The parent must be from this request's own submitter (or the form
+      // notification): createReply inherits the parent's quoted body and inline
+      // attachments, so replying to any other message would send that message's
+      // content to this customer.
       let inboxMessageIdForReply = data.id;
       try {
         const decoded = decodeInboxMessageId(data.id);
         if (decoded.provider === "request" || decoded.provider === "e2e") {
           const mailRows = await listWebsiteRequestMailMessages(decoded.requestId);
+          const submitter = message.submitterEmail.trim().toLowerCase();
           const parent =
-            [...mailRows].reverse().find((row) => row.direction === "inbound" && row.graph_message_id) ??
-            mailRows.find((row) => row.graph_message_id);
+            [...mailRows]
+              .reverse()
+              .find(
+                (row) =>
+                  row.direction === "inbound" &&
+                  Boolean(row.graph_message_id) &&
+                  (row.sender_address || "").trim().toLowerCase() === submitter,
+              ) ??
+            mailRows.find(
+              (row) => row.provider === "website_form" && Boolean(row.graph_message_id),
+            );
           if (parent?.graph_message_id) {
             inboxMessageIdForReply = encodeGraphMessageId(
               parent.graph_message_id,
@@ -846,9 +1010,7 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
             await upsertWebsiteRequestMailMessage({
               requestId: match.id,
               direction: "outbound",
-              provider: sent.usedGraphReply || sent.graphMessageId
-                ? "microsoft_graph"
-                : "smtp",
+              provider: sent.usedGraphReply || sent.graphMessageId ? "microsoft_graph" : "smtp",
               mailbox: graphMailbox,
               graphMessageId: sent.graphMessageId ?? null,
               internetMessageId: sent.internetMessageId ?? sent.messageId ?? null,
@@ -865,10 +1027,7 @@ export const replyAdminFormInboxMessage = createServerFn({ method: "POST" })
         } catch (persistError) {
           console.error("[admin-requests] failed to persist inbox reply", {
             requestNumber: message.requestNumber,
-            message:
-              persistError instanceof Error
-                ? persistError.message.slice(0, 160)
-                : "unknown",
+            message: persistError instanceof Error ? persistError.message.slice(0, 160) : "unknown",
           });
         }
       }
@@ -990,7 +1149,10 @@ export const bulkDeleteAdminFormInboxMessages = createServerFn({ method: "POST" 
         ...(failures.length > 0
           ? {
               partial: true as const,
-              error: bulkDeleteFailureMessage(bulk.deletedCount + bulk.alreadyAbsentCount, failures),
+              error: bulkDeleteFailureMessage(
+                bulk.deletedCount + bulk.alreadyAbsentCount,
+                failures,
+              ),
             }
           : {}),
       };

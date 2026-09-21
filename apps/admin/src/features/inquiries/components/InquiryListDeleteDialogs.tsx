@@ -1,8 +1,8 @@
 import type { FormInboxMessageSummary } from "@mccoy/email/contracts";
 import { ConfirmationDialog } from "@/components/admin/ConfirmationDialog";
 
-function emailDeleteNoun(count: number): string {
-  return count === 1 ? "e-mail" : "e-mails";
+function requestDeleteNoun(count: number): string {
+  return count === 1 ? "aanvraag" : "aanvragen";
 }
 
 export function InquiryListDeleteDialogs({
@@ -28,19 +28,19 @@ export function InquiryListDeleteDialogs({
   onConfirmBulk: () => void;
   onCancelBulk: () => void;
 }) {
-  const bulkNoun = emailDeleteNoun(selectedCount);
+  const bulkNoun = requestDeleteNoun(selectedCount);
 
   return (
     <>
       <ConfirmationDialog
         open={listDeleteTargetId !== null}
-        title="E-mail verwijderen?"
+        title="Aanvraag verwijderen?"
         description={
           listDeleteTarget
-            ? `Dit verwijdert het formulierbericht van ${listDeleteTarget.submitterName ?? listDeleteTarget.submitterEmail ?? listDeleteTarget.from} uit deze mailbox. Dit kan niet eenvoudig ongedaan worden gemaakt vanuit Aanvragen.`
-            : "De geselecteerde e-mail wordt uit deze mailbox verwijderd."
+            ? `Dit verwijdert de aanvraag van ${listDeleteTarget.submitterName ?? listDeleteTarget.submitterEmail ?? listDeleteTarget.from} uit Aanvragen en verwijdert waar mogelijk ook de mailboxkopie. Gebruik Afronden als u de aanvraag later wilt terugvinden.`
+            : "De geselecteerde aanvraag wordt uit Aanvragen verwijderd."
         }
-        confirmLabel="1 e-mail verwijderen"
+        confirmLabel="Aanvraag verwijderen"
         tone="destructive"
         pending={listDeleteBusy}
         error={listDeleteError}
@@ -51,7 +51,7 @@ export function InquiryListDeleteDialogs({
       <ConfirmationDialog
         open={bulkDeleteOpen}
         title={`${selectedCount} ${bulkNoun} verwijderen?`}
-        description="De geselecteerde e-mails worden uit deze mailbox verwijderd."
+        description="De geselecteerde aanvragen worden uit Aanvragen verwijderd. Gebruik Afronden voor aanvragen die u later wilt kunnen terugvinden."
         confirmLabel={`${selectedCount} ${bulkNoun} verwijderen`}
         tone="destructive"
         pending={listDeleteBusy}

@@ -36,6 +36,7 @@ import { Route as EnIndexRouteImport } from './routes/en.index'
 import { Route as EnSplatRouteImport } from './routes/en.$'
 import { Route as VacaturesSlugRouteImport } from './routes/vacatures.$slug'
 import { Route as AccountCompanyUsersRouteImport } from './routes/account.company.users'
+import { Route as AccountCompanyUsersUserIdRouteImport } from './routes/account.company.users.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -174,6 +175,12 @@ const AccountCompanyUsersRoute = AccountCompanyUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AccountCompanyRoute,
 } as any)
+const AccountCompanyUsersUserIdRoute =
+  AccountCompanyUsersUserIdRouteImport.update({
+    id: '/$userId',
+    path: '/$userId',
+    getParentRoute: () => AccountCompanyUsersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -202,7 +209,8 @@ export interface FileRoutesByFullPath {
   '/vacatures/$slug': typeof VacaturesSlugRoute
   '/account/': typeof AccountIndexRoute
   '/en/': typeof EnIndexRoute
-  '/account/company/users': typeof AccountCompanyUsersRoute
+  '/account/company/users': typeof AccountCompanyUsersRouteWithChildren
+  '/account/company/users/$userId': typeof AccountCompanyUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -230,7 +238,8 @@ export interface FileRoutesByTo {
   '/vacatures/$slug': typeof VacaturesSlugRoute
   '/account': typeof AccountIndexRoute
   '/en': typeof EnIndexRoute
-  '/account/company/users': typeof AccountCompanyUsersRoute
+  '/account/company/users': typeof AccountCompanyUsersRouteWithChildren
+  '/account/company/users/$userId': typeof AccountCompanyUsersUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -260,7 +269,8 @@ export interface FileRoutesById {
   '/vacatures/$slug': typeof VacaturesSlugRoute
   '/account/': typeof AccountIndexRoute
   '/en/': typeof EnIndexRoute
-  '/account/company/users': typeof AccountCompanyUsersRoute
+  '/account/company/users': typeof AccountCompanyUsersRouteWithChildren
+  '/account/company/users/$userId': typeof AccountCompanyUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/account/'
     | '/en/'
     | '/account/company/users'
+    | '/account/company/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/en'
     | '/account/company/users'
+    | '/account/company/users/$userId'
   id:
     | '__root__'
     | '/'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/account/'
     | '/en/'
     | '/account/company/users'
+    | '/account/company/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -564,15 +577,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountCompanyUsersRouteImport
       parentRoute: typeof AccountCompanyRoute
     }
+    '/account/company/users/$userId': {
+      id: '/account/company/users/$userId'
+      path: '/$userId'
+      fullPath: '/account/company/users/$userId'
+      preLoaderRoute: typeof AccountCompanyUsersUserIdRouteImport
+      parentRoute: typeof AccountCompanyUsersRoute
+    }
   }
 }
 
+interface AccountCompanyUsersRouteChildren {
+  AccountCompanyUsersUserIdRoute: typeof AccountCompanyUsersUserIdRoute
+}
+
+const AccountCompanyUsersRouteChildren: AccountCompanyUsersRouteChildren = {
+  AccountCompanyUsersUserIdRoute: AccountCompanyUsersUserIdRoute,
+}
+
+const AccountCompanyUsersRouteWithChildren =
+  AccountCompanyUsersRoute._addFileChildren(AccountCompanyUsersRouteChildren)
+
 interface AccountCompanyRouteChildren {
-  AccountCompanyUsersRoute: typeof AccountCompanyUsersRoute
+  AccountCompanyUsersRoute: typeof AccountCompanyUsersRouteWithChildren
 }
 
 const AccountCompanyRouteChildren: AccountCompanyRouteChildren = {
-  AccountCompanyUsersRoute: AccountCompanyUsersRoute,
+  AccountCompanyUsersRoute: AccountCompanyUsersRouteWithChildren,
 }
 
 const AccountCompanyRouteWithChildren = AccountCompanyRoute._addFileChildren(

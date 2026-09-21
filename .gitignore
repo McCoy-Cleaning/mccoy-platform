@@ -19,8 +19,11 @@ dist-ssr
 .env.*
 !.env.example
 
-# Local website-request JSON store (see docs/apps-and-hosts.md)
+# Local website-request JSON store + default DB/storage backups (see docs/operations/data-backup.md)
 .data/
+
+# Postgres custom-format dumps (never commit)
+*.dump
 
 # Playwright
 /test-results/

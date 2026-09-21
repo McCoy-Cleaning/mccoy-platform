@@ -24,6 +24,7 @@ import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSplatRouteImport } from './routes/admin.$'
 import { Route as ApiCommercePortalJobsRouteImport } from './routes/api.commerce-portal-jobs'
+import { Route as AppUsersUserIdRouteImport } from './routes/_app.users.$userId'
 import { Route as AppWebsiteIndexRouteImport } from './routes/_app.website.index'
 import { Route as AppWebsitePageIdRouteImport } from './routes/_app.website.$pageId'
 import { Route as AppWebsiteMediaRouteImport } from './routes/_app.website.media'
@@ -107,6 +108,11 @@ const ApiCommercePortalJobsRoute = ApiCommercePortalJobsRouteImport.update({
   path: '/api/commerce-portal-jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppUsersUserIdRoute = AppUsersUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => AppUsersRoute,
+} as any)
 const AppWebsiteIndexRoute = AppWebsiteIndexRouteImport.update({
   id: '/website/',
   path: '/website/',
@@ -163,10 +169,11 @@ export interface FileRoutesByFullPath {
   '/products': typeof AppProductsRoute
   '/recover-mfa': typeof AppRecoverMfaRoute
   '/settings': typeof AppSettingsRoute
-  '/users': typeof AppUsersRoute
+  '/users': typeof AppUsersRouteWithChildren
   '/admin/$': typeof AdminSplatRoute
   '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/admin/': typeof AdminIndexRoute
+  '/users/$userId': typeof AppUsersUserIdRoute
   '/website/$pageId': typeof AppWebsitePageIdRoute
   '/website/media': typeof AppWebsiteMediaRoute
   '/website/': typeof AppWebsiteIndexRoute
@@ -185,11 +192,12 @@ export interface FileRoutesByTo {
   '/products': typeof AppProductsRoute
   '/recover-mfa': typeof AppRecoverMfaRoute
   '/settings': typeof AppSettingsRoute
-  '/users': typeof AppUsersRoute
+  '/users': typeof AppUsersRouteWithChildren
   '/admin/$': typeof AdminSplatRoute
   '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/': typeof AppIndexRoute
   '/admin': typeof AdminIndexRoute
+  '/users/$userId': typeof AppUsersUserIdRoute
   '/website/$pageId': typeof AppWebsitePageIdRoute
   '/website/media': typeof AppWebsiteMediaRoute
   '/website': typeof AppWebsiteIndexRoute
@@ -211,11 +219,12 @@ export interface FileRoutesById {
   '/_app/products': typeof AppProductsRoute
   '/_app/recover-mfa': typeof AppRecoverMfaRoute
   '/_app/settings': typeof AppSettingsRoute
-  '/_app/users': typeof AppUsersRoute
+  '/_app/users': typeof AppUsersRouteWithChildren
   '/admin/$': typeof AdminSplatRoute
   '/api/commerce-portal-jobs': typeof ApiCommercePortalJobsRoute
   '/_app/': typeof AppIndexRoute
   '/admin/': typeof AdminIndexRoute
+  '/_app/users/$userId': typeof AppUsersUserIdRoute
   '/_app/website/$pageId': typeof AppWebsitePageIdRoute
   '/_app/website/media': typeof AppWebsiteMediaRoute
   '/_app/website/': typeof AppWebsiteIndexRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/admin/$'
     | '/api/commerce-portal-jobs'
     | '/admin/'
+    | '/users/$userId'
     | '/website/$pageId'
     | '/website/media'
     | '/website/'
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/api/commerce-portal-jobs'
     | '/'
     | '/admin'
+    | '/users/$userId'
     | '/website/$pageId'
     | '/website/media'
     | '/website'
@@ -290,6 +301,7 @@ export interface FileRouteTypes {
     | '/api/commerce-portal-jobs'
     | '/_app/'
     | '/admin/'
+    | '/_app/users/$userId'
     | '/_app/website/$pageId'
     | '/_app/website/media'
     | '/_app/website/'
@@ -413,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCommercePortalJobsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/users/$userId': {
+      id: '/_app/users/$userId'
+      path: '/$userId'
+      fullPath: '/users/$userId'
+      preLoaderRoute: typeof AppUsersUserIdRouteImport
+      parentRoute: typeof AppUsersRoute
+    }
     '/_app/website/': {
       id: '/_app/website/'
       path: '/website'
@@ -488,6 +507,18 @@ const AppCustomersRouteWithChildren = AppCustomersRoute._addFileChildren(
   AppCustomersRouteChildren,
 )
 
+interface AppUsersRouteChildren {
+  AppUsersUserIdRoute: typeof AppUsersUserIdRoute
+}
+
+const AppUsersRouteChildren: AppUsersRouteChildren = {
+  AppUsersUserIdRoute: AppUsersUserIdRoute,
+}
+
+const AppUsersRouteWithChildren = AppUsersRoute._addFileChildren(
+  AppUsersRouteChildren,
+)
+
 interface AppRouteChildren {
   AppCustomersRoute: typeof AppCustomersRouteWithChildren
   AppInquiriesRoute: typeof AppInquiriesRoute
@@ -497,7 +528,7 @@ interface AppRouteChildren {
   AppProductsRoute: typeof AppProductsRoute
   AppRecoverMfaRoute: typeof AppRecoverMfaRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppUsersRoute: typeof AppUsersRoute
+  AppUsersRoute: typeof AppUsersRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
   AppWebsitePageIdRoute: typeof AppWebsitePageIdRoute
   AppWebsiteMediaRoute: typeof AppWebsiteMediaRoute
@@ -515,7 +546,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProductsRoute: AppProductsRoute,
   AppRecoverMfaRoute: AppRecoverMfaRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppUsersRoute: AppUsersRoute,
+  AppUsersRoute: AppUsersRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
   AppWebsitePageIdRoute: AppWebsitePageIdRoute,
   AppWebsiteMediaRoute: AppWebsiteMediaRoute,

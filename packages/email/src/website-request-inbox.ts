@@ -16,6 +16,7 @@ import type {
   FormInboxMessage,
   FormInboxMessageSummary,
   FormInboxThreadItem,
+  InboxLifecycleView,
 } from "./form-inbox-contracts";
 import { FormInboxConfigError, FormInboxError } from "./form-inbox-contracts";
 import { mergeMailboxAndWebsiteRequestSummaries } from "./enrich-inbox-scopes";
@@ -40,10 +41,12 @@ import {
   normaliseThreadMessageBody,
   outboundMailDuplicatesStaffReply,
 } from "./inquiry-thread-dedupe";
+import { inboxAttachmentsToStored, storedMailAttachmentsToInbox } from "./mail-message-attachments";
 import {
-  inboxAttachmentsToStored,
-  storedMailAttachmentsToInbox,
-} from "./mail-message-attachments";
+  normaliseInternetMessageId,
+  requestSubmitterIsParticipant,
+  textCitesRequestNumber,
+} from "./inquiry-thread-correlation";
 
 export { mergeMailboxAndWebsiteRequestSummaries };
 
@@ -68,8 +71,7 @@ function attachmentMeta(request: WebsiteRequest): FormInboxAttachment[] {
 
 function snippetFrom(request: WebsiteRequest | WebsiteRequestSummary): string {
   if ("fields" in request && request.fields) {
-    const msg =
-      request.fields.message?.trim() || request.fields.motivation?.trim();
+    const msg = request.fields.message?.trim() || request.fields.motivation?.trim();
     if (msg) return msg.slice(0, 160);
   }
   return `${request.submitterName} · ${request.number}`;
@@ -79,7 +81,8 @@ export function websiteRequestSummaryToInboxSummary(
   request: WebsiteRequest | WebsiteRequestSummary,
 ): FormInboxMessageSummary {
   const id = encodeRequestMessageId(request.id, REQUEST_MAILBOX);
-  // new = never handled; open = customer replied / needs attention (after staff reply cycle).
+  // Fallback for non-admin consumers. Admin overlays this with the current
+  // staff recipient's durable notification read state before returning a list.
   const unread = request.status === "new" || request.status === "open";
   return {
     id,
@@ -98,6 +101,11 @@ export function websiteRequestSummaryToInboxSummary(
     date: request.createdAt,
     snippet: snippetFrom(request),
     unread,
+    lifecycleStatus: request.status,
+    activityAt:
+      request.status === "open" || request.status === "closed"
+        ? request.updatedAt
+        : request.createdAt,
     submitterName: request.submitterName || null,
     submitterEmail: request.submitterEmail || null,
     requestNumber: request.number,
@@ -112,20 +120,7 @@ export const websiteRequestToSummary = websiteRequestSummaryToInboxSummary;
 
 function websiteRequestToMessage(
   request: WebsiteRequest,
-  mailMessages: Array<{
-    id: string;
-    direction: "inbound" | "outbound";
-    provider?: string;
-    mailbox?: string | null;
-    sender_address: string | null;
-    recipient_addresses: string[] | null;
-    subject: string | null;
-    body_text: string | null;
-    occurred_at: string;
-    internet_message_id: string | null;
-    graph_message_id: string | null;
-    attachments?: unknown;
-  }> = [],
+  mailMessages: WebsiteRequestMailRow[] = [],
 ): FormInboxMessage {
   const summary = websiteRequestSummaryToInboxSummary(request);
   const fields = fieldsToParsed(request.fields);
@@ -163,11 +158,10 @@ function websiteRequestToMessage(
   }));
 
   const fromMail: FormInboxThreadItem[] = [];
-  mailMessages.forEach((row, index) => {
+  mailRowsForRequest(mailMessages, request.submitterEmail, request.number).forEach((row, index) => {
     // Form-notification identity rows must not appear as "Klant" in Gesprek —
     // structured fields already render above the thread.
     if (row.provider === "website_form") return;
-
     const isOutbound = row.direction === "outbound";
     if (isOutbound && outboundMailDuplicatesStaffReply(row, request.replies)) {
       return;
@@ -175,9 +169,7 @@ function websiteRequestToMessage(
     const mailbox = (row.mailbox || "").trim();
     const graphId = row.graph_message_id?.trim() || "";
     const threadId =
-      graphId && mailbox
-        ? encodeGraphMessageId(graphId, mailbox)
-        : `${summary.id}:mail:${row.id}`;
+      graphId && mailbox ? encodeGraphMessageId(graphId, mailbox) : `${summary.id}:mail:${row.id}`;
     fromMail.push({
       id: threadId,
       uid: summary.uid + 1000 + index,
@@ -216,33 +208,51 @@ function websiteRequestToMessage(
   };
 }
 
-function isActiveRequestStatus(status: WebsiteRequestSummary["status"]): boolean {
-  return status !== "closed" && status !== "spam";
+function isVisibleRequestStatus(status: WebsiteRequestSummary["status"]): boolean {
+  return status !== "deleted" && status !== "spam";
+}
+
+function matchesLifecycleView(
+  status: WebsiteRequestSummary["status"],
+  lifecycle: InboxLifecycleView,
+): boolean {
+  return lifecycle === "resolved"
+    ? status === "closed"
+    : status !== "closed" && isVisibleRequestStatus(status);
 }
 
 export async function listWebsiteRequestInboxSummaries(
-  options?: InboxListFilters & { limit?: number },
+  options?: InboxListFilters & { limit?: number; lifecycle?: InboxLifecycleView },
 ): Promise<FormInboxMessageSummary[]> {
   const limit = Math.min(Math.max(options?.limit ?? 80, 1), 200);
+  const lifecycle = options?.lifecycle ?? "active";
   const rows = await listWebsiteRequests({
     kind: options?.kind ?? "all",
-    status: "all",
+    statuses: lifecycle === "resolved" ? ["closed"] : ["new", "open", "replied"],
     q: options?.q,
     scopeKey: options?.scopeKey === "all" ? undefined : options?.scopeKey,
+    orderBy: "updated_at",
   });
 
   return rows
-    .filter((row) => isActiveRequestStatus(row.status))
-    .slice(0, limit)
-    .map((row) => websiteRequestSummaryToInboxSummary(row));
+    .filter((row) => matchesLifecycleView(row.status, lifecycle))
+    .map((row) => websiteRequestSummaryToInboxSummary(row))
+    .sort(
+      (a, b) =>
+        new Date(b.activityAt ?? b.date).getTime() - new Date(a.activityAt ?? a.date).getTime(),
+    )
+    .slice(0, limit);
 }
 
 export async function listWebsiteRequestFormInboxMessages(
-  options?: InboxListFilters & { limit?: number },
+  options?: InboxListFilters & { limit?: number; lifecycle?: InboxLifecycleView },
 ): Promise<{ items: FormInboxMessageSummary[]; facets: InboxFacets }> {
   const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
   const messages = await listWebsiteRequestInboxSummaries({ ...options, limit: 200 });
-  messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  messages.sort(
+    (a, b) =>
+      new Date(b.activityAt ?? b.date).getTime() - new Date(a.activityAt ?? a.date).getTime(),
+  );
   const { withActivePublishedScopesCleared } = await import("./apply-active-form-scopes");
   const scoped = await withActivePublishedScopesCleared(messages);
   const facets = buildInboxFacets(scoped);
@@ -253,7 +263,6 @@ export async function listWebsiteRequestFormInboxMessages(
   });
   return { items: filtered.slice(0, limit), facets };
 }
-
 
 type WebsiteRequestMailRow = {
   id: string;
@@ -267,8 +276,60 @@ type WebsiteRequestMailRow = {
   occurred_at: string;
   internet_message_id: string | null;
   graph_message_id: string | null;
+  conversation_id?: string | null;
+  in_reply_to?: string | null;
+  references_header?: string | null;
   attachments?: unknown;
 };
+
+/**
+ * Hide legacy Graph rows whose participants do not prove ownership by this
+ * request. This is intentionally non-destructive: rejected mail remains in
+ * Outlook, while historical rows remain available for an audited cleanup
+ * migration later.
+ */
+export function websiteRequestMailRowBelongsToSubmitter(
+  row: WebsiteRequestMailRow,
+  submitterEmail: string | null | undefined,
+): boolean {
+  if (row.provider !== "microsoft_graph") return true;
+  return requestSubmitterIsParticipant(
+    {
+      fromAddress: row.sender_address,
+      toAddresses: row.recipient_addresses ?? [],
+    },
+    submitterEmail,
+  );
+}
+
+export function mailRowsForRequest(
+  rows: WebsiteRequestMailRow[],
+  submitterEmail: string | null | undefined,
+  requestNumber?: string | null,
+): WebsiteRequestMailRow[] {
+  const directlyOwned = new Set(
+    rows
+      .filter((row) => websiteRequestMailRowBelongsToSubmitter(row, submitterEmail))
+      .map((row) => row.id),
+  );
+  const trustedOutboundParents = new Map<string, WebsiteRequestMailRow>();
+  for (const row of rows) {
+    if (!directlyOwned.has(row.id) || row.direction !== "outbound") continue;
+    if (!textCitesRequestNumber(requestNumber, row.subject, row.body_text)) continue;
+    const id = normaliseInternetMessageId(row.internet_message_id);
+    if (id) trustedOutboundParents.set(id, row);
+  }
+
+  return rows.filter((row) => {
+    if (directlyOwned.has(row.id)) return true;
+    if (row.provider !== "microsoft_graph" || row.direction !== "inbound") return false;
+    if (!textCitesRequestNumber(requestNumber, row.subject, row.body_text)) return false;
+    const parent = trustedOutboundParents.get(normaliseInternetMessageId(row.in_reply_to) ?? "");
+    if (!parent) return false;
+    const conversation = row.conversation_id?.trim();
+    return Boolean(conversation && conversation === parent.conversation_id?.trim());
+  });
+}
 
 function sameRfcMessageId(a: string | null | undefined, b: string | null | undefined): boolean {
   const left = (a || "").replace(/[<>\s]/g, "").toLowerCase();
@@ -276,6 +337,11 @@ function sameRfcMessageId(a: string | null | undefined, b: string | null | undef
   return Boolean(left && right && left === right);
 }
 
+/**
+ * Locate the bubble a mail row's files belong to. Identity only: row id, or the
+ * RFC Message-ID. A body/timestamp lookalike is never enough — guessing here
+ * renders one message's attachments under another message.
+ */
 function findMailThreadItemIndex(
   thread: FormInboxThreadItem[],
   row: WebsiteRequestMailRow,
@@ -288,20 +354,6 @@ function findMailThreadItemIndex(
   }
   if (index < 0 && row.internet_message_id) {
     index = thread.findIndex((item) => sameRfcMessageId(item.messageId, row.internet_message_id));
-  }
-  if (index < 0 && row.direction === "outbound") {
-    index = thread.findIndex(
-      (item) =>
-        item.direction === "admin" &&
-        outboundMailDuplicatesStaffReply(row, [
-          {
-            resendId: item.messageId ?? undefined,
-            body: item.textBody,
-            sentAt: item.date,
-            toEmail: item.to,
-          },
-        ]),
-    );
   }
   return index;
 }
@@ -361,9 +413,7 @@ export async function hydrateWebsiteRequestThreadAttachments(
     };
 
     try {
-      const { updateWebsiteRequestMailMessageAttachments } = await import(
-        "@mccoy/database/server"
-      );
+      const { updateWebsiteRequestMailMessageAttachments } = await import("@mccoy/database/server");
       await updateWebsiteRequestMailMessageAttachments(
         row.id,
         inboxAttachmentsToStored(attachments),
@@ -383,14 +433,18 @@ export async function getWebsiteRequestFormInboxMessage(
   if (decoded.provider !== "request" && decoded.provider !== "e2e") return null;
   const { requestId } = splitWebsiteRequestInboxTarget(decoded.requestId);
   const request = await getWebsiteRequest(requestId);
-  if (!request || !isActiveRequestStatus(request.status)) return null;
+  if (!request || !isVisibleRequestStatus(request.status)) return null;
 
   // First paint includes stored + Graph-listed reply files. Conversation sync
   // still runs in getWebsiteRequestFormInboxThread for newly arrived mail.
   let mailMessages: WebsiteRequestMailRow[] = [];
   try {
     const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
-    mailMessages = await listWebsiteRequestMailMessages(requestId);
+    mailMessages = mailRowsForRequest(
+      await listWebsiteRequestMailMessages(requestId),
+      request.submitterEmail,
+      request.number,
+    );
   } catch {
     mailMessages = [];
   }
@@ -415,9 +469,7 @@ export async function getWebsiteRequestFormInboxMessage(
   return withActivePublishedScopeCleared(message);
 }
 
-export async function getWebsiteRequestFormInboxThread(
-  id: string,
-): Promise<FormInboxThreadItem[]> {
+export async function getWebsiteRequestFormInboxThread(id: string): Promise<FormInboxThreadItem[]> {
   const decoded = decodeInboxMessageId(id);
   if (decoded.provider !== "request" && decoded.provider !== "e2e") return [];
   const { requestId } = splitWebsiteRequestInboxTarget(decoded.requestId);
@@ -436,20 +488,7 @@ export async function getWebsiteRequestFormInboxThread(
   const message = await getWebsiteRequestFormInboxMessage(
     encodeRequestMessageId(requestId, decoded.mailbox),
   );
-  const thread = message?.thread ?? [];
-  try {
-    const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
-    const { getGraphMailConfig } = await import("./graph-config");
-    const rows = await listWebsiteRequestMailMessages(requestId);
-    const mailbox = (getGraphMailConfig()?.mailbox || "info@mccoy.nl").trim();
-    return hydrateWebsiteRequestThreadAttachments(thread, rows, mailbox);
-  } catch (error) {
-    console.error("[website-request-inbox] reply attachment hydrate failed", {
-      requestId,
-      message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
-    });
-    return thread;
-  }
+  return message?.thread ?? [];
 }
 
 export async function getWebsiteRequestFormInboxAttachment(
@@ -461,7 +500,7 @@ export async function getWebsiteRequestFormInboxAttachment(
   const { requestId, mailRowId } = splitWebsiteRequestInboxTarget(decoded.requestId);
 
   const request = await getWebsiteRequest(requestId);
-  if (!request || !isActiveRequestStatus(request.status)) return null;
+  if (!request || !isVisibleRequestStatus(request.status)) return null;
 
   const wanted = filename.trim();
   if (!wanted) return null;
@@ -488,10 +527,10 @@ export async function getWebsiteRequestFormInboxAttachment(
     const access = isReplyTarget
       ? null
       : await createStoredWebsiteRequestAttachmentAccess({
-      requestId: request.id,
-      filename: attachmentMeta.filename,
-      storagePath: matched?.storagePath,
-    });
+          requestId: request.id,
+          filename: attachmentMeta.filename,
+          storagePath: matched?.storagePath,
+        });
     if (access) {
       return {
         filename: attachmentMeta.filename,
@@ -508,10 +547,10 @@ export async function getWebsiteRequestFormInboxAttachment(
     const stored = isReplyTarget
       ? null
       : await getStoredWebsiteRequestAttachment(
-      request.id,
-      attachmentMeta.filename,
-      matched?.storagePath,
-    );
+          request.id,
+          attachmentMeta.filename,
+          matched?.storagePath,
+        );
     if (stored?.contentBase64) {
       return {
         filename: attachmentMeta.filename,
@@ -527,15 +566,17 @@ export async function getWebsiteRequestFormInboxAttachment(
     if (!config) return null;
 
     const { listWebsiteRequestMailMessages } = await import("@mccoy/database/server");
-    const mailRows = await listWebsiteRequestMailMessages(request.id);
+    const mailRows = mailRowsForRequest(
+      await listWebsiteRequestMailMessages(request.id),
+      request.submitterEmail,
+      request.number,
+    );
     const formRoot =
       mailRows.find((row) => row.provider === "website_form" && row.graph_message_id?.trim()) ??
       mailRows.find((row) => Boolean(row.graph_message_id?.trim()));
 
-    const {
-      getGraphFormInboxAttachment,
-      findGraphFormNotificationByRequestNumber,
-    } = await import("./graph-mail");
+    const { getGraphFormInboxAttachment, findGraphFormNotificationByRequestNumber } =
+      await import("./graph-mail");
 
     const downloadGraphFile = async (
       graphMessageId: string,
@@ -609,18 +650,10 @@ export async function getWebsiteRequestFormInboxAttachment(
       if (formHit) return formHit;
     }
 
-    for (const row of mailRows) {
-      if (row.provider === "website_form") continue;
-      const replyGraphId = row.graph_message_id?.trim();
-      if (!replyGraphId || replyGraphId === graphId) continue;
-      const hit = await downloadGraphFile(
-        replyGraphId,
-        (row.mailbox || config.mailbox).trim() || config.mailbox,
-        false,
-      );
-      if (hit) return hit;
-    }
-
+    // No cross-message fallback: a file is served only from the message it was
+    // requested for (`mailRowId`) or the form notification. Searching every other
+    // message in the thread for a matching filename served one message's
+    // attachment under a different message.
     return null;
   } catch (error) {
     if (error instanceof FormInboxError || error instanceof FormInboxConfigError) {
@@ -634,7 +667,7 @@ export async function getWebsiteRequestFormInboxAttachment(
   }
 }
 
-/** Soft-delete: close the website request so it leaves Aanvragen. */
+/** Recoverable soft-delete: retain the row for audit, but hide it from Aanvragen. */
 export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<void> {
   const decoded = decodeInboxMessageId(id);
   if (decoded.provider !== "request" && decoded.provider !== "e2e") {
@@ -645,10 +678,12 @@ export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<
     throw new FormInboxError("Bericht niet gevonden.");
   }
 
-  const updated = await setWebsiteRequestStatus(request.id, "closed");
+  const updated = await setWebsiteRequestStatus(request.id, "deleted");
   if (!updated) {
-    throw new FormInboxError("Aanvraag kon niet worden gesloten.");
+    throw new FormInboxError("Aanvraag kon niet worden verwijderd.");
   }
+  const { clearInboxListSnapshotCache } = await import("./form-inbox-list-cache");
+  clearInboxListSnapshotCache();
 
   // Best-effort: remove known Graph copies so Vernieuwen cannot resurrect a
   // graph: row for the same WR- number.
@@ -662,7 +697,11 @@ export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<
     const config = getGraphMailConfig();
     if (!config) return;
 
-    const mailRows = await listWebsiteRequestMailMessages(request.id);
+    const mailRows = mailRowsForRequest(
+      await listWebsiteRequestMailMessages(request.id),
+      request.submitterEmail,
+      request.number,
+    );
     const seen = new Set<string>();
     for (const row of mailRows) {
       const graphId = row.graph_message_id?.trim();
@@ -679,7 +718,7 @@ export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<
       }
     }
   } catch (error) {
-    console.warn("[website-request-inbox] Graph cleanup after close failed", {
+    console.warn("[website-request-inbox] Graph cleanup after delete failed", {
       requestId: request.id,
       message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
     });
@@ -687,11 +726,11 @@ export async function deleteWebsiteRequestFormInboxMessage(id: string): Promise<
 }
 
 /**
- * Close the website request correlated with a Graph mailbox message so Aanvragen
- * list suppress hides the WR even if the mailbox move fails.
- * @returns true when an active request was closed
+ * Soft-delete the website request correlated with a Graph mailbox message so
+ * Aanvragen stays deleted even if the mailbox move fails.
+ * @returns true when a request was already deleted or is now deleted
  */
-export async function closeWebsiteRequestForGraphMessage(
+export async function deleteWebsiteRequestForGraphMessage(
   graphId: string,
   mailbox?: string,
 ): Promise<boolean> {
@@ -721,20 +760,24 @@ export async function closeWebsiteRequestForGraphMessage(
 
     const request = await getWebsiteRequest(requestId);
     if (!request) return false;
-    if (request.status === "closed" || request.status === "spam") return true;
+    if (request.status === "deleted" || request.status === "spam") return true;
 
-    const updated = await setWebsiteRequestStatus(requestId, "closed");
+    const updated = await setWebsiteRequestStatus(requestId, "deleted");
+    if (updated) {
+      const { clearInboxListSnapshotCache } = await import("./form-inbox-list-cache");
+      clearInboxListSnapshotCache();
+    }
     return Boolean(updated);
   } catch (error) {
-    console.warn("[website-request-inbox] close for Graph message failed", {
+    console.warn("[website-request-inbox] delete for Graph message failed", {
       message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
     });
     return false;
   }
 }
 
-/** Close an active website request by WR- number (IMAP / Graph subject match). */
-export async function closeWebsiteRequestByNumber(requestNumber: string): Promise<void> {
+/** Soft-delete a website request by WR- number (IMAP / Graph subject match). */
+export async function deleteWebsiteRequestByNumber(requestNumber: string): Promise<void> {
   const number = requestNumber.trim();
   if (!number) return;
   try {
@@ -743,10 +786,14 @@ export async function closeWebsiteRequestByNumber(requestNumber: string): Promis
     const requestId = await findWebsiteRequestIdByNumber(number);
     if (!requestId) return;
     const request = await getWebsiteRequest(requestId);
-    if (!request || request.status === "closed" || request.status === "spam") return;
-    await setWebsiteRequestStatus(requestId, "closed");
+    if (!request || request.status === "deleted" || request.status === "spam") return;
+    const updated = await setWebsiteRequestStatus(requestId, "deleted");
+    if (updated) {
+      const { clearInboxListSnapshotCache } = await import("./form-inbox-list-cache");
+      clearInboxListSnapshotCache();
+    }
   } catch (error) {
-    console.warn("[website-request-inbox] close by number failed", {
+    console.warn("[website-request-inbox] delete by number failed", {
       message: error instanceof Error ? error.message.slice(0, 160) : "unknown",
     });
   }

@@ -2,6 +2,7 @@
  * Pure Graph OData helpers for message list queries.
  * Kept separate so InefficientFilter ordering rules stay unit-tested.
  */
+import { normaliseInternetMessageId, textCitesRequestNumber } from "./inquiry-thread-correlation";
 
 /** Escape a single-quoted OData string literal. */
 export function escapeODataString(value: string): string {
@@ -28,10 +29,7 @@ export function buildConversationReceivedFilter(
 /**
  * Build $filter for Sent Items when also using `$orderby=sentDateTime …`.
  */
-export function buildConversationSentFilter(
-  conversationId: string,
-  sentSinceIso: string,
-): string {
+export function buildConversationSentFilter(conversationId: string, sentSinceIso: string): string {
   return (
     `sentDateTime ge ${sentSinceIso}` +
     ` and conversationId eq '${escapeODataString(conversationId)}'`
@@ -50,59 +48,82 @@ export function buildReceivedDateWindowFilter(fromIso: string, toIso?: string): 
 }
 
 /**
- * Decide whether a recent mailbox message belongs to an open Aanvraag during
- * detail sync. Conversation id is preferred; otherwise require reply-shaped
- * subject + (WR number or original subject overlap) + sender is submitter or
- * McCoy mailbox. Never matches on WR/subject alone from an unrelated sender.
+ * Targeted mailbox lookup for replies from one inquiry submitter.
+ *
+ * `receivedDateTime` leads so callers may add `$orderby=receivedDateTime desc`
+ * without triggering Graph's `InefficientFilter`. The nested `from` predicate
+ * is supported by the Microsoft Graph messages collection.
  */
-export function messageBelongsToWebsiteRequest(input: {
+export function buildSenderReceivedFilter(senderAddress: string, receivedSinceIso: string): string {
+  return (
+    `receivedDateTime ge ${receivedSinceIso}` +
+    ` and from/emailAddress/address eq '${escapeODataString(senderAddress.trim())}'`
+  );
+}
+
+/**
+ * Why a recent mailbox message provably belongs to one specific Aanvraag.
+ * Every variant is tied to a per-request unique value; there is deliberately no
+ * variant for "subject looks like this inquiry".
+ */
+export type WebsiteRequestMailEvidence = "conversation_id" | "known_message_id" | "request_number";
+
+/**
+ * Decide whether a recent mailbox message belongs to an open Aanvraag during
+ * detail sync. Returns the evidence used, or `null` when membership cannot be
+ * proven — callers must then leave the message alone.
+ *
+ * `website_requests.subject` is the shared form-kind subject ("Offerte
+ * meubelreiniging") for every request of that kind, so subject overlap can never
+ * be evidence: it matched other customers' threads and leaked their mail into
+ * unrelated inquiries. Only the per-request number, a known RFC Message-ID of
+ * this thread, or an already-correlated conversationId may match.
+ *
+ * Threading evidence is necessary but not sufficient — `requestSubmitterIsParticipant`
+ * is the second gate applied before anything is persisted.
+ */
+export function websiteRequestMailEvidence(input: {
   conversationId: string | null;
   knownConversationIds: ReadonlySet<string>;
+  /** Normalised RFC Message-IDs already correlated to this request. */
+  knownMessageIds: ReadonlySet<string>;
+  inReplyTo?: string | null;
+  references?: readonly string[];
   subject: string | null;
   bodyPreview: string | null;
   fromAddress: string | null;
   submitterEmail: string | null;
   mailbox: string;
   requestNumber: string;
-  /** Original inquiry subject without needing the WR suffix. */
-  requestSubject?: string | null;
   isReplyOrForward: boolean;
   isMcCoySender: boolean;
-}): boolean {
+}): WebsiteRequestMailEvidence | null {
   const conversationId = input.conversationId?.trim();
   if (conversationId && input.knownConversationIds.has(conversationId)) {
-    return true;
+    return "conversation_id";
   }
 
-  if (!input.isReplyOrForward) return false;
+  for (const candidate of [input.inReplyTo, ...(input.references ?? [])]) {
+    const normalised = normaliseInternetMessageId(candidate);
+    if (normalised && input.knownMessageIds.has(normalised)) {
+      return "known_message_id";
+    }
+  }
+
+  if (!input.isReplyOrForward) return null;
 
   const from = (input.fromAddress || "").trim().toLowerCase();
-  if (!from) return false;
+  if (!from) return null;
 
   const submitter = (input.submitterEmail || "").trim().toLowerCase();
   const mailbox = input.mailbox.trim().toLowerCase();
   const senderOk =
-    (submitter && from === submitter) ||
-    (mailbox && from === mailbox) ||
-    input.isMcCoySender;
-  if (!senderOk) return false;
+    (submitter && from === submitter) || (mailbox && from === mailbox) || input.isMcCoySender;
+  if (!senderOk) return null;
 
-  const wr =
-    (input.subject || "").match(/\b(WR-[A-Z0-9-]+)\b/i)?.[1] ??
-    (input.bodyPreview || "").match(/\b(WR-[A-Z0-9-]+)\b/i)?.[1];
-  if (wr && wr.toUpperCase() === input.requestNumber.trim().toUpperCase()) {
-    return true;
+  if (textCitesRequestNumber(input.requestNumber, input.subject, input.bodyPreview)) {
+    return "request_number";
   }
 
-  const requestSubject = (input.requestSubject || "")
-    .replace(/\s*\(WR-[A-Z0-9-]+\)\s*$/i, "")
-    .trim()
-    .toLowerCase();
-  if (requestSubject.length >= 10) {
-    const hay = `${input.subject || ""} ${input.bodyPreview || ""}`.toLowerCase();
-    const needle = requestSubject.slice(0, 48);
-    if (hay.includes(needle)) return true;
-  }
-
-  return false;
+  return null;
 }

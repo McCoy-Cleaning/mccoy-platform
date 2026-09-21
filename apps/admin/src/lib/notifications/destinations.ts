@@ -1,12 +1,13 @@
 /**
  * Internal admin routes that a notification is allowed to deep-link to.
- * Mirrors `ADMIN_NAV` in `@/routes/_app` plus `/settings`, kept as a
+ * Mirrors `ADMIN_NAV` in `@/lib/admin-nav` (including `/settings`), kept as a
  * separate literal list to avoid a route ↔ notification module import cycle.
  */
 const ADMIN_DESTINATION_ALLOWLIST = [
   "/",
   "/website",
   "/inquiries",
+  "/customers",
   "/users",
   "/products",
   "/settings",

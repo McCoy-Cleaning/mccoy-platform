@@ -1,12 +1,12 @@
 /**
- * Helpers for Aanvragen delete / list suppress of closed website requests.
+ * Helpers for Aanvragen delete / list suppression of non-active website requests.
  */
 import { createSupabaseServiceClient, hasSupabaseServiceConfig } from "../supabase";
 import { jsonWebsiteRequestsStore } from "../json-store";
 
 /**
- * WR- numbers for closed/spam requests. Used so mailbox copies cannot reappear
- * as graph:/imap: list rows after Aanvragen delete.
+ * WR- numbers that must not appear as raw graph:/imap: rows in the active list.
+ * Closed requests live in the resolved view; deleted/spam requests stay hidden.
  */
 export async function listHiddenWebsiteRequestNumbers(): Promise<string[]> {
   if (hasSupabaseServiceConfig()) {
@@ -14,7 +14,7 @@ export async function listHiddenWebsiteRequestNumbers(): Promise<string[]> {
     const { data, error } = await supabase
       .from("website_requests")
       .select("number")
-      .in("status", ["closed", "spam"])
+      .in("status", ["closed", "deleted", "spam"])
       .limit(2000);
 
     if (error) {
@@ -34,7 +34,7 @@ export async function listHiddenWebsiteRequestNumbers(): Promise<string[]> {
 
   const rows = await jsonWebsiteRequestsStore.listWebsiteRequests({ status: "all" });
   return rows
-    .filter((r) => r.status === "closed" || r.status === "spam")
+    .filter((r) => r.status === "closed" || r.status === "deleted" || r.status === "spam")
     .map((r) => r.number.trim().toUpperCase())
     .filter(Boolean);
 }
@@ -87,9 +87,7 @@ export async function findWebsiteRequestIdByGraphMessageId(
 /**
  * Resolve website_requests.id by human-readable WR- number (exact match).
  */
-export async function findWebsiteRequestIdByNumber(
-  requestNumber: string,
-): Promise<string | null> {
+export async function findWebsiteRequestIdByNumber(requestNumber: string): Promise<string | null> {
   const number = requestNumber.trim().toUpperCase();
   if (!number) return null;
 

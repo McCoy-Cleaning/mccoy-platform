@@ -12,10 +12,8 @@ import {
   Minus,
 } from "lucide-react";
 
-import {
-  getAdminOverviewStats,
-  type AdminOverviewStats,
-} from "@/lib/api/admin-overview.functions";
+import { ADMIN_OVERVIEW_MODULES } from "@/lib/admin-overview-modules";
+import { getAdminOverviewStats, type AdminOverviewStats } from "@/lib/api/admin-overview.functions";
 import { websiteVisitorsUnavailableCopy } from "@/lib/admin-overview-visitors";
 import { relativeWhen } from "@/features/inquiries/lib/format";
 
@@ -33,40 +31,7 @@ type StatCard = {
   tone: string;
 };
 
-const SECTIONS = [
-  {
-    to: "/website",
-    label: "Website aanpassen",
-    desc: "Teksten, foto's en pagina's van uw website wijzigen — meteen zichtbaar in een voorbeeld.",
-    icon: Globe2,
-    accent: "#1e88e5",
-    cta: "Website openen",
-  },
-  {
-    to: "/inquiries",
-    label: "Aanvragen bekijken",
-    desc: "Berichten van klanten: offertes, glasbewassing, meubelreiniging en sollicitaties.",
-    icon: Inbox,
-    accent: "#22d3ee",
-    cta: "Aanvragen openen",
-  },
-  {
-    to: "/users",
-    label: "Gebruikers beheren",
-    desc: "Wie mag er in het beheer? Teamleden toevoegen en rechten instellen.",
-    icon: Users,
-    accent: "#a78bfa",
-    cta: "Gebruikers openen",
-  },
-  {
-    to: "/products",
-    label: "Producten beheren",
-    desc: "Uw catalogus: dispensers, geuren en abonnementen bekijken en aanpassen.",
-    icon: Package,
-    accent: "#f59e0b",
-    cta: "Producten openen",
-  },
-] as const;
+const SECTIONS = ADMIN_OVERVIEW_MODULES;
 
 function todayLabel(): string {
   try {
@@ -151,8 +116,7 @@ function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
     },
     {
       label: "Actieve gebruikers",
-      value:
-        stats === null ? "—" : formatNlNumber(stats.activeStaffCount),
+      value: stats === null ? "—" : formatNlNumber(stats.activeStaffCount),
       delta: "team",
       deltaTone: "neutral",
       icon: Users,
@@ -169,13 +133,7 @@ function buildStatCards(stats: AdminOverviewStats | null): StatCard[] {
   ];
 }
 
-function DeltaBadge({
-  delta,
-  tone,
-}: {
-  delta: string;
-  tone: StatCard["deltaTone"];
-}) {
+function DeltaBadge({ delta, tone }: { delta: string; tone: StatCard["deltaTone"] }) {
   if (tone === "pending" || tone === "neutral") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-white/55">
@@ -241,8 +199,8 @@ function AdminOverview() {
             Welkom terug
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/65 sm:text-lg">
-            Dit is het beheer van uw website. Kies hieronder wat u wilt doen — alles is met één
-            klik bereikbaar.
+            Kies hieronder een onderdeel om verder te gaan. Website en aanvragen blijven in het
+            menu.
           </p>
         </div>
       </section>
@@ -259,11 +217,13 @@ function AdminOverview() {
               <Link
                 key={sec.to}
                 to={sec.to}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07] hover:shadow-[0_24px_60px_-24px_rgba(0,0,0,0.7)] sm:p-7"
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07] hover:shadow-[0_24px_60px_-24px_rgba(0,0,0,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e88e5]/50 sm:p-7"
               >
                 <div
                   className="absolute inset-x-0 top-0 h-[3px] scale-x-0 transition-transform duration-500 group-hover:scale-x-100"
-                  style={{ backgroundImage: `linear-gradient(90deg, transparent, ${sec.accent}, transparent)` }}
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, transparent, ${sec.accent}, transparent)`,
+                  }}
                 />
                 <div className="flex items-center gap-4">
                   <div
@@ -301,9 +261,13 @@ function AdminOverview() {
                 key={s.label}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.06]"
               >
-                <div className={`absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${s.tone} opacity-20 blur-2xl transition-opacity group-hover:opacity-40`} />
+                <div
+                  className={`absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${s.tone} opacity-20 blur-2xl transition-opacity group-hover:opacity-40`}
+                />
                 <div className="relative flex items-center justify-between">
-                  <div className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${s.tone} shadow-lg`}>
+                  <div
+                    className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${s.tone} shadow-lg`}
+                  >
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <DeltaBadge delta={s.delta} tone={s.deltaTone} />
@@ -322,7 +286,10 @@ function AdminOverview() {
       </section>
 
       {/* Activity */}
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-7" aria-labelledby="admin-activity-heading">
+      <section
+        className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-7"
+        aria-labelledby="admin-activity-heading"
+      >
         <div className="mb-5 flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1e88e5]/15 text-[#2f9ff0]">
             <Activity className="h-5 w-5" />
@@ -345,7 +312,7 @@ function AdminOverview() {
             Nog geen aanvragen.{" "}
             <Link
               to="/inquiries"
-              search={{ kind: "all", scope: "all", q: "" }}
+              search={{ kind: "all", scope: "all", q: "", view: "active" }}
               className="font-semibold text-[#2f9ff0] hover:underline"
             >
               Aanvragen openen
@@ -357,7 +324,7 @@ function AdminOverview() {
               <li key={item.id}>
                 <Link
                   to="/inquiries"
-                  search={{ kind: "all", scope: "all", q: "", id: item.id }}
+                  search={{ kind: "all", scope: "all", q: "", view: "active", id: item.id }}
                   className="flex items-center justify-between gap-4 py-4 transition hover:bg-white/[0.03]"
                 >
                   <div className="flex min-w-0 items-center gap-3">

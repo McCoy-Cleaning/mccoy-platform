@@ -69,6 +69,28 @@ describe("inquiry thread dedupe", () => {
     );
   });
 
+  it("strips Microsoft's English first-contact safety banner from customer replies", () => {
+    const body =
+      "You don't often get email from maria@codexcell.com. Learn why this is important\r\n\r\namazing";
+
+    expect(normaliseThreadMessageBody(body, "inbound")).toBe("amazing");
+    expect(normaliseThreadMessageBody(body, "customer")).toBe("amazing");
+  });
+
+  it("strips Microsoft's Dutch first-contact safety banner from customer replies", () => {
+    const body =
+      "U ontvangt niet vaak e-mail van maria@codexcell.com. Meer informatie over waarom dit belangrijk is.\n\nPrima, dank u.";
+
+    expect(normaliseThreadMessageBody(body, "inbound")).toBe("Prima, dank u.");
+  });
+
+  it("keeps safety-banner-like text when it is not the leading Microsoft banner", () => {
+    const body =
+      "My mail client says:\nYou don't often get email from maria@codexcell.com. Learn why this is important\nPlease investigate.";
+
+    expect(normaliseThreadMessageBody(body, "inbound")).toBe(body);
+  });
+
   it("strips iPhone On…wrote: quotes including BOM / entity prefixes", () => {
     expect(stripQuotedReplyBody(IPHONE_REPLY_WITH_QUOTE)).toBe(
       "I'm the one who contacted you\nSent from my iPhone",

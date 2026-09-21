@@ -23,21 +23,29 @@ export async function notifyApplicantReplyAppended(options: {
   try {
     const request = await getWebsiteRequest(options.requestId);
     if (!request) return;
+    if (request.status === "deleted" || request.status === "spam") return;
 
     const name =
       (typeof request.submitterName === "string" && request.submitterName.trim()) ||
       options.senderAddress?.split("@")[0]?.trim() ||
       "Aanvrager";
     const inboxMessageId = encodeRequestMessageId(options.requestId, REQUEST_MAILBOX);
+    const reopenedFromResolved = request.status === "closed";
 
     // Ensure list unread (status open) even if DB upsert still maps inbound → replied.
-    if (request.status === "replied" || request.status === "new") {
+    // Deleted/spam requests are intentionally not reopened; their mail remains
+    // in Outlook and is excluded from the Aanvragen request pipeline.
+    if (request.status === "replied" || request.status === "new" || request.status === "closed") {
       await setWebsiteRequestStatus(options.requestId, "open");
     }
+    const { clearInboxListSnapshotCache } = await import("./form-inbox-list-cache");
+    clearInboxListSnapshotCache();
 
     await enqueueNotificationOutbox({
       type: "website_request.applicant_replied",
-      title: `${name.slice(0, 80)} heeft gereageerd op je e-mail.`,
+      title: reopenedFromResolved
+        ? `${name.slice(0, 80)} heeft gereageerd op een afgeronde aanvraag.`
+        : `${name.slice(0, 80)} heeft gereageerd op je e-mail.`,
       destinationPath: "/inquiries",
       entityType: "website_request",
       entityId: options.requestId,
@@ -46,6 +54,7 @@ export async function notifyApplicantReplyAppended(options: {
         requestNumber: request.number,
         submitterName: name.slice(0, 120),
         inboxMessageId,
+        reopenedFromResolved,
       },
       dedupeKey: `website_request.applicant_replied:${options.mailMessageId}`,
     });

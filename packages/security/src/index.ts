@@ -1,6 +1,7 @@
 export {
   findMonorepoRoot,
   readServerEnv,
+  isProductionRuntime,
   getDataDir,
 } from "./env";
 
@@ -119,6 +120,7 @@ export {
   CUSTOMER_FORGOT_PASSWORD_RATE,
   CUSTOMER_ACTIVATION_RATE,
   CUSTOMER_INVITE_RATE,
+  CUSTOMER_PRODUCT_SEARCH_RATE,
 } from "./customer-session";
 export {
   assertSafeWebsiteFormUpload,

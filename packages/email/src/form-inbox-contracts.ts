@@ -1,4 +1,4 @@
-import type { FormKind, InquiryStatus } from "@mccoy/domain";
+import type { FormKind, InquiryStatus, RequestStatus } from "@mccoy/domain";
 
 import type { ParsedFormField } from "./parse-form-fields";
 
@@ -29,6 +29,10 @@ export type FormInboxMessageSummary = {
   date: string;
   snippet: string;
   unread: boolean;
+  /** Persisted request lifecycle; absent for mailbox-only messages. */
+  lifecycleStatus?: RequestStatus;
+  /** Activity sort key. `date` remains the immutable first-received timestamp. */
+  activityAt?: string;
   /** Visitor name from subject or parsed form fields when available. */
   submitterName: string | null;
   submitterEmail: string | null;
@@ -45,6 +49,8 @@ export type FormInboxMessageSummary = {
   /** Display label when known from headers/body/request. */
   scopeLabel: string | null;
 };
+
+export type InboxLifecycleView = "active" | "resolved";
 
 export type FormInboxThreadItem = {
   id: string;

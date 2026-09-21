@@ -516,6 +516,8 @@ describe("getWebsiteRequestFormInboxAttachment", () => {
         provider: "microsoft_graph",
         mailbox: "info@mccoy.nl",
         graph_message_id: "g-in",
+        sender_address: "oana@example.com",
+        recipient_addresses: ["info@mccoy.nl"],
       },
     ]);
     getGraphFormInboxAttachment.mockResolvedValue({

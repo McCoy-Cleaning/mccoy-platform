@@ -32,6 +32,23 @@ export {
 } from "./mail-messages";
 
 export {
+  recordUnmatchedInboundMail,
+  resolveUnmatchedInboundMail,
+  listUnmatchedInboundMail,
+  countOpenUnmatchedInboundMail,
+  assertUnmatchedMailStaffAccess,
+  type UnmatchedInboundMailInput,
+  type RecordUnmatchedInboundMailResult,
+  type UnmatchedInboundMailItem,
+  type UnmatchedInboundMailCandidate,
+  type UnmatchedInboundMailPage,
+  type UnmatchedInboundMailReason,
+  type UnmatchedInboundMailStatusFilter,
+  type ListUnmatchedInboundMailQuery,
+  type UnmatchedMailActorKind,
+} from "./unmatched-mail";
+
+export {
   listHiddenWebsiteRequestNumbers,
   findWebsiteRequestIdByGraphMessageId,
   findWebsiteRequestIdByNumber,
@@ -78,8 +95,7 @@ export const countWebsiteRequests: WebsiteRequestsStore["countWebsiteRequests"] 
   getWebsiteRequestsStore().countWebsiteRequests();
 
 export const countWebsiteRequestsCreatedBetween: WebsiteRequestsStore["countWebsiteRequestsCreatedBetween"] =
-  (fromIso, toIso) =>
-    getWebsiteRequestsStore().countWebsiteRequestsCreatedBetween(fromIso, toIso);
+  (fromIso, toIso) => getWebsiteRequestsStore().countWebsiteRequestsCreatedBetween(fromIso, toIso);
 
 export const clearOrphanWebsiteRequestScopes: WebsiteRequestsStore["clearOrphanWebsiteRequestScopes"] =
   (activeScopeKeys) => getWebsiteRequestsStore().clearOrphanWebsiteRequestScopes(activeScopeKeys);

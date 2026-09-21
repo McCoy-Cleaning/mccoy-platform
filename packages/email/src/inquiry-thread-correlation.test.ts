@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   correlateInboundGraphMessage,
   type KnownInquiryMailIdentity,
+  verifiedReplyParentBelongsToWebsiteRequest,
 } from "./inquiry-thread-correlation";
 
 const known: KnownInquiryMailIdentity = {
   inquiryId: "req-1",
   requestNumber: "WR-2026-00001",
   mailbox: "info@mccoy.nl",
+  submitterEmail: "anna@example.com",
   internetMessageIds: ["<form-root@mccoy.nl>", "<admin-reply@mccoy.nl>"],
   graphMessageIds: ["graph-root-1", "graph-admin-1"],
   conversationIds: ["conv-shared"],
@@ -119,6 +121,7 @@ describe("correlateInboundGraphMessage", () => {
       inquiryId: "req-2",
       requestNumber: "WR-2026-00002",
       mailbox: "info@mccoy.nl",
+      submitterEmail: "bob@example.com",
       internetMessageIds: ["<form-root-2@mccoy.nl>"],
       graphMessageIds: ["graph-root-2"],
       conversationIds: ["conv-2"],
@@ -139,6 +142,66 @@ describe("correlateInboundGraphMessage", () => {
     expect(result.status).toBe("unmatched");
   });
 
+  it("does not attach mail whose reply token belongs to a different request", () => {
+    const other: KnownInquiryMailIdentity = {
+      inquiryId: "req-2",
+      requestNumber: "WR-2026-00002",
+      mailbox: "info@mccoy.nl",
+      submitterEmail: "carla@example.com",
+      internetMessageIds: ["<form-root-2@mccoy.nl>", "<admin-reply-2@mccoy.nl>"],
+      graphMessageIds: ["graph-root-2"],
+      conversationIds: ["conv-2"],
+    };
+    // Reply to req-2's staff mail while quoting req-1's WR number in the subject.
+    const result = correlateInboundGraphMessage(
+      {
+        mailbox: "info@mccoy.nl",
+        graphMessageId: "graph-c",
+        internetMessageId: "<c@example.com>",
+        conversationId: "conv-2",
+        inReplyTo: "<admin-reply-2@mccoy.nl>",
+        references: [],
+        subject: "Re: Algemene aanvraag (WR-2026-00001)",
+        fromAddress: "carla@example.com",
+      },
+      [known, other],
+    );
+    expect(result).toEqual({
+      status: "appended",
+      inquiryId: "req-2",
+      match: "in_reply_to",
+    });
+  });
+
+  it("reports ambiguous instead of attaching when a conversation maps to two inquiries", () => {
+    const duplicate: KnownInquiryMailIdentity = {
+      inquiryId: "req-2",
+      requestNumber: "WR-2026-00002",
+      mailbox: "info@mccoy.nl",
+      submitterEmail: "dirk@example.com",
+      internetMessageIds: ["<form-root-2@mccoy.nl>"],
+      graphMessageIds: ["graph-root-2"],
+      conversationIds: ["conv-shared"],
+    };
+    const result = correlateInboundGraphMessage(
+      {
+        mailbox: "info@mccoy.nl",
+        graphMessageId: "graph-d",
+        internetMessageId: "<d@example.com>",
+        conversationId: "conv-shared",
+        inReplyTo: null,
+        references: [],
+        subject: "Re: iets",
+        fromAddress: "dirk@example.com",
+      },
+      [known, duplicate],
+    );
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.inquiryIds).toEqual(["req-1", "req-2"]);
+    }
+  });
+
   it("does not cross mailbox boundaries", () => {
     const result = correlateInboundGraphMessage(
       {
@@ -154,5 +217,46 @@ describe("correlateInboundGraphMessage", () => {
       [known],
     );
     expect(result.status).toBe("unmatched");
+  });
+});
+
+describe("verifiedReplyParentBelongsToWebsiteRequest", () => {
+  const proof = {
+    mailbox: "info@mccoy.nl",
+    submitterEmail: "form-address@example.com",
+    requestNumber: "WR-2026-00082",
+    inReplyTo: "<outbound@mccoy.nl>",
+    reply: {
+      subject: "Re: Aanvraag (WR-2026-00082)",
+      bodyPreview: "Reactie via mijn andere adres",
+      conversationId: "conversation-82",
+      fromAddress: "alias@example.net",
+      toAddresses: ["info@mccoy.nl"],
+    },
+    parent: {
+      subject: "Aanvraag (WR-2026-00082)",
+      bodyPreview: "Ons antwoord voor WR-2026-00082",
+      internetMessageId: "<outbound@mccoy.nl>",
+      conversationId: "conversation-82",
+      fromAddress: "info@mccoy.nl",
+      toAddresses: ["form-address@example.com"],
+    },
+  };
+
+  it("accepts an alternate sender only through the exact outbound parent", () => {
+    expect(verifiedReplyParentBelongsToWebsiteRequest(proof)).toBe(true);
+  });
+
+  it.each([
+    ["another request number", { requestNumber: "WR-2026-00081" }],
+    ["another conversation", { reply: { ...proof.reply, conversationId: "foreign" } }],
+    [
+      "another parent recipient",
+      { parent: { ...proof.parent, toAddresses: ["other@example.com"] } },
+    ],
+    ["another RFC parent", { inReplyTo: "<foreign@mccoy.nl>" }],
+    ["mail not sent by McCoy", { parent: { ...proof.parent, fromAddress: "other@example.com" } }],
+  ])("rejects %s", (_label, override) => {
+    expect(verifiedReplyParentBelongsToWebsiteRequest({ ...proof, ...override })).toBe(false);
   });
 });
